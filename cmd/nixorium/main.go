@@ -67,6 +67,8 @@ type options struct {
 	// collectInto is the folder collect plan/apply saves desktops into
 	// instead of ~/Nixorium/Collected.
 	collectInto string
+	// schedule holds the times and weekdays of the schedule command.
+	schedule scheduleArguments
 }
 
 func main() {
@@ -112,6 +114,11 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 	// deployment is readable (the administrator).
 	if options.command == "wake" {
 		return runWakeCommand(ctx, options, stdout, stderr)
+	}
+	// The schedule is read and set through the classroom service; the
+	// controller's timer runs it as the service user.
+	if options.command == "schedule" {
+		return runScheduleCommand(ctx, options, stdout, stderr)
 	}
 	// The classroom view needs only the classroom service: the teacher
 	// cannot read the deployment repository.
@@ -837,6 +844,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if len(arguments) > 0 && arguments[0] == "collect" {
 		return parseCollectArguments(arguments[1:])
+	}
+	if len(arguments) > 0 && arguments[0] == "schedule" {
+		return parseScheduleArguments(arguments[1:])
 	}
 	result := options{}
 	for index := 0; index < len(arguments); index++ {
@@ -1573,7 +1583,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|wake|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|wake|schedule show|schedule set|schedule clear|schedule run|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       home-files import plan --source <local-file-or-folder> --destination <relative-home-path> [--replace] [--json] captures materials for review")
 	fmt.Fprintln(writer, "       home-files plan --file <draft-or-profile.json> [--json] reviews shared student initial files")
@@ -1608,6 +1618,9 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       collect apply --on <clients|@lab> [--into <folder>] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       classroom-view opens the classroom view page (teacher and administrator)")
 	fmt.Fprintln(writer, "       wake --on <clients|@lab> [--json] sends Wake-on-LAN packets to the selected computers that are off (teacher and administrator)")
+	fmt.Fprintln(writer, "       schedule show|clear [--json] shows or clears the daily switch-on and shut-down of the computers (teacher and administrator)")
+	fmt.Fprintln(writer, "       schedule set [--on <HH:MM>] [--off <HH:MM>] --days <mon-fri|all|mon,wed,fri> [--json] sets it, replacing the old one")
+	fmt.Fprintln(writer, "       schedule run [--repo <deployment>] [--json] does what is due this minute (started by nixorium-classroom-schedule.timer)")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
 	fmt.Fprintln(writer, "       backup plan --remote <ssh-url> [--branch <branch>] [--repo <deployment>]")
 	fmt.Fprintln(writer, "       backup publish --remote <ssh-url> [--branch <branch>] --expect <token> --yes [--passphrase-file <file>]")

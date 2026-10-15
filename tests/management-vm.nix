@@ -841,6 +841,18 @@ in
     ])
     controller.succeed("su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(classroom_wake)))
     controller.succeed("test \"$(stat -c '%U:%a' /var/lib/nixorium/classroom)\" = admin:700")
+    # Scheduled switch-on and shut-down: the timer ticks every minute; the
+    # teacher sets the schedule through the classroom service (the command
+    # uses its socket) and it lands in the service's private state directory;
+    # the service starts under its sandbox and stays quiet while nothing is
+    # due (03:33 on a Sunday is not now, with all but negligible odds).
+    controller.succeed("systemctl is-active nixorium-classroom-schedule.timer; systemctl cat nixorium-classroom-schedule.timer | grep -Fx 'OnCalendar=minutely'")
+    controller.succeed("su - teacher -c 'nixorium schedule show' | grep -Fx 'No schedule.'")
+    controller.succeed("su - teacher -c 'nixorium schedule set --on 03:33 --off 03:34 --days sun' | grep -F 'Schedule saved. Switch on at 03:33 and shut down at 03:34, Sunday.'")
+    controller.succeed("test \"$(stat -c '%U:%a' /var/lib/nixorium/classroom/schedule.json)\" = admin:600")
+    controller.succeed("su - teacher -c 'nixorium schedule show --json' | jq -e '.schedule.on == \"03:33\" and .schedule.off == \"03:34\" and .schedule.days == [\"sun\"]'")
+    controller.succeed("systemctl start nixorium-classroom-schedule.service; test \"$(systemctl show -p Result --value nixorium-classroom-schedule.service)\" = success")
+    controller.succeed("su - teacher -c 'nixorium schedule clear' | grep -Fx 'The schedule was cleared.'; test ! -e /var/lib/nixorium/classroom/schedule.json; su - teacher -c 'nixorium schedule show' | grep -Fx 'No schedule.'")
     controller.succeed("systemctl start nixorium-worker-sandbox-check.service")
     controller.succeed("journalctl -u nixorium-worker-sandbox-check.service --no-pager | grep -F -- '--- PASS: TestRemoteWorkerFilesystemSandbox'")
     controller.succeed("systemctl start nixorium-workspace-save-check.service")

@@ -1110,5 +1110,60 @@ in
         RestartSec = "2s";
       };
     };
+
+    # Scheduled switch-on and shut-down of the student computers. The
+    # schedule is set from the classroom view or `nixorium schedule set` and
+    # kept in the classroom service's state directory, outside Git and the
+    # backup. Every minute the timer starts `nixorium schedule run` as the
+    # service user; it acts only in a minute the schedule names (Wake-on-LAN,
+    # or the reviewed shut-down that leaves computers in use on) and runs no
+    # minute twice. Without a schedule file the service does not start.
+    systemd.services.nixorium-classroom-schedule = {
+      description = "Switch the student computers on and off at the scheduled times";
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      unitConfig.ConditionPathExists = "/var/lib/nixorium/classroom/schedule.json";
+      path = [ pkgs.git pkgs.nix pkgs.openssh pkgs.systemd pkgs.util-linux ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${nixoriumPackage}/bin/nixorium schedule run --repo ${lib.escapeShellArg cfg.deploymentPath}";
+        User = "admin";
+        Group = "users";
+        SupplementaryGroups = [ "nixorium-operations" ];
+        UMask = "0077";
+        StateDirectory = "nixorium/classroom";
+        StateDirectoryMode = "0700";
+        Environment = [
+          "XDG_CACHE_HOME=/var/cache/nixorium/admin"
+          "XDG_STATE_HOME=/home/admin/.local/state"
+        ];
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ProtectHome = "read-only";
+        ReadOnlyPaths = [ cfg.deploymentPath "/etc/nixorium/deployment-path" "/home/admin/.ssh/id_ed25519" "/home/admin/.ssh/id_ed25519.pub" ];
+        ReadWritePaths = [
+          "/var/lib/nixorium/coordination"
+          "/home/admin/.ssh/nixorium-known-hosts"
+          "-/home/admin/.local/state/nixorium/operations"
+          "-/var/cache/nixorium/admin"
+        ];
+        NoNewPrivileges = true;
+        CapabilityBoundingSet = "";
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];
+        LimitCORE = 0;
+        # A run that hangs on an unreachable computer must not pile up
+        # behind the next minute's.
+        TimeoutStartSec = "10min";
+      };
+    };
+    systemd.timers.nixorium-classroom-schedule = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "minutely";
+        AccuracySec = "1s";
+        # A minute the controller was off is not made up afterwards.
+        Persistent = false;
+      };
+    };
   };
 }
