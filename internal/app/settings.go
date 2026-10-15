@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -170,7 +171,12 @@ func invalidConfigPlan(repository string, err error) domain.ConfigPlanReport {
 }
 
 func (m SettingsManager) Plan(ctx context.Context, repository string, candidateData []byte) domain.ConfigPlanReport {
-	report, _, _ := m.planCandidate(ctx, repository, candidateData)
+	report, baseData, candidate := m.planCandidate(ctx, repository, candidateData)
+	if !report.HasErrors() && m.network != nil {
+		if base, _, ok := decodeBase(baseData); ok {
+			report.NetworkPreflight = m.networkPreflight(ctx, base, candidate)
+		}
+	}
 	return report
 }
 
@@ -284,11 +290,73 @@ func (m SettingsManager) planCandidate(ctx context.Context, repository string, c
 }
 
 type SettingsManager struct {
-	source SettingsSource
+	source  SettingsSource
+	network SettingsNetworkObserver
 }
 
 func NewSettingsManager(source SettingsSource) SettingsManager {
 	return SettingsManager{source: source}
+}
+
+// SettingsNetworkObserver reads network devices without changing anything:
+// the controller locally, clients through the bounded inventory SSH access.
+type SettingsNetworkObserver interface {
+	ControllerNetworkDevices(ctx context.Context) domain.NetworkObservation
+	ClientNetworkDevices(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.NetworkObservation
+}
+
+// settingsClientProbeTimeout matches the inventory's per-computer probe.
+const settingsClientProbeTimeout = 3 * time.Second
+
+// WithNetworkObserver adds the read-only network preflight to plans.
+func (m SettingsManager) WithNetworkObserver(observer SettingsNetworkObserver) SettingsManager {
+	m.network = observer
+	return m
+}
+
+// ControllerAddresses lists the controller's current addresses that can be
+// its DHCP address, for the settings form.
+func (m SettingsManager) ControllerAddresses(ctx context.Context, settings domain.LabSettingsFile) domain.ControllerAddresses {
+	if m.network == nil {
+		return domain.ControllerAddresses{Choices: []domain.DHCPAddressChoice{}}
+	}
+	observation := m.network.ControllerNetworkDevices(ctx)
+	if len(observation.Devices) == 0 {
+		return domain.ControllerAddresses{Choices: []domain.DHCPAddressChoice{}, Detail: observation.Detail}
+	}
+	labAddress, _ := domain.ControllerStaticAddress(settings.Lab)
+	return domain.ControllerAddresses{Choices: domain.ControllerDHCPCandidates(observation, labAddress), Detected: true, Detail: observation.Detail}
+}
+
+// networkPreflight checks the devices a reviewed change would use. It runs
+// only for interface or DHCP address changes and never changes a computer.
+func (m SettingsManager) networkPreflight(ctx context.Context, base, candidate domain.LabSettingsFile) *domain.NetworkPreflight {
+	checkController, clients := domain.NetworkPreflightNeeds(base, candidate)
+	checkDHCP := candidate.Lab.MasterDHCPIP != base.Lab.MasterDHCPIP && candidate.Lab.MasterDHCPIP != domain.MasterDHCPPlaceholder
+	if !checkController && len(clients) == 0 && !checkDHCP {
+		return nil
+	}
+	preflight := &domain.NetworkPreflight{}
+	if checkController || checkDHCP {
+		observation := m.network.ControllerNetworkDevices(ctx)
+		if checkController {
+			check := domain.CheckControllerInterface(domain.ControllerInterfaceFor(base.Lab), domain.ControllerInterfaceFor(candidate.Lab), observation, base.Lab.MasterDHCPIP)
+			preflight.Controller = &check
+		}
+		if checkDHCP && len(observation.Devices) > 0 {
+			labAddress, _ := domain.ControllerStaticAddress(candidate.Lab)
+			check := domain.CheckDHCPAddress(candidate.Lab.MasterDHCPIP, domain.ControllerDHCPCandidates(observation, labAddress))
+			preflight.DHCPAddress = &check
+		}
+	}
+	if len(clients) > 0 {
+		observations := m.network.ClientNetworkDevices(ctx, clients, settingsClientProbeTimeout)
+		for _, host := range clients {
+			previous, _ := domain.ClientInterfaceFor(base.Lab, host.Name)
+			preflight.Clients = append(preflight.Clients, domain.CheckClientInterface(host, previous, observations[host.Name]))
+		}
+	}
+	return preflight
 }
 
 func (m SettingsManager) Validate(ctx context.Context, repository string) domain.ConfigValidationReport {

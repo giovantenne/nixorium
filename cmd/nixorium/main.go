@@ -285,7 +285,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	updateNotifications := app.NewUpdateNotificationManager(local)
 	baseSource := adapters.PackageBase{}
 	baseManager := app.NewPackageBaseManager(baseSource)
-	settingsManager := app.NewSettingsManager(local)
+	settingsManager := app.NewSettingsManager(local).WithNetworkObserver(local)
 	settingsSaveManager := app.NewSettingsSaveManager(settingsManager, gitReviewManager, gitCommitManager)
 	configurationSaveManager := app.NewManagedConfigurationSaveManager(gitReviewManager, gitCommitManager)
 	updateSaveManager := app.NewUpdateSaveManager(updateManager, local, gitReviewManager, configurationSaveManager)
@@ -615,6 +615,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		PlanSettings: func(ctx context.Context, candidate domain.LabSettingsFile) domain.ConfigPlanReport {
 			return settingsManager.PlanSettings(ctx, repository, candidate)
+		},
+		LoadControllerAddresses: func(ctx context.Context, settings domain.LabSettingsFile) domain.ControllerAddresses {
+			return settingsManager.ControllerAddresses(ctx, settings)
 		},
 		SaveSettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
 			return settingsSaveManager.Save(ctx, repository, candidate, plan)

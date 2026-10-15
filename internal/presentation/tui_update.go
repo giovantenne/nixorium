@@ -891,6 +891,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		}
 		model.settings.current = message.settings
 		model.settings.repair = message.repair
+		model.settings.addresses = message.addresses
 		model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 		model.settings.fromAccounts = false
 		if model.installation.startingLabSetup {
@@ -905,21 +906,13 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				model.settings.current.Lab.PCCount = 20
 			}
 			model.settings.collectPasswords = !domain.CredentialsFromSettings(model.settings.current).Ready()
-			model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
-			model.settings.editor.width = model.width
-			model.settings.editor.height = model.height
-			model.settings.editor.isDark = model.isDark
-			model.settings.editor.prepareCurrentField()
+			model.settings.editor = model.newSettingsEditor(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
 			model.message = ""
 			model.screen = dashboardSettingsEdit
 			return model, nil
 		}
 		if model.settings.returnScreen == dashboardSetup {
-			model.settings.editor = newSettingsEditorModel(model.settings.current, settingsFields, "First setup / Laboratory settings")
-			model.settings.editor.width = model.width
-			model.settings.editor.height = model.height
-			model.settings.editor.isDark = model.isDark
-			model.settings.editor.prepareCurrentField()
+			model.settings.editor = model.newSettingsEditor(model.settings.current, settingsFields, "First setup / Laboratory settings")
 			model.message = ""
 			model.screen = dashboardSettingsEdit
 			return model, nil
@@ -931,8 +924,17 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.busy = ""
 		model.settings.editor = settingsWizardModel{}
 		model.settings.plan = message.report
+		model.settings.saveAnyway = false
+		failure := ""
 		if message.report.HasErrors() {
-			model.message = "The proposed settings did not pass validation: " + settingsIssueMessage(message.report.Issues)
+			failure = "The proposed settings did not pass validation: " + settingsIssueMessage(message.report.Issues)
+		} else if refusal := message.report.NetworkPreflight.SaveRefusal(); model.installation.flow && refusal != "" {
+			// Installation saves without a separate review, so a failed
+			// network check returns to the form instead.
+			failure = "The network check refused these settings: " + refusal
+		}
+		if failure != "" {
+			model.message = failure
 			if model.settings.returnScreen == dashboardSetup || model.installation.flow {
 				title := "First setup / Laboratory settings"
 				if model.installation.flow {
@@ -942,7 +944,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				if model.installation.flow {
 					fields = installationSettingsFields
 				}
-				model.settings.editor = newSettingsEditorModel(model.settings.candidate, fields, title)
+				model.settings.editor = model.newSettingsEditor(model.settings.candidate, fields, title)
 				model.settings.editor.index = len(model.settings.editor.fields) - 1
 				model.settings.editor.accepted = false
 				model.settings.editor.err = model.message

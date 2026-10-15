@@ -17,16 +17,19 @@ type SettingChange struct {
 }
 
 type ConfigPlanReport struct {
-	SchemaVersion        int               `json:"schemaVersion"`
-	Operation            string            `json:"operation"`
-	State                string            `json:"state"`
-	Repository           string            `json:"repository"`
-	File                 string            `json:"file"`
-	BaseFingerprint      string            `json:"baseFingerprint,omitempty"`
-	CandidateFingerprint string            `json:"candidateFingerprint,omitempty"`
-	Changes              []SettingChange   `json:"changes"`
-	Impacts              []SettingImpact   `json:"impacts,omitempty"`
-	Issues               []ValidationIssue `json:"issues"`
+	SchemaVersion        int             `json:"schemaVersion"`
+	Operation            string          `json:"operation"`
+	State                string          `json:"state"`
+	Repository           string          `json:"repository"`
+	File                 string          `json:"file"`
+	BaseFingerprint      string          `json:"baseFingerprint,omitempty"`
+	CandidateFingerprint string          `json:"candidateFingerprint,omitempty"`
+	Changes              []SettingChange `json:"changes"`
+	Impacts              []SettingImpact `json:"impacts,omitempty"`
+	// NetworkPreflight holds read-only checks of the network devices a
+	// reviewed interface or DHCP address change would use.
+	NetworkPreflight *NetworkPreflight `json:"networkPreflight,omitempty"`
+	Issues           []ValidationIssue `json:"issues"`
 }
 
 func (r ConfigPlanReport) HasErrors() bool {

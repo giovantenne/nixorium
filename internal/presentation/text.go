@@ -754,6 +754,36 @@ func ConfigPlanText(writer io.Writer, report domain.ConfigPlanReport) {
 			fmt.Fprintln(writer, prefix+impact.Detail)
 		}
 	}
+	configNetworkCheckText(writer, report.NetworkPreflight)
+}
+
+// configNetworkCheckText prints the read-only network check of a plan. The
+// TUI save refuses what it marks as blocking; `config apply` does not run it.
+func configNetworkCheckText(writer io.Writer, preflight *domain.NetworkPreflight) {
+	if preflight == nil {
+		return
+	}
+	fmt.Fprintln(writer, "Network check:")
+	if check := preflight.Controller; check != nil {
+		prefix := "  - "
+		if check.Blocking {
+			prefix = "  ! "
+		}
+		fmt.Fprintln(writer, prefix+check.Message)
+	}
+	if check := preflight.DHCPAddress; check != nil && !check.Found {
+		fmt.Fprintln(writer, "  ! "+check.Message)
+	}
+	for _, client := range preflight.Clients {
+		switch client.State {
+		case domain.DevicePresent:
+			fmt.Fprintf(writer, "  - %s: %s present\n", client.Name, client.Interface)
+		case domain.DeviceMissing:
+			fmt.Fprintf(writer, "  ! %s: %s missing (devices: %s)\n", client.Name, client.Interface, strings.Join(client.Devices, ", "))
+		default:
+			fmt.Fprintf(writer, "  - %s: not reachable; check it at its screen\n", client.Name)
+		}
+	}
 }
 
 func ConfigApplyText(writer io.Writer, report domain.ConfigApplyReport) {

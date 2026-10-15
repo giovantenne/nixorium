@@ -122,21 +122,24 @@ type DashboardActions struct {
 	SaveHomeFiles           func(domain.HomeFilesPlanReport) domain.HomeFilesApplyReport
 	// ResolveMarketplace downloads one Marketplace version into the store
 	// and proposes a pin; it never writes deployment files.
-	ResolveMarketplace     func(context.Context, string) domain.WorkspaceMarketplaceReport
-	PlanSettings           func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
-	SaveSettings           func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
-	ChangePassword         SettingsPasswordAction
-	PreparePXE             func() domain.ActionReport
-	LoadPXEProgress        func() (domain.OperationProgress, error)
-	PlanPXEStart           func(context.Context) domain.PXELifecycleReport
-	StartPXE               func() domain.PXELifecycleReport
-	StopPXE                func() domain.PXELifecycleReport
-	RecoverPXE             func() domain.PXELifecycleReport
-	PrepareRemoteInstall   func(string) (domain.RemoteInstallResponse, error)
-	ObserveRemoteInstall   func(context.Context, string) (string, error)
-	BootstrapRemoteInstall func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
-	RemoteInstallRequest   func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
-	LoadRemoteInstall      func(context.Context) (domain.RemoteInstallResponse, error)
+	ResolveMarketplace func(context.Context, string) domain.WorkspaceMarketplaceReport
+	PlanSettings       func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
+	// LoadControllerAddresses lists the controller's current addresses that
+	// can be its DHCP address; it is read-only.
+	LoadControllerAddresses func(context.Context, domain.LabSettingsFile) domain.ControllerAddresses
+	SaveSettings            func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
+	ChangePassword          SettingsPasswordAction
+	PreparePXE              func() domain.ActionReport
+	LoadPXEProgress         func() (domain.OperationProgress, error)
+	PlanPXEStart            func(context.Context) domain.PXELifecycleReport
+	StartPXE                func() domain.PXELifecycleReport
+	StopPXE                 func() domain.PXELifecycleReport
+	RecoverPXE              func() domain.PXELifecycleReport
+	PrepareRemoteInstall    func(string) (domain.RemoteInstallResponse, error)
+	ObserveRemoteInstall    func(context.Context, string) (string, error)
+	BootstrapRemoteInstall  func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
+	RemoteInstallRequest    func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
+	LoadRemoteInstall       func(context.Context) (domain.RemoteInstallResponse, error)
 	// RemoteReservationPresent reports, without starting the worker, whether
 	// a USB installation still holds the controller reservation.
 	RemoteReservationPresent func() bool
@@ -291,6 +294,12 @@ type settingsModel struct {
 	fromAccounts bool
 	// repair lists problems of saved settings that no longer validate.
 	repair []domain.ValidationIssue
+	// addresses are the controller's current addresses offered for its DHCP
+	// address, read when the settings were loaded.
+	addresses domain.ControllerAddresses
+	// saveAnyway acknowledges the computers whose named network device is
+	// missing in the reviewed network check.
+	saveAnyway bool
 }
 
 // updateModel owns both upstream and package-base update state because both
@@ -689,9 +698,10 @@ type dashboardUpdateControllerMsg struct {
 }
 
 type dashboardSettingsMsg struct {
-	settings domain.LabSettingsFile
-	repair   []domain.ValidationIssue
-	err      error
+	settings  domain.LabSettingsFile
+	repair    []domain.ValidationIssue
+	addresses domain.ControllerAddresses
+	err       error
 }
 
 type dashboardSettingsPlanMsg struct {
@@ -868,8 +878,7 @@ func (model dashboardModel) openSetupSettings() (tea.Model, tea.Cmd) {
 	model.busy = "Loading laboratory settings"
 	model.message = ""
 	return model.startRead(func(ctx context.Context) tea.Msg {
-		settings, err := model.actions.LoadSettings(ctx)
-		return dashboardSettingsMsg{settings: settings, err: err, repair: model.settingsRepairIssues()}
+		return model.loadSettingsMsg(ctx)
 	})
 }
 
@@ -924,8 +933,7 @@ func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstal
 	model.busy = "Loading laboratory settings"
 	model.message = ""
 	return model.startRead(func(ctx context.Context) tea.Msg {
-		settings, err := model.actions.LoadSettings(ctx)
-		return dashboardSettingsMsg{settings: settings, err: err, repair: model.settingsRepairIssues()}
+		return model.loadSettingsMsg(ctx)
 	})
 }
 

@@ -92,6 +92,10 @@ func SettingsImpacts(base, candidate LabSettingsFile, changes []SettingChange) [
 				Detail: detail + " Verify the old and new device names, cabling and access to each affected computer's local console before applying."})
 		}
 	}
+	if (changed["lab.clientIfaceName"] || changed["lab.ifaceName"] || changed["lab.hostIfaceNames"]) && candidate.Lab.DeploymentMode != "controller" {
+		impacts = append(impacts, SettingImpact{Kind: "network-interface-order",
+			Detail: "Update one computer first and check it answers before updating the others."})
+	}
 	if candidate.Lab.PCCount < base.Lab.PCCount {
 		impacts = append(impacts, SettingImpact{Kind: "computers-removed", Warning: true,
 			Detail: fmt.Sprintf("Computers %s are no longer managed; they keep running their last configuration.", computerRange(candidate.Lab.PCCount+1, base.Lab.PCCount))})

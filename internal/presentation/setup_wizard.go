@@ -17,6 +17,12 @@ type settingsField struct {
 	group   string
 	label   string
 	choices []settingsChoice
+	// other names the entry for typing a value that is not listed; empty
+	// uses "Custom…".
+	other string
+	// detected lists observed values; a typed value outside it gets a
+	// warning (the controller DHCP address).
+	detected []string
 }
 
 type settingsChoice struct {
@@ -97,10 +103,12 @@ type settingsWizardModel struct {
 	cancelled bool
 	replace   bool
 	custom    bool
-	selector  list.Model
-	width     int
-	height    int
-	isDark    bool
+	// warning is a non-blocking notice about the previous answer.
+	warning  string
+	selector list.Model
+	width    int
+	height   int
+	isDark   bool
 }
 
 func RunSettingsWizard(settings domain.LabSettingsFile) (domain.LabSettingsFile, bool, error) {
@@ -152,18 +160,22 @@ func (model *settingsWizardModel) prepareCurrentField() {
 		}
 	}
 	if current != "" && !found {
+		description := "Current custom value"
+		if field.detected != nil {
+			description = "Saved value; the controller does not have it now"
+		}
 		items = append([]list.Item{settingsChoiceItem{
 			value:       current,
 			label:       current,
-			description: "Current custom value",
+			description: description,
 		}}, items...)
 		selected = 0
 	}
-	items = append(items, settingsChoiceItem{
-		value:       customSettingsChoice,
-		label:       "Custom…",
-		description: "Enter another validated value",
-	})
+	other := settingsChoiceItem{value: customSettingsChoice, label: "Custom…", description: "Enter another validated value"}
+	if field.other != "" {
+		other.label, other.description = field.other, "Type an address that is not listed"
+	}
+	items = append(items, other)
 	delegate := tuiListDelegate(model.isDark)
 	model.selector = list.New(items, delegate, model.choiceWidth(), model.choiceHeight())
 	model.selector.Title = field.label
@@ -195,6 +207,7 @@ func (model settingsWizardModel) choiceHeight() int {
 func (model settingsWizardModel) moveToField(index int) settingsWizardModel {
 	model.index = index
 	model.err = ""
+	model.warning = ""
 	model.prepareCurrentField()
 	return model
 }
@@ -354,6 +367,7 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 	}
 	model.settings = candidate
 	model.err = ""
+	warning := undetectedValueWarning(field, model.drafts[model.index])
 	if model.index == len(model.fields)-1 {
 		if issues := candidate.Validate(); len(issues) > 0 {
 			model.err = issues[0].Field + ": " + issues[0].Message
@@ -363,7 +377,27 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 		return model, tea.Quit
 	}
 	model = model.moveToField(model.index + 1)
+	model.warning = warning
 	return model, nil
+}
+
+// undetectedValueWarning warns when a typed controller DHCP address is not one
+// the controller has now. The value stays allowed: the review checks it again.
+func undetectedValueWarning(field settingsField, value string) string {
+	value = strings.TrimSpace(value)
+	if field.detected == nil || value == "" || value == domain.MasterDHCPPlaceholder {
+		return ""
+	}
+	for _, detected := range field.detected {
+		if detected == value {
+			return ""
+		}
+	}
+	found := "none"
+	if len(field.detected) > 0 {
+		found = strings.Join(field.detected, ", ")
+	}
+	return fmt.Sprintf("%s is not one of the controller's current addresses (found: %s). Check it before preparing network installation.", value, found)
 }
 
 func (model settingsWizardModel) optionalInterface() bool {
@@ -409,7 +443,11 @@ func (model settingsWizardModel) shell() tuiShell {
 	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-10)).Render(tuiMuted(description, model.isDark)))
 	actions := []tuiAction{}
 	if len(field.choices) > 0 && !model.custom {
-		lines = append(lines, "", "Choose a suggested value, or press / to search.", "", trimBlankLines(model.selector.View()))
+		prompt := "Choose a suggested value, or press / to search."
+		if field.detected != nil {
+			prompt = "Choose one of the controller's current addresses, or " + strings.TrimSuffix(field.other, "…") + " to type one."
+		}
+		lines = append(lines, "", prompt, "", trimBlankLines(model.selector.View()))
 		actions = append(actions, tuiAction{key: "↑/↓", label: "Choose"}, tuiAction{key: "Enter", label: "Continue"}, tuiAction{key: "/", label: "Search"}, tuiAction{key: "Esc", label: "Cancel"})
 	} else {
 		if model.custom {
@@ -439,6 +477,9 @@ func (model settingsWizardModel) shell() tuiShell {
 		lines = append(lines, preview...)
 	}
 	notices := []tuiNotice{}
+	if model.warning != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.warning})
+	}
 	if model.err != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Invalid: " + model.err})
 	}

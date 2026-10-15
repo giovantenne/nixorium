@@ -349,6 +349,12 @@ func (model dashboardModel) helpView() string {
 			"The guided home is enabled in configuration only. Apply systems and reboot separately; no push.",
 			"The result offers a separate controller review, then client selection after verified application. Esc leaves without applying.",
 			"An interrupted reset requires recovery; preserve the backup ref and .git/nixorium-template-reset.json.")
+	case dashboardSettingsReview:
+		lines = append(lines,
+			"Enter saves the reviewed settings; Esc cancels without changing any file.",
+			"Network check: after a change of network device or controller DHCP address, Nixorium reads the controller's devices and asks each computer that answers whether it has the named device. Nothing is changed.",
+			"A device the controller does not have blocks the save. A device missing on a computer that answers blocks it until you press c to save anyway for the computers listed; c again undoes that.",
+			"Computers that do not answer are listed: check them at their screen. Update one computer first and check it answers before updating the others.")
 	case dashboardSettingsAccounts:
 		lines = append(lines,
 			"n  Change account names: edit the teacher and student user names, then review and save.",
