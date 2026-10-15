@@ -58,12 +58,14 @@ type options struct {
 	// checked during a recovery review were inspected at their console.
 	acknowledgeUnreachable bool
 	queueUnreachable       bool
-	backupTarget           string
-	backupRemote           string
-	backupBranch           string
-	backupFile             string
-	passphraseFile         string
-	remove                 bool
+	// network is the new laboratory network of network migrate plan/start.
+	network        string
+	backupTarget   string
+	backupRemote   string
+	backupBranch   string
+	backupFile     string
+	passphraseFile string
+	remove         bool
 }
 
 func main() {
@@ -184,6 +186,8 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		}
 	case "host-key":
 		return runHostTrustCommand(ctx, repository, options, stdout, stderr)
+	case "network":
+		return runNetworkCommand(ctx, repository, options, stdout, stderr)
 	case "deploy":
 		if strings.HasPrefix(options.subcommand, "recover") {
 			return runDeploymentRecoveryCommand(ctx, repository, options, stdout, stderr)
@@ -808,6 +812,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if len(arguments) > 0 && arguments[0] == "host-key" {
 		return parseHostTrustArguments(arguments[1:])
+	}
+	if len(arguments) > 0 && arguments[0] == "network" {
+		return parseNetworkArguments(arguments[1:])
 	}
 	result := options{}
 	for index := 0; index < len(arguments); index++ {
@@ -1541,7 +1548,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|network migrate plan|network migrate start|network migrate status|network migrate finish|network migrate undo|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       home-files import plan --source <local-file-or-folder> --destination <relative-home-path> [--replace] [--json] captures materials for review")
 	fmt.Fprintln(writer, "       home-files plan --file <draft-or-profile.json> [--json] reviews shared student initial files")
@@ -1549,6 +1556,10 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
 	fmt.Fprintln(writer, "       host-key apply --host <pcNN> --expect <review-token> [--yes] rotates only the reviewed key")
+	fmt.Fprintln(writer, "       network migrate plan --to <network/prefix> [--acknowledge-unreachable] [--json] reviews a change of laboratory network")
+	fmt.Fprintln(writer, "       network migrate start --to <network/prefix> --expect <review-token> [--acknowledge-unreachable] [--yes] saves it; then apply to the controller and update computers")
+	fmt.Fprintln(writer, "       network migrate status [--json] shows which computers moved and the next step")
+	fmt.Fprintln(writer, "       network migrate finish|undo [--expect <review-token> [--yes]] [--json] reviews, then saves the end or the undo of the change")
 	fmt.Fprintln(writer, "       telemetry status|preview [--json], telemetry enable|disable: optional controller adoption statistics")
 	fmt.Fprintln(writer, "       support preview [--json] shows the filtered diagnostic payload without saving")
 	fmt.Fprintln(writer, "       support export reviews and confirms a private local file; no upload or build")
