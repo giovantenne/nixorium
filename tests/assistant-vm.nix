@@ -191,7 +191,8 @@
               send("\r")
               wait("This conversation is based on an older configuration.", after=resume_start)
               wait("Continue in a new chat", after=resume_start)
-              send("\x1b[B\r")
+              # Tab chooses "Back" in the read-only chat; the arrows scroll it.
+              send("\t\r")
               time.sleep(0.3)
               reopen_start = len(output())
               send("\r")
