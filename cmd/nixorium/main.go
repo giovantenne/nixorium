@@ -64,6 +64,9 @@ type options struct {
 	backupFile             string
 	passphraseFile         string
 	remove                 bool
+	// collectInto is the folder collect plan/apply saves desktops into
+	// instead of ~/Nixorium/Collected.
+	collectInto string
 }
 
 func main() {
@@ -120,6 +123,10 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		}
 		fmt.Fprintln(stdout, message)
 		return 0
+	}
+	// Collecting desktops needs only the classroom service, like the view.
+	if options.command == "collect" {
+		return runCollectCommand(ctx, options, stdout, stderr)
 	}
 	repository := options.repository
 	resolvedRepository, resolveErr := resolveRepository(options.repository)
@@ -825,6 +832,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if len(arguments) > 0 && arguments[0] == "host-key" {
 		return parseHostTrustArguments(arguments[1:])
+	}
+	if len(arguments) > 0 && arguments[0] == "collect" {
+		return parseCollectArguments(arguments[1:])
 	}
 	result := options{}
 	for index := 0; index < len(arguments); index++ {
@@ -1592,6 +1602,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       deploy queue status|run  shows or applies queued client updates; deploy queue cancel --on <clients|@all>")
 	fmt.Fprintln(writer, "       send plan --file <file-or-folder> --on <clients|@lab> reviews copying it to students' desktops (classroom view)")
 	fmt.Fprintln(writer, "       send apply --file <file-or-folder> --on <clients|@lab> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       collect plan --on <clients|@lab> [--into <folder>] reviews copying students' desktops into ~/Nixorium/Collected or the folder (classroom view)")
+	fmt.Fprintln(writer, "       collect apply --on <clients|@lab> [--into <folder>] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       classroom-view opens the classroom view page (teacher and administrator)")
 	fmt.Fprintln(writer, "       wake --on <clients|@lab> [--json] sends Wake-on-LAN packets to the selected computers that are off (teacher and administrator)")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")

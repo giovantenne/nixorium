@@ -47,6 +47,7 @@ type classroomHandler func(context.Context, domain.ClassroomRequest) domain.Clas
 type pendingAction struct {
 	broadcast *domain.BroadcastPlan
 	share     *domain.SharePlan
+	collect   *domain.CollectPlan
 	lock      *domain.LockPlan
 	internet  *domain.InternetPlan
 	power     *domain.ShutdownPlanReport
@@ -216,6 +217,8 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			break
 		}
 		review, pending = shareReview(*response.SharePlan)
+	case actionCollect:
+		review, pending = server.planCollect(ctx, request, operation)
 	default:
 		http.Error(writer, "Unknown action.", http.StatusBadRequest)
 		return
@@ -436,6 +439,9 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		for _, target := range report.Targets {
 			result.Rows = append(result.Rows, resultRow(target.Name, target.State == "delivered", target.Detail, planned[target.Name]))
 		}
+	case pending.collect != nil:
+		// Collecting and saving can take longer than the other actions.
+		result = server.applyCollect(request.Context(), request, pending.collect)
 	case pending.lock != nil:
 		operation.Operation = domain.ClassroomLockApplyOperation
 		operation.LockPlan = pending.lock

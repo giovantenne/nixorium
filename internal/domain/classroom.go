@@ -59,7 +59,7 @@ func (o ClassroomOperation) Valid() bool {
 		ClassroomWakePlanOperation, ClassroomWakeApplyOperation:
 		return true
 	default:
-		return saveOperations[o]
+		return saveOperations[o] || collectOperations[o]
 	}
 }
 
@@ -81,6 +81,8 @@ type ClassroomRequest struct {
 	ShareOffset    int64                 `json:"shareOffset,omitempty"`
 	ShareData      []byte                `json:"shareData,omitempty"`
 	SharePlan      *SharePlan            `json:"sharePlan,omitempty"`
+	CollectFolder  string                `json:"collectFolder,omitempty"`
+	CollectPlan    *CollectPlan          `json:"collectPlan,omitempty"`
 	SaveNames      []string              `json:"saveNames,omitempty"`
 	DesktopJob     string                `json:"desktopJob,omitempty"`
 	DesktopError   string                `json:"desktopError,omitempty"`
@@ -118,6 +120,8 @@ type ClassroomResponse struct {
 	ShareTransfer  string               `json:"shareTransfer,omitempty"`
 	SharePlan      *SharePlan           `json:"sharePlan,omitempty"`
 	ShareReport    *ShareReport         `json:"shareReport,omitempty"`
+	CollectPlan    *CollectPlan         `json:"collectPlan,omitempty"`
+	CollectReport  *CollectReport       `json:"collectReport,omitempty"`
 	SaveItems      []ShareFile          `json:"saveItems,omitempty"`
 	SaveTotal      int                  `json:"saveTotal,omitempty"`
 	SaveData       []byte               `json:"saveData,omitempty"`

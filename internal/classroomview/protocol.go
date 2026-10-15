@@ -149,6 +149,9 @@ type Message struct {
 	Entries []FileEntry `json:"entries,omitempty"`
 	Index   int         `json:"index,omitempty"`
 	Data    []byte      `json:"data,omitempty"`
+	// Skipped counts the desktop entries a collect.listed reply leaves out
+	// because their names cannot be collected.
+	Skipped int `json:"skipped,omitempty"`
 }
 
 // Write encodes a message as a big-endian length followed by JSON.

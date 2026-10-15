@@ -360,8 +360,8 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !toast.hidden && !controlling && !actionDialog.open) hideToast();
 });
 
-const outcomeWords = { done: 'done', off: 'switched off or not reachable', skipped: 'skipped', failed: 'failed' };
-const detailOrder = ['failed', 'skipped', 'off', 'done'];
+const outcomeWords = { done: 'done', empty: 'nothing to collect', off: 'switched off or not reachable', skipped: 'skipped', 'too-much': 'too much to collect', failed: 'failed' };
+const detailOrder = ['failed', 'too-much', 'skipped', 'off', 'empty', 'done'];
 
 // Switch on counts packets sent, never computers started: "Switch on:
 // 3 sent · 2 already on · 1 address unknown".
@@ -489,7 +489,8 @@ async function saveScreenshots(computers) {
   showResult('Screenshots', result);
 }
 
-// A computer's window offers a screenshot only of a live screen.
+// A computer's window offers a screenshot only of a live screen, and
+// Collect from desktop only with someone signed in.
 function updateSaveButtons(computers) {
   if (!selected) return;
   const computer = computers.find((item) => item.name === selected);
@@ -497,6 +498,8 @@ function updateSaveButtons(computers) {
   const live = computer.state === 'viewing';
   screenshotButton.disabled = !live;
   screenshotButton.title = live ? 'Save a picture of this screen in Nixorium/Screenshots in your home folder' : (stateText[computer.state] || computer.detail || '');
+  const session = computer.state === 'viewing' || computer.state === 'locked';
+  for (const button of viewerActions.querySelectorAll('button[data-action="collect"]')) button.disabled = !session;
 }
 
 screenshotButton.addEventListener('click', () => {

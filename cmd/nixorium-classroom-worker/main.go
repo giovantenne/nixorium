@@ -63,6 +63,11 @@ func run() error {
 		records:    local,
 		wake:       app.NewWakeManager(local),
 	}
+	// Files collected from students' desktops wait in the private
+	// temporary folder too, until the user who asked saves them.
+	worker.collected = newCollectStore(os.TempDir())
+	worker.collect = app.NewCollectManager(lockSource{local, adapters.ClassroomAgentConnector{}}, worker.collected)
+	go worker.collected.expire(ctx, time.Minute)
 	// The page's actions go through the same handling as the dashboard.
 	worker.view.actions = worker.handle
 	worker.view.desktops = newDesktopBroker()
@@ -92,6 +97,8 @@ type classroomWorker struct {
 	lock       *app.LockManager
 	shares     *shareStore
 	share      *app.ShareManager
+	collect    *app.CollectManager // copies students' desktops
+	collected  *collectStore       // until the user who asked saves them
 	records    app.OperationRecordSink
 	wake       *app.WakeManager
 }
@@ -198,6 +205,8 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		response.ShareReport = &report
 	case domain.ClassroomSaveItemsOperation, domain.ClassroomSaveReadOperation, domain.ClassroomSaveDoneOperation:
 		return worker.handleSave(ctx, request)
+	case domain.ClassroomCollectPlanOperation, domain.ClassroomCollectApplyOperation:
+		return worker.handleCollect(ctx, request)
 	case domain.ClassroomDesktopWaitOperation, domain.ClassroomDesktopReadyOperation:
 		uid, known := adapters.ClassroomPeerUID(ctx)
 		if !known || worker.view == nil || worker.view.desktops == nil {
