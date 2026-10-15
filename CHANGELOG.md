@@ -69,12 +69,14 @@ The project follows [Semantic Versioning](https://semver.org/).
   with **Save** and **Clear**) or in a terminal, as the teacher or the
   administrator: `nixorium schedule set --on 07:50 --off 18:00` (Monday to
   Friday unless `--days` says otherwise), `nixorium schedule show`,
-  `nixorium schedule clear`. A timer on the
-  controller (`nixorium-classroom-schedule.timer`) runs it every minute: the
-  switch-on is the ordinary **Switch on** (computers without a known network
-  address are skipped), and the shut-down never interrupts a person, since a
-  computer that someone is using, or whose session cannot be read, stays on.
-  Each run leaves a line in the operation history and the journal. The
+  `nixorium schedule clear`. A timer on the controller
+  (`nixorium-classroom-schedule.timer`) runs it every minute: the switch-on is
+  the ordinary **Switch on** (computers without a known network address are
+  skipped), and the shut-down never interrupts a person, since a computer that
+  someone is using, or whose session cannot be read, stays on. When another
+  operation or a network installation keeps it from starting, it tries again
+  every minute for ten minutes and then gives up for that day. Each run leaves
+  a line in the operation history and the journal. The
   schedule lives on the controller only, outside the configuration and the
   backup: set it again after replacing the controller. The computers must
   allow waking from the network, as for **Switch on**.

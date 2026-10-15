@@ -3,6 +3,7 @@ package domain
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -71,6 +72,46 @@ func TestScheduleNormalize(t *testing.T) {
 }
 
 // The minute is read in the time zone of the time given: the controller's.
+// An action that cannot start is tried again for ten minutes, so the two
+// times must be further apart than that, the shorter way round midnight.
+func TestScheduleTimesMustBeFurtherApartThanTheRetryWindow(t *testing.T) {
+	for _, times := range [][2]string{{"07:50", "07:50"}, {"07:50", "07:55"}, {"07:50", "08:00"}, {"08:00", "07:50"}, {"23:55", "00:05"}, {"00:05", "23:55"}, {"00:00", "23:59"}} {
+		if got, err := (Schedule{On: times[0], Off: times[1], Days: []string{"mon"}}).Normalize(); err == nil || !strings.Contains(err.Error(), "more than 10 minutes apart") {
+			t.Fatalf("%v accepted as %+v, %v", times, got, err)
+		}
+	}
+	for _, times := range [][2]string{{"07:50", "08:01"}, {"08:01", "07:50"}, {"23:55", "00:06"}, {"07:50", "18:00"}} {
+		if _, err := (Schedule{On: times[0], Off: times[1], Days: []string{"mon"}}).Normalize(); err != nil {
+			t.Fatalf("%v refused: %v", times, err)
+		}
+	}
+	// One time alone has nothing to be apart from.
+	if _, err := (Schedule{On: "07:50", Days: []string{"mon"}}).Normalize(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestScheduleActionAtNamesTheHalfSetForAMinute(t *testing.T) {
+	cest := time.FixedZone("CEST", 2*3600)
+	schedule := Schedule{On: "07:50", Off: "18:00", Days: []string{"mon", "tue"}}
+	for want, at := range map[string]time.Time{
+		ScheduleActionOn:  time.Date(2026, 10, 12, 7, 50, 59, 0, cest),
+		ScheduleActionOff: time.Date(2026, 10, 13, 18, 0, 0, 0, cest),
+		"":                time.Date(2026, 10, 14, 18, 0, 0, 0, cest),
+	} {
+		if got := schedule.ActionAt(at); got != want {
+			t.Fatalf("%s: action = %q, want %q", at, got, want)
+		}
+	}
+	moment, err := ParseScheduleMinute("2026-10-12T07:50", cest)
+	if err != nil || !moment.Equal(time.Date(2026, 10, 12, 7, 50, 0, 0, cest)) {
+		t.Fatalf("parsed = %v, %v", moment, err)
+	}
+	if _, err := ParseScheduleMinute("yesterday", cest); err == nil {
+		t.Fatal("a word parsed as a minute")
+	}
+}
+
 func TestScheduleDueReadsTheLocalMinuteAndWeekday(t *testing.T) {
 	cest := time.FixedZone("CEST", 2*3600)
 	schedule := Schedule{On: "07:50", Off: "18:00", Days: []string{"mon", "tue", "wed", "thu", "fri"}}
@@ -122,7 +163,7 @@ func TestScheduleSummary(t *testing.T) {
 }
 
 func TestScheduleRecordValidity(t *testing.T) {
-	valid := ScheduleRecord{SchemaVersion: 1, Schedule: Schedule{On: "07:50", Days: []string{"mon", "fri"}}, LastRun: "2026-10-12T07:50"}
+	valid := ScheduleRecord{SchemaVersion: 1, Schedule: Schedule{On: "07:50", Days: []string{"mon", "fri"}}, LastRun: "2026-10-12T07:50", Retry: "2026-10-12T07:50"}
 	if !valid.Valid() {
 		t.Fatal("a canonical record is not valid")
 	}
@@ -131,6 +172,7 @@ func TestScheduleRecordValidity(t *testing.T) {
 		"short time":        {SchemaVersion: 1, Schedule: Schedule{On: "7:50", Days: []string{"mon"}}},
 		"no days":           {SchemaVersion: 1, Schedule: Schedule{On: "07:50"}},
 		"bad minute":        {SchemaVersion: 1, Schedule: Schedule{On: "07:50", Days: []string{"mon"}}, LastRun: "yesterday"},
+		"bad retry":         {SchemaVersion: 1, Schedule: Schedule{On: "07:50", Days: []string{"mon"}}, Retry: "07:50"},
 	} {
 		if record.Valid() {
 			t.Fatalf("%s is valid", name)
@@ -139,8 +181,8 @@ func TestScheduleRecordValidity(t *testing.T) {
 }
 
 func TestScheduleRecordJSONIsFlat(t *testing.T) {
-	content, err := json.Marshal(ScheduleRecord{SchemaVersion: 1, Schedule: Schedule{On: "07:50", Off: "18:00", Days: []string{"mon", "tue"}}, LastRun: "2026-10-12T07:50"})
-	want := `{"schemaVersion":1,"on":"07:50","off":"18:00","days":["mon","tue"],"lastRun":"2026-10-12T07:50"}`
+	content, err := json.Marshal(ScheduleRecord{SchemaVersion: 1, Schedule: Schedule{On: "07:50", Off: "18:00", Days: []string{"mon", "tue"}}, LastRun: "2026-10-12T07:50", Retry: "2026-10-12T07:50"})
+	want := `{"schemaVersion":1,"on":"07:50","off":"18:00","days":["mon","tue"],"lastRun":"2026-10-12T07:50","retry":"2026-10-12T07:50"}`
 	if err != nil || string(content) != want {
 		t.Fatalf("json = %s, %v", content, err)
 	}

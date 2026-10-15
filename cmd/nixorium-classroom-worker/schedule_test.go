@@ -126,7 +126,7 @@ func TestPageShowsAndSavesTheSchedule(t *testing.T) {
 	// stored schedule stays.
 	response = schedulePageRequest(server, host, cookie, http.MethodPost, `{"on":"07:50","off":"07:50","days":["mon"]}`)
 	report = domain.ScheduleReport{}
-	if err := json.Unmarshal(response.Body.Bytes(), &report); err != nil || report.State != "blocked" || !strings.Contains(report.Message, "must differ") || store.record.On != "07:50" || len(store.record.Days) != 5 {
+	if err := json.Unmarshal(response.Body.Bytes(), &report); err != nil || report.State != "blocked" || !strings.Contains(report.Message, "more than 10 minutes apart") || store.record.On != "07:50" || len(store.record.Days) != 5 {
 		t.Fatalf("refused = %d %s", response.Code, response.Body.String())
 	}
 	response = schedulePageRequest(server, host, cookie, http.MethodPost, `{"on":"","off":"","days":[]}`)

@@ -848,9 +848,9 @@ in
     # due (03:33 on a Sunday is not now, with all but negligible odds).
     controller.succeed("systemctl is-active nixorium-classroom-schedule.timer; systemctl cat nixorium-classroom-schedule.timer | grep -Fx 'OnCalendar=minutely'")
     controller.succeed("su - teacher -c 'nixorium schedule show' | grep -Fx 'No schedule.'")
-    controller.succeed("su - teacher -c 'nixorium schedule set --on 03:33 --off 03:34 --days sun' | grep -F 'Schedule saved. Switch on at 03:33 and shut down at 03:34, Sunday.'")
+    controller.succeed("su - teacher -c 'nixorium schedule set --on 03:33 --off 03:50 --days sun' | grep -F 'Schedule saved. Switch on at 03:33 and shut down at 03:50, Sunday.'")
     controller.succeed("test \"$(stat -c '%U:%a' /var/lib/nixorium/classroom/schedule.json)\" = admin:600")
-    controller.succeed("su - teacher -c 'nixorium schedule show --json' | jq -e '.schedule.on == \"03:33\" and .schedule.off == \"03:34\" and .schedule.days == [\"sun\"]'")
+    controller.succeed("su - teacher -c 'nixorium schedule show --json' | jq -e '.schedule.on == \"03:33\" and .schedule.off == \"03:50\" and .schedule.days == [\"sun\"]'")
     controller.succeed("systemctl start nixorium-classroom-schedule.service; test \"$(systemctl show -p Result --value nixorium-classroom-schedule.service)\" = success")
     controller.succeed("su - teacher -c 'nixorium schedule set --on 03:33' | grep -F 'Schedule saved. Switch on at 03:33, Monday to Friday.'")
     controller.succeed("su - teacher -c 'nixorium schedule clear' | grep -Fx 'The schedule was cleared.'; test ! -e /var/lib/nixorium/classroom/schedule.json; su - teacher -c 'nixorium schedule show' | grep -Fx 'No schedule.'")

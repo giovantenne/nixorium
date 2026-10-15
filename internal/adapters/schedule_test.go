@@ -63,6 +63,16 @@ func TestScheduleIsKeptInAPrivateFileReplacedAtomically(t *testing.T) {
 	if record.On != "" || record.Off != "17:30" || record.LastRun != "2026-10-12T07:50" {
 		t.Fatalf("record = %+v", record)
 	}
+	// An action that could not start is kept for its next try.
+	if err := store.Update(func(record domain.ScheduleRecord) (domain.ScheduleRecord, bool) {
+		record.Retry = "2026-10-16T17:30"
+		return record, true
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if record = store.Read(); record.Retry != "2026-10-16T17:30" || record.LastRun != "2026-10-12T07:50" || record.Off != "17:30" {
+		t.Fatalf("record with a retry = %+v", record)
+	}
 	entries, _ := os.ReadDir(store.Directory)
 	for _, entry := range entries {
 		if strings.HasPrefix(entry.Name(), ".schedule-") {
@@ -107,6 +117,7 @@ func TestDamagedOrUnsafeScheduleFilesReadAsNoSchedule(t *testing.T) {
 		"no times":          `{"schemaVersion":1,"days":["mon"]}`,
 		"days out of order": `{"schemaVersion":1,"on":"07:50","days":["fri","mon"]}`,
 		"bad last minute":   `{"schemaVersion":1,"on":"07:50","days":["mon"],"lastRun":"now"}`,
+		"bad retry":         `{"schemaVersion":1,"on":"07:50","days":["mon"],"retry":"soon"}`,
 		"trailing data":     good + good,
 		"too large":         `{"schemaVersion":1,"on":"07:50","days":["mon"],"pad":"` + strings.Repeat("x", scheduleFileBytes) + `"}`,
 	} {

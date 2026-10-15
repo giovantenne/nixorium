@@ -31,6 +31,13 @@ var ScheduleWeekdays = []string{"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 
 var scheduleWeekdayNames = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
 
+// ScheduleRetryMinutes is how long after its set time a switch-on or a
+// shut-down that cannot start is tried again, every minute, before it is
+// given up for that day.
+const ScheduleRetryMinutes = 10
+
+const scheduleMinuteLayout = "2006-01-02T15:04"
+
 var (
 	scheduleTimePattern   = regexp.MustCompile(`^([0-9]{1,2}):([0-9]{2})$`)
 	scheduleMinutePattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$`)
@@ -138,8 +145,8 @@ func (s Schedule) Normalize() (Schedule, error) {
 	if result.Empty() {
 		return result, nil
 	}
-	if result.On == result.Off {
-		return Schedule{}, errors.New("the switch-on and the shut-down time must differ")
+	if result.On != "" && result.Off != "" && scheduleGap(result.On, result.Off) <= ScheduleRetryMinutes {
+		return Schedule{}, fmt.Errorf("the switch-on and the shut-down time must be more than %d minutes apart", ScheduleRetryMinutes)
 	}
 	chosen := [7]bool{}
 	for _, day := range s.Days {
@@ -156,9 +163,45 @@ func (s Schedule) Normalize() (Schedule, error) {
 	return result, nil
 }
 
+// scheduleGap is the distance in minutes between two HH:MM times on the
+// clock face, the shorter way round midnight.
+func scheduleGap(a, b string) int {
+	minutes := func(value string) int {
+		var hour, minute int
+		fmt.Sscanf(value, "%d:%d", &hour, &minute)
+		return hour*60 + minute
+	}
+	gap := minutes(a) - minutes(b)
+	if gap < 0 {
+		gap = -gap
+	}
+	if other := 24*60 - gap; other < gap {
+		gap = other
+	}
+	return gap
+}
+
 // ScheduleMinute names a local minute the way the record keeps the last one
 // that ran, for example 2026-10-15T07:50.
-func ScheduleMinute(now time.Time) string { return now.Format("2006-01-02T15:04") }
+func ScheduleMinute(now time.Time) string { return now.Format(scheduleMinuteLayout) }
+
+// ParseScheduleMinute reads a minute written by ScheduleMinute in a time zone.
+func ParseScheduleMinute(value string, zone *time.Location) (time.Time, error) {
+	return time.ParseInLocation(scheduleMinuteLayout, value, zone)
+}
+
+// ActionAt tells which half of the schedule starts at the local minute of t,
+// ScheduleActionOn, ScheduleActionOff, or "" when neither does.
+func (s Schedule) ActionAt(t time.Time) string {
+	on, off := s.Due(t)
+	switch {
+	case on:
+		return ScheduleActionOn
+	case off:
+		return ScheduleActionOff
+	}
+	return ""
+}
 
 // Due tells which half of the schedule starts in the minute of now, read in
 // now's own time zone (the controller's, when now is time.Now()).
@@ -222,13 +265,16 @@ func (s Schedule) Summary() string {
 	return "No schedule."
 }
 
-// ScheduleRecord is the content of the schedule file: the schedule and the
-// local minute of the last switch-on or shut-down that was started, so that
-// one minute never runs twice.
+// ScheduleRecord is the content of the schedule file: the schedule, the set
+// minute (local, such as 2026-10-15T07:50) of the last switch-on or
+// shut-down that was started or given up, so that one minute never runs
+// twice, and the set minute of one that could not start and is tried again
+// every minute for ScheduleRetryMinutes.
 type ScheduleRecord struct {
 	SchemaVersion int `json:"schemaVersion"`
 	Schedule
 	LastRun string `json:"lastRun,omitempty"`
+	Retry   string `json:"retry,omitempty"`
 }
 
 // Valid tells whether the record is well formed: a canonical schedule and a
@@ -243,7 +289,7 @@ func (r ScheduleRecord) Valid() bool {
 			return false
 		}
 	}
-	return r.LastRun == "" || scheduleMinutePattern.MatchString(r.LastRun)
+	return (r.LastRun == "" || scheduleMinutePattern.MatchString(r.LastRun)) && (r.Retry == "" || scheduleMinutePattern.MatchString(r.Retry))
 }
 
 // ScheduleReport is the answer to showing or setting the schedule.
@@ -290,17 +336,24 @@ type ScheduleOutcome struct {
 
 // ScheduleRunReport is what one run of the timer did. State is idle when
 // nothing was due (or the minute already ran), completed, partial when a
-// computer's request failed or could not be confirmed, or blocked when
-// nothing could be done (the inventory could not be read, another client
-// operation is running, a network installation is active).
+// computer's request failed or could not be confirmed, waiting when nothing
+// could be done yet (the inventory could not be read, another client
+// operation is running, a network installation is active) and the next
+// minutes try again, gave-up when the last try still could not start, or
+// blocked when the run could not even claim its minute. Minute is the minute
+// of the run and Scheduled the minute the action was set for, which differs
+// while it is tried again.
 type ScheduleRunReport struct {
 	SchemaVersion int               `json:"schemaVersion"`
 	Operation     string            `json:"operation"`
 	State         string            `json:"state"`
 	Minute        string            `json:"minute"`
+	Scheduled     string            `json:"scheduled,omitempty"`
 	Action        string            `json:"action,omitempty"`
 	Targets       []ScheduleOutcome `json:"targets"`
 	Message       string            `json:"message,omitempty"`
 }
 
-func (r ScheduleRunReport) HasErrors() bool { return r.State == "partial" || r.State == "blocked" }
+func (r ScheduleRunReport) HasErrors() bool {
+	return r.State == "partial" || r.State == "blocked" || r.State == "gave-up"
+}

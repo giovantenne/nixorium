@@ -339,24 +339,6 @@ func TestScheduleRunHasNothingToShutDownWhenEveryComputerIsOffOrInUse(t *testing
 	}
 }
 
-func TestScheduleRunIsBlockedWhileAnotherClientOperationRuns(t *testing.T) {
-	lab := scheduleFixture(schoolSchedule)
-	lab.now = mondayEvening
-	lab.power.active = true
-	report := lab.runner.Run(scheduleContext, "/lab")
-	if report.State != "blocked" || !report.HasErrors() || len(lab.power.dispatchHosts) != 0 || !strings.HasPrefix(report.Message, "Scheduled shut-down at 18:00 was not done: ") {
-		t.Fatalf("report = %+v", report)
-	}
-	if len(lab.records.records) != 1 || lab.records.records[0].State != "blocked" || lab.records.records[0].Summary != "nothing was sent; see the journal of the schedule service" {
-		t.Fatalf("history = %+v", lab.records.records)
-	}
-	// The minute is spent: the next run does not shut down at 18:01.
-	lab.power.active = false
-	if again := lab.runner.Run(scheduleContext, "/lab"); again.State != "idle" {
-		t.Fatalf("same minute again = %+v", again)
-	}
-}
-
 func TestScheduleRunReportsUnconfirmedRequests(t *testing.T) {
 	lab := scheduleFixture(schoolSchedule)
 	lab.now = mondayEvening
@@ -365,22 +347,14 @@ func TestScheduleRunReportsUnconfirmedRequests(t *testing.T) {
 	if report.State != "partial" || !report.HasErrors() || outcomeStates(report)["pc04"] != domain.ScheduleOutcomeUnconfirmed || !strings.Contains(report.Message, "1 not confirmed") {
 		t.Fatalf("report = %+v", report)
 	}
-}
-
-func TestScheduleRunDoesNotSwitchOnWhenTheInventoryCannotBeRead(t *testing.T) {
-	lab := scheduleFixture(schoolSchedule)
-	failing := &failingWakeSource{fakeWakeSource: lab.wake}
-	lab.runner.wake = NewWakeManager(failing)
-	report := lab.runner.Run(scheduleContext, "/lab")
-	if report.State != "blocked" || len(lab.wake.sent) != 0 || !strings.HasPrefix(report.Message, "Scheduled switch-on at 07:50 was not done: ") {
-		t.Fatalf("report = %+v", report)
+	// Requests were sent, so the minute is spent: no try again.
+	if lab.store.record.Retry != "" {
+		t.Fatalf("record = %+v", lab.store.record)
 	}
-}
-
-type failingWakeSource struct{ *fakeWakeSource }
-
-func (source *failingWakeSource) LabMeta(context.Context, string) (domain.LabMeta, error) {
-	return domain.LabMeta{}, errors.New("nix evaluation failed")
+	lab.now = lab.now.Add(time.Minute)
+	if again := lab.runner.Run(scheduleContext, "/lab"); again.State != "idle" || len(lab.power.dispatchHosts) != 2 {
+		t.Fatalf("after a partial run = %+v, asked %v", again, lab.power.dispatchHosts)
+	}
 }
 
 func TestScheduleRunDoesNothingWhenTheMinuteCannotBeClaimed(t *testing.T) {
@@ -443,5 +417,212 @@ func TestShutdownPlanSkipActiveLeavesComputersInUse(t *testing.T) {
 	}
 	if invalid := manager.Plan(scheduleContext, "/deployment", "@lab", "ignore"); !invalid.HasErrors() || !strings.Contains(invalid.Message, "skip-active") {
 		t.Fatalf("invalid policy = %+v", invalid)
+	}
+}
+
+// Switching on has no lock to wait for, but a laboratory that cannot be
+// read yet is waited for like one that is busy: nothing was sent.
+type flakyWakeSource struct {
+	*fakeWakeSource
+	failing bool
+}
+
+func (source *flakyWakeSource) LabMeta(ctx context.Context, repository string) (domain.LabMeta, error) {
+	if source.failing {
+		return domain.LabMeta{}, errors.New("nix evaluation failed")
+	}
+	return source.fakeWakeSource.LabMeta(ctx, repository)
+}
+
+func TestScheduleRunTriesTheSwitchOnAgainWhenTheInventoryCannotBeRead(t *testing.T) {
+	lab := scheduleFixture(schoolSchedule)
+	flaky := &flakyWakeSource{fakeWakeSource: lab.wake, failing: true}
+	lab.runner.wake = NewWakeManager(flaky)
+	report := lab.runner.Run(scheduleContext, "/lab")
+	if report.State != "waiting" || report.Scheduled != "2026-10-12T07:50" || len(lab.wake.sent) != 0 || !strings.HasPrefix(report.Message, "Scheduled switch-on at 07:50 is waiting: ") ||
+		!strings.HasSuffix(report.Message, "It is tried again every minute until 08:00.") {
+		t.Fatalf("report = %+v", report)
+	}
+	flaky.failing = false
+	lab.now = mondayMorning.Add(2 * time.Minute)
+	report = lab.runner.Run(scheduleContext, "/lab")
+	if report.State != "completed" || report.Scheduled != "2026-10-12T07:50" || report.Minute != "2026-10-12T07:52" || len(lab.wake.sent) != 1 ||
+		!strings.HasPrefix(report.Message, "Scheduled switch-on at 07:50: Wake-on-LAN packets sent to 1 computer") {
+		t.Fatalf("second try = %+v, %d packets", report, len(lab.wake.sent))
+	}
+	if len(lab.records.records) != 1 || lab.records.records[0].Subject != "scheduled switch-on at 07:50" || lab.store.record.Retry != "" {
+		t.Fatalf("history = %+v, record %+v", lab.records.records, lab.store.record)
+	}
+}
+
+// A shut-down that cannot start has sent nothing, so it does not count as
+// run: it waits, and the next minutes try again.
+func TestScheduleRunTriesAgainEveryMinuteWhileAnotherClientOperationRuns(t *testing.T) {
+	lab := scheduleFixture(schoolSchedule)
+	lab.power.active = true
+	for minute := 0; minute <= 4; minute++ {
+		lab.now = mondayEvening.Add(time.Duration(minute) * time.Minute)
+		report := lab.runner.Run(scheduleContext, "/lab")
+		if report.State != "waiting" || report.HasErrors() || report.Action != domain.ScheduleActionOff || report.Scheduled != "2026-10-12T18:00" ||
+			len(lab.power.dispatchHosts) != 0 || !strings.HasPrefix(report.Message, "Scheduled shut-down at 18:00 is waiting: another client") ||
+			!strings.HasSuffix(report.Message, "It is tried again every minute until 18:10.") {
+			t.Fatalf("minute %d: %+v", minute, report)
+		}
+	}
+	// Waiting leaves no history line, and keeps the action for the next try.
+	if len(lab.records.records) != 0 || lab.store.record.Retry != "2026-10-12T18:00" || lab.store.record.LastRun != "2026-10-12T18:00" {
+		t.Fatalf("history = %+v, record %+v", lab.records.records, lab.store.record)
+	}
+	// The operation ends: the next minute shuts the computers down, once.
+	lab.power.active = false
+	lab.now = mondayEvening.Add(5 * time.Minute)
+	report := lab.runner.Run(scheduleContext, "/lab")
+	if report.State != "completed" || report.Scheduled != "2026-10-12T18:00" || report.Minute != "2026-10-12T18:05" || len(lab.power.dispatchHosts) != 2 ||
+		!strings.HasPrefix(report.Message, "Scheduled shut-down at 18:00: 2 computers asked to shut down") {
+		t.Fatalf("report = %+v, asked %v", report, lab.power.dispatchHosts)
+	}
+	if len(lab.records.records) != 1 || lab.records.records[0].State != "completed" || lab.records.records[0].Subject != "scheduled shut-down at 18:00" || lab.store.record.Retry != "" {
+		t.Fatalf("history = %+v, record %+v", lab.records.records, lab.store.record)
+	}
+	for minute := 6; minute <= 12; minute++ {
+		lab.now = mondayEvening.Add(time.Duration(minute) * time.Minute)
+		if again := lab.runner.Run(scheduleContext, "/lab"); again.State != "idle" || len(lab.power.dispatchHosts) != 2 || len(lab.records.records) != 1 {
+			t.Fatalf("minute %d after it ran: %+v", minute, again)
+		}
+	}
+}
+
+func TestScheduleRunWaitsWhileANetworkInstallationIsActive(t *testing.T) {
+	lab := scheduleFixture(schoolSchedule)
+	lab.now = mondayEvening
+	lab.power.listener.Active = true
+	report := lab.runner.Run(scheduleContext, "/lab")
+	if report.State != "waiting" || !strings.Contains(report.Message, "installation") || len(lab.power.dispatchHosts) != 0 {
+		t.Fatalf("report = %+v", report)
+	}
+	lab.power.listener.Active = false
+	lab.now = mondayEvening.Add(time.Minute)
+	if report := lab.runner.Run(scheduleContext, "/lab"); report.State != "completed" || len(lab.power.dispatchHosts) != 2 {
+		t.Fatalf("after the installation = %+v", report)
+	}
+}
+
+// Ten minutes after the set time, the last try that cannot start is the end:
+// one history line, no more tries that day, and the next day runs as usual.
+func TestScheduleRunGivesUpTenMinutesAfterTheSetTime(t *testing.T) {
+	lab := scheduleFixture(schoolSchedule)
+	lab.power.active = true
+	for minute := 0; minute < domain.ScheduleRetryMinutes; minute++ {
+		lab.now = mondayEvening.Add(time.Duration(minute) * time.Minute)
+		if report := lab.runner.Run(scheduleContext, "/lab"); report.State != "waiting" {
+			t.Fatalf("minute %d: %+v", minute, report)
+		}
+	}
+	lab.now = mondayEvening.Add(10 * time.Minute)
+	report := lab.runner.Run(scheduleContext, "/lab")
+	if report.State != "gave-up" || !report.HasErrors() || report.Scheduled != "2026-10-12T18:00" ||
+		!strings.HasPrefix(report.Message, "Scheduled shut-down at 18:00 was given up after 10 minutes: another client") {
+		t.Fatalf("report = %+v", report)
+	}
+	if len(lab.records.records) != 1 || lab.records.records[0].State != "gave-up" || lab.records.records[0].Subject != "scheduled shut-down at 18:00" ||
+		lab.records.records[0].Summary != "nothing was sent within 10 minutes; see the journal of the schedule service" || lab.store.record.Retry != "" {
+		t.Fatalf("history = %+v, record %+v", lab.records.records, lab.store.record)
+	}
+	// Nothing more that day, even once the lock is free.
+	lab.power.active = false
+	for minute := 11; minute <= 30; minute++ {
+		lab.now = mondayEvening.Add(time.Duration(minute) * time.Minute)
+		if again := lab.runner.Run(scheduleContext, "/lab"); again.State != "idle" || len(lab.power.dispatchHosts) != 0 || len(lab.records.records) != 1 {
+			t.Fatalf("minute %d after giving up: %+v", minute, again)
+		}
+	}
+	// The next day shuts down as usual.
+	lab.now = mondayEvening.AddDate(0, 0, 1)
+	if next := lab.runner.Run(scheduleContext, "/lab"); next.State != "completed" || next.Scheduled != "2026-10-13T18:00" || len(lab.power.dispatchHosts) != 2 {
+		t.Fatalf("next day = %+v", next)
+	}
+}
+
+// When the controller's timer did not run during the last minutes of the
+// window, the next run gives up without trying: it is too late.
+func TestScheduleRunGivesUpWhenTheTriesRanOutBetweenRuns(t *testing.T) {
+	lab := scheduleFixture(schoolSchedule)
+	lab.power.active = true
+	lab.now = mondayEvening
+	if report := lab.runner.Run(scheduleContext, "/lab"); report.State != "waiting" {
+		t.Fatalf("first try = %+v", report)
+	}
+	lab.power.active = false
+	lab.now = mondayEvening.Add(15 * time.Minute)
+	report := lab.runner.Run(scheduleContext, "/lab")
+	if report.State != "gave-up" || len(lab.power.dispatchHosts) != 0 || report.Message != "Scheduled shut-down at 18:00 was given up: it could not start within 10 minutes." {
+		t.Fatalf("report = %+v", report)
+	}
+	if len(lab.records.records) != 1 || lab.records.records[0].State != "gave-up" {
+		t.Fatalf("history = %+v", lab.records.records)
+	}
+	lab.now = lab.now.Add(time.Minute)
+	if again := lab.runner.Run(scheduleContext, "/lab"); again.State != "idle" || len(lab.records.records) != 1 {
+		t.Fatalf("after giving up = %+v", again)
+	}
+}
+
+func TestAChangedScheduleDropsAnActionThatWasWaiting(t *testing.T) {
+	lab := scheduleFixture(schoolSchedule)
+	lab.power.active = true
+	lab.now = mondayEvening
+	if report := lab.runner.Run(scheduleContext, "/lab"); report.State != "waiting" || lab.store.record.Retry == "" {
+		t.Fatalf("first try = %+v", report)
+	}
+	lab.runner.schedule.now = func() time.Time { return lab.now }
+	if saved := lab.runner.schedule.Set(domain.Schedule{On: "07:50", Off: "19:00", Days: schoolDays}); saved.HasErrors() || lab.store.record.Retry != "" {
+		t.Fatalf("saved = %+v, record %+v", saved, lab.store.record)
+	}
+	lab.power.active = false
+	lab.now = mondayEvening.Add(time.Minute)
+	if report := lab.runner.Run(scheduleContext, "/lab"); report.State != "idle" || len(lab.power.dispatchHosts) != 0 {
+		t.Fatalf("after the change = %+v", report)
+	}
+	// A marker that names a minute the schedule no longer sets is ignored too.
+	lab.store.record.Retry = "2026-10-12T18:00"
+	lab.now = mondayEvening.Add(2 * time.Minute)
+	if report := lab.runner.Run(scheduleContext, "/lab"); report.State != "idle" || len(lab.power.dispatchHosts) != 0 {
+		t.Fatalf("stale marker = %+v", report)
+	}
+}
+
+func TestScheduleNextFindsTheOccurrenceToTry(t *testing.T) {
+	record := func(schedule domain.Schedule, retry string) domain.ScheduleRecord {
+		return domain.ScheduleRecord{SchemaVersion: 1, Schedule: schedule, LastRun: retry, Retry: retry}
+	}
+	night := domain.Schedule{Off: "23:55", Days: []string{"mon", "fri"}}
+	for name, test := range map[string]struct {
+		record domain.ScheduleRecord
+		now    time.Time
+		want   scheduleAttempt
+		found  bool
+	}{
+		"due now":     {domain.ScheduleRecord{Schedule: schoolSchedule}, mondayEvening, scheduleAttempt{scheduled: "2026-10-12T18:00", action: domain.ScheduleActionOff, until: "18:10"}, true},
+		"already ran": {domain.ScheduleRecord{Schedule: schoolSchedule, LastRun: "2026-10-12T18:00"}, mondayEvening, scheduleAttempt{}, false},
+		"not due":     {domain.ScheduleRecord{Schedule: schoolSchedule}, mondayEvening.Add(time.Minute), scheduleAttempt{}, false},
+		"retry, a few minutes on": {record(schoolSchedule, "2026-10-12T18:00"), mondayEvening.Add(3 * time.Minute),
+			scheduleAttempt{scheduled: "2026-10-12T18:00", action: domain.ScheduleActionOff, until: "18:10"}, true},
+		"retry, last minute": {record(schoolSchedule, "2026-10-12T18:00"), mondayEvening.Add(10 * time.Minute),
+			scheduleAttempt{scheduled: "2026-10-12T18:00", action: domain.ScheduleActionOff, until: "18:10", last: true}, true},
+		"retry, too late": {record(schoolSchedule, "2026-10-12T18:00"), mondayEvening.Add(11 * time.Minute),
+			scheduleAttempt{scheduled: "2026-10-12T18:00", action: domain.ScheduleActionOff, until: "18:10", last: true, expired: true}, true},
+		// The window runs over midnight, and the weekday is the one of the set time.
+		"retry over midnight": {record(night, "2026-10-12T23:55"), time.Date(2026, 10, 13, 0, 3, 0, 0, cest),
+			scheduleAttempt{scheduled: "2026-10-12T23:55", action: domain.ScheduleActionOff, until: "00:05"}, true},
+		"retry over midnight into the weekend": {record(night, "2026-10-16T23:55"), time.Date(2026, 10, 17, 0, 5, 0, 0, cest),
+			scheduleAttempt{scheduled: "2026-10-16T23:55", action: domain.ScheduleActionOff, until: "00:05", last: true, expired: false}, true},
+		"retry of a minute the schedule does not set": {record(schoolSchedule, "2026-10-12T17:00"), mondayEvening.Add(time.Minute), scheduleAttempt{}, false},
+		"retry of a day the schedule does not list":   {record(domain.Schedule{Off: "18:00", Days: []string{"tue"}}, "2026-10-12T18:00"), mondayEvening.Add(time.Minute), scheduleAttempt{}, false},
+		"no schedule": {domain.ScheduleRecord{Retry: "2026-10-12T18:00"}, mondayEvening, scheduleAttempt{}, false},
+	} {
+		got, found := scheduleNext(test.record, test.now)
+		if found != test.found || got != test.want {
+			t.Errorf("%s: got %+v (%v), want %+v (%v)", name, got, found, test.want, test.found)
+		}
 	}
 }

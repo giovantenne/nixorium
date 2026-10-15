@@ -437,9 +437,10 @@ review token and changes no system, and `nixorium schedule show`, `set [--on
 HH:MM] [--off HH:MM] [--days mon-fri|all|<list>]` (Monday to Friday when
 `--days` is left out), `clear` and `--json` do the same for the teacher and
 the administrator, through the classroom service's typed `schedule-get` and
-`schedule-set` operations. The schedule is
+`schedule-set` operations; the two times must be more than ten minutes apart. The schedule is
 `/var/lib/nixorium/classroom/schedule.json` (`{"schemaVersion":1,"on":"07:50",
-"off":"18:00","days":["mon",…,"fri"],"lastRun":"2026-10-15T07:50"}`), beside
+"off":"18:00","days":["mon",…,"fri"],"lastRun":"2026-10-15T07:50"}`, with a
+`retry` minute while an action waits for its next try), beside
 the learned addresses: the service's own state directory, replaced
 atomically with mode 0600 under a lock, and a missing or damaged file reads as
 "no schedule". It is not in Git or in the backup, so set it again after
@@ -451,12 +452,20 @@ skips the computers already on and those with no known address yet, or the
 ordinary reviewed shut-down with the `skip-active` session policy: a computer
 someone is using, or whose session state cannot be read, is left on, both in
 the review and in the check just before each request, and the usual client
-operation lock and installation checks apply. The minute is recorded as
-`lastRun` under the lock before anything is sent, so no minute runs twice;
-a minute in which the controller was off is not made up afterwards. A run
-prints one line per computer and a summary to the journal of
+operation lock and installation checks apply. The set minute is recorded as
+`lastRun` under the lock before anything is sent, so no minute runs twice.
+An action that cannot start, because the inventory cannot be read, another
+client operation holds the lock or an installation check refuses, has sent
+nothing and is not counted as run: its minute goes to `retry`, the next runs
+report "waiting" and try again every minute until ten minutes after the set
+time, and the last try that still cannot start gives it up for that day with
+one `gave-up` record in the history (a changed schedule drops it too). An
+action that started, completed or partial, is never repeated, and a minute in
+which the controller was off is not made up afterwards. A run prints one line
+per computer and a summary to the journal of
 `nixorium-classroom-schedule.service`, adds a `schedule-run` record with counts
-only to the operation history, and prints nothing when nothing is due. The
+only to the operation history (not for a waiting minute), and prints nothing
+when nothing is due. The
 computers must allow waking from the network, as for Switch on.
 
 **Lock** asks the agent to have the bundled Shell extension cover the whole

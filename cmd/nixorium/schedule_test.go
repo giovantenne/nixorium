@@ -164,4 +164,14 @@ func TestScheduleRunPrintsWhatItDidAndNothingWhenIdle(t *testing.T) {
 	if code, _ := run(options{}, domain.ScheduleRunReport{State: "partial", Message: "x"}); code != 1 {
 		t.Fatalf("partial: %d", code)
 	}
+	// An action that waits for its next try is not a failure; the last try
+	// that cannot start is, so the unit shows it.
+	waiting := domain.ScheduleRunReport{State: "waiting", Action: domain.ScheduleActionOff, Message: "Scheduled shut-down at 18:00 is waiting: another client deployment or shutdown is already running. It is tried again every minute until 18:10.", Targets: []domain.ScheduleOutcome{}}
+	if code, out := run(options{}, waiting); code != 0 || out != waiting.Message+"\n" {
+		t.Fatalf("waiting: %d %q", code, out)
+	}
+	gaveUp := domain.ScheduleRunReport{State: "gave-up", Action: domain.ScheduleActionOff, Message: "Scheduled shut-down at 18:00 was given up after 10 minutes: another client deployment or shutdown is already running.", Targets: []domain.ScheduleOutcome{}}
+	if code, out := run(options{}, gaveUp); code != 1 || out != gaveUp.Message+"\n" {
+		t.Fatalf("gave up: %d %q", code, out)
+	}
 }

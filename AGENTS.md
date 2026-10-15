@@ -764,10 +764,13 @@ release is not finished until the site follows it.
   only in `schedule.json` in the same state directory (mode 0600, atomic,
   damaged reads as none), never in `lab-settings.json`, Git or the backup.
   `nixorium-classroom-schedule.timer` runs `nixorium schedule run` as the
-  service user; it claims the minute in the file before acting, so a minute
-  never runs twice, switches on with the ordinary wake operation and shuts
-  down with the reviewed shutdown under the `skip-active` policy, which never
-  interrupts a person: a session in use or unknown stays on.
+  service user; it claims the set minute in the file before acting, so an
+  action never runs twice, switches on with the ordinary wake operation and
+  shuts down with the reviewed shutdown under the `skip-active` policy, which
+  never interrupts a person: a session in use or unknown stays on. An action
+  that cannot start has sent nothing: it is handed back (`retry`) and tried
+  every minute for ten minutes, then given up with one history record; never
+  retry after a request was sent.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet
   lock. Recheck authenticated boot ID and state before every fixed helper

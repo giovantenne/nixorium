@@ -68,6 +68,8 @@ func (m *ScheduleManager) Set(requested domain.Schedule) domain.ScheduleReport {
 		// The last minute that ran stays, so saving again within that
 		// minute does not run it twice.
 		record.Schedule = normalized
+		// A new schedule supersedes an action that was waiting for its next try.
+		record.Retry = ""
 		return record, true
 	})
 	if err != nil {
@@ -107,6 +109,13 @@ func NewScheduleRunner(store ScheduleStore, wake *WakeManager, power *ShutdownMa
 
 // Run does what is due now. Nothing due, no schedule, or a minute that
 // already ran is an idle report without any effect.
+//
+// An action that cannot start (the inventory cannot be read, another client
+// operation holds the lock, a network installation is active) has sent
+// nothing, so it is not counted as run: it is tried again every minute for
+// ScheduleRetryMinutes after its set time, with a "waiting" report each
+// time, and then given up for that day with one history record. A run that
+// started, completed or partial, claims its minute for good.
 func (r *ScheduleRunner) Run(ctx context.Context, repository string) domain.ScheduleRunReport {
 	now := r.schedule.now()
 	report := domain.ScheduleRunReport{
@@ -116,19 +125,21 @@ func (r *ScheduleRunner) Run(ctx context.Context, repository string) domain.Sche
 		Minute:        domain.ScheduleMinute(now),
 		Targets:       []domain.ScheduleOutcome{},
 	}
-	if record := r.schedule.store.ReadSchedule(); !scheduleDue(record, now) {
+	if _, found := scheduleNext(r.schedule.store.ReadSchedule(), now); !found {
 		return report
 	}
-	// Claim the minute under the lock before doing anything, so a second run
-	// in the same minute, or a run that stops half way, never repeats it.
+	// Claim the occurrence under the lock before doing anything, so a second
+	// run in the same minute, or a run that stops half way, never repeats it.
+	// A blocked try hands it back below.
+	var attempt scheduleAttempt
 	claimed := false
-	var due domain.Schedule
 	err := r.schedule.store.UpdateSchedule(func(record domain.ScheduleRecord) (domain.ScheduleRecord, bool) {
-		if !scheduleDue(record, now) {
+		next, found := scheduleNext(record, now)
+		if !found {
 			return record, false
 		}
-		record.LastRun = report.Minute
-		due, claimed = record.Schedule, true
+		record.LastRun, record.Retry = next.scheduled, ""
+		attempt, claimed = next, true
 		return record, true
 	})
 	if err != nil {
@@ -139,15 +150,41 @@ func (r *ScheduleRunner) Run(ctx context.Context, repository string) domain.Sche
 	if !claimed {
 		return report
 	}
-	on, _ := due.Due(now)
-	if on {
-		report.Action = domain.ScheduleActionOn
+	report.Scheduled, report.Action = attempt.scheduled, attempt.action
+	label := scheduleLabel(report)
+	switch {
+	case attempt.expired:
+		// The tries ran out between two runs of the timer.
+		report.State = "gave-up"
+		report.Message = fmt.Sprintf("%s was given up: it could not start within %d minutes.", label, domain.ScheduleRetryMinutes)
+	case attempt.action == domain.ScheduleActionOn:
 		r.switchOn(ctx, repository, &report)
-	} else {
-		report.Action = domain.ScheduleActionOff
+	default:
 		r.shutDown(ctx, repository, &report)
 	}
-	if r.records != nil {
+	if report.State == "blocked" {
+		reason := report.Message
+		if attempt.last {
+			report.State = "gave-up"
+			report.Message = fmt.Sprintf("%s was given up after %d minutes: %s", label, domain.ScheduleRetryMinutes, reason)
+		} else {
+			// Hand the occurrence back for the next minute.
+			report.State = "waiting"
+			report.Message = fmt.Sprintf("%s is waiting: %s It is tried again every minute until %s.", label, reason, attempt.until)
+			if err := r.schedule.store.UpdateSchedule(func(record domain.ScheduleRecord) (domain.ScheduleRecord, bool) {
+				if record.LastRun != attempt.scheduled || record.Retry != "" {
+					return record, false
+				}
+				record.Retry = attempt.scheduled
+				return record, true
+			}); err != nil {
+				// Without the marker the occurrence stays claimed.
+				report.State = "blocked"
+				report.Message = fmt.Sprintf("%s was not done: %s It could not be kept for another try: %v.", label, reason, err)
+			}
+		}
+	}
+	if r.records != nil && report.State != "waiting" {
 		if err := RecordOperationOutcome(r.records, report); err != nil {
 			report.Message += " Its history record could not be saved."
 		}
@@ -155,35 +192,87 @@ func (r *ScheduleRunner) Run(ctx context.Context, repository string) domain.Sche
 	return report
 }
 
-// scheduleDue tells whether the schedule starts something in the minute of
-// now that did not run yet.
-func scheduleDue(record domain.ScheduleRecord, now time.Time) bool {
-	if record.Empty() || record.LastRun == domain.ScheduleMinute(now) {
-		return false
+// scheduleAttempt is an occurrence of the schedule that is to be tried now.
+type scheduleAttempt struct {
+	// scheduled is the local minute the action was set for, and action what
+	// is to be done then.
+	scheduled string
+	action    string
+	// last: the try of the final minute of the window; expired: the window
+	// was over before this run, so there is nothing left to try.
+	last, expired bool
+	// until is the clock time the tries end.
+	until string
+}
+
+func scheduleMinuteStart(now time.Time) time.Time {
+	return time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, now.Location())
+}
+
+// scheduleNext finds what a run at now has to try: the occurrence that could
+// not start earlier and is still inside its window (or whose window just
+// ran out), else the one that is due in this minute and did not run.
+func scheduleNext(record domain.ScheduleRecord, now time.Time) (scheduleAttempt, bool) {
+	if record.Empty() {
+		return scheduleAttempt{}, false
 	}
-	on, off := record.Due(now)
-	return on || off
+	window := time.Duration(domain.ScheduleRetryMinutes) * time.Minute
+	if record.Retry != "" {
+		// A schedule changed meanwhile no longer names the minute: that
+		// retry is dropped, and what the new schedule names now still runs.
+		if set, err := domain.ParseScheduleMinute(record.Retry, now.Location()); err == nil {
+			if action := record.ActionAt(set); action != "" {
+				elapsed := scheduleMinuteStart(now).Sub(set)
+				return scheduleAttempt{
+					scheduled: record.Retry,
+					action:    action,
+					last:      elapsed >= window,
+					expired:   elapsed > window,
+					until:     set.Add(window).Format("15:04"),
+				}, true
+			}
+		}
+	}
+	if record.LastRun == domain.ScheduleMinute(now) {
+		return scheduleAttempt{}, false
+	}
+	if action := record.ActionAt(now); action != "" {
+		return scheduleAttempt{scheduled: domain.ScheduleMinute(now), action: action, until: scheduleMinuteStart(now).Add(window).Format("15:04")}, true
+	}
+	return scheduleAttempt{}, false
+}
+
+// scheduleLabel names the action of a run, by the time it was set for.
+func scheduleLabel(report domain.ScheduleRunReport) string {
+	kind := "Scheduled switch-on at "
+	if report.Action == domain.ScheduleActionOff {
+		kind = "Scheduled shut-down at "
+	}
+	return kind + scheduleClock(report)
 }
 
 func scheduleClock(report domain.ScheduleRunReport) string {
-	if _, clock, found := strings.Cut(report.Minute, "T"); found {
+	minute := report.Scheduled
+	if minute == "" {
+		minute = report.Minute
+	}
+	if _, clock, found := strings.Cut(minute, "T"); found {
 		return clock
 	}
-	return report.Minute
+	return minute
 }
 
 func (r *ScheduleRunner) switchOn(ctx context.Context, repository string, report *domain.ScheduleRunReport) {
-	label := "Scheduled switch-on at " + scheduleClock(*report)
+	label := scheduleLabel(*report)
 	plan := r.wake.Plan(ctx, repository, "@lab")
 	if plan.HasErrors() {
-		report.State = "blocked"
-		report.Message = label + " was not done: " + plan.Message
+		// Nothing was sent: the caller may try again.
+		report.State, report.Message = "blocked", plan.Message
 		return
 	}
 	applied := r.wake.Apply(ctx, plan)
 	if applied.State == "blocked" {
-		report.State = "blocked"
-		report.Message = label + " was not done: " + applied.Message
+		report.State, report.Message = "blocked", applied.Message
 		return
 	}
 	for _, target := range applied.Targets {
@@ -212,7 +301,7 @@ func (r *ScheduleRunner) switchOn(ctx context.Context, repository string, report
 }
 
 func (r *ScheduleRunner) shutDown(ctx context.Context, repository string, report *domain.ScheduleRunReport) {
-	label := "Scheduled shut-down at " + scheduleClock(*report)
+	label := scheduleLabel(*report)
 	plan := r.power.PlanAction(ctx, repository, "@lab", domain.ShutdownSkipActive, domain.ClientPowerOff)
 	outcomes := map[string]domain.ScheduleOutcome{}
 	for _, target := range plan.Targets {
@@ -229,8 +318,8 @@ func (r *ScheduleRunner) shutDown(ctx context.Context, repository string, report
 	}
 	if plan.State != "ready" {
 		if !scheduleNothingEligible(plan) {
-			report.State = "blocked"
-			report.Message = label + " was not done: " + plan.Message
+			// Nothing was sent: the caller may try again.
+			report.State, report.Message = "blocked", plan.Message
 			return
 		}
 		// Every computer is off or in use: nothing to ask, nothing wrong.
@@ -241,8 +330,7 @@ func (r *ScheduleRunner) shutDown(ctx context.Context, repository string, report
 	}
 	applied := r.power.ApplyPlan(ctx, plan, plan.ReviewToken)
 	if len(applied.Issues) > 0 {
-		report.State = "blocked"
-		report.Message = label + " was not done: " + applied.Message
+		report.State, report.Message = "blocked", applied.Message
 		return
 	}
 	for _, target := range applied.Targets {
@@ -341,6 +429,8 @@ func scheduleRunRecord(report domain.ScheduleRunReport) domain.OperationRecord {
 		counts[target.State]++
 	}
 	switch {
+	case report.State == "gave-up":
+		record.Summary = fmt.Sprintf("nothing was sent within %d minutes; see the journal of the schedule service", domain.ScheduleRetryMinutes)
 	case report.State == "blocked":
 		record.Summary = "nothing was sent; see the journal of the schedule service"
 	case report.Action == domain.ScheduleActionOff:

@@ -897,9 +897,11 @@ nixorium schedule clear
 ```
 
 `--days` takes `mon-fri`, `all` or a list such as `mon,wed,fri`, and is
-Monday to Friday when left out; `set` replaces the whole schedule and
-`--json` gives the answer in a form for scripts. At each set time the controller does what it does for **Switch on**
-or **Shut down** on all student computers, with these differences:
+Monday to Friday when left out; `set` replaces the whole schedule, and the
+switch-on and shut-down times must be more than ten minutes apart. `--json`
+gives the answer in a form for scripts. At each set time the controller does
+what it does for **Switch on** or **Shut down** on all student computers,
+with these differences:
 
 - the switch-on skips computers that are already on and those whose network
   address is not known yet, so the points of [Switch computers
@@ -909,13 +911,19 @@ or **Shut down** on all student computers, with these differences:
   or whose session cannot be read, stays on, and so does one that is off or
   does not answer. A computer where the student is logged in but has not
   touched keyboard or mouse for ten minutes does shut down;
-- nothing is made up afterwards: a minute in which the controller was off or
-  busy with another operation (a deployment, for example) is simply missed.
+- when another operation (a deployment, for example) or a network
+  installation keeps the controller from starting at the set time, it tries
+  again every minute for up to ten minutes after that time, then gives up for
+  that day and writes one line to the history saying so; once it has started
+  it is not repeated. A time at which the controller was off is not made up
+  afterwards.
 
 Every run that does something is a line in the operation history that
-`nixorium logs` lists for the administrator (`schedule-run`, with counts only)
-and in the journal of `nixorium-classroom-schedule.service`
-(`journalctl -u nixorium-classroom-schedule`), which lists each computer. The
+`nixorium logs` lists for the administrator (`schedule-run`, with counts only;
+state `gave-up` when it never started) and in the journal of
+`nixorium-classroom-schedule.service`
+(`journalctl -u nixorium-classroom-schedule`), which lists each computer and
+each minute it waited. The
 schedule is kept on the controller only, in
 `/var/lib/nixorium/classroom/schedule.json`: it is not part of the
 configuration in Git or of the backup, so **set it again after replacing the
