@@ -101,6 +101,7 @@ var administrationTasks = []dashboardTask{
 	{id: "restore", shortcut: "o", title: "Restore lab", description: "Restore a backup file or Git backup into a new folder with the original keys"},
 	{id: "cleanup", shortcut: "f", title: "Free disk space", description: "Remove old system versions on the controller and clients, after review", advanced: true},
 	{id: "controller", shortcut: "c", title: "Apply to controller", description: "Make this controller run the saved configuration, after review", advanced: true},
+	networkChangeTask,
 	{id: "services", shortcut: "s", title: "Controller services", description: "Check software delivery services or restart the signed cache when troubleshooting", advanced: true},
 	{id: "git", shortcut: "g", title: "Review Git changes", description: "Inspect and commit selected safe deployment files", advanced: true},
 	{id: "template-reset", shortcut: "t", title: "Reset deployment template", description: "Replace local customizations from the locked upstream; preserve settings and keys with a backup", advanced: true},

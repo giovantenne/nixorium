@@ -88,8 +88,15 @@ type DashboardActions struct {
 	// choice.
 	ApplyDeploymentQueued func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
 	// LoadDeferredUpdates and CancelDeferredUpdates show and edit the queue.
-	LoadDeferredUpdates     func(context.Context) domain.DeferredUpdateStatus
-	CancelDeferredUpdates   func([]string) error
+	LoadDeferredUpdates   func(context.Context) domain.DeferredUpdateStatus
+	CancelDeferredUpdates func([]string) error
+	// LoadNetworkMigration, PlanNetworkMigration and ApplyNetworkMigration
+	// drive Maintenance → Change network addressing. Plan takes the step
+	// (start, finish or undo), the new network for start, and whether the
+	// computers that are off are acknowledged.
+	LoadNetworkMigration    func(context.Context) domain.NetworkMigrationStatus
+	PlanNetworkMigration    func(context.Context, string, string, bool) domain.NetworkMigrationPlan
+	ApplyNetworkMigration   func(domain.NetworkMigrationPlan) domain.NetworkMigrationResult
 	PlanController          func(context.Context) domain.ControllerRebuildPlanReport
 	ApplyController         func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
 	LoadControllerProgress  func() (domain.OperationProgress, error)
@@ -198,6 +205,7 @@ const (
 	dashboardLock
 	dashboardShare
 	dashboardDeferredUpdates
+	dashboardNetworkChange
 	dashboardCleanup
 	dashboardRecovery
 	dashboardRecoveryReview
@@ -474,6 +482,7 @@ type dashboardModel struct {
 	installation           installationModel
 	deployment             deploymentModel
 	deferred               deferredModel
+	networkChange          networkChangeModel
 	controller             controllerModel
 	maintenance            maintenanceModel
 	updates                updateModel
@@ -1267,6 +1276,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.shareView()
 	case dashboardDeferredUpdates:
 		content = model.deferredUpdatesView()
+	case dashboardNetworkChange:
+		content = model.networkChangeView()
 	case dashboardCleanup:
 		content = model.cleanupView()
 	case dashboardRecovery:

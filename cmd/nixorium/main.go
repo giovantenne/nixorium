@@ -685,6 +685,19 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadDeferredUpdates: func(ctx context.Context) domain.DeferredUpdateStatus {
 			return newDeferredUpdateManager().Status(ctx, repository)
 		},
+		LoadNetworkMigration: func(ctx context.Context) domain.NetworkMigrationStatus {
+			return newNetworkMigrationManager().Status(ctx, repository)
+		},
+		PlanNetworkMigration: func(ctx context.Context, action, network string, acknowledgeOff bool) domain.NetworkMigrationPlan {
+			request := app.NetworkMigrationRequest{Action: action, AcknowledgeOff: acknowledgeOff}
+			if action == domain.NetworkMigrationStart {
+				request.Base, request.Prefix, _ = domain.ParseLabNetwork(network)
+			}
+			return newNetworkMigrationManager().Plan(ctx, repository, request)
+		},
+		ApplyNetworkMigration: func(plan domain.NetworkMigrationPlan) domain.NetworkMigrationResult {
+			return newNetworkMigrationManager().Apply(ctx, plan, plan.ReviewToken)
+		},
 		CancelDeferredUpdates: func(hosts []string) error {
 			_, err := newDeferredUpdateManager().Cancel(hosts)
 			return err

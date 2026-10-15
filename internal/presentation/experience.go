@@ -293,6 +293,12 @@ func (model dashboardModel) helpView() string {
 			"Type CLEAN on the review to start. Computers that are off are never queued. After the result: n new review.")
 	case dashboardShare:
 		lines = append(lines, "Type the path of a file or folder (it starts at your home), Enter; then Space selects clients, a selects all, Enter reviews and Enter sends.", "A folder arrives with its name and contents; hidden files and links inside it are left out; at most 2000 items and 500 MB. Students get their own copy, never executable; existing names are kept as \"name (2)\".", "Computers that are off or have nobody signed in are listed and skipped. A restart empties the student's home.")
+	case dashboardNetworkChange:
+		lines = append(lines, "Type the new network as address/prefix, for example 10.1.0.0/24, then Enter reviews it. Every computer keeps its number.",
+			"The review checks every computer: c continues without those that are off (they move when they are next updated, or are queued). Enter saves the step; no computer changes yet.",
+			"Then apply to the controller (it answers on both networks) and update the computers (each moves to its new address), each with its own review and typed confirmation.",
+			"During the change Enter opens the next step; f finishes when every computer is on the new network; u undoes the change, which is possible until it is finished.",
+			"After finishing, prepare network installation again before installing a computer by PXE.")
 	case dashboardDeferredUpdates:
 		lines = append(lines, "These computers were off when an update was reviewed. Every minute the controller tries those that answer, one at a time, with the same build, check and record as Update computers.", "A computer marked as changed is not updated: the configuration moved on after queueing. Review the update again.", "x removes the selected computer, X removes all; they keep their current system. r refreshes.")
 	case dashboardLock:

@@ -92,6 +92,8 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		return model.openRestoreLab()
 	case "t":
 		return model.openTemplateReset()
+	case "n":
+		return model.openNetworkChange()
 	case "s":
 		model.screen = dashboardServices
 		model.busy = "Checking managed controller services"
@@ -795,6 +797,8 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		return model.updateShare(key)
 	case dashboardDeferredUpdates:
 		return model.updateDeferredUpdates(key)
+	case dashboardNetworkChange:
+		return model.updateNetworkChange(key)
 	case dashboardCleanup:
 		return model.updateCleanup(key)
 	case dashboardRecovery:

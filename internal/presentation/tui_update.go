@@ -13,6 +13,9 @@ import (
 
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
+	if updated, command, handled := model.handleNetworkChangeMessage(message); handled {
+		return updated, command
+	}
 	switch message := message.(type) {
 	case assistantBillingMsg:
 		return model.finishAssistantBilling(message)
@@ -682,6 +685,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		model.controller.autoApply = false
+		if model.screen == dashboardNetworkChange && model.networkChange.result.Operation == "" {
+			// Back to the change in progress: read it again, the controller
+			// now carries other addresses.
+			message := model.message
+			next, read := model.loadNetworkChange()
+			updated := next.(dashboardModel)
+			updated.message = message
+			return updated, read
+		}
 		if model.actions.LoadControllerProgress != nil {
 			return model, model.loadControllerProgress(model.controller.progressID)
 		}

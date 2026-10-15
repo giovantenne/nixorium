@@ -341,11 +341,11 @@ func migrationComputerDetail(state string, runsSaved bool) string {
 		if runsSaved {
 			return "runs the saved configuration but still answers on its previous address; restart it to move it"
 		}
-		return "still on the previous network; update it"
+		return "update it so it moves to its new address"
 	case domain.MigrationComputerOutdated:
-		return "answers on its new address but runs an older configuration; update it"
+		return "update it to the saved configuration"
 	case domain.MigrationComputerWaiting:
-		return "off; queued, it moves when switched on"
+		return "it moves when switched on"
 	case domain.MigrationComputerUnknown:
 		return "does not answer on either address; switch it on, then update it"
 	}
