@@ -8,69 +8,6 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- `nixorium git undo plan` and `nixorium git undo apply --expect <token>` go
-  back from the last saved change (settings, software, student workspace):
-  the review shows its description, date and files, and applying it (typed
-  `UNDO`) saves one new "Undo: ..." change and puts the files back. In the
-  dashboard press `u` on **Maintenance → Review Git changes**; Enter on the
-  result opens Apply to controller. Nothing is pushed and no computer changes;
-  apply to the controller and update the computers as usual. It refuses, and names the next step, unsaved changes, a
-  first version, a merge, an earlier undo, an update of Nixorium or of the
-  package base (see the update recovery), recorded keys, a change of the
-  laboratory network and files that cannot go back safely.
-- Assistant can now change the browser homepage, the time zone, the locale, the
-  keyboard layout and the Git identities in a proposal; everything else in the
-  settings stays in the menu. The change is reviewed and saved like any other
-  proposal, with the same checks and the same "what happens next" lines as a
-  change made in Maintenance → Change settings.
-- Student computers now get the time from the controller. The controller keeps
-  its own clock right from Internet time servers (it needs to reach them) and
-  gives the time to the laboratory network only, opening UDP port 123 on the
-  laboratory network card and nowhere else. Each computer asks the controller
-  and no Internet time server, so a computer whose clock battery is drained
-  starts with the right time even though it has no Internet of its own, and
-  certificates, file dates and logs stay correct, also for a computer that has
-  Internet after a user signs in. If the controller cannot reach the Internet
-  it keeps giving its own clock, starting five minutes after it boots. The
-  change reaches each computer at its next update and the controller when you
-  apply it; there is nothing to configure. Controller-only installations keep
-  their previous time settings.
-- Programs downloaded outside Nix now run on the controller and every client:
-  Nixorium enables nix-ld with the common libraries (zlib, libstdc++, glib,
-  OpenSSL, ICU and the X11/GTK set that Electron and Java GUI programs need).
-  A VS Code extension installed from the Marketplace that bundles its own
-  binaries, such as the Java runtime of the Java extension, starts instead of
-  failing with "Could not start dynamically linked executable". Managed
-  extensions from the profile remain the recommended route, and student homes
-  still lose their installs at the reset.
-- When the student workspace profile selects the Java extension and the
-  software includes a JDK, the managed editor settings point the extension at
-  that JDK (`java.jdt.ls.java.home` and `java.configuration.runtimes`), so it
-  never depends on a runtime bundled in a Marketplace copy. Reviewed editor
-  settings in the profile may still override them.
-- The settings review checks network devices before saving, without changing
-  any computer. A new controller device name is compared with the controller's
-  devices (listed with their addresses, the one carrying the DHCP address
-  marked), and a name the controller does not have as a wired device cannot be
-  saved: "The controller has no network device called enp5s0. Its devices are:
-  …". A new client device name is checked on every affected computer that
-  answers: a missing device blocks the save unless you choose to save anyway
-  for the computers listed, and computers that do not answer are listed to
-  check at their screen. The review also advises updating one computer first.
-  `nixorium config plan --json` reports the same findings in a new
-  `networkPreflight` object.
-- The controller DHCP address in Settings → Network is picked from the
-  controller's current DHCP addresses, with the saved value preselected;
-  Other… still accepts a typed address, with a warning when the controller
-  does not have it. The command line is unchanged.
-- The laboratory can move to a new network without losing a computer:
-  Maintenance → Change network addressing (`nixorium network migrate
-  plan|start|status|finish|undo`) reviews the new address of the controller
-  and of every computer, then continues with Apply to controller and Update
-  computers while the controller and the computers answer on both networks.
-  A computer still on the old network is updated there, computers that are off
-  are queued, the Overview shows the change in progress (`NETWORK-CHANGING`)
-  with its next step, and the change can be undone until it is finished.
 - **Switch on** starts student computers that are off, with Wake-on-LAN. It is
   in **Computers → Power controls** (Tab beside Shut down and Restart, for the
   administrator and the teacher), in the classroom view page (**Power →
@@ -137,42 +74,108 @@ The project follows [Semantic Versioning](https://semver.org/).
   shows the same; the computers keep no exam state, and restarting the
   classroom service forgets it (then use **Remove message**, **Unlock** and
   **Allow Internet**).
-- **Schedule** switches the student computers on and off by themselves, at
-  most one switch-on time and one shut-down time for a set of weekdays, for
+- **Schedule** switches the student computers on and off by themselves, with
+  at most one switch-on time and one shut-down time for a set of weekdays, for
   example on at 07:50 and off at 18:00 from Monday to Friday, in the
-  controller's time zone. Set it in the classroom view (**Power → Schedule…**,
-  with **Save** and **Clear**) or in a terminal, as the teacher or the
-  administrator: `nixorium schedule set --on 07:50 --off 18:00` (Monday to
-  Friday unless `--days` says otherwise), `nixorium schedule show`,
-  `nixorium schedule clear`. A timer on the controller
-  (`nixorium-classroom-schedule.timer`) runs it every minute: the switch-on is
-  the ordinary **Switch on** (computers without a known network address are
-  skipped), and the shut-down never interrupts a person, since a computer that
-  someone is using, or whose session cannot be read, stays on. When another
-  operation or a network installation keeps it from starting, it tries again
-  every minute for ten minutes and then gives up for that day. Each run leaves
-  a line in the operation history and the journal. The
-  schedule lives on the controller only, outside the configuration and the
-  backup: set it again after replacing the controller. The computers must
-  allow waking from the network, as for **Switch on**.
+  controller's time zone; the two times must be more than ten minutes apart.
+  Set it in the classroom view (**Power → Schedule…**, with **Save** and
+  **Clear**) or in a terminal, as the teacher or the administrator:
+  `nixorium schedule set --on 07:50 --off 18:00` (Monday to Friday unless
+  `--days` says otherwise), `nixorium schedule show`,
+  `nixorium schedule clear`. The controller checks the schedule every minute:
+  the switch-on is the ordinary **Switch on** (computers without a known
+  network address are skipped), and the shut-down never interrupts a person,
+  since a computer that someone is using, or whose session cannot be read,
+  stays on. When another operation or a network installation keeps it from
+  starting, it tries again every minute for ten minutes and then gives up for
+  that day. Each run leaves a line in the operation history and in the
+  controller's log. The schedule lives on the controller only, outside the
+  configuration and the backup: set it again after replacing the controller.
+  The computers must allow waking from the network, as for **Switch on**.
+- `nixorium git undo plan` and `nixorium git undo apply --expect <token>` go
+  back from the last saved change (settings, software, student workspace): the
+  review shows its description, date and files, and applying it (typed `UNDO`)
+  saves one new "Undo: ..." change and puts the files back. In the dashboard
+  press `u` on **Maintenance → Review Git changes**; Enter on the result opens
+  **Apply to controller**. Nothing is pushed and no computer changes; apply to
+  the controller and update the computers as usual. It refuses, and names the
+  next step, unsaved changes, a first version, a merge, an earlier undo, an
+  update of Nixorium or of the package base (see the update recovery),
+  recorded keys, a change of the laboratory network and files that cannot go
+  back safely.
+- The laboratory can move to a new network without losing a computer:
+  **Maintenance → Change network addressing**
+  (`nixorium network migrate plan|start|status|finish|undo`) reviews the new
+  address of the controller and of every computer, then continues with
+  **Apply to controller** and **Update computers** while the controller and
+  the computers answer on both networks. A computer still on the old network
+  is updated there, computers that are off are queued, the Overview shows the
+  change in progress (`NETWORK-CHANGING`) with its next step, and the change
+  can be undone until it is finished.
+- The settings review checks network devices before saving, without changing
+  any computer. A new controller device name is compared with the controller's
+  devices (listed with their addresses, the one carrying the DHCP address
+  marked), and a name the controller does not have as a wired device cannot be
+  saved: "The controller has no network device called enp5s0. Its devices are:
+  …". A new client device name is checked on every affected computer that
+  answers: a missing device blocks the save unless you choose to save anyway
+  for the computers listed, and computers that do not answer are listed to
+  check at their screen. The review also advises updating one computer first.
+  `nixorium config plan --json` reports the same findings in a new
+  `networkPreflight` object.
+- The controller DHCP address in **Settings → Network** is picked from the
+  controller's current DHCP addresses, with the saved value preselected;
+  **Other…** still accepts a typed address, with a warning when the controller
+  does not have it. The command line is unchanged.
+- Student computers now get the time from the controller. The controller keeps
+  its own clock right from Internet time servers (it must be able to reach
+  them) and gives the time to the laboratory network only, opening UDP port
+  123 on the laboratory network card and nowhere else. Each computer asks the
+  controller and no Internet time server, so a computer whose clock battery is
+  drained starts with the right time even though it has no Internet of its
+  own, and certificates, file dates and logs stay correct, also for a computer
+  that has Internet after a user signs in. If the controller cannot reach the
+  Internet it keeps giving its own clock, starting five minutes after it boots
+  so that a clock that may still be wrong is not given out meanwhile. The
+  change reaches each computer at its next update and the controller when you
+  apply it; there is nothing to configure. Controller-only installations keep
+  their previous time settings.
+- Assistant can now change the browser homepage, the time zone, the locale,
+  the keyboard layout and the Git identities in a proposal; everything else in
+  the settings stays in the menu. The change is reviewed and saved like any
+  other proposal, with the same checks and the same "what happens next" lines
+  as a change made in **Maintenance → Change settings**.
+- Programs downloaded outside Nix now run on the controller and every client.
+  NixOS does not keep the shared libraries that most downloaded programs look
+  for, so they failed to start; Nixorium now enables nix-ld, which provides
+  the common ones: zlib, libstdc++, glib, OpenSSL, ICU and the X11/GTK set
+  that Electron and Java programs with a window need. A VS Code extension
+  installed from the Marketplace that brings its own programs, such as the
+  Java runtime of the Java extension, starts instead of failing with "Could
+  not start dynamically linked executable". Managed extensions from the
+  profile remain the recommended route, and student homes still lose their
+  installs at the reset.
+- When the student workspace profile selects the Java extension and the
+  software includes a JDK, the Java extension finds the laboratory's JDK by
+  itself, so it never depends on a runtime bundled in a Marketplace copy.
+  Reviewed editor settings in the profile may still override this.
 
 ### Changed
 
-- A student can no longer switch off the classroom view from the terminal of
-  the session: `systemctl --user stop` is refused for the classroom view and
-  its Shell extension helper, and the classroom view restarts one second after
-  it is killed, however many times. While it is down, the computer's card says
-  "Monitoring stopped on this PC" instead of just dimming, and the same words
-  explain why Lock, Send files, Share screen, Collect from desktop and Save
-  screenshot skipped that computer; the result notice counts it apart. A
-  computer waiting at the login screen still says "Nobody is signed in". A
-  classroom view that is frozen rather than stopped is reported the same way,
-  and a frozen one no longer keeps its connection open on the computer after
-  the controller has gone.
-  This is a classroom aid, not a security boundary: a student who masks the
-  unit gets the classroom view back at the next restart, because the home
-  folder is reset then. An update no longer restarts the classroom view on a
-  computer in use; the new version starts at the next sign-in.
+- A student can no longer stop the classroom view from a terminal on the
+  computer: the stop is refused, and when the program is killed it starts
+  again by itself a second later, however many times. While it is down, the
+  computer's card says "Monitoring stopped on this PC" instead of just
+  dimming, and the same words explain why Lock, Send files, Share screen,
+  Collect from desktop and Save screenshot skipped that computer; the result
+  notice counts it apart. A computer waiting at the login screen still says
+  "Nobody is signed in". A classroom view that is frozen rather than stopped
+  is reported the same way, and a frozen one no longer keeps its connection
+  open on the computer after the controller has gone. This is a classroom aid,
+  not a security boundary: a determined student can still switch it off or
+  freeze it, but it comes back at the next start of the computer, because the
+  home folder is reset then. An update no longer restarts the classroom view
+  on a computer in use; the new version takes effect at the next sign-in.
 - After **Update Nixorium** or **Apply to controller** activates the
   controller, Nixorium reopens itself on the newly installed version: the
   result shows "Nixorium <version> is active. The interface reopens in 3 s
@@ -183,11 +186,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   something does not work as expected, restart the computer."
 - Changing the laboratory network address, prefix length or controller number
   while computers are configured is refused with a clearer message and the new
-  situation code `NETWORK-LOCKED`: the computers would keep their old addresses
-  and lose the controller. The message points to the guided change of the
-  laboratory network (Maintenance → Change network addressing); the controller
-  number stays locked.
-
+  situation code `NETWORK-LOCKED`: the computers would keep their old
+  addresses and lose the controller. The message points to the guided change
+  of the laboratory network (**Maintenance → Change network addressing**); the
+  controller number stays locked.
 - The review of an Assistant proposal reuses the evaluation Assistant already
   ran when nothing changed since, instead of evaluating the laboratory a second
   time.
@@ -196,19 +198,40 @@ The project follows [Semantic Versioning](https://semver.org/).
   the message again, instead of asking you to update Nixorium. The reason for
   any refused response is kept in a private per-chat record on the controller
   and is never sent to the service.
+- When the Assistant service interrupts a request before it gives an answer,
+  because the AI provider failed or the service reached its safety limit,
+  Assistant now adds "This request was not counted." to the notice, and the
+  request is not taken from the requests you have left. A request you stop
+  yourself is still counted.
 
 ### Fixed
 
-- A stuck helper program can no longer keep the classroom view busy forever.
-  On a student computer, the session query behind a classroom connection is
-  stopped after 10 seconds and the screen capture program ends with the
-  capture; on the controller, the dark-style lookup of the classroom window
-  ends after 10 seconds. The reset of a student's home at boot stops a program
-  that has not finished after 5 minutes and fails safely, leaving what it
-  found for the administrator, instead of waiting without end.
+- The classroom view no longer waits forever on a slow or stuck student
+  computer. When a computer does not say within 10 seconds who is signed in,
+  its card says "Nobody is signed in" instead of waiting, and the program that
+  captures a student's screen is stopped whenever the capture stops. On the
+  controller, opening the classroom window no longer waits more than 10
+  seconds for the desktop's light or dark style, and opens without the dark
+  style when nothing answers. The reset of a student's home at boot stops
+  waiting after 5 minutes on a step that does not finish, ends safely and
+  leaves what it found for the administrator, instead of waiting without end.
 - `nixorium send plan|apply` works from the teacher's terminal: like
   `nixorium collect`, it needs only the classroom service and no longer stops
   with "deployment repository not found".
+
+### Documentation
+
+- The "Time" section of the system reference describes how the controller
+  keeps the laboratory's time and gives it to the computers.
+- The administrator guide has new sections "Switch computers on", "Schedule",
+  "Collect files" and "Undo the last saved change".
+- The "Laboratory settings" section of the Assistant guide lists the settings
+  Assistant can change, and the guide says which interrupted requests are not
+  counted.
+- The release checklist now asks to confirm the website release branch and to
+  update the Assistant instructions before tagging.
+- The development validation guide describes the ShellCheck and errcheck lint
+  that the default gate now runs.
 
 ## [3.7.0] - 2026-10-15
 
