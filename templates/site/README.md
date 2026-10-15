@@ -822,6 +822,39 @@ operating system accepted the request; loss of network contact does not prove
 physical power state or a completed reboot. An unconfirmed result may have taken effect, so inspect
 the target instead of retrying blindly.
 
+#### Switch computers on
+
+**Switch on** (Tab in **Power controls**, as the administrator or the
+teacher) sends a Wake-on-LAN packet to the selected computers that are off.
+The review lists the computers that receive it and skips those already on
+and those whose network address is not known yet. You never type an address:
+the controller learns each computer's address by itself while the computer
+is on and the classroom view is open or **Computer inventory** runs, and keeps
+it on the controller only. The classroom view page offers the same as
+**Power → Switch on** for the selected computers and in a computer's
+**Actions** menu while it does not answer; its card shows "Starting…" until
+the computer answers. From a terminal, without a review token:
+
+```sh
+nixorium wake --on pc03,pc04
+nixorium wake --on @lab
+```
+
+It prints one line per computer: sent, already on, address unknown, or
+invalid target. A sent packet does not prove that a computer starts. For
+that, each student computer must:
+
+- allow waking from the network in its BIOS/UEFI (often "Wake on LAN" or
+  "Power on by PCI-E"; some computers also need "ErP" or "Deep sleep"
+  turned off);
+- have been restarted once after the client update that enables
+  Wake-on-LAN on its lab network card;
+- stay plugged in: a switched-off power strip or a power cut disarms it
+  until the computer is started by hand once.
+
+When a computer stays off, check those points, then start it by hand and
+let the classroom view or the inventory see it once more.
+
 ### Operation logs
 
 To prepare a minimized support report, run `nixorium support preview --json`

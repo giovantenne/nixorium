@@ -479,6 +479,24 @@ that computer. Finish or close an unfinished USB installation from
 **Installation → USB over SSH**, and a network installation from
 **Installation → Network boot (PXE)**, before installing that computer again.
 
+## A computer does not start after Switch on
+
+**Switch on** sends a Wake-on-LAN packet; "sent" means only that the packet
+left the controller. The controller does not know yet the address of a
+computer listed as "address unknown": start it by hand once and open the
+classroom view or run **Computer inventory** while it is on. When a computer
+with a known address stays off:
+
+- check its BIOS/UEFI: waking from the network must be allowed (often "Wake
+  on LAN" or "Power on by PCI-E"); some computers also need "ErP" or "Deep
+  sleep" turned off;
+- restart it once after the client update that enabled Wake-on-LAN: the
+  network card is armed at start-up;
+- keep it plugged in: a switched-off power strip or a power cut disarms the
+  card until the computer is started by hand;
+- check that it is on the same network segment as the controller: the packet
+  is a broadcast and does not cross a router.
+
 ## A client was deliberately reinstalled and its SSH key changed
 
 An address match does not prove identity. Save and commit the declared inventory.

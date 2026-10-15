@@ -353,6 +353,22 @@ connection or subsequent network absence never proves physical power state,
 or that a restart completed, and an unconfirmed dispatch is explicitly not safe for blind retry. Operation
 history stores the bounded typed outcome rather than remote command output.
 
+`wake --on` (Switch on, also in Power controls and the classroom view page)
+accepts the same client selector grammar, refuses the whole request when a
+name is not a configured client, and never permits the controller. It
+changes no system state, so it has no review token, confirmation word or
+operation lock; the TUI and page still show a review first. A brief TCP
+reachability check marks computers already on, which are skipped. Hardware
+addresses come only from the controller's private record
+(`/var/lib/nixorium/classroom/wake-addresses.json`, mode 0600 in the
+classroom service's mode-0700 state directory), filled from the kernel's
+IPv4 neighbor table right after a client answered on the lab network; apply
+reads them again and never accepts one from a plan or a request. The adapter
+sends the standard magic packet over an unprivileged UDP socket to port 9 of
+the lab subnet's broadcast address and of `255.255.255.255`, three times
+over about one second. Outcomes are `sent`, `on`, `unknown` or `failed`; a
+sent packet is never reported as a computer that started.
+
 When the configured teacher starts `nixorium` on the controller, ordinary
 repository discovery fails because `/home/admin/nixorium-deployment` remains
 mode 0700. The frontend then connects to `/run/nixorium-classroom/control.sock`,

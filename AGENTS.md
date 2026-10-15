@@ -730,6 +730,14 @@ release is not finished until the site follows it.
   teacher chooses with the browser's own consent (never the page itself), posts JPEGs to `/api/broadcast/frame`, and the
   worker keeps one showing at a time, sending each computer only the latest
   picture and ending after ten silent seconds.
+  Switch on (Wake-on-LAN, `wake-plan`/`wake-apply`, `nixorium wake`) takes
+  no review token or operation lock, validates names like every classroom
+  operation and never targets the controller. Hardware addresses come only
+  from the controller's mode-0600 record in the classroom service's state
+  directory, learned from the kernel neighbor table after a client answered;
+  never from a request, `lab-settings.json` or Git. Send only unprivileged
+  UDP to port 9 (lab broadcast and 255.255.255.255), open no port, and never
+  report a sent packet as a computer that started.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet
   lock. Recheck authenticated boot ID and state before every fixed helper

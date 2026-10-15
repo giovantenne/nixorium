@@ -31,8 +31,8 @@ On the controller, `admin` owns the mode-0700 private deployment and the SSH
 identity used to manage clients. The teacher instead belongs to the
 `nixorium-classroom` group. Running `nixorium` without a readable deployment
 connects to a group-private local worker and opens only the classroom view,
-inventory, temporary Internet control, screen locking, sending files and
-reviewed client shutdown/restart. The worker runs as
+inventory, temporary Internet control, screen locking, sending files,
+switching computers on and reviewed client shutdown/restart. The worker runs as
 `admin`, validates every target against the fixed deployment, uses only fixed
 SSH helper/systemd commands, and shares the normal client-operation lock.
 Student accounts cannot traverse the runtime directory or connect to its
@@ -178,6 +178,21 @@ and `modules/firewall.nix` omit `iifname`/`oifname` from their rules
 the profile; use `hostIfaceNames` for such computers. The installer and the
 USB/SSH preparation skip the name check for these clients and use the card that
 carries the live address. See ADR 0017.
+
+Clients answer Wake-on-LAN magic packets on their lab card, so **Switch on**
+can start them (see [Classroom view](#classroom-view)); the controller does
+not. A client configured by type sets `ethernet.wake-on-lan=64` (magic packet)
+in the `nixorium-lab` profile, which NetworkManager applies to the card each
+time it activates the profile. A client configured by name gets a udev rule
+that runs `ethtool -s <interface> wol g` when that card appears, matching the
+final interface name, or the kernel name when nothing renames it. The NixOS
+`networking.interfaces.<name>.wakeOnLan` option is not used: its systemd
+`.link` file matches only the kernel's original name (`OriginalName=`), so it
+misses cards renamed to predictable names such as `enp3s0`. Either way the
+setting takes effect from the first restart after the client update. The
+computer's firmware must also allow it (BIOS/UEFI options often called "Wake
+on LAN" or "Power on by PCI-E"), and the computer must keep standby power: a
+switched-off power strip or a power cut disarms it.
 
 ## USB/SSH client installation boundary
 
@@ -373,6 +388,44 @@ closes by itself unless a computer failed. After **Restart** or **Shut
 down**, a card shows "Restarting…" or "Shutting down…" until the computer
 comes back from the restart or stops answering after the shutdown, and for
 at most three minutes.
+
+**Switch on** sends a Wake-on-LAN magic packet to the selected computers
+that are off: **Power → Switch on** for the selected computers, and **Switch
+on** in a computer's **Actions** menu while it does not answer. The review
+lists the computers that receive the packet and those skipped because they
+are already on (they answered on the lab network a moment ago) or because
+their address is not known yet. After the click a card shows "Starting…"
+until the computer answers, for at most three minutes, and the notice counts
+packets, such as "Switch on: 3 sent · 2 already on · 1 address unknown". The
+same review is in **Computers → Power controls** (Tab chooses Switch on), and
+`nixorium wake --on <clients|@lab> [--json]` sends without a review token,
+printing one line per computer (sent, already on, address unknown or invalid
+target). Like the lock, it takes neither a review token nor the
+administrative operation lock, since it changes no system state; the
+teacher's command and dashboard go through the classroom service, which
+validates the computer names against the inventory like every classroom
+operation.
+
+The controller learns each client's network card address without anyone
+typing it: right after a client answered on the lab network (the classroom
+view's connection, the computer inventory, or a Switch on review that found
+it on), it reads the kernel's IPv4 neighbor table (`/proc/net/arp`) for that
+client's lab address and keeps complete Ethernet entries only. The record is
+`/var/lib/nixorium/classroom/wake-addresses.json`: the classroom service's
+own state directory (systemd `StateDirectory`, mode 0700, owned by `admin`),
+so it survives reboots and stays outside Git, the deployment and the Nix
+store; it is never written to `lab-settings.json`. It is replaced atomically
+with mode 0600 under a lock, a damaged or unsafe record reads as empty and is
+replaced by the next address learned, and an address moves to the last
+computer seen with it. Applying a switch-on review always reads the
+addresses from this record, never from the review. The packet (six `0xFF`
+bytes, then the address sixteen times) goes as UDP to port 9 of the lab
+subnet's broadcast address and of `255.255.255.255`, three times over about
+one second, from an ordinary unprivileged socket bound to the controller's
+lab address and, where the kernel allows it, to its lab interface. No port is
+opened and no service is added. A sent packet is not proof that a computer
+starts: see [Network interfaces](#network-interfaces) for what the client
+and its firmware need.
 
 **Lock** asks the agent to have the bundled Shell extension cover the whole
 screen with "Eyes on the teacher" and take the keyboard and mouse (a modal

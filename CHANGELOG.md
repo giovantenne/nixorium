@@ -21,6 +21,24 @@ The project follows [Semantic Versioning](https://semver.org/).
   that JDK (`java.jdt.ls.java.home` and `java.configuration.runtimes`), so it
   never depends on a runtime bundled in a Marketplace copy. Reviewed editor
   settings in the profile may still override them.
+- **Switch on** starts student computers that are off, with Wake-on-LAN. It is
+  in **Computers → Power controls** (Tab beside Shut down and Restart, for the
+  administrator and the teacher), in the classroom view page (**Power →
+  Switch on** for the selected computers, and in a computer's **Actions** menu
+  while it does not answer) and in a terminal as
+  `nixorium wake --on <computers|@lab>`. The review lists the computers that
+  receive the packet and skips those already on and those whose network
+  address is not known yet; in the classroom view a card shows "Starting…"
+  until the computer answers, for at most three minutes. Nobody types an
+  address: the controller learns each computer's network card address by
+  itself while the computer is on and the classroom view is open or the
+  computer inventory runs, and keeps it on the controller only, outside the
+  configuration. A sent packet does not prove that a computer starts: its
+  BIOS/UEFI must allow waking from the network (often called "Wake on LAN"
+  or "Power on by PCI-E"), and it must stay plugged in. Addresses are learned
+  from computers already installed too, as soon as the controller runs this
+  version; the computers themselves accept the packet from their first
+  restart after their next update.
 
 ### Changed
 
