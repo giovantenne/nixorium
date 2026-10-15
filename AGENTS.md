@@ -720,7 +720,27 @@ release is not finished until the site follows it.
   user (the browser launcher, running as that user, long-polling
   `desktop-wait`); the helper shows the system file chooser (zenity). Users are matched only by the classroom socket's kernel
   peer credentials, recorded with the one-time view token; a job is
-  answered only by its own user. Showing the teacher's screen sends JPEG
+  answered only by its own user.
+  Collecting a desktop (`collect.list/chunk/end`) is read-only on the agent:
+  it lists only regular files and folders of the XDG desktop folder (no
+  hidden names, links or special files), hands pieces over by list position
+  only, and opens files below the listed folder without following links.
+  The worker treats every listed name as untrusted (`ValidateCollectEntries`:
+  relative, no `..`, control characters or backslashes, bounded depth,
+  length, items, bytes and name bytes), stores pieces under position-based
+  names in its private temporary folder, keeps nothing of a computer that
+  exceeds a limit, fails or is interrupted, keeps a free-space reserve, and
+  expires collections after 30 unused minutes. Screenshots and collections
+  reach a home only through a save: the worker never writes into a home;
+  the requesting user's own process (the page's desktop helper, or the
+  `collect` command) copies the save with `save-items/read/done`, which
+  only that user (classroom socket peer credentials) may use, and writes
+  with `classroomview.TreeWriter`: names validated again, private staging,
+  explicit 0755/0644 modes, no-follow exclusive creation and "name (2)"
+  instead of replacing anything. A page without the helper downloads
+  screenshots through the browser and does not collect. Collect plan/apply
+  binds the computers and the destination folder and applies once.
+  Showing the teacher's screen sends JPEG
   pictures (`broadcast.frame`, at most 2 MB); the agent writes them only to
   its own runtime folder and the extension shows them in a second modal
   cover above the lock, accepting only those file names. The showing ends

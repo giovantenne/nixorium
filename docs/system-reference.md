@@ -463,6 +463,56 @@ the chosen file or folder as whoever runs Nixorium and send it through the
 classroom service the same way; `send apply` prepares the files again and
 requires the token of the review.
 
+**Save screenshot** (a computer's window) and **Save screenshots** (the
+toolbar, for the selected computers) ask each computer whose screen is live
+for a picture at up to 1920 pixels through the overview's channel
+(`thumbnail.request`). Computers that are switched off, behind GNOME's own
+lock (Idle) or with nobody signed in are reported as skipped, in the card's
+words. The service hands the pictures to the desktop helper of the page's
+user with a save job through `desktop-wait`; the helper copies them over
+the classroom socket (`save-items`, `save-read` in 512 KB pieces,
+`save-done`) and writes
+`~/Nixorium/Screenshots/<computer>-<YYYY-MM-DD>-<HH.MM.SS>.jpg` itself, as
+that user (folders 0755, files 0644), never replacing a file: a taken name
+becomes "name (2)". The notice names the file, such as "Screenshot saved:
+Nixorium/Screenshots/pc03-2026-10-15-10.30.12.jpg". A page opened without
+the helper downloads each picture once through the browser instead
+(`Content-Disposition: attachment`, same name); the service keeps it for two
+minutes. Only the save's own user (the socket's kernel peer credentials) may
+list, read or end a save, and the service itself never writes into a home.
+
+**Collect from desktop** (beside Send files in the toolbar, and in a
+computer's Actions menu) is the reverse of Send files. The review lists each
+selected computer's desktop; a computer whose agent predates collecting is
+left out and named. After the one confirmation, the service reads at most
+four computers at a time with `collect.list` (the regular files and folders
+of the student's XDG desktop folder with their sizes; hidden names, links
+and special files are left out, and names with control characters or
+backslashes and folders nested more than 32 levels are left out and
+counted), `collect.chunk` answered by `collect.data` (1 MB pieces, asked for
+by position in that list, never by name) and `collect.end`. The agent only
+reads: it opens each file below the desktop folder it listed, never through
+a link, and refuses a file whose size changed. The service treats the list
+as untrusted: relative paths only, no `..`, absolute paths, control
+characters or backslashes, at most 32 levels and 255 bytes per name, and at
+most 2000 items, 500 MB and 512 KB of names per computer. Beyond the limits
+a computer is "too much to collect"; then, as after any refusal or
+interruption, nothing of that computer is kept. Files wait in the service's
+private temporary folder under position-based names, only while the
+controller keeps 1 GB free beyond twice their size, and are removed once
+saved or after 30 unused minutes. The helper of the page's user saves them
+like screenshots into `~/Nixorium/Collected/<YYYY-MM-DD HH.MM>/<computer>/…`
+(folders 0755, files 0644, never executable; a folder of the same minute
+already there is kept and the new one becomes "… (2)"). A page opened
+without the helper does not collect. The result line counts the computers,
+such as "Collect: 10 done · 2 nothing to collect · 1 switched off or not
+reachable"; an empty desktop is not a failure. `nixorium collect plan|apply
+--on <clients|@lab> [--into <folder>]` (teacher and administrator) collects
+through the classroom service the same way and saves as whoever runs it,
+into `~/Nixorium/Collected` or the existing folder given; the review token
+binds the computers and the folder, and each review applies once. Only the
+desktop folder is collected, and the students are not notified.
+
 **Share screen** exists only in the page. The browser asks GNOME what to
 share: the entire screen is offered first, and a window or another tab works
 too (never the classroom view page itself). After the review,

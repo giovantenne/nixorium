@@ -94,7 +94,8 @@ together. Open **Nixorium** for the restricted classroom dashboard.
   snapshots, so a lost file can be recovered from **Snapshots** in the Files
   sidebar.
 - **Help students from your desk.** See every student screen at once, open
-  one in its own window and take control, lock screens, share your own screen,
+  one in its own window, take control or save a screenshot of it, lock
+  screens, collect students' files from their desktops, share your own screen,
   and send a file or folder to the students' desktops.
 - **Control the room.** See which PCs are on, switch them on from the
   classroom view, pause or restore Internet on selected PCs, and shut them

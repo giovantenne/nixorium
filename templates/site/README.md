@@ -235,7 +235,12 @@ Clients expose only SSH (22) to the controller's static IPv4 address on the
 lab interface; IPv6 cannot bypass this restriction. The classroom view reaches
 each student's session through that access, and GNOME shows its sharing
 notice while the teacher watches. Changes to the classroom Shell extension
-apply at the student's next login.
+apply at the student's next login. In a computer's window of the classroom
+view page, **Save screenshot** keeps a picture of its screen in
+`Nixorium/Screenshots` of your home folder, such as
+`pc03-2026-10-15-10.30.12.jpg`; **Save screenshots** in the toolbar does it
+for the selected computers, and a page not opened from Nixorium downloads the
+picture through the browser instead.
 
 ## Temporary Internet access
 
@@ -277,6 +282,21 @@ the review token.
 In the classroom view page, **Share screen** shows your screen (or the
 window or tab you choose) on the selected computers, over their whole screen and with their keyboard
 and mouse blocked, until **Stop sharing** or until you close the page.
+
+## Collect files
+
+With the classroom view, **Collect from desktop** in the classroom view page
+(beside **Send files**, and in a computer's **Actions** menu) copies the files
+on the desktops of the selected students' computers into your home folder,
+in `Nixorium/Collected/<date and time>/<computer>/`, after a review. Hidden
+files and links are left out and nothing changes on the students' computers.
+At most 2000 items and 500 MB are taken from one computer: a computer with
+more is reported as "too much to collect" and nothing of it is kept. An empty
+desktop is "nothing to collect"; computers that are off or have nobody signed
+in are skipped. From a terminal: `nixorium collect plan --on @lab`, then
+`nixorium collect apply --on @lab --expect` with the review token; add
+`--into <folder>` to collect into another existing folder. Update the client
+computers before first use.
 
 ## Local customization
 

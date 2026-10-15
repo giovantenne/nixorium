@@ -39,6 +39,30 @@ The project follows [Semantic Versioning](https://semver.org/).
   from computers already installed too, as soon as the controller runs this
   version; the computers themselves accept the packet from their first
   restart after their next update.
+- In the classroom view, **Save screenshot** in a computer's window keeps a
+  picture of the student's screen, up to 1920 pixels wide, in
+  `Nixorium/Screenshots` of your home folder, named after the computer, the
+  date and the time (for example `pc03-2026-10-15-10.30.12.jpg`).
+  **Save screenshots** in the toolbar does the same for every selected
+  computer. A picture never replaces an earlier one. Computers that are off,
+  idle behind their own screen lock or without anyone signed in are listed as
+  skipped. When the page was not opened from Nixorium, the browser downloads
+  the picture instead.
+- **Collect from desktop** copies the files on the desktops of the selected
+  students' computers into your home folder, in
+  `Nixorium/Collected/<date and time>/<computer>/`, after the usual review
+  with one confirmation button. It sits beside **Send files** in the classroom
+  view toolbar and in a computer's **Actions** menu. Hidden files and links
+  are left out and nothing changes on the students' computers. At most 2000
+  items and 500 MB are taken from one computer; a computer with more is
+  reported as "too much to collect" and nothing of it is kept. The result
+  counts the computers, such as "Collect: 10 done · 2 nothing to collect ·
+  1 switched off or not reachable". From a terminal, teacher or
+  administrator: `nixorium collect plan --on <clients|@lab>`, then
+  `nixorium collect apply` with the same options and `--expect` set to the
+  review token; `--into <folder>` collects into another existing folder.
+  Update the student computers first: one that is not updated is listed as
+  not able to collect yet.
 
 ### Changed
 
