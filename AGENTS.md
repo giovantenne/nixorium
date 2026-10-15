@@ -537,9 +537,18 @@ release is not finished until the site follows it.
   `networkPrefixLength` and `masterHostNumber` when the saved client count is
   nonzero, both in planning and before writing a reviewed candidate. Reducing
   the candidate count must not bypass this rule. This is separate from schema
-  validation and does not implement network migration. Interface reviews must
+  validation and does not implement network migration; the refusal is the
+  `NETWORK-LOCKED` situation. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first
-  order for network changes.
+  order for network changes. Device-name and DHCP-hint changes get a read-only
+  network preflight in the plan (`networkPreflight`): `/sys/class/net` plus
+  bounded `ip -4 -j address` on the controller, the fixed read-only device
+  listing over the inventory's bounded parallel SSH for affected reachable
+  clients (only clients configured by name; by-type clients are not probed).
+  The settings save manager refuses a controller device that is not a present
+  wired device, and a device missing on a reachable client unless exactly that
+  computer is acknowledged; unreachable clients are listed, never blocking.
+  `config apply` does not run the preflight.
 - `lib/eval-workspace-profile.nix` accepts raw JSON text so duplicate keys are
   rejected before they can disappear in `builtins.fromJSON`. Keep it aligned
   with `internal/domain/workspace.go` through `tests/workspace-validation-cases.json`.

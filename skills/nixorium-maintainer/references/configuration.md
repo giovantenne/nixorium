@@ -30,10 +30,13 @@ reset policy and SSH trust are operator-controlled. Do not change them here.
 A controller DHCP hint must not overlap the static laboratory prefix. On
 supporting pins, saved clients prevent managed changes to subnet, prefix and
 controller host number. Never remove clients or edit JSON to bypass this.
-There is no assumed guided network migration capability.
+There is no assumed guided network migration capability; the refusal code is
+`NETWORK-LOCKED`.
 
 Interface changes can disconnect computers; do not prescribe a universal
-controller-first order. USB/SSH can use Wi-Fi on supporting pins, but live-ISO
+controller-first order. On supporting pins the settings review checks the named
+devices read-only (`networkPreflight` in `config plan --json`); point the
+administrator to that review instead of guessing device names. USB/SSH can use Wi-Fi on supporting pins, but live-ISO
 credentials do not configure the installed system. PXE compatibility depends
 on hardware and networking.
 

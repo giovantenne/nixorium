@@ -21,8 +21,29 @@ The project follows [Semantic Versioning](https://semver.org/).
   that JDK (`java.jdt.ls.java.home` and `java.configuration.runtimes`), so it
   never depends on a runtime bundled in a Marketplace copy. Reviewed editor
   settings in the profile may still override them.
+- The settings review checks network devices before saving, without changing
+  any computer. A new controller device name is compared with the controller's
+  devices (listed with their addresses, the one carrying the DHCP address
+  marked), and a name the controller does not have as a wired device cannot be
+  saved: "The controller has no network device called enp5s0. Its devices are:
+  …". A new client device name is checked on every affected computer that
+  answers: a missing device blocks the save unless you choose to save anyway
+  for the computers listed, and computers that do not answer are listed to
+  check at their screen. The review also advises updating one computer first.
+  `nixorium config plan --json` reports the same findings in a new
+  `networkPreflight` object.
+- The controller DHCP address in Settings → Network is picked from the
+  controller's current DHCP addresses, with the saved value preselected;
+  Other… still accepts a typed address, with a warning when the controller
+  does not have it. The command line is unchanged.
 
 ### Changed
+
+- Changing the laboratory network address, prefix length or controller number
+  while computers are configured is refused with a clearer message and the new
+  situation code `NETWORK-LOCKED`: the computers would keep their old addresses
+  and lose the controller; a guided change of the laboratory network is
+  planned, until then keep the saved value.
 
 - The review of an Assistant proposal reuses the evaluation Assistant already
   ran when nothing changed since, instead of evaluating the laboratory a second

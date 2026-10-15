@@ -103,15 +103,33 @@ Computers → Controller host number** before configuring clients, then save and
 review the controller update. The number must be greater than `pcCount` and fit
 inside the subnet. Once clients are configured, managed settings block changes
 to this number, the static network address and its prefix: installed clients
-would retain their previous network settings. Guided network migration is not
-available yet; do not reduce the client count to bypass the block.
+would retain their previous network settings. The refusal carries the code
+`NETWORK-LOCKED`: a guided change of the laboratory network is planned; until
+then keep the saved values, and do not reduce the client count to bypass the
+block.
 
-Changes to network interfaces remain available, with warnings in the review.
-Check old and new device names, cabling and local console access before applying:
-changing the controller interface or a shared fallback can interrupt client
-management. Saving alone does not change the live network. The controller DHCP
-address field is only a hint for PXE preparation; it does not change the lease
-or the static addresses used to manage clients.
+Changes to network devices remain available, and the review checks them before
+saving without changing any computer. For the controller's device it lists the
+controller's network devices with their addresses, marks the one that carries
+the DHCP address, and refuses to save a name that is not a wired device of the
+controller. For a client device name (the client interface or a per-computer
+override) it asks every affected computer that answers whether it has that
+device: a missing device blocks the save until you choose to save anyway for the
+computers listed (`c` in the review), and computers that do not answer are
+listed so you can check them at their screen. Clients without a configured name
+use their wired card whatever its name and are not asked. `nixorium config plan
+--json` reports the same findings under `networkPreflight`; `config apply` does
+not repeat the check.
+
+Saving alone does not change the live network. Check cabling and local console
+access, apply the controller, then update one computer first and check it
+answers before updating the others.
+
+The controller DHCP address is chosen from the controller's current DHCP
+addresses; the static laboratory address and link-local addresses are left out.
+Choose Other… to type an address; the form and the review warn when the
+controller does not have it. The value is only a hint for PXE preparation; it
+does not change the lease or the static addresses used to manage clients.
 
 The student session uses the network configured by the system but cannot change
 NetworkManager connections, radios, DNS, or other host network state through
@@ -538,7 +556,8 @@ For symptom-first recovery, safe retry rules, and backup boundaries, see
 
 Open **Change settings** for routine Network, Computers, Accounts, Regional,
 Browser, or Git changes. Regional fields reuse the offline searchable
-selectors from first-run setup. Git author names and email addresses live here
+selectors from first-run setup. Network changes get the read-only network check
+described in [First setup](#first-setup) before they can be saved. Git author names and email addresses live here
 instead of extending the initial setup path.
 
 **Accounts** opens a small menu with two entries. **Change account names** (`n`)
