@@ -516,7 +516,10 @@ that release's notes, so a release is not finished until the site follows it.
   fixed Git commands, content-bound token, typed `UNDO`, compare-and-update of
   HEAD, two-tree `read-tree` for the files, no hook, signing, remote or push.
   It never applies to the controller or computers; its review names those
-  steps. The TUI does not offer it yet.
+  steps. The Git review screen offers it with `u` through the typed
+  `PlanGitUndo`/`ApplyGitUndo` callbacks: presentation shows the review, the
+  refusal with its catalogued next step and the typed word, and never decides
+  what can be undone.
 - Upstream update planning must preserve the configured source identity, accept
   only the exact `master` branch or an explicit SemVer tag, generate the
   candidate lock outside the checkout,

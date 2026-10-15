@@ -1011,8 +1011,8 @@ stores that content as a commit under `refs/nixorium/discard-backups/`, and
 only then restores the selected paths to HEAD. Untracked files, new files and
 private-key paths are never touched, and nothing is pushed.
 
-The undo workflow (`git undo plan`/`apply`) reverts the last saved change as a
-new saved change. It needs a clean tree on a branch and refuses a first
+The undo workflow (`git undo plan`/`apply`, or key `u` on **Review Git
+changes**) reverts the last saved change as a new saved change. It needs a clean tree on a branch and refuses a first
 version, a merge, an earlier undo, an update of Nixorium or of the package base
 (their own recovery), recorded keys or recovery file, a change that belongs to
 the guided change of the laboratory network, links, submodules, private files,

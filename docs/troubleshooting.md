@@ -666,7 +666,9 @@ or plaintext credentials.
 ## The last saved change caused trouble
 
 To go back to the configuration saved before your last change, review and
-apply the undo, then apply to the controller and update the computers as usual:
+apply the undo (in the dashboard: **Maintenance → Advanced → Review Git
+changes**, key `u`), then apply to the controller and update the computers as
+usual:
 
 ```sh
 nixorium git undo plan

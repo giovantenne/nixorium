@@ -969,7 +969,9 @@ and push are never invoked.
 
 When the change you saved last (settings, software, the student workspace)
 causes trouble, go back to the configuration saved before it, then apply and
-update as usual. From the administrator's terminal:
+update as usual. In the dashboard open **Maintenance → Advanced → Review Git
+changes** and press `u` (**Undo the last saved change**). From the
+administrator's terminal:
 
 ```sh
 nix run .#nixorium -- git undo plan
@@ -978,7 +980,7 @@ nix run .#nixorium -- git undo apply --expect REVIEW_TOKEN
 
 The review shows the description, date and files of the change that will be
 undone, what the undo does to those files, and the steps that follow. Applying
-it (confirm with `UNDO`) saves one new change named `Undo: <description of the
+it (confirm by typing `UNDO`) saves one new change named `Undo: <description of the
 undone change>` and puts the files back; the undone change stays in the history
 and nothing is pushed. No computer changes yet: run **Apply to controller**, then
 **Update computers**, so the controller and the student computers return too. Save
@@ -996,7 +998,9 @@ when it belongs to a change of the laboratory network (use **Maintenance →
 Change network addressing**); when it holds links, private files or Git
 attribute rules; or when the files cannot go back safely, for example because
 an ignored file of the same name would be overwritten. A Git operation left
-unfinished, or a repository that is not on a branch, also stops it.
+unfinished, or a repository that is not on a branch, also stops it. The
+dashboard shows each refusal with the same words and the next step; nothing is
+changed.
 
 ### Apply to the controller
 
