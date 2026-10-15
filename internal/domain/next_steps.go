@@ -134,6 +134,13 @@ var nextSteps = map[string]NextStep{
 		Action: "Back up the lab",
 		TUI:    "Maintenance → Back up lab", Command: "nixorium backup plan --remote git@github.com:OWNER/REPOSITORY.git --branch main", Screen: RecoveryBackupDue,
 	},
+	"NETWORK-LOCKED": {
+		Code:   "NETWORK-LOCKED",
+		Title:  "The laboratory network cannot be changed while computers are configured",
+		Why:    "The computers would keep their old addresses and lose contact with the controller.",
+		Action: "Keep the saved network values; a guided change of the laboratory network is planned",
+		TUI:    "Maintenance → Change settings → Network",
+	},
 	"EVAL-FAILED": {
 		Code:   "EVAL-FAILED",
 		Title:  "The configuration has an error",

@@ -29,11 +29,20 @@ func SettingsTransitionIssues(base, candidate LabSettingsFile) []ValidationIssue
 	for _, change := range DiffLabSettings(base, candidate) {
 		switch change.Field {
 		case "lab.networkBase", "lab.networkPrefixLength", "lab.masterHostNumber":
-			issues = append(issues, ValidationIssue{Field: change.Field, Message: fmt.Sprintf(
-				"Cannot change laboratory addressing while %d client computers are configured. They would keep their old network settings and could lose contact with the controller. Keep the saved value; guided network migration is not available yet.", base.Lab.PCCount)})
+			issues = append(issues, BlockedIssue(change.Field, "NETWORK-LOCKED", NetworkLockedMessage(base.Lab.PCCount)))
 		}
 	}
 	return issues
+}
+
+// NetworkLockedMessage is the refusal for an addressing change while
+// computers are configured (situation NETWORK-LOCKED).
+func NetworkLockedMessage(computers int) string {
+	noun := "computers are"
+	if computers == 1 {
+		noun = "computer is"
+	}
+	return fmt.Sprintf("The laboratory network cannot be changed while %d %s configured: they would keep their old addresses and lose the controller. A guided change of the laboratory network is planned; until then keep the saved value.", computers, noun)
 }
 
 // SettingsImpacts classifies reviewed changes into what happens next.
