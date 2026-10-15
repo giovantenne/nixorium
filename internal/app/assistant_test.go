@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -451,5 +452,49 @@ func TestAssistantRunnerEmitsActualCheckResults(t *testing.T) {
 	transcript, err := store.ReadTranscript(conversation)
 	if err != nil || transcript[2].Content != events[0].ToolResult || transcript[3].Content != events[1].ToolResult {
 		t.Fatal("tool transcript changed", err)
+	}
+}
+func TestAssistantRunnerAdvertisesPrefetchAndNamesItsHost(t *testing.T) {
+	var steps atomic.Int32
+	headers := []string{}
+	results := []string{}
+	runner, conversation, _, _, _ := runnerFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/turns":
+			runnerAdmit(w)
+		case strings.HasSuffix(r.URL.Path, "/steps"):
+			headers = append(headers, r.Header.Get("X-Nixorium-Capabilities"))
+			var request domain.AssistantStepRequest
+			if json.NewDecoder(r.Body).Decode(&request) != nil {
+				t.Error("invalid request")
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			if steps.Add(1) == 1 {
+				// Plain http is refused before any network access.
+				fmt.Fprint(w, "event: tool_calls\ndata: {\"calls\":[{\"id\":\"c1\",\"name\":\"prefetch\",\"arguments\":{\"url\":\"http://downloads.example.org/tool.AppImage\"}}]}\n\n")
+				return
+			}
+			results = append(results, request.Messages[len(request.Messages)-1].Content)
+			fmt.Fprint(w, "event: final\ndata: {\"summary\":\"Done\"}\n\n")
+		default:
+			t.Error("unexpected cancel or route")
+		}
+	})
+	activities := []string{}
+	if _, err := runner.Run(t.Context(), conversation, "Install the tool", func(event domain.AssistantEvent) {
+		if event.Type == "activity" {
+			activities = append(activities, event.Text)
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(headers) != 2 || !slices.Contains(strings.Split(headers[0], ","), "prefetch_v1") {
+		t.Fatal("prefetch_v1 not advertised", headers)
+	}
+	if !slices.Contains(activities, "Downloading downloads.example.org to compute its hash") {
+		t.Fatal(activities)
+	}
+	if len(results) != 1 || !strings.Contains(results[0], `"error":"invalid_url"`) {
+		t.Fatal(results)
 	}
 }

@@ -202,5 +202,20 @@
       "required": [],
       "type": "object"
     }
+  },
+  {
+    "name": "prefetch",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
   }
 ]
