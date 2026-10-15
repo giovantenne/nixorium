@@ -176,7 +176,7 @@ func (m *RemoteInstallManager) plan(ctx context.Context, preparation domain.Remo
 	report.ExpiresAt = m.now().UTC().Add(domain.RemoteInstallReviewWindow)
 	report.ReviewToken = domain.RemoteInstallReviewToken(report)
 	report.Confirmation = fmt.Sprintf("ERASE %s FOR %s", disk.Path, preparation.Host.Name)
-	report.Message = "Review the verified live machine, logical identity, cache, revision, and exact disk before applying."
+	report.Message = "Check the computer, its address afterwards and the disk to erase before you type the confirmation."
 	return report
 }
 
@@ -253,7 +253,7 @@ func (m *RemoteInstallManager) apply(ctx context.Context, plan domain.RemoteInst
 			report.Phase = domain.RemoteInstallPhaseReconciliationRequired
 			report.DispatchUncertain = true
 			report.DiskMayBeModified = true
-			report.Message = "Apply dispatch may have reached the live client; reconcile the same operation ID before any retry."
+			report.Message = "The installation may have started on the computer; check this installation again (reconcile) before trying anything else."
 			return report
 		}
 		resolved = true
@@ -274,7 +274,7 @@ func (m *RemoteInstallManager) apply(ctx context.Context, plan domain.RemoteInst
 		report.State = "reconciliation-required"
 		report.Phase = domain.RemoteInstallPhaseReconciliationRequired
 		report.DispatchUncertain = true
-		report.Message = "Remote receipt identity does not match the dispatched operation."
+		report.Message = "The computer answered for another installation; check this installation again (reconcile) before trying anything else."
 	}
 	return report
 }

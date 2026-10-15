@@ -254,9 +254,11 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, taskHelp(installationAreaTasks)...)
 		lines = append(lines, "r  Reattach the recorded USB operation when available")
 	case dashboardUSBInstall:
-		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.", "Use r to refresh, n to check an interrupted installation, b to review a reboot, c to close without reboot, and v to check the installed system.")
+		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.",
+			"An unfinished installation says what Nixorium found (does the computer answer, was the disk touched) and what you can do: a resumes it, n checks how far it got, b restarts the installed computer, v checks the installed system.",
+			"x cancels safely and c closes the record; both ask only for Enter when the disk was not touched. Closing after the disk was written asks you to type CLOSE.")
 		lines = append(lines, "While the installer job runs the view refreshes by itself with read-only status requests. d shows the raw result fields.")
-		lines = append(lines, "Installation files may be ready before the USB-booted computer is connected. Use a to connect and verify its fingerprint, or x to cancel safely.", "A failed connection's original error remains visible across status refreshes in this TUI session.")
+		lines = append(lines, "A failed connection's original error remains visible across status refreshes in this TUI session.")
 	case dashboardAdministration:
 		lines = append(lines, taskHelp(administrationTasks)...)
 	case dashboardHosts:
@@ -599,7 +601,7 @@ func (model dashboardModel) textEntry() bool {
 	}
 	if model.screen == dashboardUSBInstall {
 		switch model.installation.remote.stage {
-		case remoteInstallConsole, remoteInstallRotateHostKey, remoteInstallPassword, remoteInstallReview, remoteInstallConfirmReboot, remoteInstallConfirmClose:
+		case remoteInstallConsole, remoteInstallRotateHostKey, remoteInstallPassword, remoteInstallReview, remoteInstallConfirmReboot, remoteInstallConfirmClose, remoteInstallConfirmCancel:
 			return true
 		}
 	}

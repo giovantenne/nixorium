@@ -267,6 +267,30 @@ type RemoteInstallBootstrapRecord struct {
 	Facts             RemoteMachineFacts `json:"facts"`
 }
 
+// RemoteInstallNeverDispatched reports a session whose installation was never
+// sent to the computer: no review token was used, no remote receipt exists and
+// no dispatch, reboot or verification is recorded. Its disk was not touched,
+// so it may be cancelled or closed with Enter (ADR 0026).
+func RemoteInstallNeverDispatched(session RemoteInstallSession) bool {
+	if session.TokenConsumed || session.DispatchUncertain || session.Receipt != nil || session.RebootRequested || session.BootVerified {
+		return false
+	}
+	switch session.State {
+	case "artifacts-ready", "bootstrapped", "bootstrapped-artifacts", "prepared", "review-ready", "reconciliation-required", "closed-before-apply":
+		return true
+	}
+	return false
+}
+
+// Status phrases of the USB worker that say whether the computer answered
+// the last status request; screens put them in plain words.
+const (
+	RemoteStatusLoaded        = "remote installation state loaded"
+	RemoteStatusAnswered      = "the computer answered"
+	RemoteStatusNoConnection  = "verified live connection is unavailable"
+	RemoteStatusRefreshFailed = "remote status refresh failed"
+)
+
 // RemoteInstallDiskCompleted distinguishes durable completion of disk work
 // from a still-pending reboot or post-boot identity check. It never means that
 // the installed host has passed that final identity check.

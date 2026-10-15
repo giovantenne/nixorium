@@ -172,7 +172,7 @@ func (model dashboardModel) openDeploymentUSBInstallation() (tea.Model, tea.Cmd)
 		bootstrapError = model.installation.remote.bootstrapError
 	}
 	model.installation.remote = remoteInstallationModel{
-		stage: remoteInstallResult, operationID: recovery.response.OperationID,
+		stage: remoteInstallResult, operationID: recovery.response.OperationID, reopened: true,
 		response: recovery.response, returnToDeployment: true, bootstrapError: bootstrapError,
 	}
 	model.screen = dashboardUSBInstall
@@ -183,35 +183,48 @@ func (model dashboardModel) openDeploymentUSBInstallation() (tea.Model, tea.Cmd)
 	})
 }
 
+// deploymentUSBRecoveryView says what Nixorium found about the unfinished
+// installation and what can be done before the update is reviewed again.
 func (model dashboardModel) deploymentUSBRecoveryView(shell tuiShell) string {
 	recovery := model.deployment.usbRecovery
 	shell.path = append(shell.path, "Finish installation")
-	lines := []string{tuiTitle("Finish the previous installation", model.isDark), "", "Selected for deployment: " + recovery.requested, ""}
+	lines := []string{tuiTitle("Finish the previous installation", model.isDark), "", "Selected for update: " + recovery.requested, ""}
 	if model.busy != "" {
 		shell.body = strings.Join(append(lines, model.busyView()), "\n")
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
 	primary := "Retry check"
-	notice := tuiNotice{kind: tuiStatusAttention, title: "Installation status could not be checked", detail: "Retry the check. If it still fails, open Details for assistance."}
+	notice := tuiNotice{kind: tuiStatusAttention, title: "Installation status could not be checked", detail: "Retry the check. If it still fails, open Details for assistance.", plain: true}
 	if recovery.hasSession() {
-		primary = "Open installation"
-		notice.title = "An unfinished USB installation is blocking deployment"
-		notice.detail = "Open the installation to check its progress and available recovery actions."
-		lines = append(lines, "Computer: "+recovery.host())
+		step, _ := domain.NextStepByCode("USB-RESERVED")
+		primary = step.Action
+		notice = tuiNotice{kind: tuiStatusAttention, code: step.Code, title: sanitizeRemoteInstallText(recovery.response.Message),
+			headline: "The computers were not updated: a USB installation was not finished."}
+		shell.jump, shell.detailsKey, shell.details = true, true, recovery.details
+		lines = append(lines, tuiSection("What Nixorium found", model.isDark), "  "+recovery.host()+" has an unfinished USB installation.")
+		for _, line := range []string{remoteInstallComputerWords(recovery.response), remoteInstallDiskWords(recovery.response)} {
+			if line != "" {
+				lines = append(lines, "  "+line)
+			}
+		}
+		lines = append(lines, "", tuiSection("What you can do", model.isDark))
 		if recovery.canVerify() && model.actions.RemoteInstallRequest != nil {
 			primary = "Verify " + recovery.host() + " and resume"
-			lines = append(lines, "The system is installed; its final check is pending.")
-			notice.title = "Ready to check the installed computer"
-			notice.detail = "Turn it on, boot from the installed disk and check the network cable."
+			lines = append(lines, "  Enter  "+primary+": check the installed system, then review the update again.")
+			notice = tuiNotice{kind: tuiStatusAttention, title: "Ready to check the installed computer", detail: "Turn it on, boot from the installed disk and check the network cable.", plain: true}
+			shell.jump, shell.detailsKey = false, false
 			if recovery.failed {
 				primary = "Retry verification"
 				notice.title = "Verification did not complete"
 				notice.detail += " If retry fails, open Details for assistance."
 			}
+		} else {
+			lines = append(lines, "  Enter  "+primary+": open it to resume, cancel or close it.")
 		}
+		lines = append(lines, "  i      Open the installation without checking it first.")
 	}
-	lines = append(lines, "", "After recovery, review and confirm the deployment again.")
+	lines = append(lines, "", "After recovery, review and confirm the update again.")
 	if recovery.details {
 		lines = append(lines, "", tuiSection("Technical details", model.isDark),
 			fmt.Sprintf("Operation: %s", sanitizeRemoteInstallText(recovery.response.OperationID)),
@@ -220,7 +233,11 @@ func (model dashboardModel) deploymentUSBRecoveryView(shell tuiShell) string {
 	}
 	shell.body = strings.Join(lines, "\n")
 	shell.notices = []tuiNotice{notice}
-	shell.actions = []tuiAction{{key: "Enter", label: primary}, {key: "Esc", label: "Selection"}, {key: "d", label: "Details"}, {key: "r", label: "Refresh"}}
+	details := "Details"
+	if recovery.details {
+		details = "Hide details"
+	}
+	shell.actions = []tuiAction{{key: "Enter", label: primary}, {key: "Esc", label: "Selection"}, {key: "d", label: details}, {key: "r", label: "Refresh"}}
 	if recovery.hasSession() {
 		shell.actions = append(shell.actions, tuiAction{key: "i", label: "Installation"})
 	}

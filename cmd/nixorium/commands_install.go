@@ -197,11 +197,22 @@ func runInteractiveRemoteInstallAction(ctx context.Context, action, operationID 
 	word := "REBOOT"
 	operation := domain.RemoteInstallRebootOperation
 	if action == "usb-close" {
-		word = "CLOSE"
 		operation = domain.RemoteInstallCloseOperation
-		fmt.Fprintln(terminal, "For a never-dispatched installation, CLOSE discards local access credentials and releases the reservation even if the ISO is gone. Remote key revocation is not confirmed; a new installation needs a new review. Uncertain or incomplete dispatched installations remain blocked.")
+		fmt.Fprintln(terminal, presentation.RemoteInstallCloseExplanation(status))
+		// A record that never reached the disk closes with yes/no; after a
+		// possible disk change CLOSE is typed (ADR 0026).
+		word = ""
+		if presentation.RemoteInstallCloseNeedsWord(status) {
+			word = "CLOSE"
+		}
 	}
-	approved, err := confirmRemoteInstall(bufio.NewReaderSize(terminal, 4096), terminal, word)
+	reader := bufio.NewReaderSize(terminal, 4096)
+	var approved bool
+	if word == "" {
+		approved, err = presentation.ConfirmYesNo(reader, terminal, "Close this record?")
+	} else {
+		approved, err = confirmRemoteInstall(reader, terminal, word)
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, "Error:", err)
 		return 1

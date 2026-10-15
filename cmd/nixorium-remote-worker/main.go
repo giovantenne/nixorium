@@ -450,14 +450,7 @@ func (worker *remoteWorker) handleClose(ctx context.Context, request domain.Remo
 }
 
 func remoteSessionNeverDispatched(session domain.RemoteInstallSession) bool {
-	if session.TokenConsumed || session.DispatchUncertain || session.Receipt != nil || session.RebootRequested || session.BootVerified {
-		return false
-	}
-	switch session.State {
-	case "artifacts-ready", "bootstrapped", "bootstrapped-artifacts", "prepared", "review-ready", "reconciliation-required", "closed-before-apply":
-		return true
-	}
-	return false
+	return domain.RemoteInstallNeverDispatched(session)
 }
 
 func (worker *remoteWorker) releaseClosedBeforeApplyLocked(session domain.RemoteInstallSession) error {
@@ -614,7 +607,7 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 	}
 	worker.mutex.Lock()
 	defer worker.mutex.Unlock()
-	message := "remote installation state loaded"
+	message := domain.RemoteStatusLoaded
 	if worker.operationID == request.OperationID && session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
 		if cleanupErr := worker.releaseResolvedFailureLocked(&session); cleanupErr != nil {
 			message = "confirmed pre-mutation failure cleanup remains incomplete: " + cleanupErr.Error()
@@ -626,12 +619,13 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 		(session.TokenConsumed || session.DispatchUncertain || session.Receipt != nil) {
 		connection, connectionErr := worker.newStatusConnection(*worker.liveSession)
 		if connectionErr != nil {
-			message = "remote installation state loaded; verified live connection is unavailable: " + connectionErr.Error()
+			message = domain.RemoteStatusLoaded + "; " + domain.RemoteStatusNoConnection + ": " + connectionErr.Error()
 		} else {
 			receipt, statusErr := connection.Status(ctx, session.Preparation.BundlePath, request.OperationID)
 			if statusErr != nil {
-				message = "remote installation state loaded; remote status refresh failed: " + statusErr.Error()
+				message = domain.RemoteStatusLoaded + "; " + domain.RemoteStatusRefreshFailed + ": " + statusErr.Error()
 			} else {
+				message = domain.RemoteStatusLoaded + "; " + domain.RemoteStatusAnswered
 				session.Receipt = &receipt
 				session.DispatchUncertain = receipt.State == "unknown"
 				if receipt.State == "unknown" {

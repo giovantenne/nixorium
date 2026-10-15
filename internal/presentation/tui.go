@@ -373,6 +373,7 @@ const (
 	remoteInstallResult
 	remoteInstallConfirmReboot
 	remoteInstallConfirmClose
+	remoteInstallConfirmCancel
 )
 
 type remoteInstallationModel struct {
@@ -388,7 +389,10 @@ type remoteInstallationModel struct {
 	diskCursor         int
 	confirmation       string
 	recovery           bool
-	bootstrapError     string
+	// reopened: an unfinished record was opened again (Overview, a refused
+	// operation or the deployment check), so the screen is its review.
+	reopened       bool
+	bootstrapError string
 	// liveInterface is the network card that carries the live address when
 	// it differs from the one configured for the chosen computer.
 	liveInterface string

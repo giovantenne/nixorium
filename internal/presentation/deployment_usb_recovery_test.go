@@ -186,7 +186,7 @@ func TestDeploymentUSBRecoveryDoesNotBypassActiveOrIncompleteInstallation(t *tes
 				return response, nil
 			}
 			model = settleDeploymentUSB(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
-			if !strings.Contains(model.View().Content, "Open installation") || strings.Contains(model.View().Content, "and resume") {
+			if !strings.Contains(model.View().Content, "Resume or close the USB installation") || strings.Contains(model.View().Content, "and resume") {
 				t.Fatalf("unsafe recovery option:\n%s", model.View().Content)
 			}
 			model = settleDeploymentUSB(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})

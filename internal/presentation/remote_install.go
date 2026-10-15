@@ -7,7 +7,23 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// RemoteInstallCloseNeedsWord reports whether closing this installation asks
+// for the typed CLOSE: only a record that never reached the disk closes with
+// a yes/no answer (ADR 0026).
+func RemoteInstallCloseNeedsWord(response domain.RemoteInstallResponse) bool {
+	return remoteInstallCloseNeedsWord(response)
+}
+
+// RemoteInstallCloseExplanation says in one sentence what closing means.
+func RemoteInstallCloseExplanation(response domain.RemoteInstallResponse) string {
+	if remoteInstallCloseNeedsWord(response) {
+		return "CLOSE stops following this installation: the system stays on the disk, but Nixorium does not check that the computer starts correctly. Uncertain or unfinished installations stay blocked."
+	}
+	return "The disk was not touched: closing discards this installation's local access and frees the computer, without confirming that the temporary access was removed from the computer started from the USB stick. A new installation needs a new review."
+}
+
 func RemoteInstallResponseText(writer io.Writer, response domain.RemoteInstallResponse) {
+	RemoteInstallFindingsText(writer, response)
 	fmt.Fprintf(writer, "USB SSH installation: %s\n", response.State)
 	if response.OperationID != "" {
 		fmt.Fprintf(writer, "Operation ID:        %s\n", response.OperationID)

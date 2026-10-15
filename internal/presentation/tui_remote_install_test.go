@@ -68,7 +68,7 @@ func TestUSBInstallFailedBootstrapDoesNotFinalizeOrLoseErrorOnRefresh(t *testing
 			updated, command = model.Update(dashboardRemoteInstallMsg{action: "status", response: status})
 			model = updated.(dashboardModel)
 			view := model.View().Content
-			if command != nil || !strings.Contains(view, failure) || !strings.Contains(view, "Connect live client") || !strings.Contains(view, "Cancel safely") {
+			if command != nil || !strings.Contains(view, failure) || !strings.Contains(view, "Resume the installation") || !strings.Contains(view, "Cancel safely") {
 				t.Fatalf("status erased the error or omitted recovery actions:\n%s", view)
 			}
 			updated, command = model.Update(tea.KeyPressMsg{Text: "a"})
@@ -136,7 +136,7 @@ func TestUSBInstallBootstrapFailureFitsSupportedLayouts(t *testing.T) {
 			if !strings.Contains(view, "SSH authentication rejected") || !strings.Contains(view, "Cancel safely") {
 				t.Fatalf("bootstrap failure lost error or cancellation at %dx%d:\n%s", size[0], size[1], view)
 			}
-			if stage == remoteInstallResult && !strings.Contains(view, "Connect live client") {
+			if stage == remoteInstallResult && !strings.Contains(view, "Resume the installation") {
 				t.Fatalf("bootstrap failure lost reconnect action at %dx%d:\n%s", size[0], size[1], view)
 			}
 		}
@@ -453,6 +453,17 @@ func TestUSBInstallConfirmedFailureBeforeMutationOffersCancellation(t *testing.T
 		t.Fatal("confirmed pre-mutation failure did not offer safe cancellation")
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
+	model = updated.(dashboardModel)
+	// Cancelling safely asks for Enter only: the disk was not touched.
+	if command != nil || cancelled || model.installation.remote.stage != remoteInstallConfirmCancel ||
+		!contains(plainView(model), "The disk was not touched, so Enter is enough.") || contains(plainView(model), "Type exactly") {
+		t.Fatalf("x did not open the Enter confirmation:\n%s", model.View().Content)
+	}
+	back, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if back.(dashboardModel).installation.remote.stage != remoteInstallResult || cancelled {
+		t.Fatal("Esc on the confirmation cancelled the installation")
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil {
 		t.Fatal("safe cancellation did not dispatch a request")

@@ -138,10 +138,14 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 	if host == "" {
 		host = "the computer"
 	}
+	neverDispatched := response.Session != nil && domain.RemoteInstallNeverDispatched(*response.Session)
 	switch {
+	case response.State == "reconciliation-required" && neverDispatched:
+		return "The installation of " + host + " was never started, and Nixorium lost its connection to the computer.",
+			"Reconnect to resume it, or close this record if the computer is gone."
 	case remoteInstallDispatchUncertain(response) || response.State == "reconciliation-required":
 		return "It is not certain whether the installation of " + host + " started or finished.",
-			"Do not start another installation. Press n to read the computer's own record again."
+			"Do not start another installation; first find out how far this one got."
 	case remoteInstallRunning(response):
 		elapsed := ""
 		if !remote.watchStarted.IsZero() {
@@ -151,27 +155,33 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 			"This view refreshes by itself every few seconds. You can leave it; the job continues on the computer."
 	case response.State == "ready-to-reboot":
 		return "The system is installed on " + host + " and is waiting to restart.",
-			"Remove the USB stick (or make the disk boot first), then press b to restart it."
+			"Remove the USB stick (or make the disk boot first), then restart it."
 	case response.State == "reboot-requested" || response.State == "reboot-dispatching":
 		return "Restart of " + host + " was requested.",
-			"The controller checks the installed identity automatically every few seconds; press v to retry now."
+			"The controller checks the installed identity automatically every few seconds."
 	case response.State == "verified":
 		return host + " is installed and verified.", "It now appears among the configured computers."
-	case response.State == "cancelled" || response.State == "closed-before-apply":
+	case response.State == "cancelled":
 		return "The installation was cancelled; no disk was changed.", "Start again from Installation when the computer is ready."
+	case response.State == "closed-before-apply":
+		return "The record was closed; the disk was not touched.", "Restart the computer started from the USB stick before using it, then start again from Installation."
 	case response.State == "closed-installed":
 		return "The session was closed without restarting; the system is installed.", "Restart the computer locally when ready."
 	case remoteInstallCanConnect(response):
-		return "The installation files for " + host + " are ready.", "Press a to connect to the computer started from the USB stick."
+		return "The installation files for " + host + " are ready.", "Start the computer from the USB stick, then connect to it."
 	case remoteInstallResponseFailed(response):
 		disk := "No disk was changed."
 		if remoteInstallDiskMayBeChanged(response) {
 			disk = "The disk may have been changed."
 		}
 		return "The installation of " + host + " did not complete. " + disk,
-			"Read the reason below and the details (d), fix the cause, then refresh or cancel safely."
+			"Read the reason in the details (d) and fix the cause, then check again."
 	}
-	return "Current state: " + response.State + ".", "Press r to refresh the state."
+	if neverDispatched && response.State != "closed-before-apply" {
+		return "The installation of " + host + " was prepared but not started.",
+			"Cancel safely, then start again from Installation; close this record instead if the computer is gone."
+	}
+	return "Nixorium cannot tell yet how far the installation of " + host + " got.", "Press r to check again; d shows the technical state."
 }
 
 // humanBytes prints a disk size in decimal units, as disks are labelled.

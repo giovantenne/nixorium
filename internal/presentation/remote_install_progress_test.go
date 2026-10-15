@@ -51,7 +51,7 @@ func TestUSBInstallRefreshesItselfWithStatusOnlyWhileRunning(t *testing.T) {
 			t.Fatalf("automatic refresh issued %s", request.Operation)
 		}
 	}
-	if model.installation.remote.response.State != "ready-to-reboot" || !strings.Contains(model.View().Content, "press b to restart") {
+	if model.installation.remote.response.State != "ready-to-reboot" || !strings.Contains(model.View().Content, "b  Restart the computer: remove the USB stick first") {
 		t.Fatalf("finished job not reported plainly:\n%s", model.View().Content)
 	}
 	// A finished job schedules nothing further, and stale ticks are ignored.

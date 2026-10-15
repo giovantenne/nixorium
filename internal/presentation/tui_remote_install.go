@@ -79,13 +79,18 @@ func (model dashboardModel) selectedRemoteInstallDisk() (domain.RemoteDisk, bool
 func (model dashboardModel) remoteInstallView() string {
 	remote := model.installation.remote
 	// The breadcrumb names the task; the step heading is the page title.
-	lines := []string{tuiTitle("Install one computer from USB", model.isDark)}
+	title := "Install one computer from USB"
+	if remote.reopened && remote.stage >= remoteInstallResult {
+		title = "Resume or close the USB installation"
+	}
+	lines := []string{tuiTitle(title, model.isDark)}
 	if step, name := remoteInstallStep(remote.stage); step > 0 && model.busy == "" {
 		lines = []string{tuiStepHeading(step, 6, name, model.isDark)}
 	}
 	notices := []tuiNotice{}
 	actions := []tuiAction{{key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	fixedBody := ""
+	jump, detailsKey, details := false, false, false
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
 		lines = append(lines, model.remoteInstallProgressLines()...)
@@ -236,14 +241,23 @@ func (model dashboardModel) remoteInstallView() string {
 		}
 		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Everything on this disk will be permanently deleted", detail: "Only this disk is erased. Computer, disk and revision are checked again just before erasing."})
 		actions = []tuiAction{{key: "Enter", label: "Erase and install"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
-	case remoteInstallConfirmReboot, remoteInstallConfirmClose:
+	case remoteInstallConfirmReboot, remoteInstallConfirmClose, remoteInstallConfirmCancel:
 		label := "Restart the PC"
 		title := "Restart the installed computer?"
 		detail := "Remove the USB stick first (or make the disk boot first). The PC restarts once, then the controller checks that it came back as installed."
-		if remote.stage == remoteInstallConfirmClose {
-			label = "Close"
-			title = "Close without restarting?"
-			detail = "The controller stops using the PC and frees its reservation. Restart the PC yourself when ready."
+		switch {
+		case remote.stage == remoteInstallConfirmCancel:
+			label = "Cancel safely"
+			title = "Cancel the installation safely?"
+			detail = "The controller removes the temporary access from the computer and frees its reservation. The disk was not touched, so Enter is enough."
+		case remote.stage == remoteInstallConfirmClose && remoteInstallCloseNeedsWord(remote.response):
+			label = "Close this record"
+			title = "Close this record without restarting?"
+			detail = "CLOSE stops following this installation: the system stays on the disk, but Nixorium does not check that the computer starts correctly."
+		case remote.stage == remoteInstallConfirmClose:
+			label = "Close this record"
+			title = "Close this record?"
+			detail = "Nixorium forgets this installation and frees the computer. The disk was not touched; the temporary access on the computer started from the USB stick is not confirmed removed, so restart that computer before using it."
 		}
 		lines = append(lines, "", tuiSection(title, model.isDark), detail)
 		actions = []tuiAction{{key: "Enter", label: label}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
@@ -257,16 +271,24 @@ func (model dashboardModel) remoteInstallView() string {
 		} else if remote.response.State == "ready-to-reboot" || remote.response.State == "reboot-requested" {
 			kind = tuiStatusAttention
 		}
-		title := sanitizeRemoteInstallText(remote.response.Message)
+		// The headline is the outcome in plain words; the worker's own text
+		// stays in the details (d).
+		outcome, _ := model.remoteInstallOutcome()
 		if remote.response.State == "ready-to-reboot" {
-			title = "Installation completed. Remove the USB stick before restarting the PC."
+			outcome = "Installation completed. Remove the USB stick before restarting the PC."
 		}
-		notices = append(notices, tuiNotice{kind: kind, title: title})
+		notices = append(notices, tuiNotice{kind: kind, title: outcome, plain: true})
+		if step, found := remoteInstallSituation(remote.response); found {
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: sanitizeRemoteInstallText(remote.response.Message), code: step.Code,
+				prefix: "The USB installation cannot continue"})
+			jump, detailsKey, details = model.situationScreenAvailable(step), true, remote.details
+		}
 		actions = model.remoteInstallResultActions()
 	}
 
-	if remote.stage == remoteInstallFingerprint || remote.stage == remoteInstallRotateHostKey || remote.stage == remoteInstallReview {
-		expected := ""
+	closeWord := remote.stage == remoteInstallConfirmClose && remoteInstallCloseNeedsWord(remote.response)
+	if remote.stage == remoteInstallFingerprint || remote.stage == remoteInstallRotateHostKey || remote.stage == remoteInstallReview || closeWord {
+		expected := remoteInstallCloseWord
 		switch remote.stage {
 		case remoteInstallFingerprint:
 			expected = "MATCH"
@@ -285,7 +307,8 @@ func (model dashboardModel) remoteInstallView() string {
 		detail := ansi.Truncate(remote.bootstrapError, max(30, model.width-12), "…")
 		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Could not connect to the PC: check its IP address and command 2", detail: detail})
 	}
-	return model.renderShell(tuiShell{path: []string{"Installation", "USB over SSH"}, body: strings.Join(lines, "\n"), fixedBody: fixedBody, notices: notices, actions: actions})
+	return model.renderShell(tuiShell{path: []string{"Installation", "USB over SSH"}, body: strings.Join(lines, "\n"), fixedBody: fixedBody, notices: notices, actions: actions,
+		jump: jump, detailsKey: detailsKey, details: details})
 }
 
 func (model dashboardModel) remoteInstallInput(label, value, hint string, secret bool) string {
@@ -340,8 +363,8 @@ func (model dashboardModel) remoteInstallProgressLines() []string {
 }
 
 func (model dashboardModel) remoteInstallResultLines() []string {
-	outcome, next := model.remoteInstallOutcome()
-	lines := []string{outcome, "", "Next: " + next}
+	_, next := model.remoteInstallOutcome()
+	lines := append([]string{""}, model.remoteInstallFindingLines(next)...)
 	if !model.installation.remote.details {
 		return append(lines, "", tuiMuted("Technical details are hidden; press d to show them.", model.isDark))
 	}
@@ -353,6 +376,9 @@ func (model dashboardModel) remoteInstallDetailLines() []string {
 	lines := []string{
 		fmt.Sprintf("State:               %s", response.State),
 		fmt.Sprintf("Operation ID:        %s", response.OperationID),
+	}
+	if message := sanitizeRemoteInstallText(response.Message); message != "" {
+		lines = append(lines, "Message:             "+message)
 	}
 	if response.Execution != nil {
 		lines = append(lines,
@@ -392,30 +418,17 @@ func (model dashboardModel) remoteInstallDetailLines() []string {
 
 func (model dashboardModel) remoteInstallResultActions() []tuiAction {
 	response := model.installation.remote.response
-	state := response.State
 	details := "Details"
 	if model.installation.remote.details {
 		details = "Hide details"
 	}
-	actions := []tuiAction{{key: "r", label: "Refresh status"}, {key: "d", label: details}}
-	if remoteInstallCanConnect(response) {
-		actions = append(actions, tuiAction{key: "a", label: "Connect live client"})
+	actions := []tuiAction{}
+	if step, found := remoteInstallSituation(response); found && model.situationScreenAvailable(step) {
+		actions = append(actions, tuiAction{key: "Enter", label: step.Action})
 	}
-	if state == "ready-to-reboot" {
-		actions = append(actions, tuiAction{key: "b", label: "Reboot"}, tuiAction{key: "c", label: "Close without reboot"})
-	}
-	if state == "reboot-requested" || state == "verified" || state == "reconciliation-required" {
-		label := "Verify installed system"
-		if state == "reboot-requested" {
-			label = "Verify now"
-		}
-		actions = append(actions, tuiAction{key: "v", label: label})
-	}
-	if state == "reconciliation-required" {
-		actions = append(actions, tuiAction{key: "n", label: "Check interrupted installation"}, tuiAction{key: "a", label: "Restore live recovery access"})
-	}
-	if remoteInstallSafelyCancellable(response) {
-		actions = append(actions, tuiAction{key: "x", label: "Cancel safely"})
+	actions = append(actions, tuiAction{key: "r", label: "Refresh status"}, tuiAction{key: "d", label: details})
+	for _, choice := range remoteInstallChoices(response) {
+		actions = append(actions, tuiAction{key: choice.key, label: choice.label})
 	}
 	back := "Detach"
 	if model.installation.remote.returnToDeployment {
@@ -619,9 +632,22 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			return model.remoteInstallCommand("reboot", domain.RemoteInstallRequest{Operation: domain.RemoteInstallRebootOperation, OperationID: model.installation.remote.operationID})
 		})
 	case remoteInstallConfirmClose:
-		return model.updateRemoteInstallConfirmation(key, "", func(model dashboardModel) (tea.Model, tea.Cmd) {
-			model.busy = "Closing the connection to the PC"
+		// CLOSE is typed only when the disk may have been written.
+		word := ""
+		if remoteInstallCloseNeedsWord(remote.response) {
+			word = remoteInstallCloseWord
+		}
+		return model.updateRemoteInstallConfirmation(key, word, func(model dashboardModel) (tea.Model, tea.Cmd) {
+			model.busy = "Closing the record of this installation"
 			return model.remoteInstallCommand("close", domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: model.installation.remote.operationID})
+		})
+	case remoteInstallConfirmCancel:
+		return model.updateRemoteInstallConfirmation(key, "", func(model dashboardModel) (tea.Model, tea.Cmd) {
+			if !remoteInstallSafelyCancellable(model.installation.remote.response) {
+				model.installation.remote.stage = remoteInstallResult
+				return model, nil
+			}
+			return model.cancelRemoteInstall()
 		})
 	case remoteInstallResult:
 		switch key.String() {
@@ -676,13 +702,20 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 				remote.confirmation = ""
 			}
 		case "c":
-			if remote.response.State == "ready-to-reboot" {
+			if remoteInstallOffers(remote.response, "c") {
 				remote.stage = remoteInstallConfirmClose
 				remote.confirmation = ""
 			}
 		case "x":
 			if remoteInstallSafelyCancellable(remote.response) {
-				return model.cancelRemoteInstall()
+				remote.stage = remoteInstallConfirmCancel
+				remote.confirmation = ""
+			}
+		case "enter":
+			if step, found := remoteInstallSituation(remote.response); found && model.situationScreenAvailable(step) {
+				if next, command, opened := model.recoveryFlow(domain.BlockingCondition{Kind: step.Screen, Next: step}); opened {
+					return next, command
+				}
 			}
 		}
 	}
@@ -729,7 +762,7 @@ func (model dashboardModel) updateRemoteInstallConfirmation(key tea.KeyPressMsg,
 	remote := &model.installation.remote
 	switch key.String() {
 	case "esc":
-		if remote.stage == remoteInstallConfirmReboot || remote.stage == remoteInstallConfirmClose {
+		if remote.stage == remoteInstallConfirmReboot || remote.stage == remoteInstallConfirmClose || remote.stage == remoteInstallConfirmCancel {
 			remote.stage = remoteInstallResult
 			remote.confirmation = ""
 			return model, nil
@@ -827,6 +860,7 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 			remote.operationID = message.response.OperationID
 			remote.response = message.response
 			remote.stage = remoteInstallResult
+			remote.reopened = true
 		} else {
 			*remote = remoteInstallationModel{}
 		}
