@@ -141,7 +141,7 @@ func TestDeploymentCommandIsFixedAndUsesArgumentArray(t *testing.T) {
 func TestConfigureColmenaSSHUsesPrivateSupportedConfig(t *testing.T) {
 	command := exec.Command("true")
 	command.Env = []string{"PATH=/bin", "SSH_CONFIG_FILE=/tmp/untrusted"}
-	cleanup, err := configureColmenaSSH(command)
+	cleanup, err := configureColmenaSSH(command, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -61,28 +61,11 @@ func mergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operation
 	if err != nil || key.Type() != ssh.KeyAlgoED25519 {
 		return errors.New("known-host merge key is invalid")
 	}
-	directoryPath := filepath.Dir(path)
-	if err := ensurePrivateOwnedDirectory(directoryPath); err != nil {
-		return fmt.Errorf("inspect administrator SSH directory: %w", err)
-	}
-	lockPath := filepath.Join(directoryPath, ".nixorium-known-hosts.lock")
-	lockDescriptor, err := syscall.Open(lockPath, syscall.O_RDWR|syscall.O_CREAT|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
+	unlock, err := lockKnownHosts(path, expectedBase != "")
 	if err != nil {
 		return err
 	}
-	lock := os.NewFile(uintptr(lockDescriptor), lockPath)
-	defer lock.Close()
-	if err := validatePrivateOwnedFile(lock, syscall.S_IFREG, 0600); err != nil {
-		return err
-	}
-	lockMode := syscall.LOCK_EX
-	if expectedBase != "" {
-		lockMode |= syscall.LOCK_NB
-	}
-	if err := syscall.Flock(lockDescriptor, lockMode); err != nil {
-		return err
-	}
-	defer syscall.Flock(lockDescriptor, syscall.LOCK_UN)
+	defer unlock()
 
 	content, err := readOptionalKnownHosts(path)
 	if err != nil {
@@ -128,6 +111,44 @@ func mergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operation
 	}
 	filtered = append(filtered, knownhosts.Line([]string{host}, key))
 	updated := []byte(strings.Join(filtered, "\n") + "\n")
+	return replaceKnownHosts(path, backupRoot, operationID, content, updated)
+}
+
+// lockKnownHosts takes the exclusive lock shared by every writer of the
+// managed known-hosts file; nonBlocking fails instead of waiting.
+func lockKnownHosts(path string, nonBlocking bool) (func(), error) {
+	directoryPath := filepath.Dir(path)
+	if err := ensurePrivateOwnedDirectory(directoryPath); err != nil {
+		return nil, fmt.Errorf("inspect administrator SSH directory: %w", err)
+	}
+	lockPath := filepath.Join(directoryPath, ".nixorium-known-hosts.lock")
+	lockDescriptor, err := syscall.Open(lockPath, syscall.O_RDWR|syscall.O_CREAT|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
+	if err != nil {
+		return nil, err
+	}
+	lock := os.NewFile(uintptr(lockDescriptor), lockPath)
+	if err := validatePrivateOwnedFile(lock, syscall.S_IFREG, 0600); err != nil {
+		lock.Close()
+		return nil, err
+	}
+	lockMode := syscall.LOCK_EX
+	if nonBlocking {
+		lockMode |= syscall.LOCK_NB
+	}
+	if err := syscall.Flock(lockDescriptor, lockMode); err != nil {
+		lock.Close()
+		return nil, err
+	}
+	return func() {
+		_ = syscall.Flock(lockDescriptor, syscall.LOCK_UN)
+		_ = lock.Close()
+	}, nil
+}
+
+// replaceKnownHosts keeps a private backup of the previous content and
+// atomically replaces the file with updated. The caller holds the lock.
+func replaceKnownHosts(path, backupRoot, operationID string, content, updated []byte) error {
+	directoryPath := filepath.Dir(path)
 	if content != nil {
 		if err := ensurePrivateOwnedDirectory(backupRoot); err != nil {
 			if !os.IsNotExist(err) {

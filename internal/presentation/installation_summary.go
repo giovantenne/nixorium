@@ -41,9 +41,7 @@ func (model dashboardModel) updateInstallationSummary(key tea.KeyPressMsg) (tea.
 		model.screen = dashboardPXE
 	case "e":
 		model.installation.savedSummary = false
-		model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
-		model.settings.editor.width, model.settings.editor.height, model.settings.editor.isDark = model.width, model.height, model.isDark
-		model.settings.editor.prepareCurrentField()
+		model.settings.editor = model.newSettingsEditor(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
 		model.screen = dashboardSettingsEdit
 	case "enter":
 		if model.actions.LoadSetup == nil {

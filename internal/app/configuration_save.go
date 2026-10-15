@@ -109,6 +109,12 @@ func (m SettingsSaveManager) Save(ctx context.Context, repository string, candid
 	if reviewed.BaseFingerprint == "" || reviewed.CandidateFingerprint == "" {
 		return configurationSaveIssue(report, "review", "the reviewed configuration snapshot is missing; review the settings again")
 	}
+	// The review's network check refuses a device the controller does not
+	// have, and a device missing on a reachable client unless the
+	// administrator chose to save anyway for exactly that computer.
+	if refusal := reviewed.NetworkPreflight.SaveRefusal(); refusal != "" {
+		return configurationSaveIssue(report, "network", refusal)
+	}
 	candidateData, err := domain.MarshalLabSettings(candidate)
 	if err != nil {
 		return configurationSaveIssue(report, "candidate", err.Error())

@@ -183,6 +183,7 @@ func (i *Inspector) hosts(ctx context.Context, repository, requested string) (do
 	if err != nil {
 		return domain.HostsReport{}, domain.EvaluationError("labMeta", err)
 	}
+	rekeyDuringTransition(i.source, meta)
 	hostsToObserve := meta.Clients.Hosts
 	operation := "hosts"
 	if requested != "" {
@@ -314,7 +315,7 @@ func (i *Inspector) addLocalFindings(ctx context.Context, repository string, rep
 	if recovery, ok := i.source.(RecoverySource); ok {
 		for _, condition := range NewRecoveryInspector(recovery).Observe(ctx, repository).Conditions {
 			level := domain.LevelError
-			if condition.Kind == domain.RecoveryOperationBusy || condition.Kind == domain.RecoveryControllerChanged || condition.Kind == domain.RecoveryBackupDue || condition.Kind == domain.RecoveryDeferredUpdates {
+			if condition.Kind == domain.RecoveryOperationBusy || condition.Kind == domain.RecoveryControllerChanged || condition.Kind == domain.RecoveryBackupDue || condition.Kind == domain.RecoveryDeferredUpdates || condition.Kind == domain.RecoveryNetworkChanging {
 				level = domain.LevelWarning
 			}
 			remediation := condition.Next.Action
@@ -588,14 +589,19 @@ func hostStatuses(hosts []domain.HostMeta, probes map[string]domain.SSHProbe, cu
 		status := domain.HostStatus{
 			Name:            host.Name,
 			IP:              host.IP,
+			PreviousIP:      host.PreviousIP,
 			Role:            "client",
 			Reachability:    probe.Reachability,
 			SSH:             probe.SSH,
+			Network:         probe.Network,
 			Detail:          probe.Detail,
 			Deployment:      domain.DeploymentUnknown,
 			DesiredRevision: revision,
 		}
 		observed, observedFound := current[host.Name]
+		if observed.Network != "" && observed.Network != domain.HostNetworkUnknown {
+			status.Network = observed.Network
+		}
 		status.HostKeyCondition = observed.HostKeyCondition
 		status.CurrentSystem = observed.SystemPath
 		status.CurrentRevision = observed.Revision

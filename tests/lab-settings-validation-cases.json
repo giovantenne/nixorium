@@ -69,6 +69,54 @@
       "overrides": {
         "keyboardLayout": ""
       }
+    },
+    {
+      "name": "network transition from the same network",
+      "overrides": { "networkTransition": { "previousBase": "10.0.0.0", "previousPrefixLength": 24, "startedAt": "2026-10-15T08:00:00Z" } }
+    },
+    {
+      "name": "network transition from an overlapping larger network",
+      "overrides": { "networkTransition": { "previousBase": "10.0.0.0", "previousPrefixLength": 16, "startedAt": "2026-10-15T08:00:00Z" } }
+    },
+    {
+      "name": "network transition from a network inside the current one",
+      "overrides": { "networkTransition": { "previousBase": "10.0.0.128", "previousPrefixLength": 25, "startedAt": "2026-10-15T08:00:00Z" } }
+    },
+    {
+      "name": "network transition from a network too small for the controller number",
+      "overrides": { "networkTransition": { "previousBase": "10.1.0.0", "previousPrefixLength": 26, "startedAt": "2026-10-15T08:00:00Z" } }
+    },
+    {
+      "name": "network transition from an unaligned network address",
+      "overrides": { "networkTransition": { "previousBase": "10.1.0.1", "previousPrefixLength": 24, "startedAt": "2026-10-15T08:00:00Z" } }
+    },
+    {
+      "name": "network transition from an invalid network address",
+      "overrides": { "networkTransition": { "previousBase": "10.1.0", "previousPrefixLength": 24, "startedAt": "2026-10-15T08:00:00Z" } }
+    },
+    {
+      "name": "network transition with a prefix length out of range",
+      "overrides": { "networkTransition": { "previousBase": "10.1.0.0", "previousPrefixLength": 31, "startedAt": "2026-10-15T08:00:00Z" } }
+    },
+    {
+      "name": "network transition whose previous network holds the controller DHCP address",
+      "overrides": { "masterDhcpIp": "10.1.0.42", "networkTransition": { "previousBase": "10.1.0.0", "previousPrefixLength": 24, "startedAt": "2026-10-15T08:00:00Z" } }
+    },
+    {
+      "name": "network transition with an unparseable start time",
+      "overrides": { "networkTransition": { "previousBase": "10.1.0.0", "previousPrefixLength": 24, "startedAt": "yesterday" } }
+    },
+    {
+      "name": "network transition with a start time without a time zone",
+      "overrides": { "networkTransition": { "previousBase": "10.1.0.0", "previousPrefixLength": 24, "startedAt": "2026-10-15T08:00:00" } }
+    },
+    {
+      "name": "network transition without a start time",
+      "overrides": { "networkTransition": { "previousBase": "10.1.0.0", "previousPrefixLength": 24 } }
+    },
+    {
+      "name": "network transition with an unknown field",
+      "overrides": { "networkTransition": { "previousBase": "10.1.0.0", "previousPrefixLength": 24, "startedAt": "2026-10-15T08:00:00Z", "previousController": "10.1.0.99" } }
     }
   ]
 }

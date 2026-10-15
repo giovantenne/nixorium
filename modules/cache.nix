@@ -3,17 +3,24 @@ let
   isMaster = config.networking.hostName == labSettings.masterHostName;
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   signingKeyPath = "/var/lib/nixorium/keys/harmonia-secret-key";
+  transition = labSettings.networkTransition or null;
 in
 {
   nix.settings = {
-    # The master does not need itself as a substituter
-    substituters = if isMaster then [] else [ "http://${labSettings.masterIp}:${toString labSettings.cachePort}" ];
+    # The master does not need itself as a substituter. During a change of
+    # laboratory network clients try the new controller address first and the
+    # previous one second.
+    substituters = if isMaster then [] else map
+      (address: "http://${address}:${toString labSettings.cachePort}")
+      ([ labSettings.masterIp ] ++ lib.optional (transition != null) transition.masterIp);
     trusted-public-keys = if labSettings.cachePublicKey == null then [] else [ labSettings.cachePublicKey ];
   };
 
   services.harmonia.cache = lib.mkIf (isMaster && laboratoryEnabled) {
     enable = true;
     signKeyPaths = [ signingKeyPath ];
+    # Every address of the controller, so the cache answers on both laboratory
+    # addresses during a change of laboratory network.
     settings.bind = "[::]:${toString labSettings.cachePort}";
   };
 

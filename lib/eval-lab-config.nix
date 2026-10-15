@@ -31,6 +31,11 @@ let
     builtins.match ".*[^[:space:]].*" value != null;
   isAbsoluteHttpUrl = value:
     builtins.match "https?://[^/[:space:]]+(/.*)?" value != null;
+  # RFC 3339 date-time in the form time.RFC3339 produces and parses.
+  isRfc3339 = value:
+    builtins.match
+      "[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])"
+      value != null;
   evaluated = lib.evalModules {
     modules = [
       {
@@ -153,6 +158,31 @@ let
             type = lib.types.str;
             description = "XKB keyboard layout";
           };
+          networkTransition = lib.mkOption {
+            type = lib.types.nullOr (lib.types.submodule {
+              options = {
+                previousBase = lib.mkOption {
+                  type = lib.types.str;
+                  description = "IPv4 network address the laboratory is moving from";
+                };
+                previousPrefixLength = lib.mkOption {
+                  type = lib.types.ints.between 1 30;
+                  description = "CIDR prefix length of the previous laboratory network";
+                };
+                startedAt = lib.mkOption {
+                  type = lib.types.str;
+                  description = "RFC 3339 time at which the change of laboratory network started";
+                };
+              };
+            });
+            default = null;
+            description = ''
+              Change of laboratory network in progress, managed by the guided
+              change. While it is set the controller also keeps its previous
+              address and clients also trust the previous controller address.
+              Ignored when no client computers are configured.
+            '';
+          };
           consoleKeyMap = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
@@ -190,6 +220,16 @@ let
   emptyRequiredFields = builtins.filter
     (name: !isNonEmpty config.${name})
     requiredNonEmptyFields;
+  # A change of laboratory network concerns client computers only; without
+  # them the record is ignored (mkLab reports it as a warning).
+  transition = config.networkTransition;
+  checkTransition = transition != null && config.pcCount > 0;
+  previousNetworkSize = pow2 (32 - transition.previousPrefixLength);
+  # Two aligned networks overlap when the larger one contains the other's base.
+  sharedNetworkSize = pow2 (32 - lib.min transition.previousPrefixLength config.networkPrefixLength);
+  transitionOverlaps =
+    builtins.div (ipv4ToInt transition.previousBase) sharedNetworkSize
+      == builtins.div (ipv4ToInt config.networkBase) sharedNetworkSize;
 in
 assert (config.deploymentMode == "controller" && config.pcCount == 0)
   || (config.deploymentMode == "laboratory" && config.pcCount > 0)
@@ -208,6 +248,25 @@ assert config.masterDhcpIp == "MASTER_DHCP_IP"
   || throw "controller DHCP address must be outside the static laboratory network; choose a distinct laboratory subnet";
 assert config.masterHostNumber < networkSize - 1
   || throw "masterHostNumber (${toString config.masterHostNumber}) does not fit in ${config.networkBase}/${toString config.networkPrefixLength}";
+assert !checkTransition || isIpv4 transition.previousBase
+  || throw "networkTransition.previousBase must be an IPv4 network address such as 10.0.0.0";
+assert !checkTransition || lib.mod (ipv4ToInt transition.previousBase) previousNetworkSize == 0
+  || throw "networkTransition.previousBase (${transition.previousBase}) is not aligned to /${toString transition.previousPrefixLength}";
+assert !checkTransition
+  || transition.previousBase != config.networkBase
+  || transition.previousPrefixLength != config.networkPrefixLength
+  || throw "networkTransition must name a previous network different from the current laboratory network";
+assert !checkTransition || !transitionOverlaps
+  || throw "networkTransition previous network ${transition.previousBase}/${toString transition.previousPrefixLength} must not overlap the laboratory network ${config.networkBase}/${toString config.networkPrefixLength}";
+assert !checkTransition || config.masterHostNumber < previousNetworkSize - 1
+  || throw "masterHostNumber (${toString config.masterHostNumber}) does not fit in the previous network ${transition.previousBase}/${toString transition.previousPrefixLength}";
+assert !checkTransition
+  || config.masterDhcpIp == "MASTER_DHCP_IP"
+  || ipv4ToInt config.masterDhcpIp < ipv4ToInt transition.previousBase
+  || ipv4ToInt config.masterDhcpIp >= ipv4ToInt transition.previousBase + previousNetworkSize
+  || throw "controller DHCP address must be outside the previous laboratory network too";
+assert !checkTransition || isRfc3339 transition.startedAt
+  || throw "networkTransition.startedAt must be an RFC 3339 time such as 2026-10-15T08:00:00Z";
 assert isIfaceName config.ifaceName
   || throw "ifaceName must be a valid Linux interface name of at most 15 characters";
 assert config.controllerIfaceName == null || isIfaceName config.controllerIfaceName
