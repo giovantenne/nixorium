@@ -270,7 +270,7 @@ func (store WakeAddressStore) update(change func(map[string]domain.WakeAddress) 
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	defer unix.Flock(lock, unix.LOCK_UN)
+	defer func() { _ = unix.Flock(lock, unix.LOCK_UN) }()
 	addresses := readWakeAddresses(directory)
 	if !change(addresses) {
 		return nil
@@ -353,7 +353,7 @@ func (Local) SendWakePackets(ctx context.Context, network domain.WakeNetwork, ma
 		}
 		return results
 	}
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 	for mac, err := range sendWakeRounds(ctx, connection, wakeDestinations(network), packets, wakeRounds, wakePause) {
 		results[mac] = err
 	}
