@@ -23,6 +23,18 @@ The project follows [Semantic Versioning](https://semver.org/).
   settings stays in the menu. The change is reviewed and saved like any other
   proposal, with the same checks and the same "what happens next" lines as a
   change made in Maintenance → Change settings.
+- Student computers now get the time from the controller. The controller keeps
+  its own clock right from Internet time servers (it needs to reach them) and
+  gives the time to the laboratory network only, opening UDP port 123 on the
+  laboratory network card and nowhere else. Each computer asks the controller
+  and no Internet time server, so a computer whose clock battery is drained
+  starts with the right time even though it has no Internet of its own, and
+  certificates, file dates and logs stay correct, also for a computer that has
+  Internet after a user signs in. If the controller cannot reach the Internet
+  it keeps giving its own clock, starting five minutes after it boots. The
+  change reaches each computer at its next update and the controller when you
+  apply it; there is nothing to configure. Controller-only installations keep
+  their previous time settings.
 - Programs downloaded outside Nix now run on the controller and every client:
   Nixorium enables nix-ld with the common libraries (zlib, libstdc++, glib,
   OpenSSL, ICU and the X11/GTK set that Electron and Java GUI programs need).
