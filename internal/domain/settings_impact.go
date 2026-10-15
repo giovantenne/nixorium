@@ -21,28 +21,70 @@ var controllerOnlySettings = map[string]bool{
 // SettingsTransitionIssues protects the management connection while clients are
 // configured. Use the saved count, including when the candidate removes clients.
 // This is a transition rule, not a restriction on valid initial configurations.
+//
+// The laboratory network (base and prefix) may change only as a change of
+// laboratory network: the candidate records the saved network as the previous
+// one, so the controller keeps both addresses and the clients accept both
+// controller addresses until the record is removed. The controller number
+// stays locked.
 func SettingsTransitionIssues(base, candidate LabSettingsFile) []ValidationIssue {
 	if base.Lab.PCCount <= 0 {
 		return nil
 	}
+	migration := movesFromSavedNetwork(base, candidate)
 	var issues []ValidationIssue
 	for _, change := range DiffLabSettings(base, candidate) {
 		switch change.Field {
-		case "lab.networkBase", "lab.networkPrefixLength", "lab.masterHostNumber":
-			issues = append(issues, BlockedIssue(change.Field, "NETWORK-LOCKED", NetworkLockedMessage(base.Lab.PCCount)))
+		case "lab.networkBase", "lab.networkPrefixLength":
+			if !migration {
+				issues = append(issues, BlockedIssue(change.Field, "NETWORK-LOCKED", NetworkLockedMessage(base.Lab.PCCount)))
+			}
+		case "lab.networkTransition":
+			// Removing the record finishes a change; any other edit must
+			// come with the network it describes.
+			if candidate.Lab.NetworkTransition != nil && !migration {
+				issues = append(issues, BlockedIssue(change.Field, "NETWORK-LOCKED", NetworkLockedMessage(base.Lab.PCCount)))
+			}
+		case "lab.masterHostNumber":
+			issues = append(issues, BlockedIssue(change.Field, "NETWORK-LOCKED", ControllerNumberLockedMessage(base.Lab.PCCount)))
 		}
 	}
 	return issues
 }
 
+// movesFromSavedNetwork reports whether the candidate is a change of
+// laboratory network away from the saved one: it records the saved base and
+// prefix as the previous network. While a change is already in progress only
+// going back to its previous network is accepted, because computers still on
+// that network would otherwise lose the controller.
+func movesFromSavedNetwork(base, candidate LabSettingsFile) bool {
+	transition := candidate.Lab.NetworkTransition
+	if transition == nil || transition.PreviousBase != base.Lab.NetworkBase || transition.PreviousPrefixLength != base.Lab.NetworkPrefix {
+		return false
+	}
+	if saved := base.Lab.NetworkTransition; saved != nil {
+		return candidate.Lab.NetworkBase == saved.PreviousBase && candidate.Lab.NetworkPrefix == saved.PreviousPrefixLength
+	}
+	return true
+}
+
+func configuredComputers(computers int) string {
+	if computers == 1 {
+		return "1 computer is"
+	}
+	return fmt.Sprintf("%d computers are", computers)
+}
+
 // NetworkLockedMessage is the refusal for an addressing change while
 // computers are configured (situation NETWORK-LOCKED).
 func NetworkLockedMessage(computers int) string {
-	noun := "computers are"
-	if computers == 1 {
-		noun = "computer is"
-	}
-	return fmt.Sprintf("The laboratory network cannot be changed while %d %s configured: they would keep their old addresses and lose the controller. A guided change of the laboratory network is planned; until then keep the saved value.", computers, noun)
+	return fmt.Sprintf("The laboratory network cannot be changed while %s configured: they would keep their old addresses and lose the controller. To move them to a new network use Maintenance → Change network addressing; here keep the saved value.", configuredComputers(computers))
+}
+
+// ControllerNumberLockedMessage is the refusal for a controller number change
+// while computers are configured (situation NETWORK-LOCKED).
+func ControllerNumberLockedMessage(computers int) string {
+	return fmt.Sprintf("The controller number cannot be changed while %s configured: it sets the controller's laboratory address, so they would lose the controller. Keep the saved value.", configuredComputers(computers))
 }
 
 // SettingsImpacts classifies reviewed changes into what happens next.

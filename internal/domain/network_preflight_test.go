@@ -173,7 +173,7 @@ func TestNetworkLockedRefusalUsesTheCatalogue(t *testing.T) {
 	candidate := base
 	candidate.Lab.NetworkBase = "10.1.0.0"
 	issues := SettingsTransitionIssues(base, candidate)
-	want := "The laboratory network cannot be changed while 20 computers are configured: they would keep their old addresses and lose the controller. A guided change of the laboratory network is planned; until then keep the saved value."
+	want := "The laboratory network cannot be changed while 20 computers are configured: they would keep their old addresses and lose the controller. To move them to a new network use Maintenance → Change network addressing; here keep the saved value."
 	if len(issues) != 1 || issues[0].Message != want || issues[0].Next == nil || issues[0].Next.Code != "NETWORK-LOCKED" {
 		t.Fatalf("issues = %+v", issues)
 	}

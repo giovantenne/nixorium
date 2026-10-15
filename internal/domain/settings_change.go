@@ -74,6 +74,7 @@ func DiffLabSettings(before, after LabSettingsFile) []SettingChange {
 	add("lab.masterDhcpIp", before.Lab.MasterDHCPIP, after.Lab.MasterDHCPIP)
 	add("lab.networkBase", before.Lab.NetworkBase, after.Lab.NetworkBase)
 	add("lab.networkPrefixLength", before.Lab.NetworkPrefix, after.Lab.NetworkPrefix)
+	add("lab.networkTransition", before.Lab.NetworkTransition, after.Lab.NetworkTransition)
 	add("lab.pcCount", before.Lab.PCCount, after.Lab.PCCount)
 	add("lab.masterHostNumber", before.Lab.MasterHostNumber, after.Lab.MasterHostNumber)
 	add("lab.ifaceName", before.Lab.InterfaceName, after.Lab.InterfaceName)

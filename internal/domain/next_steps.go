@@ -138,8 +138,8 @@ var nextSteps = map[string]NextStep{
 		Code:   "NETWORK-LOCKED",
 		Title:  "The laboratory network cannot be changed while computers are configured",
 		Why:    "The computers would keep their old addresses and lose contact with the controller.",
-		Action: "Keep the saved network values; a guided change of the laboratory network is planned",
-		TUI:    "Maintenance → Change settings → Network",
+		Action: "Keep the saved network values here and move the computers with the guided change of the laboratory network",
+		TUI:    "Maintenance → Change network addressing",
 	},
 	"EVAL-FAILED": {
 		Code:   "EVAL-FAILED",
