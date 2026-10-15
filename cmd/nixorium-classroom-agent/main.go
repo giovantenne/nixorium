@@ -8,9 +8,10 @@
 //	probe    runs a command (for example the SSH connection) and exchanges
 //	         one hello through it, optionally a thumbnail and input, or a
 //	         lock request (--lock on|off), sends a folder's contents to the
-//	         desktop (--send DIR), or shows a picture as the teacher's
-//	         screen for some seconds (--show JPEG SECONDS); used by tests
-//	         and diagnostics.
+//	         desktop (--send DIR), collects the desktop into a folder
+//	         (--collect DIR), or shows a picture as the teacher's screen for
+//	         some seconds (--show JPEG SECONDS); used by tests and
+//	         diagnostics.
 package main
 
 import (
@@ -64,6 +65,10 @@ func main() {
 		}
 		if len(arguments) >= 2 && arguments[0] == "--send" {
 			err = probeSend(arguments[2:], arguments[1], os.Stdout)
+			break
+		}
+		if len(arguments) >= 2 && arguments[0] == "--collect" {
+			err = probeCollect(arguments[2:], arguments[1], os.Stdout)
 			break
 		}
 		if len(arguments) >= 2 && arguments[0] == "--lock" && (arguments[1] == "on" || arguments[1] == "off") {
@@ -178,10 +183,15 @@ func handle(connection net.Conn, agent agentContext) {
 	// Files of an unfinished sending are removed when the connection ends,
 	// and a showing of the teacher's screen through it ends too.
 	var incoming *receiver
+	// A collection of the desktop through this connection ends with it.
+	var outgoing *collector
 	showing := false
 	defer func() {
 		if incoming != nil {
 			incoming.abort()
+		}
+		if outgoing != nil {
+			outgoing.close()
 		}
 		if showing && agent.screen != nil {
 			agent.screen.Stop()
@@ -240,6 +250,10 @@ func handle(connection net.Conn, agent agentContext) {
 		case classroomview.TypeFilesBegin, classroomview.TypeFilesChunk, classroomview.TypeFilesEnd:
 			reply := filesReply(&incoming, agent.home, message)
 			if err := classroomview.Write(connection, reply); err != nil {
+				return
+			}
+		case classroomview.TypeCollectList, classroomview.TypeCollectChunk, classroomview.TypeCollectEnd:
+			if err := classroomview.Write(connection, collectReply(&outgoing, agent.home, message)); err != nil {
 				return
 			}
 		case classroomview.TypeInput:

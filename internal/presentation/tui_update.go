@@ -1237,6 +1237,23 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.message = message.report.Message
 		model.screen = dashboardShutdownResult
 		return model, nil
+	case dashboardWakePlanMsg:
+		model.busy = ""
+		model.shutdown.wakePlan = message.plan
+		model.message = message.plan.Message
+		if len(message.plan.Targets) == 0 {
+			model.screen = dashboardShutdown
+			return model, nil
+		}
+		model.screen = dashboardShutdownReview
+		return model, nil
+	case dashboardWakeApplyMsg:
+		model.busy = ""
+		model.shutdown.applying = false
+		model.shutdown.wakeResult = message.report
+		model.message = ""
+		model.screen = dashboardShutdownResult
+		return model, nil
 	case tea.WindowSizeMsg:
 		model.width = message.Width
 		model.height = message.Height

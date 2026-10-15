@@ -89,7 +89,9 @@ After activation, the screen shows **Free trial · N of M left**, where M is the
 trial allowance the service reports for your account. An ended trial
 shows **Free trial ended**; exhausted annual quota shows **No requests left**.
 The controller checks account metadata without sending your draft or files,
-and refreshes that count after a request.
+and refreshes that count after a request. A request that the service interrupts
+before an answer (a service error or its safety limit) is not counted; a request
+you stop yourself is.
 
 When the trial expires or its requests are used, Assistant shows a signed
 purchase link from the service. The link lasts seven days; reopening Assistant

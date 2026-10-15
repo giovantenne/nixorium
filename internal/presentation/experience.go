@@ -309,6 +309,9 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "The brief availability check is not authentication or proof of power state.", "F3, when some computers did not answer, chooses whether they update automatically when switched on (Computers → Queued updates) or are skipped.", "F2, when offered, creates a new review for only the reachable computers with an open SSH port.", "The new review requires a fresh DEPLOY confirmation; it never starts automatically.", "Esc during replanning keeps the original review and clears its confirmation.")
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		lines = append(lines, "Space select   a select/deselect all   n select those on at the last check   r check computers   Tab shutdown/restart   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state or a completed restart.")
+		if model.actions.PlanWake != nil {
+			lines = append(lines, "Tab also chooses Switch on: a Wake-on-LAN packet for the selected computers that are off and whose network address the controller has learned; n then selects those off at the last check.", "A sent packet does not prove that a computer starts: Wake-on-LAN must be allowed in its firmware.")
+		}
 	case dashboardSetup:
 		lines = append(lines, "Enter continue the observed stage   t full checklist")
 	case dashboardSettings:

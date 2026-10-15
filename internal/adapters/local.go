@@ -358,6 +358,7 @@ func (Local) SSHStatus(ctx context.Context, hosts []domain.HostMeta, timeout tim
 func (Local) CurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.HostSystemProbe {
 	probes := probeCurrentSystems(ctx, hosts, timeout, probeCurrentSystem)
 	rememberTelemetryBoot(probes)
+	rememberWakeAddresses(hosts, probes)
 	return probes
 }
 

@@ -433,6 +433,7 @@ technical cause stays in `journalctl -u nixorium-classroom.service`.
 | `CLASSROOM-LOAD` | The classroom service could not read the committed configuration | Read the service journal; fix and commit the configuration |
 | `CLASSROOM-SERVICE` | The classroom service is not running or not answering | `systemctl status nixorium-classroom.service`; apply the controller configuration if it is missing |
 | `CLASSROOM-VIEW-OFF` | The classroom view is turned off for this laboratory | Remove `"classroomView": false` from `lab-settings.json` (or set it to `true`), apply the controller and update the client computers |
+| `DISK-LOW` | Collect from desktop found too little free space on the controller to keep a computer's files (it keeps 1 GB free) | Free disk space (Maintenance → Free disk space) and collect again |
 
 Classroom controls read the last **committed** configuration, so uncommitted
 edits in the deployment repository do not affect them until they are saved.
@@ -480,6 +481,24 @@ save it through the reviewed settings change, apply the controller and update
 that computer. Finish or close an unfinished USB installation from
 **Installation → USB over SSH**, and a network installation from
 **Installation → Network boot (PXE)**, before installing that computer again.
+
+## A computer does not start after Switch on
+
+**Switch on** sends a Wake-on-LAN packet; "sent" means only that the packet
+left the controller. The controller does not know yet the address of a
+computer listed as "address unknown": start it by hand once and open the
+classroom view or run **Computer inventory** while it is on. When a computer
+with a known address stays off:
+
+- check its BIOS/UEFI: waking from the network must be allowed (often "Wake
+  on LAN" or "Power on by PCI-E"); some computers also need "ErP" or "Deep
+  sleep" turned off;
+- restart it once after the client update that enabled Wake-on-LAN: the
+  network card is armed at start-up;
+- keep it plugged in: a switched-off power strip or a power cut disarms the
+  card until the computer is started by hand;
+- check that it is on the same network segment as the controller: the packet
+  is a broadcast and does not cross a router.
 
 ## A client was deliberately reinstalled and its SSH key changed
 

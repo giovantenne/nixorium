@@ -23,5 +23,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Native diagnostics could not be collected.")
 		os.Exit(1)
 	}
-	os.Stdout.Write(append(data, '\n'))
+	if _, err := os.Stdout.Write(append(data, '\n')); err != nil {
+		os.Exit(1)
+	}
 }

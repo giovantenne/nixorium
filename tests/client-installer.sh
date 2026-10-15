@@ -25,9 +25,9 @@ load_test_installer() {
     LAB_CACHE_PORT=5000
     LAB_STUDENT_USER=student
     LAB_IFACE_NAME=eth0
-    LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1"},{"name":"pc02","ip":"10.0.0.2"}]'
+    export LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1"},{"name":"pc02","ip":"10.0.0.2"}]'
     export LAB_META_SCHEMA_VERSION LAB_CONTROLLER_DHCP_IP LAB_CACHE_PORT
-    export LAB_STUDENT_USER LAB_CLIENT_HOSTS_JSON
+    export LAB_STUDENT_USER
   }
   require_deployment_ready() { return 0; }
   require_uefi() { return 0; }
@@ -35,7 +35,7 @@ load_test_installer() {
   prompt_input() {
     local _PROMPT="$1"
     local TARGET_VAR="$2"
-    IFS= read -r "$TARGET_VAR"
+    IFS= read -r "${TARGET_VAR?}"
   }
   collect_available_disks() { AVAILABLE_DISKS=(/dev/vda /dev/vdb); }
   list_disks() {

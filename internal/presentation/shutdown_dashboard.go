@@ -22,6 +22,12 @@ type shutdownModel struct {
 	applying     bool
 	technical    bool
 	confirmation string
+	// Switch on (Wake-on-LAN) is a third action when the deployment offers
+	// it; its own review and result replace the power ones.
+	wake          bool
+	wakeAvailable bool
+	wakePlan      domain.WakePlan
+	wakeResult    domain.WakeReport
 }
 
 func newShutdownModel() shutdownModel {
@@ -41,6 +47,8 @@ const (
 	shutdownPlanIntent
 	shutdownApplyIntent
 	shutdownHistoryIntent
+	shutdownWakePlanIntent
+	shutdownWakeApplyIntent
 )
 
 type shutdownIntent struct {
@@ -76,19 +84,21 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 				model.chosen[host.Name] = selectAll
 			}
 		case "tab":
-			if model.action == domain.ClientPowerOff {
-				model.action = domain.ClientRestart
-			} else {
-				model.action = domain.ClientPowerOff
-			}
+			model = model.nextAction()
 		case "enter":
 			requested := model.requested(hosts)
 			if requested == "" {
 				return model, shutdownIntent{message: "Select at least one client computer. The controller is never selectable."}
 			}
+			if model.wake {
+				return model, shutdownIntent{kind: shutdownWakePlanIntent, requested: requested}
+			}
 			return model, shutdownIntent{kind: shutdownPlanIntent, requested: requested}
 		}
 	case dashboardShutdownReview:
+		if model.wake {
+			return model.updateWakeReview(key)
+		}
 		switch key.String() {
 		case "esc":
 			model.confirmation = ""
@@ -121,6 +131,7 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 		case "n":
 			model.plan = domain.ShutdownPlanReport{}
 			model.result = domain.ShutdownApplyReport{}
+			model.wakePlan, model.wakeResult = domain.WakePlan{}, domain.WakeReport{}
 			return model, shutdownIntent{kind: shutdownSelectionIntent}
 		case "l":
 			return model, shutdownIntent{kind: shutdownHistoryIntent}
@@ -136,15 +147,22 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 }
 
 func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	// An unconfirmed request is followed by a fresh look at the computers.
-	if model.screen == dashboardShutdownResult && key.String() == "h" && model.shutdown.result.Unconfirmed > 0 {
+	// An unconfirmed request, or packets sent to switch computers on, are
+	// followed by a fresh look at the computers.
+	if model.screen == dashboardShutdownResult && key.String() == "h" && (model.shutdown.result.Unconfirmed > 0 || model.shutdown.wake) {
 		return model.openComputerTask("h")
 	}
+	model.shutdown.wakeAvailable = model.actions.PlanWake != nil && model.actions.ApplyWake != nil
 	if model.screen == dashboardShutdown {
 		switch key.String() {
 		case "r":
 			return model.checkComputersThen()
 		case "n":
+			if model.shutdown.wake {
+				chosen, message := model.selectComputers(model.shutdown.chosen, hostIsOff, "No client was off at the last check.")
+				model.shutdown.chosen, model.message = chosen, message
+				return model, nil
+			}
 			chosen, message := model.selectComputers(model.shutdown.chosen, hostIsOn, "No client was on at the last check.")
 			model.shutdown.chosen, model.message = chosen, message
 			return model, nil
@@ -167,6 +185,10 @@ func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.
 		model.screen = dashboardShutdown
 	case shutdownPlanIntent:
 		return model.startShutdownPlan(intent.requested)
+	case shutdownWakePlanIntent:
+		return model.startWakePlan(intent.requested)
+	case shutdownWakeApplyIntent:
+		return model.startWakeApply()
 	case shutdownApplyIntent:
 		if model.actions.ApplyShutdown == nil {
 			model.shutdown.applying = false
@@ -206,6 +228,7 @@ func (model dashboardModel) startShutdownPlan(requested string) (tea.Model, tea.
 }
 
 func (model dashboardModel) shutdownView() string {
+	model.shutdown.wakeAvailable = model.actions.PlanWake != nil && model.actions.ApplyWake != nil
 	context := shutdownViewContext{
 		height:           model.height,
 		dark:             model.isDark,
@@ -239,10 +262,17 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 	if context.busy != "" {
 		shell.body = context.busyView
 		if model.applying {
-			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: "Sending power commands to the selected computers", detail: "Closing is disabled until the reviewed operation returns."}}
+			title := "Sending power commands to the selected computers"
+			if model.wake {
+				title = "Sending Wake-on-LAN packets to the selected computers"
+			}
+			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: title, detail: "Closing is disabled until the reviewed operation returns."}}
 		}
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return shell
+	}
+	if model.wake && (screen == dashboardShutdownReview || screen == dashboardShutdownResult) {
+		return model.wakeView(shell, screen, context)
 	}
 	switch screen {
 	case dashboardShutdownReview:
@@ -270,6 +300,12 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 	default:
 		shell.body = strings.Join(model.selectionView(hosts, context), "\n")
 		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "n", label: "Those that are on"}, {key: "r", label: "Check computers"}, {key: "Tab", label: "Shut down / restart"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
+		if model.wakeAvailable {
+			shell.actions[4].label = "Shut down / restart / switch on"
+		}
+		if model.wake {
+			shell.actions[2].label = "Those that are off"
+		}
 	}
 	if context.message != "" && context.message != model.plan.Message {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: context.message})
@@ -288,7 +324,12 @@ func (model shutdownModel) selectionView(hosts []domain.HostMeta, context shutdo
 	if model.action == domain.ClientRestart {
 		actionLabel = "Restart"
 	}
-	lines := []string{tuiSection("Which client computers should receive the request?", context.dark), tuiMuted("Access and sessions are checked again when you continue. The controller is never included.", context.dark), tuiMuted(observationHeading(context.observedAt), context.dark), "", "Action  " + actionLabel, fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
+	heading, note := "Which client computers should receive the request?", "Access and sessions are checked again when you continue. The controller is never included."
+	if model.wake {
+		actionLabel = "Switch on"
+		heading, note = "Which client computers should be switched on?", "Computers already on are found again when you continue. The controller is never included."
+	}
+	lines := []string{tuiSection(heading, context.dark), tuiMuted(note, context.dark), tuiMuted(observationHeading(context.observedAt), context.dark), "", "Action  " + actionLabel, fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
 	start, end := listWindow(len(hosts), model.cursor, max(3, context.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
@@ -307,6 +348,9 @@ func (model shutdownModel) selectionView(hosts []domain.HostMeta, context shutdo
 	}
 	if len(hosts) == 0 {
 		lines = append(lines, "No configured client computers.")
+	}
+	if model.wake {
+		return append(lines, "", "Only computers that are off and whose network address is known receive the packet.")
 	}
 	lines = append(lines, "", "No request is queued for a computer that is off or unreachable.")
 	return lines

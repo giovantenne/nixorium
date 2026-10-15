@@ -1,8 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func TestSendArguments(t *testing.T) {
@@ -61,5 +68,57 @@ func TestDeployQueueArguments(t *testing.T) {
 		if _, err := parseArguments(strings.Fields(args)); err == nil {
 			t.Fatal("accepted", args)
 		}
+	}
+}
+
+// noDeployment leaves no deployment repository to find, as for the teacher.
+func noDeployment(t *testing.T) {
+	t.Helper()
+	empty := t.TempDir()
+	t.Chdir(empty)
+	t.Setenv("HOME", empty)
+	t.Setenv("NIXORIUM_REPO", "")
+	if _, err := resolveRepository(""); err == nil {
+		t.Fatal("a deployment repository was found")
+	}
+}
+
+func TestSendWorksWithoutTheDeploymentRepository(t *testing.T) {
+	noDeployment(t)
+	file := filepath.Join(t.TempDir(), "notes.txt")
+	if err := os.WriteFile(file, []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	received := ""
+	service := &fakeSaveService{answer: func(request domain.ClassroomRequest) (domain.ClassroomResponse, error) {
+		response := domain.ClassroomResponse{State: "completed"}
+		switch request.Operation {
+		case domain.ClassroomShareBeginOperation:
+			if len(request.ShareFiles) != 1 || request.ShareFiles[0].Path != "notes.txt" {
+				return domain.ClassroomResponse{State: "failed", Message: "unexpected files"}, errors.New("unexpected files")
+			}
+			response.ShareTransfer = "t1"
+		case domain.ClassroomShareChunkOperation:
+			received += string(request.ShareData)
+		case domain.ClassroomSharePlanOperation:
+			response.SharePlan = &domain.SharePlan{State: "ready", Requested: request.Requested, Transfer: request.ShareTransfer, ReviewToken: "sha256:share", Message: "1 item (5 bytes) go to the desktop of 1 of 1 computers.", Targets: []domain.ShareTarget{{HostMeta: domain.HostMeta{Name: "pc01"}, Eligible: true}}}
+		case domain.ClassroomShareApplyOperation:
+			response.ShareReport = &domain.ShareReport{State: "completed", Message: "Delivered to 1 of 1 selected computers.", Targets: []domain.ShareOutcome{{Name: "pc01", State: "delivered"}}}
+		default:
+			return domain.ClassroomResponse{State: "failed", Message: "unexpected"}, errors.New("unexpected")
+		}
+		return response, nil
+	}}
+	replaceSaveRequest(t, service)
+	var stdout, stderr bytes.Buffer
+	if code := run(context.Background(), []string{"send", "plan", "--file", file, "--on", "pc01"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "Review token: sha256:share") || strings.Contains(stderr.String(), "repository") {
+		t.Fatalf("plan = %d %s %s", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	if code := run(context.Background(), []string{"send", "apply", "--file", file, "--on", "pc01", "--expect", "sha256:share", "--yes"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "Delivered to 1 of 1") {
+		t.Fatalf("apply = %d %s %s", code, stdout.String(), stderr.String())
+	}
+	if received != "hellohello" {
+		t.Fatalf("uploaded = %q", received)
 	}
 }

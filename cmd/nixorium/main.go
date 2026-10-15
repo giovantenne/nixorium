@@ -66,6 +66,9 @@ type options struct {
 	backupFile     string
 	passphraseFile string
 	remove         bool
+	// collectInto is the folder collect plan/apply saves desktops into
+	// instead of ~/Nixorium/Collected.
+	collectInto string
 }
 
 func main() {
@@ -107,6 +110,11 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 	if options.command == "telemetry" {
 		return runTelemetryCommand(ctx, options, stdout, stderr)
 	}
+	// Switching on goes through the classroom service unless the
+	// deployment is readable (the administrator).
+	if options.command == "wake" {
+		return runWakeCommand(ctx, options, stdout, stderr)
+	}
 	// The classroom view needs only the classroom service: the teacher
 	// cannot read the deployment repository.
 	if options.command == "classroom-view" {
@@ -117,6 +125,14 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		}
 		fmt.Fprintln(stdout, message)
 		return 0
+	}
+	// Sending and collecting files need only the classroom service, like
+	// the view: the teacher cannot read the deployment repository.
+	if options.command == "send" {
+		return runSendCommand(ctx, options, stdout, stderr)
+	}
+	if options.command == "collect" {
+		return runCollectCommand(ctx, options, stdout, stderr)
 	}
 	repository := options.repository
 	resolvedRepository, resolveErr := resolveRepository(options.repository)
@@ -224,8 +240,6 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		return runInternetCommand(ctx, repository, options, stdout, stderr)
 	case "lock":
 		return runLockCommand(ctx, repository, options, stdout, stderr)
-	case "send":
-		return runSendCommand(ctx, options, stdout, stderr)
 	case "cleanup":
 		return runCleanupCommand(ctx, repository, options, stdout, stderr)
 	case "shutdown", "restart":
@@ -302,6 +316,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	softwarePresetSaveManager := app.NewSoftwarePresetSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	shutdownManager := app.NewShutdownManager(local)
+	wakeManager := app.NewWakeManager(local)
 	cleanupManager := app.NewCleanupManager(local)
 	internetManager := app.NewInternetManager(local)
 	lockManager := app.NewLockManager(lockSource{Local: local})
@@ -530,6 +545,12 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report := shutdownManager.ApplyPlan(ctx, plan, plan.ReviewToken)
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
+		},
+		PlanWake: func(ctx context.Context, requested string) domain.WakePlan {
+			return wakeManager.Plan(ctx, repository, requested)
+		},
+		ApplyWake: func(plan domain.WakePlan) domain.WakeReport {
+			return wakeManager.Apply(ctx, plan)
 		},
 		PlanDeployment: func(ctx context.Context, requested string) domain.DeploymentPlanReport {
 			return deploymentManager.Plan(ctx, repository, requested)
@@ -845,6 +866,9 @@ func parseArguments(arguments []string) (options, error) {
 	if len(arguments) > 0 && arguments[0] == "host-key" {
 		return parseHostTrustArguments(arguments[1:])
 	}
+	if len(arguments) > 0 && arguments[0] == "collect" {
+		return parseCollectArguments(arguments[1:])
+	}
 	if len(arguments) > 0 && arguments[0] == "network" {
 		return parseNetworkArguments(arguments[1:])
 	}
@@ -1008,7 +1032,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "lock", "send", "classroom-view", "install", "support", "cleanup", "recovery", "template-reset", "backup":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "lock", "send", "classroom-view", "install", "support", "cleanup", "recovery", "template-reset", "backup", "wake":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -1254,8 +1278,11 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, errors.New("workspace apply requires --expect from workspace plan")
 		}
 	}
-	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "lock" && result.command != "send" && result.command != "cleanup") || (result.subcommand != "plan" && result.subcommand != "apply" && result.subcommand != "queue-cancel")) {
-		return options{}, errors.New("--on is only valid with deploy, shutdown, restart, Internet or cleanup plan/apply, and deploy queue cancel")
+	if result.command == "wake" && (result.subcommand != "" || result.on == "") {
+		return options{}, errors.New("wake requires --on <clients|@lab> and no subcommand")
+	}
+	if result.on != "" && result.command != "wake" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "lock" && result.command != "send" && result.command != "cleanup") || (result.subcommand != "plan" && result.subcommand != "apply" && result.subcommand != "queue-cancel")) {
+		return options{}, errors.New("--on is only valid with deploy, shutdown, restart, Internet or cleanup plan/apply, wake, and deploy queue cancel")
 	}
 	if result.command == "cleanup" {
 		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" {
@@ -1580,7 +1607,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|git undo plan|git undo apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|network migrate plan|network migrate start|network migrate status|network migrate finish|network migrate undo|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|wake|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|git undo plan|git undo apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|network migrate plan|network migrate start|network migrate status|network migrate finish|network migrate undo|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       home-files import plan --source <local-file-or-folder> --destination <relative-home-path> [--replace] [--json] captures materials for review")
 	fmt.Fprintln(writer, "       home-files plan --file <draft-or-profile.json> [--json] reviews shared student initial files")
@@ -1615,7 +1642,10 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       deploy queue status|run  shows or applies queued client updates; deploy queue cancel --on <clients|@all>")
 	fmt.Fprintln(writer, "       send plan --file <file-or-folder> --on <clients|@lab> reviews copying it to students' desktops (classroom view)")
 	fmt.Fprintln(writer, "       send apply --file <file-or-folder> --on <clients|@lab> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       collect plan --on <clients|@lab> [--into <folder>] reviews copying students' desktops into ~/Nixorium/Collected or the folder (classroom view)")
+	fmt.Fprintln(writer, "       collect apply --on <clients|@lab> [--into <folder>] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       classroom-view opens the classroom view page (teacher and administrator)")
+	fmt.Fprintln(writer, "       wake --on <clients|@lab> [--json] sends Wake-on-LAN packets to the selected computers that are off (teacher and administrator)")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
 	fmt.Fprintln(writer, "       backup plan --remote <ssh-url> [--branch <branch>] [--repo <deployment>]")
 	fmt.Fprintln(writer, "       backup publish --remote <ssh-url> [--branch <branch>] --expect <token> --yes [--passphrase-file <file>]")

@@ -15,6 +15,15 @@ const assistantNetworkNotice = "The Assistant service could not be reached. Chec
 const assistantProviderBusyNotice = "The AI provider is busy right now. Your request was not completed; try again in a minute."
 const assistantInterruptedNotice = "The Assistant service interrupted the answer. Send the message again."
 const assistantFailedNotice = "The Assistant could not complete this request. Try again in a minute."
+
+// assistantNotCountedNotice ends the notice of a code that the service always
+// refunds: a provider failure (model_unavailable, model_error) or the safety
+// budget (budget_exhausted). Codes that can end either way carry no sentence:
+// step_limit is also the controller's own round limit and the service sends it
+// for an expired turn, which stays counted; turn_interrupted and
+// service_unavailable cover refunded and counted cases alike. A request the user
+// stops shows no notice at all.
+const assistantNotCountedNotice = "This request was not counted."
 const assistantConsentText = "Your messages, configuration files and saved configuration history read by\nAssistant are sent to the Nixorium Assistant service and its AI provider.\nAssistant may also read system state and limited recent logs from declared\ncomputers. Known secret patterns and common private identifiers are filtered;\nfiltering is best effort and may leave personal or sensitive text.\nStudent home files are not read. The service does not keep configuration files.\nIt keeps messages and answers for 30 days to detect abuse, then deletes them.\nWhole conversations, including files and diagnostics read, are kept for\n90 days only if you report an answer or turn on sharing below.\nEach message you send uses one request."
 
 func assistantServiceNotice(err error, subscribeURL string) string {
@@ -42,7 +51,9 @@ func assistantServiceNotice(err error, subscribeURL string) string {
 		case "service_interrupted":
 			return assistantInterruptedNotice
 		case "model_unavailable":
-			return assistantProviderBusyNotice
+			return assistantProviderBusyNotice + " " + assistantNotCountedNotice
+		case "model_error", "budget_exhausted":
+			return assistantFailedNotice + " " + assistantNotCountedNotice
 		default:
 			// The service answered with a code: the controller was online.
 			return assistantFailedNotice

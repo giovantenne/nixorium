@@ -36,6 +36,7 @@
       </div>
     </details>
     <button type="button" data-action="show-screen" title="Share your screen, a window or a tab on the selected computers, with their keyboard and mouse blocked">Share screen</button>
+    <button type="button" data-action="collect" title="Copy the files on the desktops of the selected computers into Nixorium/Collected in your home folder">Collect from desktop</button>
     <details class="actions-menu send-menu" title="Copy a file or a folder to the desktops of the selected computers">
       <summary>Send files</summary>
       <div class="menu">
@@ -46,6 +47,7 @@
     <details class="actions-menu power-menu">
       <summary>Power</summary>
       <div class="menu">
+        <button type="button" data-action="wake" title="Send a Wake-on-LAN packet to the selected computers that are off">Switch on</button>
         <button type="button" data-action="restart">Restart</button>
         <button type="button" data-action="shutdown">Shut down</button>
       </div>
@@ -70,13 +72,16 @@
         <button type="button" data-action="internet-block">Block Internet</button>
         <button type="button" data-action="internet-allow">Allow Internet</button>
         <button type="button" data-action="show-screen">Share screen</button>
+        <button type="button" data-action="collect">Collect from desktop</button>
         <button type="button" data-action="send-file">Send a file…</button>
         <button type="button" data-action="send-folder">Send a folder…</button>
+        <button type="button" data-action="wake" title="Send a Wake-on-LAN packet to this computer">Switch on</button>
         <button type="button" data-action="restart">Restart</button>
         <button type="button" data-action="shutdown">Shut down</button>
       </div>
     </details>
     <button type="button" id="viewer-control" class="primary">Take control</button>
+    <button type="button" id="viewer-screenshot" title="Save a picture of this screen in Nixorium/Screenshots in your home folder">Save screenshot</button>
     <button type="button" id="viewer-fullscreen">Full screen</button>
     <button type="button" id="viewer-close">Close</button>
   </div>

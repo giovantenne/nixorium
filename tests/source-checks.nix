@@ -145,6 +145,11 @@ in
   go-shell = pkgs.mkShell {
     packages = [ nixoriumPackage.go pkgs.git ];
   };
+  # Pinned linters of the quick gate: ShellCheck for every shell script and
+  # errcheck for unchecked Go error returns, run by scripts/lint.sh.
+  lint-shell = pkgs.mkShell {
+    packages = [ nixoriumPackage.go pkgs.errcheck pkgs.shellcheck pkgs.git ];
+  };
   security-shell = pkgs.mkShell {
     packages = [ nixoriumPackage.go pkgs.go-tools pkgs.govulncheck pkgs.actionlint ];
   };

@@ -318,6 +318,15 @@ assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensur
 assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection.type == "ethernet";
 assert !(subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection ? interface-name);
 assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.settings.main.no-auto-default == "*";
+# Clients answer Wake-on-LAN magic packets on their lab card; the controller
+# is never switched on this way.
+assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ethernet.wake-on-lan == "64";
+assert !(lib.hasInfix "wol g" subnetLab.nixosConfigurations.pc01.config.services.udev.extraRules);
+assert lib.hasInfix "NAME==\"enp2s0\", RUN+=" roleInterfaceLab.nixosConfigurations.pc01.config.services.udev.extraRules;
+assert lib.hasInfix "KERNEL==\"enp2s0\", RUN+=" roleInterfaceLab.nixosConfigurations.pc01.config.services.udev.extraRules;
+assert lib.hasInfix "/bin/ethtool -s $name wol g" roleInterfaceLab.nixosConfigurations.pc01.config.services.udev.extraRules;
+assert !(lib.hasInfix "wol g" roleInterfaceLab.nixosConfigurations.pc99.config.services.udev.extraRules);
+assert !(lib.hasInfix "wol g" subnetLab.nixosConfigurations.pc99.config.services.udev.extraRules);
 assert !(lib.hasInfix "iifname \"enp" subnetLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules);
 assert !(lib.hasInfix "iifname \"enp" subnetLab.nixosConfigurations.pc01.config.networking.nftables.tables.nixorium-client-access.content);
 assert lib.hasInfix "ip saddr 10.23.4.227 tcp dport 22 accept" subnetLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;

@@ -31,8 +31,8 @@ On the controller, `admin` owns the mode-0700 private deployment and the SSH
 identity used to manage clients. The teacher instead belongs to the
 `nixorium-classroom` group. Running `nixorium` without a readable deployment
 connects to a group-private local worker and opens only the classroom view,
-inventory, temporary Internet control, screen locking, sending files and
-reviewed client shutdown/restart. The worker runs as
+inventory, temporary Internet control, screen locking, sending files,
+switching computers on and reviewed client shutdown/restart. The worker runs as
 `admin`, validates every target against the fixed deployment, uses only fixed
 SSH helper/systemd commands, and shares the normal client-operation lock.
 Student accounts cannot traverse the runtime directory or connect to its
@@ -178,6 +178,21 @@ and `modules/firewall.nix` omit `iifname`/`oifname` from their rules
 the profile; use `hostIfaceNames` for such computers. The installer and the
 USB/SSH preparation skip the name check for these clients and use the card that
 carries the live address. See ADR 0017.
+
+Clients answer Wake-on-LAN magic packets on their lab card, so **Switch on**
+can start them (see [Classroom view](#classroom-view)); the controller does
+not. A client configured by type sets `ethernet.wake-on-lan=64` (magic packet)
+in the `nixorium-lab` profile, which NetworkManager applies to the card each
+time it activates the profile. A client configured by name gets a udev rule
+that runs `ethtool -s <interface> wol g` when that card appears, matching the
+final interface name, or the kernel name when nothing renames it. The NixOS
+`networking.interfaces.<name>.wakeOnLan` option is not used: its systemd
+`.link` file matches only the kernel's original name (`OriginalName=`), so it
+misses cards renamed to predictable names such as `enp3s0`. Either way the
+setting takes effect from the first restart after the client update. The
+computer's firmware must also allow it (BIOS/UEFI options often called "Wake
+on LAN" or "Power on by PCI-E"), and the computer must keep standby power: a
+switched-off power strip or a power cut disarms it.
 
 ### Laboratory network transition
 
@@ -411,6 +426,44 @@ down**, a card shows "Restarting…" or "Shutting down…" until the computer
 comes back from the restart or stops answering after the shutdown, and for
 at most three minutes.
 
+**Switch on** sends a Wake-on-LAN magic packet to the selected computers
+that are off: **Power → Switch on** for the selected computers, and **Switch
+on** in a computer's **Actions** menu while it does not answer. The review
+lists the computers that receive the packet and those skipped because they
+are already on (they answered on the lab network a moment ago) or because
+their address is not known yet. After the click a card shows "Starting…"
+until the computer answers, for at most three minutes, and the notice counts
+packets, such as "Switch on: 3 sent · 2 already on · 1 address unknown". The
+same review is in **Computers → Power controls** (Tab chooses Switch on), and
+`nixorium wake --on <clients|@lab> [--json]` sends without a review token,
+printing one line per computer (sent, already on, address unknown or invalid
+target). Like the lock, it takes neither a review token nor the
+administrative operation lock, since it changes no system state; the
+teacher's command and dashboard go through the classroom service, which
+validates the computer names against the inventory like every classroom
+operation.
+
+The controller learns each client's network card address without anyone
+typing it: right after a client answered on the lab network (the classroom
+view's connection, the computer inventory, or a Switch on review that found
+it on), it reads the kernel's IPv4 neighbor table (`/proc/net/arp`) for that
+client's lab address and keeps complete Ethernet entries only. The record is
+`/var/lib/nixorium/classroom/wake-addresses.json`: the classroom service's
+own state directory (systemd `StateDirectory`, mode 0700, owned by `admin`),
+so it survives reboots and stays outside Git, the deployment and the Nix
+store; it is never written to `lab-settings.json`. It is replaced atomically
+with mode 0600 under a lock, a damaged or unsafe record reads as empty and is
+replaced by the next address learned, and an address moves to the last
+computer seen with it. Applying a switch-on review always reads the
+addresses from this record, never from the review. The packet (six `0xFF`
+bytes, then the address sixteen times) goes as UDP to port 9 of the lab
+subnet's broadcast address and of `255.255.255.255`, three times over about
+one second, from an ordinary unprivileged socket bound to the controller's
+lab address and, where the kernel allows it, to its lab interface. No port is
+opened and no service is added. A sent packet is not proof that a computer
+starts: see [Network interfaces](#network-interfaces) for what the client
+and its firmware need.
+
 **Lock** asks the agent to have the bundled Shell extension cover the whole
 screen with "Eyes on the teacher" and take the keyboard and mouse (a modal
 grab); the extension offers this only on the session bus. A locked computer
@@ -445,7 +498,58 @@ administrator, with a path that starts at the user's home) and
 `nixorium send plan|apply --file <file-or-folder> --on <clients|@lab>` read
 the chosen file or folder as whoever runs Nixorium and send it through the
 classroom service the same way; `send apply` prepares the files again and
-requires the token of the review.
+requires the token of the review. Like `collect`, the command needs no
+deployment repository, so the teacher can run it from a terminal.
+
+**Save screenshot**, in the window of one computer whose screen is live,
+asks that computer for a picture at up to 1920 pixels through the
+overview's channel (`thumbnail.request`); the button is off while the
+computer is switched off, behind GNOME's own lock (Idle) or without anybody
+signed in, and a computer that changed state meanwhile is reported in the
+card's words. The service hands the picture to the desktop helper of the
+page's user with a save job through `desktop-wait`; the helper copies it
+over the classroom socket (`save-items`, `save-read` in 512 KB pieces,
+`save-done`) and writes
+`~/Nixorium/Screenshots/<computer>-<YYYY-MM-DD>-<HH.MM.SS>.jpg` itself, as
+that user (folders 0755, files 0644), never replacing a file: a taken name
+becomes "name (2)". The notice names the file, such as "Screenshot saved:
+Nixorium/Screenshots/pc03-2026-10-15-10.30.12.jpg". A page opened without
+the helper downloads the picture once through the browser instead
+(`Content-Disposition: attachment`, same name); the service keeps it for two
+minutes. Only the save's own user (the socket's kernel peer credentials) may
+list, read or end a save, and the service itself never writes into a home.
+
+**Collect from desktop** (beside Send files in the toolbar, and in a
+computer's Actions menu) is the reverse of Send files. The review lists each
+selected computer's desktop; a computer whose agent predates collecting is
+left out and named. After the one confirmation, the service reads at most
+four computers at a time with `collect.list` (the regular files and folders
+of the student's XDG desktop folder with their sizes; hidden names, links
+and special files are left out, and names with control characters or
+backslashes and folders nested more than 32 levels are left out and
+counted), `collect.chunk` answered by `collect.data` (1 MB pieces, asked for
+by position in that list, never by name) and `collect.end`. The agent only
+reads: it opens each file below the desktop folder it listed, never through
+a link, and refuses a file whose size changed. The service treats the list
+as untrusted: relative paths only, no `..`, absolute paths, control
+characters or backslashes, at most 32 levels and 255 bytes per name, and at
+most 2000 items, 500 MB and 512 KB of names per computer. Beyond the limits
+a computer is "too much to collect"; then, as after any refusal or
+interruption, nothing of that computer is kept. Files wait in the service's
+private temporary folder under position-based names, only while the
+controller keeps 1 GB free beyond twice their size, and are removed once
+saved or after 30 unused minutes. The helper of the page's user saves them
+like screenshots into `~/Nixorium/Collected/<YYYY-MM-DD HH.MM>/<computer>/…`
+(folders 0755, files 0644, never executable; a folder of the same minute
+already there is kept and the new one becomes "… (2)"). A page opened
+without the helper does not collect. The result line counts the computers,
+such as "Collect: 10 done · 2 nothing to collect · 1 switched off or not
+reachable"; an empty desktop is not a failure. `nixorium collect plan|apply
+--on <clients|@lab> [--into <folder>]` (teacher and administrator) collects
+through the classroom service the same way and saves as whoever runs it,
+into `~/Nixorium/Collected` or the existing folder given; the review token
+binds the computers and the folder, and each review applies once. Only the
+desktop folder is collected, and the students are not notified.
 
 **Share screen** exists only in the page. The browser asks GNOME what to
 share: the entire screen is offered first, and a window or another tab works

@@ -47,9 +47,11 @@ type classroomHandler func(context.Context, domain.ClassroomRequest) domain.Clas
 type pendingAction struct {
 	broadcast *domain.BroadcastPlan
 	share     *domain.SharePlan
+	collect   *domain.CollectPlan
 	lock      *domain.LockPlan
 	internet  *domain.InternetPlan
 	power     *domain.ShutdownPlanReport
+	wake      *domain.WakePlan
 	expires   time.Time
 }
 
@@ -100,6 +102,8 @@ type computerLabels struct {
 	// powerAway: the computer has stopped answering since the restart.
 	powerRestart bool
 	powerAway    bool
+	// powerStart: the label waits for a computer switched on to answer.
+	powerStart bool
 }
 
 func decodePageJSON(writer http.ResponseWriter, request *http.Request, value any) bool {
@@ -184,6 +188,8 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			break
 		}
 		review, pending = powerReview(*response.PowerPlan)
+	case actionWake:
+		review, pending = server.planWake(ctx, operation)
 	case actionLock, actionUnlock:
 		operation.Operation = domain.ClassroomLockPlanOperation
 		operation.LockAction = domain.LockOff
@@ -211,6 +217,8 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			break
 		}
 		review, pending = shareReview(*response.SharePlan)
+	case actionCollect:
+		review, pending = server.planCollect(ctx, request, operation)
 	default:
 		http.Error(writer, "Unknown action.", http.StatusBadRequest)
 		return
@@ -431,6 +439,9 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		for _, target := range report.Targets {
 			result.Rows = append(result.Rows, resultRow(target.Name, target.State == "delivered", target.Detail, planned[target.Name]))
 		}
+	case pending.collect != nil:
+		// Collecting and saving can take longer than the other actions.
+		result = server.applyCollect(request.Context(), request, pending.collect)
 	case pending.lock != nil:
 		operation.Operation = domain.ClassroomLockApplyOperation
 		operation.LockPlan = pending.lock
@@ -500,6 +511,8 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 				})
 			}
 		}
+	case pending.wake != nil:
+		result = server.applyWake(ctx, *pending.wake)
 	default:
 		result.State, result.Message = "failed", "Unknown action."
 	}
@@ -573,6 +586,10 @@ func (server *viewServer) labelsFor(name, state string) (string, string) {
 	switch {
 	case server.now().After(labels.powerExpiry):
 		labels.power = ""
+	case labels.powerStart:
+		if state != app.ClassroomUnreachable && state != app.ClassroomConnecting {
+			labels.power = ""
+		}
 	case state == app.ClassroomUnreachable && !labels.powerRestart:
 		labels.power = ""
 	case state == app.ClassroomUnreachable:
@@ -582,6 +599,7 @@ func (server *viewServer) labelsFor(name, state string) (string, string) {
 	}
 	if labels.power == "" {
 		labels.powerExpiry, labels.powerRestart, labels.powerAway = time.Time{}, false, false
+		labels.powerStart = false
 	}
 	server.labels[name] = labels
 	return labels.internet, labels.power

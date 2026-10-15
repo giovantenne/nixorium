@@ -39,6 +39,11 @@ const (
 	// ClassroomViewOpenOperation returns a one-time address of the
 	// classroom view page.
 	ClassroomViewOpenOperation ClassroomOperation = "view-open"
+	// Switching on student computers with Wake-on-LAN: review which ones
+	// receive a packet, then send. Applying reads the hardware addresses
+	// from the controller's own record, never from the request.
+	ClassroomWakePlanOperation  ClassroomOperation = "wake-plan"
+	ClassroomWakeApplyOperation ClassroomOperation = "wake-apply"
 )
 
 func (o ClassroomOperation) Valid() bool {
@@ -50,10 +55,11 @@ func (o ClassroomOperation) Valid() bool {
 		ClassroomShareBeginOperation, ClassroomShareChunkOperation,
 		ClassroomSharePlanOperation, ClassroomShareApplyOperation,
 		ClassroomDesktopWaitOperation, ClassroomDesktopReadyOperation,
-		ClassroomViewOpenOperation:
+		ClassroomViewOpenOperation,
+		ClassroomWakePlanOperation, ClassroomWakeApplyOperation:
 		return true
 	default:
-		return false
+		return saveOperations[o] || collectOperations[o]
 	}
 }
 
@@ -75,10 +81,15 @@ type ClassroomRequest struct {
 	ShareOffset    int64                 `json:"shareOffset,omitempty"`
 	ShareData      []byte                `json:"shareData,omitempty"`
 	SharePlan      *SharePlan            `json:"sharePlan,omitempty"`
+	CollectFolder  string                `json:"collectFolder,omitempty"`
+	CollectPlan    *CollectPlan          `json:"collectPlan,omitempty"`
+	SaveNames      []string              `json:"saveNames,omitempty"`
 	DesktopJob     string                `json:"desktopJob,omitempty"`
 	DesktopError   string                `json:"desktopError,omitempty"`
 	// DesktopCancelled: the user closed the file chooser without a choice.
 	DesktopCancelled bool `json:"desktopCancelled,omitempty"`
+	// WakePlan is the reviewed switch-on request to apply.
+	WakePlan *WakePlan `json:"wakePlan,omitempty"`
 }
 
 // Send files from the classroom view page: what the user's file chooser
@@ -109,8 +120,16 @@ type ClassroomResponse struct {
 	ShareTransfer  string               `json:"shareTransfer,omitempty"`
 	SharePlan      *SharePlan           `json:"sharePlan,omitempty"`
 	ShareReport    *ShareReport         `json:"shareReport,omitempty"`
+	CollectPlan    *CollectPlan         `json:"collectPlan,omitempty"`
+	CollectReport  *CollectReport       `json:"collectReport,omitempty"`
+	SaveItems      []ShareFile          `json:"saveItems,omitempty"`
+	SaveTotal      int                  `json:"saveTotal,omitempty"`
+	SaveData       []byte               `json:"saveData,omitempty"`
 	DesktopJob     string               `json:"desktopJob,omitempty"`
 	DesktopKind    string               `json:"desktopKind,omitempty"`
+	// Switch-on review and its result.
+	WakePlan   *WakePlan   `json:"wakePlan,omitempty"`
+	WakeReport *WakeReport `json:"wakeReport,omitempty"`
 }
 
 func NewClassroomRequest(operation ClassroomOperation) (ClassroomRequest, error) {

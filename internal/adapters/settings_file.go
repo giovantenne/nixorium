@@ -45,7 +45,7 @@ func writeSettings(repository string, expected []byte, settings domain.LabSettin
 	if err := syscall.Flock(rootDescriptor, syscall.LOCK_EX); err != nil {
 		return fmt.Errorf("lock deployment root: %w", err)
 	}
-	defer syscall.Flock(rootDescriptor, syscall.LOCK_UN)
+	defer func() { _ = syscall.Flock(rootDescriptor, syscall.LOCK_UN) }()
 
 	target := filepath.Join(repository, settingsFileName)
 	if expected != nil {

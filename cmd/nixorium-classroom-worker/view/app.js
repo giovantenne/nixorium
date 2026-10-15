@@ -229,8 +229,6 @@ function render(computers) {
       viewerImage.classList.toggle('gone', cover === 'off');
       setCover(viewerCover, cover);
       viewerScreen.title = cover ? covers[cover].title : '';
-      viewerActions.classList.toggle('disabled', !reachable);
-      if (!reachable) viewerActions.open = false;
       // This computer's menu offers only the change that applies.
       const offer = { lock: !computer.locked, unlock: Boolean(computer.locked), 'internet-block': computer.internet !== 'blocked', 'internet-allow': computer.internet === 'blocked' };
       const needsSession = ['lock', 'unlock', 'show-screen', 'send-file', 'send-folder'];
@@ -238,10 +236,17 @@ function render(computers) {
         if (button.dataset.action in offer) button.hidden = !offer[button.dataset.action];
         button.disabled = !reachable || (needsSession.includes(button.dataset.action) && !session);
       }
+      // Switch on is offered only while the computer does not answer; its
+      // menu stays open for it.
+      for (const button of viewerActions.querySelectorAll('button[data-action="wake"]')) {
+        button.hidden = reachable;
+        button.disabled = reachable;
+      }
     }
   }
   summary.textContent = viewing + ' of ' + computers.length + ' screens visible. Student computers show a sharing notice while you watch.';
   updateSelection();
+  updateSaveButtons(computers);
 }
 
 // Actions: the controller reviews the computers first; nothing happens until
@@ -355,8 +360,13 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !toast.hidden && !controlling && !actionDialog.open) hideToast();
 });
 
-const outcomeWords = { done: 'done', off: 'switched off or not reachable', skipped: 'skipped', failed: 'failed' };
-const detailOrder = ['failed', 'skipped', 'off', 'done'];
+const outcomeWords = { done: 'done', empty: 'nothing to collect', off: 'switched off or not reachable', skipped: 'skipped', 'too-much': 'too much to collect', failed: 'failed' };
+const detailOrder = ['failed', 'too-much', 'skipped', 'off', 'empty', 'done'];
+
+// Switch on counts packets sent, never computers started: "Switch on:
+// 3 sent · 2 already on · 1 address unknown".
+Object.assign(outcomeWords, { sent: 'sent', on: 'already on', unknown: 'address unknown' });
+detailOrder.push('unknown', 'on', 'sent');
 
 // One line such as "Lock: 8 done · 12 switched off or not reachable · 1 failed";
 // under Details, the computers that need a look come first.
@@ -446,6 +456,53 @@ async function sendFiles(kind, computers) {
   }
   runAction('send-files', computers, prepared.transfer);
 }
+
+// Save screenshot, in a computer's window: the controller takes a picture
+// of its screen at up to 1920 pixels, and Nixorium (which started this
+// browser) saves it in Nixorium/Screenshots in the home folder. A page
+// opened another way downloads the picture through the browser instead.
+const screenshotButton = document.getElementById('viewer-screenshot');
+
+async function saveScreenshot(name) {
+  showToast('Saving the screenshot…', { sticky: true });
+  let result;
+  try {
+    result = await postJSON('/api/screenshot', { computer: name });
+  } catch (error) {
+    showToast('The controller did not answer; no screenshot was saved.', { sticky: true });
+    return;
+  }
+  if (result.state === 'saved') {
+    showToast('Screenshot saved: ' + result.file);
+  } else if (result.state === 'download') {
+    const link = document.createElement('a');
+    link.href = '/api/screenshot/file?id=' + encodeURIComponent(result.download);
+    link.download = result.file;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    showToast('Screenshot downloaded: ' + result.file);
+  } else {
+    showToast('No screenshot of ' + name + ': ' + (result.message || 'it could not be taken.'), { problem: true, sticky: result.state === 'failed' });
+  }
+}
+
+// A computer's window offers a screenshot only of a live screen, and
+// Collect from desktop only with someone signed in.
+function updateSaveButtons(computers) {
+  if (!selected) return;
+  const computer = computers.find((item) => item.name === selected);
+  if (!computer) return;
+  const live = computer.state === 'viewing';
+  screenshotButton.disabled = !live;
+  screenshotButton.title = live ? 'Save a picture of this screen in Nixorium/Screenshots in your home folder' : (stateText[computer.state] || computer.detail || '');
+  const session = computer.state === 'viewing' || computer.state === 'locked';
+  for (const button of viewerActions.querySelectorAll('button[data-action="collect"]')) button.disabled = !session;
+}
+
+screenshotButton.addEventListener('click', () => {
+  if (selected) saveScreenshot(selected);
+});
 
 // Share screen: GNOME asks what to share (the whole screen is offered
 // first; a window or a tab works too, but not this page itself); after the

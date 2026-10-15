@@ -82,6 +82,7 @@ scripts/
   create-home-template.sh  # Builds clean home directory template
   validate.sh              # Tiered upstream validation entry point
   security-check.sh        # Pinned staticcheck and govulncheck entry point
+  lint.sh                  # Pinned ShellCheck and errcheck entry point
 assets/
   empty-*                  # Neutral fallbacks for optional deployment assets
 templates/site/            # Private deployment repository template
@@ -110,7 +111,8 @@ Use the smallest gate appropriate to the change:
 # Edit-test loop: cached Go tests; accepts package paths and go test flags
 ./scripts/test-go.sh
 
-# Reproducible gate: syntax, shell regressions, guidance, schemas, Go package
+# Reproducible gate: syntax, shell regressions, ShellCheck, errcheck, guidance,
+# schemas, Go package
 ./scripts/validate.sh --quick
 
 # Add full mkLab evaluation for Nix API or host-composition changes
@@ -120,11 +122,24 @@ Use the smallest gate appropriate to the change:
 nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell
 go test ./...
 
+# ShellCheck and errcheck alone, with the pinned tools (the quick gate runs them)
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix lint-shell --command ./scripts/lint.sh
+
 # Dedicated Go security and static analysis with the locked toolchain
 nix --extra-experimental-features 'nix-command flakes' \
   develop --file tests/source-checks.nix security-shell \
   --command ./scripts/security-check.sh
 ```
+
+The quick gate runs ShellCheck (warnings and errors) over every `*.sh` file and
+errcheck over the non-test Go code. Fix a finding; do not disable a check
+globally. Where a ShellCheck finding is a false positive or the fix would
+change what an installer does, put `# shellcheck disable=SCxxxx # reason` above
+that command. Where dropping a Go error is the decision, write `_ = call()`.
+`.errcheck-exclude` lists only calls whose error never matters (closing a
+handle that was only read, `os.Remove`, `fmt.Fprint*`); a write, lock or commit
+must be checked. See [development validation](docs/development-validation.md).
 
 Use the affected management or client-installer VM only when changing its
 integration boundary. Reserve `--full` for cross-cutting system-build changes
@@ -771,7 +786,28 @@ that release's notes, so a release is not finished until the site follows it.
   user (the browser launcher, running as that user, long-polling
   `desktop-wait`); the helper shows the system file chooser (zenity). Users are matched only by the classroom socket's kernel
   peer credentials, recorded with the one-time view token; a job is
-  answered only by its own user. Showing the teacher's screen sends JPEG
+  answered only by its own user.
+  Collecting a desktop (`collect.list/chunk/end`) is read-only on the agent:
+  it lists only regular files and folders of the XDG desktop folder (no
+  hidden names, links or special files), hands pieces over by list position
+  only, and opens files below the listed folder without following links.
+  The worker treats every listed name as untrusted (`ValidateCollectEntries`:
+  relative, no `..`, control characters or backslashes, bounded depth,
+  length, items, bytes and name bytes), stores pieces under position-based
+  names in its private temporary folder, keeps nothing of a computer that
+  exceeds a limit, fails or is interrupted, keeps a free-space reserve, and
+  expires collections after 30 unused minutes. Screenshots and collections
+  reach a home only through a save: the worker never writes into a home;
+  the requesting user's own process (the page's desktop helper, or the
+  `collect` command) copies the save with `save-items/read/done`, which
+  only that user (classroom socket peer credentials) may use, and writes
+  with `classroomview.TreeWriter`: names validated again, private staging,
+  explicit 0755/0644 modes, no-follow exclusive creation and "name (2)"
+  instead of replacing anything. A page without the helper downloads a
+  screenshot (one computer's window only) through the browser and does not
+  collect. Collect plan/apply
+  binds the computers and the destination folder and applies once.
+  Showing the teacher's screen sends JPEG
   pictures (`broadcast.frame`, at most 2 MB); the agent writes them only to
   its own runtime folder and the extension shows them in a second modal
   cover above the lock, accepting only those file names. The showing ends
@@ -781,6 +817,14 @@ that release's notes, so a release is not finished until the site follows it.
   teacher chooses with the browser's own consent (never the page itself), posts JPEGs to `/api/broadcast/frame`, and the
   worker keeps one showing at a time, sending each computer only the latest
   picture and ending after ten silent seconds.
+  Switch on (Wake-on-LAN, `wake-plan`/`wake-apply`, `nixorium wake`) takes
+  no review token or operation lock, validates names like every classroom
+  operation and never targets the controller. Hardware addresses come only
+  from the controller's mode-0600 record in the classroom service's state
+  directory, learned from the kernel neighbor table after a client answered;
+  never from a request, `lab-settings.json` or Git. Send only unprivileged
+  UDP to port 9 (lab broadcast and 255.255.255.255), open no port, and never
+  report a sent packet as a computer that started.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet
   lock. Recheck authenticated boot ID and state before every fixed helper

@@ -54,6 +54,47 @@ The project follows [Semantic Versioning](https://semver.org/).
   A computer still on the old network is updated there, computers that are off
   are queued, the Overview shows the change in progress (`NETWORK-CHANGING`)
   with its next step, and the change can be undone until it is finished.
+- **Switch on** starts student computers that are off, with Wake-on-LAN. It is
+  in **Computers → Power controls** (Tab beside Shut down and Restart, for the
+  administrator and the teacher), in the classroom view page (**Power →
+  Switch on** for the selected computers, and in a computer's **Actions** menu
+  while it does not answer) and in a terminal as
+  `nixorium wake --on <computers|@lab>`. The review lists the computers that
+  receive the packet and skips those already on and those whose network
+  address is not known yet; in the classroom view a card shows "Starting…"
+  until the computer answers, for at most three minutes. Nobody types an
+  address: the controller learns each computer's network card address by
+  itself while the computer is on and the classroom view is open or the
+  computer inventory runs, and keeps it on the controller only, outside the
+  configuration. A sent packet does not prove that a computer starts: its
+  BIOS/UEFI must allow waking from the network (often called "Wake on LAN"
+  or "Power on by PCI-E"), and it must stay plugged in. Addresses are learned
+  from computers already installed too, as soon as the controller runs this
+  version; the computers themselves accept the packet from their first
+  restart after their next update.
+- In the classroom view, **Save screenshot** in a computer's window keeps a
+  picture of the student's screen, up to 1920 pixels wide, in
+  `Nixorium/Screenshots` of your home folder, named after the computer, the
+  date and the time (for example `pc03-2026-10-15-10.30.12.jpg`). A picture
+  never replaces an earlier one. The button works only while the screen is
+  live: a computer that is off, idle behind its own screen lock or without
+  anyone signed in has no picture to save. When the page was not opened from
+  Nixorium, the browser downloads the picture instead.
+- **Collect from desktop** copies the files on the desktops of the selected
+  students' computers into your home folder, in
+  `Nixorium/Collected/<date and time>/<computer>/`, after the usual review
+  with one confirmation button. It sits beside **Send files** in the classroom
+  view toolbar and in a computer's **Actions** menu. Hidden files and links
+  are left out and nothing changes on the students' computers. At most 2000
+  items and 500 MB are taken from one computer; a computer with more is
+  reported as "too much to collect" and nothing of it is kept. The result
+  counts the computers, such as "Collect: 10 done · 2 nothing to collect ·
+  1 switched off or not reachable". From a terminal, teacher or
+  administrator: `nixorium collect plan --on <clients|@lab>`, then
+  `nixorium collect apply` with the same options and `--expect` set to the
+  review token; `--into <folder>` collects into another existing folder.
+  Update the student computers first: one that is not updated is listed as
+  not able to collect yet.
 
 ### Changed
 
@@ -80,6 +121,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   the message again, instead of asking you to update Nixorium. The reason for
   any refused response is kept in a private per-chat record on the controller
   and is never sent to the service.
+
+### Fixed
+
+- `nixorium send plan|apply` works from the teacher's terminal: like
+  `nixorium collect`, it needs only the classroom service and no longer stops
+  with "deployment repository not found".
 
 ## [3.7.0] - 2026-10-15
 

@@ -257,7 +257,11 @@ Clients expose only SSH (22) to the controller's static IPv4 address on the
 lab interface; IPv6 cannot bypass this restriction. The classroom view reaches
 each student's session through that access, and GNOME shows its sharing
 notice while the teacher watches. Changes to the classroom Shell extension
-apply at the student's next login.
+apply at the student's next login. In a computer's window of the classroom
+view page, **Save screenshot** keeps a picture of its screen in
+`Nixorium/Screenshots` of your home folder, such as
+`pc03-2026-10-15-10.30.12.jpg`; a page not opened from Nixorium downloads the
+picture through the browser instead.
 
 ## Temporary Internet access
 
@@ -292,13 +296,29 @@ executable, and a name already on a student's desktop is kept as
 "name (2)". A restart empties the student's home, as usual. In the classroom
 view page, **Send files** offers **A file…** and **A folder…**, which open
 the system file chooser in your home folder.
-From a terminal: `nixorium send plan --file <file-or-folder> --on @lab`,
-then `nixorium send apply --file <file-or-folder> --on @lab --expect` with
-the review token.
+From a terminal, as the teacher or the administrator: `nixorium send plan
+--file <file-or-folder> --on @lab`, then `nixorium send apply --file
+<file-or-folder> --on @lab --expect` with the review token; it needs only the
+classroom service, not the deployment repository.
 
 In the classroom view page, **Share screen** shows your screen (or the
 window or tab you choose) on the selected computers, over their whole screen and with their keyboard
 and mouse blocked, until **Stop sharing** or until you close the page.
+
+## Collect files
+
+With the classroom view, **Collect from desktop** in the classroom view page
+(beside **Send files**, and in a computer's **Actions** menu) copies the files
+on the desktops of the selected students' computers into your home folder,
+in `Nixorium/Collected/<date and time>/<computer>/`, after a review. Hidden
+files and links are left out and nothing changes on the students' computers.
+At most 2000 items and 500 MB are taken from one computer: a computer with
+more is reported as "too much to collect" and nothing of it is kept. An empty
+desktop is "nothing to collect"; computers that are off or have nobody signed
+in are skipped. From a terminal: `nixorium collect plan --on @lab`, then
+`nixorium collect apply --on @lab --expect` with the review token; add
+`--into <folder>` to collect into another existing folder. Update the client
+computers before first use.
 
 ## Local customization
 
@@ -907,6 +927,39 @@ Results are `accepted`, `not-sent`, or `unconfirmed`. Accepted means the remote
 operating system accepted the request; loss of network contact does not prove
 physical power state or a completed reboot. An unconfirmed result may have taken effect, so inspect
 the target instead of retrying blindly.
+
+#### Switch computers on
+
+**Switch on** (Tab in **Power controls**, as the administrator or the
+teacher) sends a Wake-on-LAN packet to the selected computers that are off.
+The review lists the computers that receive it and skips those already on
+and those whose network address is not known yet. You never type an address:
+the controller learns each computer's address by itself while the computer
+is on and the classroom view is open or **Computer inventory** runs, and keeps
+it on the controller only. The classroom view page offers the same as
+**Power → Switch on** for the selected computers and in a computer's
+**Actions** menu while it does not answer; its card shows "Starting…" until
+the computer answers. From a terminal, without a review token:
+
+```sh
+nixorium wake --on pc03,pc04
+nixorium wake --on @lab
+```
+
+It prints one line per computer: sent, already on, address unknown, or
+invalid target. A sent packet does not prove that a computer starts. For
+that, each student computer must:
+
+- allow waking from the network in its BIOS/UEFI (often "Wake on LAN" or
+  "Power on by PCI-E"; some computers also need "ErP" or "Deep sleep"
+  turned off);
+- have been restarted once after the client update that enables
+  Wake-on-LAN on its lab network card;
+- stay plugged in: a switched-off power strip or a power cut disarms it
+  until the computer is started by hand once.
+
+When a computer stays off, check those points, then start it by hand and
+let the classroom view or the inventory see it once more.
 
 ### Operation logs
 

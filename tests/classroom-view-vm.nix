@@ -135,6 +135,15 @@ pkgs.testers.runNixOSTest {
     client.succeed("${agent} probe --send /tmp/share nixorium-classroom-connect | grep -F 'files.done Lesson (2), run (2).sh'")
     client.succeed("test -z \"$(ls -A /home/student/.local/share/nixorium-classroom)\"")
 
+    # Collecting copies the desktop without changing it: the contents
+    # arrive with explicit modes, links stay out, and the student keeps
+    # every file.
+    client.succeed("ln -s /etc/shadow /home/student/Desktop/shadow && install -d /tmp/collected")
+    client.succeed("${agent} probe --collect /tmp/collected nixorium-classroom-connect | tee /dev/stderr | grep -F 'collect.done Lesson, Lesson (2), run (2).sh, run.sh skipped=0'")
+    client.succeed("grep -qx notes /tmp/collected/Lesson/notes.txt && grep -qx notes '/tmp/collected/Lesson (2)/notes.txt' && test ! -e /tmp/collected/shadow")
+    client.succeed("test \"$(stat -c %a /tmp/collected/Lesson /tmp/collected/Lesson/notes.txt /tmp/collected/run.sh | tr '\\n' ' ')\" = '755 644 644 '")
+    client.succeed("test -L /home/student/Desktop/shadow && grep -qx notes /home/student/Desktop/Lesson/notes.txt && test -f '/home/student/Desktop/run (2).sh'")
+
     # A locked screen cannot be captured; the teacher is told why. The
     # capture stops after 30 idle seconds, then the screen is locked.
     client.sleep(35)

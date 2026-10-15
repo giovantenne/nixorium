@@ -10,6 +10,10 @@ let
   ifaceExplicit = labSettings.ifaceExplicit or true;
   byType = laboratoryEnabled && !isController && !ifaceExplicit;
   prefixLength = labSettings.networkPrefixLength;
+  # Clients answer Wake-on-LAN magic packets on their lab card, so Switch on
+  # can start them; their firmware must allow it too.
+  wakeByName = laboratoryEnabled && !isController && !byType;
+  ethtool = "${pkgs.ethtool}/bin/ethtool";
   # During a change of laboratory network every host keeps its previous
   # address next to the new one: the controller so that computers not yet
   # moved still reach it, and clients so that the update that moves them
@@ -59,7 +63,9 @@ in
       autoconnect = "true";
       autoconnect-retries = "0";
     };
-    ethernet = { };
+    # Magic-packet wake (0x40 in NetworkManager's flags), set on the card
+    # whenever this profile is activated.
+    ethernet.wake-on-lan = "64";
     ipv4 = {
       method = "auto";
       address1 = "${hostIp}/${toString prefixLength}";
@@ -99,6 +105,15 @@ in
       fi
     '';
   };
+
+  # A named lab card gets magic-packet wake when it appears at boot. The
+  # NixOS wakeOnLan option matches only the kernel's original name (a .link
+  # OriginalName), which predictable names such as enp3s0 replace, so udev
+  # matches the final name here, or the kernel name when nothing renames it.
+  services.udev.extraRules = lib.mkIf wakeByName ''
+    ACTION=="add", SUBSYSTEM=="net", NAME=="${labSettings.ifaceName}", RUN+="${ethtool} -s $name wol g"
+    ACTION=="add", SUBSYSTEM=="net", NAME=="", KERNEL=="${labSettings.ifaceName}", RUN+="${ethtool} -s $name wol g"
+  '';
 
   # The interface already exists when a controller-only installation switches
   # live to laboratory mode, so no new udev event starts this generated unit.

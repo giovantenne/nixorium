@@ -411,7 +411,7 @@ func parseJournal(data []byte, area string, controller bool) ([]Entry, bool) {
 			incomplete = true
 			continue
 		}
-		get := func(key string) string { var value string; json.Unmarshal(fields[key], &value); return value }
+		get := func(key string) string { var value string; _ = json.Unmarshal(fields[key], &value); return value }
 		unit := get("_SYSTEMD_UNIT")
 		if !allowedUnit(unit, area, controller) {
 			unit = get("UNIT")

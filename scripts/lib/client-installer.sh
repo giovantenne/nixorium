@@ -4,13 +4,14 @@
 # authorization and operation state; this file owns the safety checks used by
 # the live installers.
 
+# shellcheck disable=SC2034 # Version marker of this library, read by the sourcing installers.
 NIXORIUM_INSTALLER_SCHEMA_VERSION=1
 NIXORIUM_MAX_DISKS=128
 
 nixorium_canonical_ed25519_public_key() {
-  local value=$1 key_type key_data remainder
+  local value=$1 key_type key_data
   [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || return 1
-  read -r key_type key_data remainder <<< "$value"
+  read -r key_type key_data _ <<< "$value"
   [[ "$key_type" == ssh-ed25519 && "$key_data" =~ ^[A-Za-z0-9+/=]+$ ]] || return 1
   printf '%s %s\n' "$key_type" "$key_data"
 }

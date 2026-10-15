@@ -826,6 +826,26 @@ in
         "assert result['powerReport']['state'] == 'completed' and result['powerReport']['action'] == 'restart', result",
     ])
     controller.succeed("rm -f /tmp/nixorium-test-restart-dispatch.log; su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(classroom_restart)) + "; grep -Fx 'systemctl reboot --no-block' /tmp/nixorium-test-shutdown-ssh.log; test \"$(wc -l < /tmp/nixorium-test-restart-dispatch.log)\" = 1")
+    # Switch on through the classroom service: pc01 answers, so it is already
+    # on and gets no packet; a name outside the inventory is refused. Learned
+    # addresses live in the service's private state directory.
+    classroom_wake = "\n".join([
+        "import json, socket",
+        "path = '/run/nixorium-classroom/control.sock'",
+        "def call(request):",
+        "    connection = socket.socket(socket.AF_UNIX)",
+        "    connection.connect(path)",
+        "    connection.sendall((json.dumps(request) + '\\n').encode())",
+        "    return json.loads(connection.makefile().readline())",
+        "plan = call({'schemaVersion': 1, 'requestId': '33333333333333333333333333333333', 'operation': 'wake-plan', 'requested': 'pc01'})",
+        "assert plan['wakePlan']['state'] == 'ready' and plan['wakePlan']['targets'][0]['state'] == 'on', plan",
+        "result = call({'schemaVersion': 1, 'requestId': '44444444444444444444444444444444', 'operation': 'wake-apply', 'wakePlan': plan['wakePlan']})",
+        "assert result['wakeReport']['alreadyOn'] == 1 and result['wakeReport']['sent'] == 0, result",
+        "refused = call({'schemaVersion': 1, 'requestId': '55555555555555555555555555555555', 'operation': 'wake-plan', 'requested': 'pc42'})",
+        "assert refused['wakePlan']['state'] == 'blocked' and refused['wakePlan']['targets'][0]['state'] == 'invalid', refused",
+    ])
+    controller.succeed("su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(classroom_wake)))
+    controller.succeed("test \"$(stat -c '%U:%a' /var/lib/nixorium/classroom)\" = admin:700")
     controller.succeed("systemctl start nixorium-worker-sandbox-check.service")
     controller.succeed("journalctl -u nixorium-worker-sandbox-check.service --no-pager | grep -F -- '--- PASS: TestRemoteWorkerFilesystemSandbox'")
     controller.succeed("systemctl start nixorium-workspace-save-check.service")

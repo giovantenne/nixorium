@@ -59,6 +59,9 @@ type viewServer struct {
 	sessions   map[string]viewGrant
 	// desktops reaches the desktop helper of a page's user, if any.
 	desktops *desktopBroker
+	// downloads keeps screenshots no helper saved until the page downloads
+	// them (screenshot.go).
+	downloads *screenshotDownloads
 	// internet reads the computers' real Internet state while the page is
 	// open; nil keeps only the page's own changes.
 	internet *internetWatcher
@@ -240,6 +243,8 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		default:
 			server.shareChosen(writer, request)
 		}
+	case "/api/screenshot", "/api/screenshot/file":
+		server.screenshot(writer, request)
 	case "/api/input":
 		if request.Method != http.MethodPost {
 			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)

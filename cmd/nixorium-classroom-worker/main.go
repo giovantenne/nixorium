@@ -46,9 +46,13 @@ func run() error {
 	}
 	// The service has a private temporary folder for files being sent.
 	shares := newShareStore(os.TempDir())
+	hub := app.NewClassroomViewHub(hosts, adapters.ClassroomAgentConnector{})
+	// A computer that answers the classroom view teaches the controller its
+	// hardware address for Switch on.
+	hub.Answered = func(host domain.HostMeta) { local.LearnWakeAddresses([]domain.HostMeta{host}) }
 	worker := classroomWorker{
 		repository: repository,
-		view:       newViewServer(app.NewClassroomViewHub(hosts, adapters.ClassroomAgentConnector{})),
+		view:       newViewServer(hub),
 		viewOn:     func() bool { return classroomViewEnabled(adapters.Local{}, repository) },
 		inspector:  app.NewInspector(local),
 		power:      app.NewShutdownManager(local),
@@ -57,10 +61,17 @@ func run() error {
 		shares:     shares,
 		share:      app.NewShareManager(lockSource{local, adapters.ClassroomAgentConnector{}}, shares),
 		records:    local,
+		wake:       app.NewWakeManager(local),
 	}
+	// Files collected from students' desktops wait in the private
+	// temporary folder too, until the user who asked saves them.
+	worker.collected = newCollectStore(os.TempDir())
+	worker.collect = app.NewCollectManager(lockSource{local, adapters.ClassroomAgentConnector{}}, worker.collected)
+	go worker.collected.expire(ctx, time.Minute)
 	// The page's actions go through the same handling as the dashboard.
 	worker.view.actions = worker.handle
 	worker.view.desktops = newDesktopBroker()
+	go worker.view.desktops.expireSaves(ctx, time.Minute)
 	view := worker.view
 	view.internet = &internetWatcher{
 		observe:  local.ObserveInternet,
@@ -86,7 +97,10 @@ type classroomWorker struct {
 	lock       *app.LockManager
 	shares     *shareStore
 	share      *app.ShareManager
+	collect    *app.CollectManager // copies students' desktops
+	collected  *collectStore       // until the user who asked saves them
 	records    app.OperationRecordSink
+	wake       *app.WakeManager
 }
 
 // lockSource reads the laboratory identities and reaches the classroom agents.
@@ -189,6 +203,10 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 			worker.shares.Remove(request.SharePlan.Transfer)
 		}
 		response.ShareReport = &report
+	case domain.ClassroomSaveItemsOperation, domain.ClassroomSaveReadOperation, domain.ClassroomSaveDoneOperation:
+		return worker.handleSave(ctx, request)
+	case domain.ClassroomCollectPlanOperation, domain.ClassroomCollectApplyOperation:
+		return worker.handleCollect(ctx, request)
 	case domain.ClassroomDesktopWaitOperation, domain.ClassroomDesktopReadyOperation:
 		uid, known := adapters.ClassroomPeerUID(ctx)
 		if !known || worker.view == nil || worker.view.desktops == nil {
@@ -200,6 +218,8 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		} else if !worker.view.desktops.Ready(uid, request.DesktopJob, request.ShareTransfer, request.DesktopError, request.DesktopCancelled) {
 			return domain.ClassroomResponse{State: "failed", Message: "This desktop job is unknown."}
 		}
+	case domain.ClassroomWakePlanOperation, domain.ClassroomWakeApplyOperation:
+		return worker.handleWake(ctx, request)
 	case domain.ClassroomViewOpenOperation:
 		if worker.view == nil || worker.viewOn == nil || !worker.viewOn() {
 			return domain.ClassroomResponse{State: "failed", Message: errViewDisabled.Error()}

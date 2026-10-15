@@ -51,7 +51,7 @@ func prepareShare(ctx context.Context, item string) (string, error) {
 	for index, entry := range entries {
 		files[index] = domain.ShareFile{Path: entry.Path, Size: entry.Size, Dir: entry.Dir}
 	}
-	response, err := classroomRequest(ctx, domain.ClassroomShareBeginOperation, func(request *domain.ClassroomRequest) {
+	response, err := classroomCall(ctx, domain.ClassroomShareBeginOperation, func(request *domain.ClassroomRequest) {
 		request.ShareFiles = files
 	})
 	if err != nil || response.ShareTransfer == "" {
@@ -85,7 +85,7 @@ func uploadFile(ctx context.Context, transfer string, index int, name string, si
 			return fmt.Errorf("%s changed while it was read: %w", name, err)
 		}
 		data := buffer[:count]
-		response, requestErr := classroomRequest(ctx, domain.ClassroomShareChunkOperation, func(request *domain.ClassroomRequest) {
+		response, requestErr := classroomCall(ctx, domain.ClassroomShareChunkOperation, func(request *domain.ClassroomRequest) {
 			request.ShareTransfer, request.ShareIndex, request.ShareOffset, request.ShareData = transfer, index, offset, data
 		})
 		if requestErr != nil || response.State == "failed" {
@@ -101,7 +101,7 @@ func planShare(ctx context.Context, requested, item string) domain.SharePlan {
 	if err != nil {
 		return shareFailure(err.Error() + ".")
 	}
-	response, err := classroomRequest(ctx, domain.ClassroomSharePlanOperation, func(request *domain.ClassroomRequest) {
+	response, err := classroomCall(ctx, domain.ClassroomSharePlanOperation, func(request *domain.ClassroomRequest) {
 		request.Requested, request.ShareTransfer = requested, transfer
 	})
 	if err != nil || response.SharePlan == nil {
@@ -113,7 +113,7 @@ func planShare(ctx context.Context, requested, item string) domain.SharePlan {
 }
 
 func applyShare(ctx context.Context, plan domain.SharePlan) domain.ShareReport {
-	response, err := classroomRequest(ctx, domain.ClassroomShareApplyOperation, func(request *domain.ClassroomRequest) {
+	response, err := classroomCall(ctx, domain.ClassroomShareApplyOperation, func(request *domain.ClassroomRequest) {
 		request.SharePlan = &plan
 	})
 	if err != nil || response.ShareReport == nil {
