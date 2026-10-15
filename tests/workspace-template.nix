@@ -19,6 +19,11 @@ let
   programmingPreset = builtins.head (builtins.filter (preset: preset.id == "programming") presets);
   programming = resolveFor programmingPreset.packages [ "pc01" ] programmingJSON;
   programmingExtensions = programming.effective.vscode.extensions;
+  # Generated editor settings; the seed derivation itself is not built here.
+  seedSettings = resolution: (import ../lib/build-workspace-seed.nix { inherit lib pkgs; } resolution).vscodeSettings;
+  programmingSettings = seedSettings programming;
+  withoutJava = resolveFor (initialPackages ++ [ "vscode" ]) []
+    ''{"schemaVersion":1,"vscode":{"extensions":["ritwickdey.liveserver"]}}'';
   rejects = value: !(builtins.tryEval (builtins.deepSeq value true)).success;
   templateArguments =
     ((import ../templates/site/flake.nix).outputs {
@@ -84,6 +89,12 @@ assert builtins.elem "ms-python.vscode-pylance" programmingExtensions;
 assert builtins.elem "mysql-workbench.desktop" programming.effective.desktop.favorites;
 assert builtins.all (package: builtins.elem package programming.requiredPackages)
   [ "gcc" "gdb" "jdk21" "maven" "php" "python3" "vscode" "mysql-workbench" ];
+# The Java extension runs on the lab's JDK; a profile without it is untouched.
+assert programmingSettings."java.jdt.ls.java.home" == pkgs.jdk21.home;
+assert programmingSettings."java.configuration.runtimes"
+  == [ { name = "JavaSE-21"; path = pkgs.jdk21.home; default = true; } ];
+assert !(builtins.any (lib.hasPrefix "java.") (builtins.attrNames (seedSettings withoutJava)));
+assert !(builtins.any (lib.hasPrefix "java.") (builtins.attrNames (seedSettings example)));
 assert rejects (resolveFor initialPackages [] programmingJSON);
 assert rejects (resolveFor (lib.remove "gdb" programmingPreset.packages) [] programmingJSON);
 # Staff homes get editor settings only; the student home comes from the seed.
