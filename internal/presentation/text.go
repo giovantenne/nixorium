@@ -816,6 +816,7 @@ func ActionText(writer io.Writer, report domain.ActionReport) {
 }
 
 func PXELifecycleText(writer io.Writer, report domain.PXELifecycleReport) {
+	PXELifecycleOutcomeText(writer, report)
 	fmt.Fprintf(writer, "%s: %s\n", report.Operation, strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Mode: %s\n", report.Mode)
 	if report.Interface != "" {

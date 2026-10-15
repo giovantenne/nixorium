@@ -965,7 +965,7 @@ func TestPXEScreenRecommendsOnlyTheObservedNextStage(t *testing.T) {
 
 	report.PXE.Mode = "recovery-required"
 	view = (dashboardModel{report: report, screen: dashboardPXE}).View().Content
-	if !strings.Contains(view, "Next: recover normal controller networking") || strings.Contains(view, "start PXE") {
+	if !strings.Contains(view, "Recover the controller network") || !strings.Contains(view, "What Nixorium found") || !strings.Contains(view, "What you can do") || strings.Contains(view, "start PXE") {
 		t.Fatalf("recovery guidance is ambiguous:\n%s", view)
 	}
 }

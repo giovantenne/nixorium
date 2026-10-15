@@ -20,6 +20,8 @@ func (model dashboardModel) openNetworkInstallation() (tea.Model, tea.Cmd) {
 	model.installation.flow = false
 	model.installation.failed = false
 	model.installation.stateError = false
+	model.installation.pxeResult = domain.PXELifecycleReport{}
+	model.noticeDetails = false
 	model.message = ""
 	if model.actions.Refresh == nil {
 		return model, nil
@@ -39,7 +41,7 @@ func (model dashboardModel) pxePrimaryAction() tuiAction {
 	case "active":
 		return tuiAction{key: "x", label: "Finish installation"}
 	case "degraded", "recovery-required":
-		return tuiAction{key: "n", label: "Recover network"}
+		return tuiAction{key: "n", label: "Recover the network"}
 	}
 	if model.report.PXEPreparation.Ready {
 		return tuiAction{key: "s", label: "Review start"}

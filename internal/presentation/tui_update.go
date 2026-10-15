@@ -418,6 +418,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return next, tea.Batch(model.loadPXEProgress(model.installation.pxeProgressID), plan)
 		}
 		return next, plan
+	case dashboardPXELifecycleMsg:
+		return model.handlePXELifecycle(message)
 	case dashboardOperationMsg:
 		preparationFinished := model.installation.pxePreparing && message.screen == dashboardPXE
 		model.busy = ""

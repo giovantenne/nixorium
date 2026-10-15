@@ -53,9 +53,9 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 	}
 	switch model.report.PXE.Mode {
 	case "active":
-		add("pending-pxe", situationTitle("PXE-ACTIVE"), "Review the installation session before restoring normal networking.")
+		add("pending-pxe", situationTitle("PXE-ACTIVE"), "Open it to finish the network installation and restore the controller's normal network.")
 	case "recovery-required", "degraded":
-		add("pending-pxe", situationTitle("PXE-ACTIVE"), "The controller network needs recovery. Inspect the installation session; recovery remains separately confirmed.")
+		add("pending-pxe", situationTitle("PXE-ACTIVE"), "It was interrupted. Open it to recover the controller network; nothing changes on the student computers.")
 	}
 	// Controller setup evidence enters the same ordered observation as saves
 	// and reviews; never revive it by reading the older setup report again.

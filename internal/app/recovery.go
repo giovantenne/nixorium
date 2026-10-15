@@ -80,7 +80,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	network := inspector.source.ServiceState(ctx, PXENetworkUnit)
 	switch mode := ObservePXELifecycle(listener, network, domain.PXEPreparationState{}); mode.Mode {
 	case "degraded", "recovery-required":
-		add(domain.RecoveryPXE, "PXE-ACTIVE", mode.Detail, "Client operations and a new network installation.", nil, nil)
+		add(domain.RecoveryPXE, "PXE-ACTIVE", pxeRecoveryDetail(mode), "Client operations and a new network installation.", nil, nil)
 	}
 	if holder, busy := inspector.source.OperationLockHolder(); busy {
 		detail := "Other operations wait until it finishes."
@@ -117,6 +117,15 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 		report.State = "attention"
 	}
 	return report
+}
+
+// pxeRecoveryDetail says in plain words how an interrupted network
+// installation left the controller.
+func pxeRecoveryDetail(state domain.PXELifecycleState) string {
+	if state.Mode == "recovery-required" {
+		return "It was interrupted: the controller still uses its temporary network setup. Open it to recover the controller network."
+	}
+	return "It was interrupted: one of its services stopped or failed. Open it to recover the controller network."
 }
 
 // computerList names a few computers and counts the rest.

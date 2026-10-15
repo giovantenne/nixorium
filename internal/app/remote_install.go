@@ -318,9 +318,9 @@ func remotePXEConflict(source RemoteInstallSource, ctx context.Context) string {
 	observed := ObservePXELifecycle(listener, network, domain.PXEPreparationState{})
 	switch observed.Mode {
 	case "active":
-		return "network installation is active; stop it before starting USB installation"
+		return "network installation is active; stop it before starting a USB installation"
 	case "degraded", "recovery-required":
-		return "controller network or PXE installation state requires recovery"
+		return "controller network or installation state requires recovery before a USB installation"
 	default:
 		return ""
 	}

@@ -1394,20 +1394,24 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			if model.actions.StopPXE == nil || model.actions.Refresh == nil || (model.report.PXE.Mode != "active" && model.report.PXE.Mode != "degraded" && model.report.PXE.Mode != "recovery-required") {
 				return model, nil
 			}
-			model.busy = "Stopping installation mode and restoring networking"
+			model.busy = "Stopping network installation and checking the controller network"
 			model.message = ""
-			return model, model.runAction(func() string {
-				return model.actions.StopPXE().Message
-			}, dashboardPXE)
+			model.installation.pxeResult = domain.PXELifecycleReport{}
+			return model, model.runPXELifecycle(model.actions.StopPXE)
 		case "n":
-			if model.report.PXE.Mode != "degraded" && model.report.PXE.Mode != "recovery-required" {
+			if !pxeRecoveryMode(model.report.PXE.Mode) || model.actions.RecoverPXE == nil || model.actions.Refresh == nil {
 				return model, nil
 			}
-			model.busy = "Recovering normal controller networking"
+			// The review on this screen says what Enter does; recovery
+			// changes only the controller's network (ADR 0026).
+			model.busy = "Recovering the controller network"
 			model.message = ""
-			return model, model.runAction(func() string {
-				return model.actions.RecoverPXE().Message
-			}, dashboardPXE)
+			model.installation.pxeResult = domain.PXELifecycleReport{}
+			return model, model.runPXELifecycle(model.actions.RecoverPXE)
+		case "d":
+			if model.installation.pxeResult.HasErrors() {
+				model.noticeDetails = !model.noticeDetails
+			}
 		}
 	case dashboardDiagnostics:
 		switch key.String() {

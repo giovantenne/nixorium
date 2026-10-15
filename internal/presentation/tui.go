@@ -352,6 +352,8 @@ type installationModel struct {
 	method           domain.RemoteInstallMethod
 	stateError       bool
 	remote           remoteInstallationModel
+	// pxeResult is the last stop or recovery of network installation.
+	pxeResult domain.PXELifecycleReport
 }
 
 type remoteInstallationStage int
@@ -2685,6 +2687,9 @@ func (model dashboardModel) pxeView() string {
 	}
 	path := []string{"Installation", "Network boot (PXE)"}
 	title := "Network installation"
+	if pxeRecoveryMode(model.report.PXE.Mode) && !model.installation.stateError {
+		title = "Recover the controller network"
+	}
 	if model.installation.flow {
 		path = []string{"Installation", "Install computers"}
 		title = "Install computers"
@@ -2827,7 +2832,7 @@ func (model dashboardModel) pxeView() string {
 		lines = append(lines, "")
 		lines = append(lines, model.operationProgressView(model.installation.pxeProgress, "Last preparation")...)
 	}
-	notices := []tuiNotice{}
+	notices := model.pxeLifecycleNotices()
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
@@ -2889,11 +2894,18 @@ func (model dashboardModel) pxeActions() []tuiAction {
 			add(tuiAction{key: "s", label: "Start"})
 		}
 	}
-	if model.report.PXE.Mode == "active" || recovery {
+	if model.report.PXE.Mode == "active" {
 		add(tuiAction{key: "x", label: "Stop"})
 	}
 	if recovery {
-		add(tuiAction{key: "n", label: "Recover network"})
+		add(tuiAction{key: "x", label: "Stop the network installation"})
+	}
+	if result := model.installation.pxeResult; result.HasErrors() && result.Message != "" {
+		label := "Details"
+		if model.noticeDetails {
+			label = "Hide details"
+		}
+		add(tuiAction{key: "d", label: label})
 	}
 	actions = append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: "Installation"})
 	if model.report.PXE.Mode == "active" {
@@ -2914,11 +2926,7 @@ func (model dashboardModel) pxeNextStepView() []string {
 			tuiInstruction(4, "Back on this controller", "Press Enter when finished to stop network installation and restore normal networking.", model.isDark),
 		}
 	case "degraded", "recovery-required":
-		return []string{
-			tuiStatus("Next: recover normal controller networking", tuiStatusFailure, model.isDark),
-			"  A previous PXE transition was interrupted.",
-			"  Press Enter to restore its recorded network state and stop network installation.",
-		}
+		return model.pxeRecoveryLines()
 	}
 	if !model.report.PXEPreparation.Ready {
 		return []string{

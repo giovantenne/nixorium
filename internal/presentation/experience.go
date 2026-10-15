@@ -359,7 +359,11 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "After review and save, apply the configuration to this controller, then update the computers. Esc returns to Accounts.")
 		}
 	case dashboardPXE:
-		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   n recover network   r refresh", "l progress details while preparing; q closes only the view")
+		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   r refresh", "l progress details while preparing; q closes only the view")
+		if pxeRecoveryMode(model.report.PXE.Mode) {
+			lines = append(lines, "After an interrupted network installation, Enter recovers the network: it puts back the controller's normal address and turns network installation off. Nothing changes on the student computers, so no word needs typing.",
+				"x stops both network installation services instead and checks the normal address. d shows the technical text of a failed attempt.")
+		}
 	case dashboardController:
 		lines = append(lines, "n new review   d result details   l logs / progress detail", "q closes the view; systemd-owned work continues")
 	case dashboardRecoveryReview:
