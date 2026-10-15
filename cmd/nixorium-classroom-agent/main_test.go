@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -17,7 +18,7 @@ import (
 )
 
 func fakeLoginctl(values map[string]string) commandRunner {
-	return func(arguments ...string) (string, error) {
+	return func(_ context.Context, arguments ...string) (string, error) {
 		key := strings.Join(arguments, " ")
 		if value, found := values[key]; found {
 			return value, nil
@@ -68,7 +69,7 @@ func TestConnectRelaysHelloToTheSessionAgent(t *testing.T) {
 	if err := classroomview.Write(request, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
 		t.Fatal(err)
 	}
-	if err := connect(request, output, graphicalSession(uid), base); err != nil {
+	if err := connect(context.Background(), request, output, graphicalSession(uid), base); err != nil {
 		t.Fatal(err)
 	}
 	reply, err := classroomview.Read(output)
@@ -92,7 +93,7 @@ func TestConnectReportsMissingSessionOrAgent(t *testing.T) {
 		"no agent": graphicalSession(os.Getuid()),
 	} {
 		output := &bytes.Buffer{}
-		if err := connect(strings.NewReader(""), output, run, base); err != nil {
+		if err := connect(context.Background(), strings.NewReader(""), output, run, base); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		reply, err := classroomview.Read(output)
@@ -395,4 +396,91 @@ func TestAgentShowsTheTeachersScreenUntilTheConnectionEnds(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("the showing did not end with its connection")
+}
+
+// hangingCommands puts a loginctl that never answers first in PATH.
+func hangingCommands(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "loginctl"), []byte("#!/bin/sh\nexec sleep 30\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+}
+
+func TestStuckLoginctlEndsAndTheControllerIsTold(t *testing.T) {
+	hangingCommands(t)
+	old := loginctlTimeout
+	loginctlTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { loginctlTimeout = old })
+	output := &bytes.Buffer{}
+	started := time.Now()
+	if err := connect(context.Background(), strings.NewReader(""), output, loginctl, t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(started) > 5*time.Second {
+		t.Fatalf("connect waited %v for loginctl", time.Since(started))
+	}
+	reply, err := classroomview.Read(output)
+	if err != nil || reply.Type != classroomview.TypeError || reply.Code != classroomview.CodeNoSession {
+		t.Fatalf("reply = %+v, %v", reply, err)
+	}
+	// The caller's own context ends it too.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := loginctl(ctx, "show-seat", "seat0"); err == nil {
+		t.Fatal("loginctl ran with a cancelled context")
+	}
+}
+
+func TestProbeEndsWhenItsContextEnds(t *testing.T) {
+	folder := t.TempDir()
+	if err := os.WriteFile(filepath.Join(folder, "notes.txt"), []byte("notes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, run := range map[string]func(context.Context) error{
+		"hello": func(ctx context.Context) error { return probe(ctx, []string{"sleep", "30"}, "", false, io.Discard) },
+		"lock":  func(ctx context.Context) error { return probeLock(ctx, []string{"sleep", "30"}, true, io.Discard) },
+		"collect": func(ctx context.Context) error {
+			return probeCollect(ctx, []string{"sleep", "30"}, t.TempDir(), io.Discard)
+		},
+		"send": func(ctx context.Context) error {
+			return probeSend(ctx, []string{"sleep", "30"}, folder, io.Discard)
+		},
+	} {
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		done := make(chan error, 1)
+		go func() { done <- run(ctx) }()
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Fatalf("%s: a command that never answered was a success", name)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s: the probe waited for a command that never answers", name)
+		}
+		cancel()
+	}
+	// A showing waits for its time, but not past the context.
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	picture := filepath.Join(t.TempDir(), "screen.jpg")
+	if err := os.WriteFile(picture, []byte("\xff\xd8\xff\xd9"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := probeShow(ctx, []string{"cat"}, picture, time.Minute, io.Discard); err == nil {
+		t.Fatal("a showing outlived its context")
+	}
+}
+
+func TestProbeNeedsACommandAndSaneArguments(t *testing.T) {
+	for name, arguments := range map[string][]string{
+		"no command":        nil,
+		"no command (send)": {"--send", t.TempDir()},
+		"too long a show":   {"--show", "screen.jpg", "61", "cat"},
+	} {
+		if err := runProbe(context.Background(), arguments, io.Discard); err == nil {
+			t.Fatalf("%s: accepted", name)
+		}
+	}
 }

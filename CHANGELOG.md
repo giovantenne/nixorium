@@ -96,6 +96,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A stuck helper program can no longer keep the classroom view busy forever.
+  On a student computer, the session query behind a classroom connection is
+  stopped after 10 seconds and the screen capture program ends with the
+  capture; on the controller, the dark-style lookup of the classroom window
+  ends after 10 seconds. The reset of a student's home at boot stops a program
+  that has not finished after 5 minutes and fails safely, leaving what it
+  found for the administrator, instead of waiting without end.
 - `nixorium send plan|apply` works from the teacher's terminal: like
   `nixorium collect`, it needs only the classroom service and no longer stops
   with "deployment repository not found".
