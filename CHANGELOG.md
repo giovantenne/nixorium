@@ -6,6 +6,22 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Programs downloaded outside Nix now run on the controller and every client:
+  Nixorium enables nix-ld with the common libraries (zlib, libstdc++, glib,
+  OpenSSL, ICU and the X11/GTK set that Electron and Java GUI programs need).
+  A VS Code extension installed from the Marketplace that bundles its own
+  binaries, such as the Java runtime of the Java extension, starts instead of
+  failing with "Could not start dynamically linked executable". Managed
+  extensions from the profile remain the recommended route, and student homes
+  still lose their installs at the reset.
+- When the student workspace profile selects the Java extension and the
+  software includes a JDK, the managed editor settings point the extension at
+  that JDK (`java.jdt.ls.java.home` and `java.configuration.runtimes`), so it
+  never depends on a runtime bundled in a Marketplace copy. Reviewed editor
+  settings in the profile may still override them.
+
 ### Changed
 
 - The review of an Assistant proposal reuses the evaluation Assistant already

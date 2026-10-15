@@ -462,6 +462,21 @@ See [student preferences](skills/nixorium-maintainer/references/student-home.md#
 for supported settings, retained system policy and boot-time behavior. Keep
 private modules from overwriting managed student preferences at login.
 
+Staff accounts may also install extensions from the VS Code Marketplace and
+run programs downloaded outside Nix. Every computer enables nix-ld with the
+common libraries, so a program that bundles generic Linux binaries (for
+example the Java runtime inside a Marketplace Java extension) starts instead
+of stopping with "Could not start dynamically linked executable". Where the
+profile selects the Java extension and the software list provides a JDK, the
+managed editor settings point the extension at that JDK, whichever version is
+installed. The managed extensions of the profile remain the recommended route
+for everyone: they are tested with the pinned editor, work offline and are
+identical on every computer. Student homes are restored at each boot, so
+anything a student installs in a home is lost at the reset; add what students
+need to the profile or to the software list instead. A downloaded program that
+needs a library outside the common set is a deployment change, not a
+workaround for each user.
+
 Run the task-oriented dashboard from the repository root:
 
 ```sh

@@ -293,6 +293,12 @@ assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.setti
 assert !(lib.hasInfix "iifname \"enp" subnetLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules);
 assert !(lib.hasInfix "iifname \"enp" subnetLab.nixosConfigurations.pc01.config.networking.nftables.tables.nixorium-client-access.content);
 assert lib.hasInfix "ip saddr 10.23.4.227 tcp dport 22 accept" subnetLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
+# Generic Linux binaries run on the controller and every client (nix-ld).
+assert subnetLab.nixosConfigurations.pc99.config.programs.nix-ld.enable
+  && subnetLab.nixosConfigurations.pc01.config.programs.nix-ld.enable
+  && controllerOnly.programs.nix-ld.enable;
+assert builtins.all (name: builtins.elem subnetLab.nixosConfigurations.pc01.pkgs.${name}
+  subnetLab.nixosConfigurations.pc01.config.programs.nix-ld.libraries) [ "zlib" "glib" "gtk3" "libgbm" ];
 # The controller always keeps its configured name and has no by-type profile.
 assert subnetLab.nixosConfigurations.pc99.config.networking.interfaces ? enp0s3;
 assert subnetLab.nixosConfigurations.pc99.config.networking.networkmanager.ensureProfiles.profiles == {};

@@ -39,23 +39,42 @@ let
       value = "${profile.browser.defaultApplication};";
     }) [ "text/html" "x-scheme-handler/http" "x-scheme-handler/https" ]);
   });
-  settingsSource = pkgs.writeText "nixorium-workspace-vscode-settings.json" (builtins.toJSON (
-    (profile.vscode.extraSettings or {}) // (profile.vscode.settings or {}) // {
-      # These are editable session defaults, not global editor policies.
-      # Managed extension updates come from the reviewed package-base pin.
-      "extensions.autoUpdate" = false;
-      "extensions.autoCheckUpdates" = false;
-      "update.mode" = "none";
-    }
-  ));
+  pinnedPkgs = import ./workspace-marketplace.nix { inherit lib pkgs; } (profile.vscode.marketplace or []);
+  packageTools = import ./software-packages.nix { inherit lib; pkgs = pinnedPkgs; allowUnfree = true; };
+  # The Java extension starts its language server on the JRE it bundles unless
+  # told otherwise, and a copy installed later from the Marketplace may bundle
+  # another one. With the extension selected and a JDK among the resolved
+  # packages, point it at the lab's JDK instead. Reviewed profile settings
+  # below may still override these defaults.
+  jdkAttributes = builtins.filter (name: builtins.match "jdk[0-9]*" name != null)
+    (resolution.requiredPackages or []);
+  jdk = if builtins.elem "redhat.java" (profile.vscode.extensions or []) && jdkAttributes != []
+    then packageTools.resolve (builtins.head jdkAttributes) else null;
+  # Only the JAVA_HOME directory carries the `release` file the extension reads.
+  javaHome = jdk.home or "${jdk}/lib/openjdk";
+  javaMajor = lib.versions.major jdk.version;
+  javaDefaults = lib.optionalAttrs (jdk != null) {
+    "java.jdt.ls.java.home" = javaHome;
+    "java.configuration.runtimes" = [ {
+      name = "JavaSE-${if javaMajor == "1" then "1.${lib.versions.minor jdk.version}" else javaMajor}";
+      path = javaHome;
+      default = true;
+    } ];
+  };
+  settings = javaDefaults // (profile.vscode.extraSettings or {}) // (profile.vscode.settings or {}) // {
+    # These are editable session defaults, not global editor policies.
+    # Managed extension updates come from the reviewed package-base pin.
+    "extensions.autoUpdate" = false;
+    "extensions.autoCheckUpdates" = false;
+    "update.mode" = "none";
+  };
+  settingsSource = pkgs.writeText "nixorium-workspace-vscode-settings.json" (builtins.toJSON settings);
   # Fixed launch defaults for an automatically logged-in, reset account: no
   # keyring prompt for extension secrets and no crash upload.
   argvSource = pkgs.writeText "nixorium-workspace-vscode-argv.json" (builtins.toJSON {
     password-store = "basic";
     enable-crash-reporter = false;
   });
-  pinnedPkgs = import ./workspace-marketplace.nix { inherit lib pkgs; } (profile.vscode.marketplace or []);
-  packageTools = import ./software-packages.nix { inherit lib; pkgs = pinnedPkgs; allowUnfree = true; };
   extensions = map (entry:
     let
       package = packageTools.resolve entry.package;
@@ -85,6 +104,8 @@ assert map (entry: entry.id) extensions == (profile.vscode.extensions or [])
   || throw "workspace seed: resolved extensions do not match the effective profile";
 pkgs.runCommand "nixorium-workspace-seed" {
   nativeBuildInputs = [ pkgs.dconf pkgs.jq ];
+  # The generated editor settings, for evaluation-only checks.
+  passthru.vscodeSettings = settings;
 } ''
   mkdir -p "$out/home" "$out/dconf"
   install -m 0444 ${manifest} "$out/manifest.json"

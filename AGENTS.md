@@ -64,6 +64,7 @@ modules/
   firewall.nix             # Interface-scoped SSH, cache, and PXE policy
   desktop.nix              # Core GNOME session, locale and regional policy
   power.nix                # Idle and controller sleep policy
+  nix-ld.nix               # nix-ld loader and common libraries for downloaded Linux binaries
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
   networking.nix           # Hostname + static IP with shared iface name
@@ -741,7 +742,7 @@ release is not finished until the site follows it.
 - GitHub CI disables import-from-derivation: evaluation must never read a derivation output.
 - The `nixorium-staff` group (declared in `modules/users.nix`) lets `admin` and the teacher read the student's home snapshots.
 - `modules/common.nix` is only the composition point for core desktop, firewall,
-  power, and SSH modules. Packages, shell preferences, development tools,
+  power, SSH and nix-ld modules. Packages, shell preferences, development tools,
   screensaver behavior, and application policy belong in the deployment.
   The one exception, by owner decision, is base software:
   `internal/domain/base-software.json` (Chromium, Ghostty, Git, the

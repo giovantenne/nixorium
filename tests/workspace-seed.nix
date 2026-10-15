@@ -14,13 +14,25 @@ let
       "$out/share/vscode/extensions/${fixtureDirectory}/package.json"
   '';
   fixtureManifest = { publisher = "RitwickDey"; name = "LiveServer"; version = "1.0.0"; };
+  # A Java extension and a JDK stand-in test the managed Java settings without
+  # building either; the real JDK is covered by the template evaluation.
+  javaExtension = pkgs.runCommand "workspace-java-extension-fixture" {
+    version = "1.0.0";
+    passthru.vscodeExtUniqueId = "redhat.java";
+  } ''
+    mkdir -p "$out/share/vscode/extensions/redhat.java"
+    cp ${pkgs.writeText "package.json" (builtins.toJSON { publisher = "redhat"; name = "java"; version = "1.0.0"; })} \
+      "$out/share/vscode/extensions/redhat.java/package.json"
+  '';
+  jdk = pkgs.runCommand "workspace-jdk-fixture" { version = "21.0.1"; } "mkdir -p $out/lib/openjdk";
   extension = if usePinnedExtension then pkgs.vscode-extensions.ritwickdey.liveserver
     else fixtureExtension fixtureManifest;
   # The synthetic editor keeps this artifact check independent of an editor
   # build. Neither fixture claims to test extension activation in VS Code.
   seedPackages = pkgs // {
     vscode = pkgs.hello;
-    vscode-extensions = { ritwickdey.liveserver = extension; };
+    vscode-extensions = { ritwickdey.liveserver = extension; redhat.java = javaExtension; };
+    jdk21 = jdk;
   };
   resolve = import ../lib/resolve-workspace-profile.nix { inherit lib; pkgs = seedPackages; };
   build = import ../lib/build-workspace-seed.nix { inherit lib; pkgs = seedPackages; };
@@ -34,11 +46,14 @@ let
         { id = "org.gnome.TextEditor.desktop"; package = "gnome-text-editor"; }
         { id = "chromium-browser.desktop"; package = "chromium"; browser = true; }
       ];
-      extensions = [ { id = extensionID; package = "vscode-extensions.${extensionID}"; } ];
+      extensions = [
+        { id = extensionID; package = "vscode-extensions.${extensionID}"; }
+        { id = "redhat.java"; package = "vscode-extensions.redhat.java"; requiredPackages = [ "jdk21" ]; }
+      ];
     };
     controllerName = "pc99";
     clientNames = [];
-    hostPackages.pc99 = [ "vscode" "gnome-shell" "gnome-text-editor" "chromium" "gnomeExtensions.dash-to-dock" ];
+    hostPackages.pc99 = [ "vscode" "gnome-shell" "gnome-text-editor" "chromium" "gnomeExtensions.dash-to-dock" "jdk21" ];
   };
   resolved = prepare {
     desktop = {
@@ -85,6 +100,11 @@ let
     vscode.extensions = [];
   });
   emptySeed = build (prepare {});
+  javaSeed = build (prepare { vscode.extensions = [ "redhat.java" ]; });
+  javaOverrideSeed = build (prepare {
+    vscode.extensions = [ "redhat.java" ];
+    vscode.extraSettings."java.jdt.ls.java.home" = "/opt/reviewed-jdk";
+  });
   schemas = pkgs.runCommand "nixorium-workspace-test-schemas" {
     nativeBuildInputs = [ pkgs.glib ];
   } ''
@@ -160,6 +180,15 @@ pkgs.runCommand "nixorium-workspace-seed${lib.optionalString usePinnedExtension 
     and ."update.mode" == "none"
     and ."telemetry.telemetryLevel" == "off" and ."[python]"."editor.rulers" == [80]
     and length == 12' ${seed}/home/.config/Code/User/settings.json
+  # The Java extension runs on the lab's JDK, whichever JRE a Marketplace copy
+  # bundles; a profile without it receives neither key.
+  jq -e '."java.jdt.ls.java.home" == "${jdk}/lib/openjdk"
+    and ."java.configuration.runtimes" == [{"name": "JavaSE-21", "path": "${jdk}/lib/openjdk", "default": true}]
+    and ."extensions.autoUpdate" == false' ${javaSeed}/home/.config/Code/User/settings.json
+  jq -e '."java.jdt.ls.java.home" == "/opt/reviewed-jdk"
+    and ."java.configuration.runtimes"[0].path == "${jdk}/lib/openjdk"' \
+    ${javaOverrideSeed}/home/.config/Code/User/settings.json
+  jq -e 'keys | map(select(startswith("java."))) == []' ${seed}/home/.config/Code/User/settings.json
   test "$(readlink ${seed}/home/.vscode/extensions/${extensionID})" = ${extension}/share/vscode/extensions/${extension.vscodeExtUniqueId}
   # A writable extension is a read-only copy in the seed, not a link.
   test -f ${writableSeed}/home/.vscode/extensions/${extensionID}/package.json
