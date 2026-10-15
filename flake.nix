@@ -136,6 +136,29 @@
           };
         };
       });
+      # One client moving from 10.0.0.0/24 to 10.1.0.0/24: its configuration
+      # before, during and after the change of laboratory network.
+      migrationLab = labConfig: mkLab {
+        deploymentSelf = self;
+        labConfig = (import ./lab-config.nix) // { pcCount = 1; ifaceName = "eth1"; } // labConfig;
+        publicKeys = {
+          cache = ./tests/fixtures/remote-vm-cache-public-key;
+          ssh = ./tests/fixtures/remote-vm-admin.pub;
+        };
+      };
+      networkMigrationVmTest = pkgs.testers.runNixOSTest (import ./tests/network-migration-vm.nix {
+        nixoriumPackage = defaultLab.packages.${system}.nixorium;
+        baseLab = migrationLab { networkBase = "10.0.0.0"; };
+        transitionLab = migrationLab {
+          networkBase = "10.1.0.0";
+          networkTransition = {
+            previousBase = "10.0.0.0";
+            previousPrefixLength = 24;
+            startedAt = "2026-10-15T08:00:00Z";
+          };
+        };
+        finishedLab = migrationLab { networkBase = "10.1.0.0"; };
+      });
       remoteInstallerDeploymentRevision = "0123456789abcdef0123456789abcdef01234567";
       remoteInstallerTestLab = mkLab {
         deploymentSelf = self;
@@ -264,6 +287,7 @@
         remote-client-installer-vm = remoteClientInstallerVmTest;
         client-network-upgrade-vm = clientNetworkUpgradeVmTest;
         network-transition-vm = networkTransitionVmTest;
+        network-migration-vm = networkMigrationVmTest;
         management-vm = managementVmTest;
         assistant-vm = assistantVmTest;
         host-diagnostics-vm = hostDiagnosticsVmTest;
