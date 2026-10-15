@@ -106,7 +106,8 @@ to this number, the static network address and its prefix: installed clients
 would retain their previous network settings. The refusal carries the code
 `NETWORK-LOCKED`: keep the saved values in Settings and move the computers with
 the guided change of the laboratory network (**Maintenance → Change network
-addressing**); do not reduce the client count to bypass the block. While such a
+addressing**, see [Changing the laboratory network](#changing-the-laboratory-network));
+do not reduce the client count to bypass the block. While such a
 change is in progress `lab-settings.json` holds a `lab.networkTransition`
 record with the previous network; it is managed by the guided change, so do not
 add, edit or remove it by hand.
@@ -578,6 +579,69 @@ replacement of `lab-settings.json`; password edits also replace the ignored
 The TUI saves the managed file and its local history as one operation. Then
 rebuild the controller and deploy affected clients as appropriate. The Settings
 action does not push, rebuild, activate, or deploy implicitly.
+
+### Changing the laboratory network
+
+Use **Maintenance → Change network addressing** (or `nixorium network migrate`)
+to move the controller and every computer to a new laboratory network, for
+example from `10.0.0.0/24` to `10.1.0.0/24`. Every computer keeps its number:
+`pc01` takes the first address of the new network, the controller keeps its
+host number. The change never happens at once and never by itself: it is three
+ordinary reviewed steps, and until you finish, the controller answers on both
+networks and each computer keeps its previous address next to the new one, so
+nothing loses contact.
+
+Before you start, finish or stop network installation, resolve anything the
+Overview lists as blocking, save or review pending Git changes, and switch on
+the computers.
+
+1. **Review and save.** Type the new network as address/prefix. The review
+   lists the controller's and every computer's address before and after, and
+   checks that every computer answers. A computer that is off blocks the
+   review until you switch it on or press `c` to continue without it (it moves
+   when it is next updated, and Update computers can queue it). Enter saves the
+   new network with a record of the previous one and changes no computer.
+   Trusted SSH keys are recorded for the new addresses from the keys already
+   trusted for the previous ones, so no new fingerprint has to be accepted.
+2. **Apply to controller** (its own review, `REBUILD`). The controller then
+   carries both addresses.
+3. **Update computers** (its own review, `DEPLOY`). Every computer is
+   selected; a computer still on the previous network is reached there, moves
+   to its new address and is checked on it. Computers that are off can be
+   queued (F3) and move when they are switched on.
+
+While the change is in progress the Overview shows **The laboratory network is
+being changed** (`NETWORK-CHANGING`); open it, or the Maintenance entry, to see
+every computer: moved, queued, still on the previous network, to update, or not
+answering, with the next step on Enter. From the command line:
+
+```sh
+nixorium network migrate plan --to 10.1.0.0/24
+nixorium network migrate start --to 10.1.0.0/24 --expect <review-token>
+nixorium network migrate status
+```
+
+**Finish** (`f`, `nixorium network migrate finish`) is offered once every
+computer runs the saved configuration and answers on its new address. Saving
+it removes the record; then apply to the controller, which drops its previous
+address, and update the computers, which then accept the controller only on its
+new address. Prepare network installation again (**Installation → Network
+boot**) before installing a computer by PXE: the prepared files carry the
+controller's address.
+
+**Undo** (`u`, `nixorium network migrate undo`) is possible at any time before
+you finish: it saves the previous network again and removes the record. Update
+the computers first (each returns to its previous address; the controller still
+answers there), then apply to the controller, which drops the address on the
+network you left. A computer that was off during the change still has its
+previous address and is updated when it answers.
+
+A computer **still on the previous network** answers only on its old address:
+update it (it is reached there). If it already runs the saved configuration,
+restart it. A computer that does not answer on either address is off or
+unplugged; switch it on and check the change again. The address a computer no
+longer needs disappears at its next start. `nixorium hosts` and Computer
+inventory name these computers too.
 
 ### Add or change software
 

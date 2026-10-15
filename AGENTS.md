@@ -545,7 +545,22 @@ release is not finished until the site follows it.
   both controller addresses, new cache first); without it every host must stay
   byte-identical to the single-network configuration. Without clients it is
   ignored with a warning in Nix and refused by the Go validator. The
-  controller number stays locked. Interface reviews must
+  controller number stays locked. An undo restores the previous network and
+  removes the record in one candidate. During a change every client also
+  keeps its previous address (by-type clients reapply the changed profile),
+  so the update that moves it keeps its SSH session and an undo finds it.
+  The guided change (`internal/app/network_migration.go`, Maintenance →
+  Change network addressing, `nixorium network migrate`) is a sequence of
+  reviewed saves followed by the ordinary controller and deployment reviews;
+  it never applies a system itself, refuses to finish while a client is not
+  on the new network with the saved configuration, and keeps undo possible
+  until then (ADR 0028). During a change labMeta decoding copies each
+  client's previous address into `HostMeta.PreviousIP`: every per-computer
+  probe tries the new address first, then the previous one, and Colmena
+  reaches a computer on the previous network through `HostName` entries in
+  its SSH configuration. Trusted host keys are copied from the previous to
+  the new address in the managed known-hosts file before any contact there;
+  never replace a different key or relax checking. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first
   order for network changes. Device-name and DHCP-hint changes get a read-only
   network preflight in the plan (`networkPreflight`): `/sys/class/net` plus

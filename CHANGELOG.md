@@ -36,9 +36,14 @@ The project follows [Semantic Versioning](https://semver.org/).
   controller's current DHCP addresses, with the saved value preselected;
   Other… still accepts a typed address, with a warning when the controller
   does not have it. The command line is unchanged.
-- Nixorium can run the laboratory on two networks at once while the computers
-  move from the old one to the new one; the guided change of the laboratory
-  network builds on it.
+- The laboratory can move to a new network without losing a computer:
+  Maintenance → Change network addressing (`nixorium network migrate
+  plan|start|status|finish|undo`) reviews the new address of the controller
+  and of every computer, then continues with Apply to controller and Update
+  computers while the controller and the computers answer on both networks.
+  A computer still on the old network is updated there, computers that are off
+  are queued, the Overview shows the change in progress (`NETWORK-CHANGING`)
+  with its next step, and the change can be undone until it is finished.
 
 ### Changed
 
