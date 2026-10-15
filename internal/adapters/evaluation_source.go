@@ -66,7 +66,7 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	}
 	settings, issues := domain.DecodeLabSettings(public)
 	if len(issues) != 0 {
-		return "", errors.New("deployment settings are invalid; repair them in Change settings")
+		return "", domain.Blocked("SETTINGS-INVALID", errors.New("deployment settings are invalid; repair them in Change settings"))
 	}
 	if settings.Lab.CredentialsVersion != credentials.Version {
 		return "", errors.New("account credentials do not match this configuration; set all passwords again or restore its complete backup")

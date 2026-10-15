@@ -189,6 +189,7 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 		report = updatePlanIssue(report, "git", fmt.Sprintf("inspect worktree: %v", err))
 	} else if state.Dirty {
 		report = updatePlanIssue(report, "git", fmt.Sprintf("deployment worktree has %d changed path(s); commit or stash them before planning an update", state.Changes))
+		report.Issues[len(report.Issues)-1] = domain.BlockedIssue("git", "GIT-DIRTY", report.Issues[len(report.Issues)-1].Message)
 	}
 	revision, err := m.source.GitRevision(ctx, root)
 	if err != nil || !fullGitRevisionPattern.MatchString(revision) {

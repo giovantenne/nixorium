@@ -22,13 +22,47 @@ type DeploymentRecoverySource interface {
 	ArchivePendingDeployment(domain.PendingDeployment) (string, error)
 }
 
+// ownApplySource reports whether this process is still applying a client
+// update itself (the record it wrote is then not yet abandoned).
+type ownApplySource interface {
+	OwnDeploymentApplyRunning() bool
+}
+
+// pxeStateSource observes the managed network installation units.
+type pxeStateSource interface {
+	ServiceState(context.Context, string) domain.ServiceState
+}
+
 type DeploymentRecoveryManager struct {
 	source DeploymentRecoverySource
 	now    func() time.Time
+	ownPID int
 }
 
 func NewDeploymentRecoveryManager(source DeploymentRecoverySource) *DeploymentRecoveryManager {
 	return &DeploymentRecoveryManager{source: source, now: time.Now}
+}
+
+// ForProcess names the caller's own PID. A record written by this process is
+// not refused as "still running" once its apply has returned: the caller is
+// the process that would otherwise be waited for. Any other live PID is
+// still refused, and so is this one while it is applying.
+func (m *DeploymentRecoveryManager) ForProcess(pid int) *DeploymentRecoveryManager {
+	m.ownPID = pid
+	return m
+}
+
+func (m *DeploymentRecoveryManager) recorderRunning(pid int) bool {
+	if pid <= 0 || !m.source.ProcessRunning(pid) {
+		return false
+	}
+	if pid != m.ownPID {
+		return true
+	}
+	// Fail closed when the source cannot tell whether this process is
+	// still applying.
+	own, ok := m.source.(ownApplySource)
+	return !ok || own.OwnDeploymentApplyRunning()
 }
 
 func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string, acknowledgeUnreachable bool) domain.DeploymentRecoveryPlan {
@@ -53,10 +87,12 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 		return plan
 	}
 	if err != nil {
-		return issue("record", err.Error()+". Keep the record and collect a support report; do not delete it.")
+		plan.Issues = append(plan.Issues, domain.BlockedIssue("record", "DEPLOY-PENDING", err.Error()+". Keep the record and collect a support report; do not delete it."))
+		plan.Message = plan.Issues[0].Message
+		return plan
 	}
 	plan.Pending = pending
-	if pending.ControllerPID > 0 && m.source.ProcessRunning(pending.ControllerPID) {
+	if m.recorderRunning(pending.ControllerPID) {
 		return issue("process", fmt.Sprintf("the Nixorium process that started the update (PID %d) is still running; wait for it to finish or close it first", pending.ControllerPID))
 	}
 	hosts := make([]domain.HostMeta, 0, len(pending.Targets))
@@ -72,6 +108,12 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 			activating++
 		case domain.RecoveryTargetUnreachable:
 			plan.Unreachable++
+		}
+	}
+	if pxe, ok := m.source.(pxeStateSource); ok {
+		switch mode := ObservePXELifecycle(pxe.ServiceState(ctx, PXEListenerUnit), pxe.ServiceState(ctx, PXENetworkUnit), domain.PXEPreparationState{}); mode.Mode {
+		case "active", "degraded", "recovery-required":
+			plan.PXEMode = mode.Mode
 		}
 	}
 	if activating > 0 {
@@ -92,7 +134,11 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 func (m *DeploymentRecoveryManager) Apply(ctx context.Context, plan domain.DeploymentRecoveryPlan, expectedToken string) domain.DeploymentRecoveryResult {
 	result := domain.DeploymentRecoveryResult{SchemaVersion: domain.SchemaVersion, Operation: "deploy-recover", State: "blocked", Issues: []domain.ValidationIssue{}}
 	refuse := func(field, message string) domain.DeploymentRecoveryResult {
-		result.Issues = append(result.Issues, domain.ValidationIssue{Field: field, Message: message})
+		code := "REVIEW-CHANGED"
+		if field == "expiry" {
+			code = "REVIEW-EXPIRED"
+		}
+		result.Issues = append(result.Issues, domain.BlockedIssue(field, code, message))
 		result.Message = message
 		return result
 	}
@@ -106,7 +152,7 @@ func (m *DeploymentRecoveryManager) Apply(ctx context.Context, plan domain.Deplo
 	if !present || err != nil || !samePendingDeployment(pending, plan.Pending) {
 		return refuse("record", "the interrupted update record changed after review; create a fresh review")
 	}
-	if pending.ControllerPID > 0 && m.source.ProcessRunning(pending.ControllerPID) {
+	if m.recorderRunning(pending.ControllerPID) {
 		return refuse("process", "the Nixorium process that started the update is running again; create a fresh review")
 	}
 	recheck := []domain.HostMeta{}

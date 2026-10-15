@@ -277,7 +277,8 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 	report.Repository = root
 	meta, err := m.source.LabMeta(ctx, root)
 	if err != nil {
-		return deploymentIssue(report, "configuration", fmt.Sprintf("evaluate labMeta: %v", err))
+		report.Issues = append(report.Issues, domain.EvaluationIssue("configuration", "labMeta", err))
+		return report
 	}
 	deployment, err := m.source.DeploymentStatus(ctx, root)
 	if err != nil {
@@ -292,7 +293,7 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 	if err != nil {
 		report = deploymentIssue(report, "git", fmt.Sprintf("inspect worktree: %v", err))
 	} else if gitState.Dirty {
-		report = deploymentIssue(report, "git", fmt.Sprintf("deployment worktree has %d changed path(s); save or inspect them in Maintenance → Review Git changes (`nixorium git review`)", gitState.Changes))
+		report.Issues = append(report.Issues, domain.BlockedIssue("git", "GIT-DIRTY", fmt.Sprintf("deployment worktree has %d changed path(s); save or inspect them in Maintenance → Review Git changes (`nixorium git review`)", gitState.Changes)))
 	}
 	if revision, revisionErr := m.source.GitRevision(ctx, root); revisionErr != nil {
 		report = deploymentIssue(report, "git", fmt.Sprintf("resolve revision: %v", revisionErr))

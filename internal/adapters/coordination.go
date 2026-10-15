@@ -65,9 +65,9 @@ func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate,
 	}
 	if present, markerErr := inspectReservationAt(directory); present {
 		if markerErr != nil {
-			return nil, fmt.Errorf("USB installation reservation blocks new operations: %w", markerErr)
+			return nil, domain.Blocked("USB-RESERVED", fmt.Errorf("USB installation reservation blocks new operations: %w", markerErr))
 		}
-		return nil, errors.New("a USB installation remains reserved; reconcile or close that operation first")
+		return nil, domain.Blocked("USB-RESERVED", errors.New(domain.MessageUSBReserved+"; reconcile or close that operation first"))
 	}
 	descriptor, err := syscall.Openat(int(directory.Fd()), coordinationLockName, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
 	if err != nil {
@@ -91,9 +91,9 @@ func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate,
 		_ = syscall.Flock(descriptor, syscall.LOCK_UN)
 		lock.Close()
 		if markerErr != nil {
-			return nil, fmt.Errorf("USB installation reservation blocks new operations: %w", markerErr)
+			return nil, domain.Blocked("USB-RESERVED", fmt.Errorf("USB installation reservation blocks new operations: %w", markerErr))
 		}
-		return nil, errors.New("a USB installation remains reserved; reconcile or close that operation first")
+		return nil, domain.Blocked("USB-RESERVED", errors.New(domain.MessageUSBReserved+"; reconcile or close that operation first"))
 	}
 	recordOperationOwner(lock, defaultOperationLabel())
 	return &operationGate{file: lock}, nil

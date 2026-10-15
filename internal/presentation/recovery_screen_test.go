@@ -11,7 +11,7 @@ import (
 
 func blockedRecovery() domain.RecoveryReport {
 	step, _ := domain.NextStepByCode("RESET-PENDING")
-	return domain.RecoveryReport{State: "attention", Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryResetPending, Title: "A deployment template reset was interrupted", Next: step}}}
+	return domain.RecoveryReport{State: "attention", Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryResetPending, Title: step.Title, Next: step}}}
 }
 
 func TestSafeModeOffersReadOnlyTools(t *testing.T) {
@@ -22,7 +22,7 @@ func TestSafeModeOffersReadOnlyTools(t *testing.T) {
 	}
 	model := dashboardModel{actions: actions, initialError: true, message: "unfinished deployment template reset", recovery: blockedRecovery(), width: 120, height: 30}
 	view := model.View().Content
-	for _, want := range []string{"Safe mode", "A deployment template reset was interrupted", "What blocks", "Diagnostics", "Support report", "Try again"} {
+	for _, want := range []string{"Safe mode", "A reset of the configuration template was interrupted", "What blocks", "Diagnostics", "Support report", "Try again"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("safe mode omits %q:\n%s", want, view)
 		}
@@ -34,7 +34,7 @@ func TestSafeModeOffersReadOnlyTools(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if !strings.Contains(model.View().Content, "Next: Finish or undo the interrupted template reset") {
+	if !strings.Contains(model.View().Content, "Next: Finish or undo the reset") {
 		t.Fatalf("recovery view:\n%s", model.View().Content)
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func TestBusyGateNamesItsHolder(t *testing.T) {
@@ -26,6 +28,9 @@ func TestBusyGateNamesItsHolder(t *testing.T) {
 	}
 	if !strings.HasPrefix(err.Error(), OperationBusyMessage+": Update computers, started") {
 		t.Fatalf("message = %q", err.Error())
+	}
+	if step, found := domain.NextStepForError(err); !found || step.Code != "OP-BUSY" {
+		t.Fatalf("busy refusal next step = %+v, %v", step, found)
 	}
 	active, activeErr := operationActiveAt(directory, false)
 	if !active || !errors.As(activeErr, &busy) || !busy.Known {

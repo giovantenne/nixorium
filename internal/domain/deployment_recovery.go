@@ -45,11 +45,15 @@ type DeploymentRecoveryPlan struct {
 	Targets                []DeploymentRecoveryTarget `json:"targets"`
 	Unreachable            int                        `json:"unreachable"`
 	AcknowledgeUnreachable bool                       `json:"acknowledgeUnreachable"`
-	ExpiresAt              time.Time                  `json:"expiresAt,omitempty"`
-	ReviewToken            string                     `json:"reviewToken,omitempty"`
-	Confirmation           string                     `json:"confirmation,omitempty"`
-	Message                string                     `json:"message,omitempty"`
-	Issues                 []ValidationIssue          `json:"issues"`
+	// PXEMode is the network installation mode when a session is still open
+	// (active, degraded or recovery-required): a computer installed through
+	// it may never have finished. It is advisory and not bound by the token.
+	PXEMode      string            `json:"pxeMode,omitempty"`
+	ExpiresAt    time.Time         `json:"expiresAt,omitempty"`
+	ReviewToken  string            `json:"reviewToken,omitempty"`
+	Confirmation string            `json:"confirmation,omitempty"`
+	Message      string            `json:"message,omitempty"`
+	Issues       []ValidationIssue `json:"issues"`
 }
 
 func (p DeploymentRecoveryPlan) HasErrors() bool {

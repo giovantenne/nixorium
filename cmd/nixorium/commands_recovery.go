@@ -12,7 +12,7 @@ import (
 )
 
 func runDeploymentRecoveryCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
-	manager := app.NewDeploymentRecoveryManager(adapters.Local{})
+	manager := app.NewDeploymentRecoveryManager(adapters.Local{}).ForProcess(os.Getpid())
 	plan := manager.Plan(ctx, repository, options.acknowledgeUnreachable)
 	if options.subcommand == "recover-plan" || plan.State != "ready" {
 		if options.json {

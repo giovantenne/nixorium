@@ -76,7 +76,7 @@ func (i *Inspector) Inventory(ctx context.Context, repository string) (domain.St
 	}
 	report.Meta, err = i.source.LabMeta(ctx, report.Repository)
 	if err != nil {
-		return report, fmt.Errorf("evaluate labMeta: %w", err)
+		return report, domain.EvaluationError("labMeta", err)
 	}
 	return report, nil
 }
@@ -92,7 +92,7 @@ func (i *Inspector) status(ctx context.Context, repository string, full, evaluat
 	if evaluate {
 		meta, err = i.source.LabMeta(ctx, root)
 		if err != nil {
-			return domain.StatusReport{}, fmt.Errorf("evaluate labMeta: %w", err)
+			return domain.StatusReport{}, domain.EvaluationError("labMeta", err)
 		}
 		deployment, err = i.source.DeploymentStatus(ctx, root)
 		if err != nil {
@@ -181,7 +181,7 @@ func (i *Inspector) hosts(ctx context.Context, repository, requested string) (do
 	}
 	meta, err := i.source.LabMeta(ctx, root)
 	if err != nil {
-		return domain.HostsReport{}, fmt.Errorf("evaluate labMeta: %w", err)
+		return domain.HostsReport{}, domain.EvaluationError("labMeta", err)
 	}
 	hostsToObserve := meta.Clients.Hosts
 	operation := "hosts"

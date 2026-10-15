@@ -68,7 +68,7 @@ func TestRecoveryReportsEveryPersistentBlocker(t *testing.T) {
 		t.Fatalf("pending = %+v", pending)
 	}
 	busy, _ := report.Condition(domain.RecoveryOperationBusy)
-	if !strings.Contains(busy.Title, "Update computers, started by admin") {
+	if busy.Title != "Another Nixorium operation is still running" || !strings.Contains(busy.Detail, "Update computers, started by admin") {
 		t.Fatalf("busy = %+v", busy)
 	}
 

@@ -78,6 +78,11 @@ exit `+exit+"\n")
 			if gate, err := acquireOperationGateAt(directory, false); err == nil {
 				gate.Close()
 				t.Fatal("new operation bypassed pending intent")
+			} else if code, typed := domain.BlockedCodeOf(err); !typed || code != "DEPLOY-PENDING" || !strings.Contains(err.Error(), domain.MessageDeploymentPending) {
+				t.Fatalf("pending refusal is not a typed DEPLOY-PENDING: %v", err)
+			}
+			if (Local{}).OwnDeploymentApplyRunning() {
+				t.Fatal("returned apply still counted as running")
 			}
 			if gate, err := acquireRecoveryGateAt(directory, false); err == nil {
 				gate.Close()

@@ -122,7 +122,7 @@ func (m SettingsManager) ApplyReviewedSettings(repository string, candidate doma
 	}
 	base, removed, ok := decodeBase(baseData)
 	if !ok {
-		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$base", Message: "managed settings are invalid; repair them before applying a candidate"})
+		report.Issues = append(report.Issues, domain.BlockedIssue("$base", "SETTINGS-INVALID", "managed settings are invalid; repair them before applying a candidate"))
 		return report
 	}
 	currentFingerprint := domain.SettingsFingerprint(baseData)
@@ -235,7 +235,7 @@ func (m SettingsManager) planCandidate(ctx context.Context, repository string, c
 	}
 	base, removed, ok := decodeBase(baseData)
 	if !ok {
-		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$base", Message: "managed settings are invalid; repair them before applying a candidate"})
+		report.Issues = append(report.Issues, domain.BlockedIssue("$base", "SETTINGS-INVALID", "managed settings are invalid; repair them before applying a candidate"))
 		return report, baseData, domain.LabSettingsFile{}
 	}
 	report.BaseFingerprint = domain.SettingsFingerprint(baseData)

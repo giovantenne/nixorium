@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -53,5 +55,59 @@ func TestEveryNextStepCodeIsDocumented(t *testing.T) {
 		if !strings.Contains(string(guide), "`"+code+"`") {
 			t.Fatalf("code %s is not explained in docs/troubleshooting.md", code)
 		}
+	}
+}
+
+func TestSituationCatalogueIsComplete(t *testing.T) {
+	for _, code := range NextStepCodes() {
+		step, _ := NextStepByCode(code)
+		if step.Code != code || step.Title == "" || step.Why == "" || step.Action == "" {
+			t.Fatalf("situation %s is incomplete: %+v", code, step)
+		}
+		for _, word := range []string{".json", "PID", "Colmena", "token", "lock"} {
+			if strings.Contains(step.Title, word) {
+				t.Fatalf("situation %s title %q uses the implementation word %q", code, step.Title, word)
+			}
+		}
+		if strings.HasSuffix(step.Title, ".") || strings.HasSuffix(step.Action, ".") {
+			t.Fatalf("situation %s title and action are phrases, not sentences: %+v", code, step)
+		}
+	}
+	step, _ := NextStepByCode("DEPLOY-PENDING")
+	if step.Screen != RecoveryDeploymentPending {
+		t.Fatalf("DEPLOY-PENDING screen = %q", step.Screen)
+	}
+	if got := step.Headline("The controller was not updated"); got != "The controller was not updated: a previous update of the student computers was interrupted." {
+		t.Fatalf("headline = %q", got)
+	}
+	if got := step.Headline(""); got != "A previous update of the student computers was interrupted." {
+		t.Fatalf("headline = %q", got)
+	}
+}
+
+func TestBlockedErrorRoundTrip(t *testing.T) {
+	raw := errors.New("something the operator should not have to read")
+	err := fmt.Errorf("controller build failed: %w", Blocked("RESET-PENDING", raw))
+	step, found := NextStepForError(err)
+	if !found || step.Code != "RESET-PENDING" {
+		t.Fatalf("NextStepForError = %+v, %v", step, found)
+	}
+	if err.Error() != "controller build failed: "+raw.Error() || !errors.Is(err, raw) {
+		t.Fatalf("blocked error text or chain changed: %v", err)
+	}
+	var blocked *BlockedError
+	if !errors.As(err, &blocked) || blocked.Code != "RESET-PENDING" {
+		t.Fatalf("errors.As = %+v", blocked)
+	}
+	// Untyped errors still fall back to the message.
+	if step, found := NextStepForError(errors.New(MessageDeploymentPending)); !found || step.Code != "DEPLOY-PENDING" {
+		t.Fatalf("fallback = %+v, %v", step, found)
+	}
+	if _, found := NextStepForError(nil); found {
+		t.Fatal("nil error recognized")
+	}
+	issue := BlockedIssue("git", "GIT-DIRTY", "2 files")
+	if issue.Next == nil || issue.Next.Code != "GIT-DIRTY" {
+		t.Fatalf("issue = %+v", issue)
 	}
 }

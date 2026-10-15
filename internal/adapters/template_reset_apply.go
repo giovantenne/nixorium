@@ -381,5 +381,5 @@ func checkTemplateResetPending(repository string) error {
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
-	return errors.New("unfinished deployment template reset: preserve .git/" + resetPendingName + " and recover before other operations")
+	return domain.Blocked("RESET-PENDING", errors.New(domain.MessageResetPending+": preserve .git/"+resetPendingName+" and recover before other operations"))
 }

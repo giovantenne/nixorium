@@ -683,10 +683,10 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return err
 		},
 		PlanDeploymentRecovery: func(ctx context.Context, acknowledge bool) domain.DeploymentRecoveryPlan {
-			return app.NewDeploymentRecoveryManager(local).Plan(ctx, repository, acknowledge)
+			return app.NewDeploymentRecoveryManager(local).ForProcess(os.Getpid()).Plan(ctx, repository, acknowledge)
 		},
 		ApplyDeploymentRecovery: func(plan domain.DeploymentRecoveryPlan) domain.DeploymentRecoveryResult {
-			result := app.NewDeploymentRecoveryManager(local).Apply(ctx, plan, plan.ReviewToken)
+			result := app.NewDeploymentRecoveryManager(local).ForProcess(os.Getpid()).Apply(ctx, plan, plan.ReviewToken)
 			result.Message = operationRecordMessage(result.Message, result)
 			return result
 		},

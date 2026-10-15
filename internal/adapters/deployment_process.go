@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -80,6 +81,17 @@ func clearDeploymentPending(directory, pending *os.File) error {
 	return directory.Sync()
 }
 
+// ownDeploymentApplies counts the client applies of this process that hold
+// a pending record. Recovery review uses it to tell a returned apply of this
+// process from one that is still running.
+var ownDeploymentApplies atomic.Int32
+
+// OwnDeploymentApplyRunning reports whether this process is applying a
+// client update right now.
+func (Local) OwnDeploymentApplyRunning() bool {
+	return ownDeploymentApplies.Load() > 0
+}
+
 func checkDeploymentPendingAt(directory *os.File) error {
 	return checkDeploymentPendingPath(directory.Name())
 }
@@ -92,7 +104,7 @@ func checkDeploymentPendingPath(directory string) error {
 	if err != nil {
 		return fmt.Errorf("cannot inspect pending deployment: %w", err)
 	}
-	return errors.New("an unfinished client deployment blocks new operations; inspect deployment-pending.json and follow the deployment recovery guide")
+	return domain.Blocked("DEPLOY-PENDING", errors.New(domain.MessageDeploymentPending+"; inspect deployment-pending.json and follow the deployment recovery guide"))
 }
 
 func runDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, phase domain.DeploymentPhase, output io.Writer, coordinationDirectory string, managed bool, timeout time.Duration) error {
@@ -135,6 +147,10 @@ func runDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, p
 			return err
 		}
 		defer directory.Close()
+		// Count before the record exists and until this function returns,
+		// so a recovery review in this process never sees it unowned.
+		ownDeploymentApplies.Add(1)
+		defer ownDeploymentApplies.Add(-1)
 		pending, err = createDeploymentPending(directory, plan)
 		if err != nil {
 			return &domain.DeploymentUnconfirmedError{Err: fmt.Errorf("persist deployment intent; no new apply started: %w", err)}

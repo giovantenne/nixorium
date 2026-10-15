@@ -78,3 +78,74 @@ func TestDeploymentRecoveryRequiresFinishedOrAcknowledgedComputers(t *testing.T)
 		t.Fatalf("running process ignored: %+v", plan)
 	}
 }
+
+type ownApplyRecovery struct {
+	*fakeDeploymentRecovery
+	applying bool
+}
+
+func (f ownApplyRecovery) OwnDeploymentApplyRunning() bool { return f.applying }
+
+func TestDeploymentRecoveryAcceptsOwnReturnedProcessOnly(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	fake := &fakeDeploymentRecovery{
+		present: true, running: true,
+		pending: domain.PendingDeployment{SchemaVersion: 1, Repository: "/srv/lab", Revision: revision, StartedAt: time.Now().UTC(), ControllerPID: 4242,
+			Targets: []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}}},
+		activity: map[string]domain.DeploymentActivity{"pc01": {Reachable: true, Revision: revision}},
+	}
+	source := ownApplyRecovery{fakeDeploymentRecovery: fake}
+	// This process wrote the record and its apply returned: not refused.
+	plan := NewDeploymentRecoveryManager(source).ForProcess(4242).Plan(context.Background(), "/srv/lab", false)
+	if plan.State != "ready" {
+		t.Fatalf("own returned process refused: %+v", plan)
+	}
+	if result := NewDeploymentRecoveryManager(source).ForProcess(4242).Apply(context.Background(), plan, plan.ReviewToken); result.State != "completed" {
+		t.Fatalf("own returned process refused at apply: %+v", result)
+	}
+	fake.present = true
+	// Another live Nixorium process is still refused.
+	if plan := NewDeploymentRecoveryManager(source).ForProcess(1).Plan(context.Background(), "/srv/lab", false); plan.State != "blocked" || plan.Issues[0].Field != "process" {
+		t.Fatalf("foreign process accepted: %+v", plan)
+	}
+	// So is this process while it is still applying.
+	source.applying = true
+	if plan := NewDeploymentRecoveryManager(source).ForProcess(4242).Plan(context.Background(), "/srv/lab", false); plan.State != "blocked" || plan.Issues[0].Field != "process" {
+		t.Fatalf("own running apply accepted: %+v", plan)
+	}
+	// A source that cannot tell fails closed.
+	if plan := NewDeploymentRecoveryManager(fake).ForProcess(4242).Plan(context.Background(), "/srv/lab", false); plan.State != "blocked" || plan.Issues[0].Field != "process" {
+		t.Fatalf("unknown own state accepted: %+v", plan)
+	}
+}
+
+type pxeOpenRecovery struct {
+	*fakeDeploymentRecovery
+	network bool
+}
+
+func (f pxeOpenRecovery) ServiceState(_ context.Context, unit string) domain.ServiceState {
+	return domain.ServiceState{Name: unit, Loaded: true, Active: f.network && unit == PXENetworkUnit}
+}
+
+func TestDeploymentRecoveryReportsAnOpenNetworkInstallation(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	fake := &fakeDeploymentRecovery{
+		present: true,
+		pending: domain.PendingDeployment{SchemaVersion: 1, Repository: "/srv/lab", Revision: revision, StartedAt: time.Now().UTC(),
+			Targets: []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}}},
+		activity: map[string]domain.DeploymentActivity{},
+	}
+	plan := NewDeploymentRecoveryManager(pxeOpenRecovery{fakeDeploymentRecovery: fake, network: true}).Plan(context.Background(), "/srv/lab", false)
+	if plan.PXEMode != "recovery-required" || plan.Unreachable != 1 {
+		t.Fatalf("open network installation not reported: %+v", plan)
+	}
+	token := plan.ReviewToken
+	acknowledged := NewDeploymentRecoveryManager(pxeOpenRecovery{fakeDeploymentRecovery: fake, network: true}).Plan(context.Background(), "/srv/lab", true)
+	if acknowledged.State != "ready" || token != "" {
+		t.Fatalf("PXE observation changed the review rules: %+v", acknowledged)
+	}
+	if plan := NewDeploymentRecoveryManager(pxeOpenRecovery{fakeDeploymentRecovery: fake}).Plan(context.Background(), "/srv/lab", false); plan.PXEMode != "" {
+		t.Fatalf("stopped network installation reported: %+v", plan)
+	}
+}

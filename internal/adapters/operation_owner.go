@@ -43,6 +43,11 @@ func (err *OperationBusyError) Error() string {
 	return OperationBusyMessage + ": " + err.Holder()
 }
 
+// BlockedCode names the catalogued situation of a held lock.
+func (err *OperationBusyError) BlockedCode() string {
+	return "OP-BUSY"
+}
+
 // Holder describes the running operation in a few words.
 func (err *OperationBusyError) Holder() string {
 	return err.Description()
