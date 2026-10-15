@@ -73,6 +73,10 @@ type ClassroomViewHub struct {
 	focus      map[string]time.Time
 	lastViewed time.Time
 	now        func() time.Time
+	// Answered, when set, hears of every computer that answered over the
+	// lab network, whether or not someone is signed in; Switch on learns
+	// its hardware address then.
+	Answered func(domain.HostMeta)
 }
 
 func NewClassroomViewHub(hosts func(ctx context.Context) ([]domain.HostMeta, error), connector ClassroomAgentConnector) *ClassroomViewHub {
@@ -215,6 +219,9 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 			// The channel lives as long as the overview is watched; each
 			// exchange has its own timeout in the connector.
 			opened, err := hub.connector.Connect(context.Background(), host)
+			if hub.Answered != nil && (err == nil || errors.As(err, new(classroomview.AgentError))) {
+				hub.Answered(host)
+			}
 			if err != nil {
 				state, detail := classroomFailureState(err)
 				hub.update(host.Name, func(computer *ClassroomComputer) { computer.State, computer.Detail = state, detail })

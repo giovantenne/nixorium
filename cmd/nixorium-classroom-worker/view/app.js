@@ -229,14 +229,18 @@ function render(computers) {
       viewerImage.classList.toggle('gone', cover === 'off');
       setCover(viewerCover, cover);
       viewerScreen.title = cover ? covers[cover].title : '';
-      viewerActions.classList.toggle('disabled', !reachable);
-      if (!reachable) viewerActions.open = false;
       // This computer's menu offers only the change that applies.
       const offer = { lock: !computer.locked, unlock: Boolean(computer.locked), 'internet-block': computer.internet !== 'blocked', 'internet-allow': computer.internet === 'blocked' };
       const needsSession = ['lock', 'unlock', 'show-screen', 'send-file', 'send-folder'];
       for (const button of viewerActions.querySelectorAll('button[data-action]')) {
         if (button.dataset.action in offer) button.hidden = !offer[button.dataset.action];
         button.disabled = !reachable || (needsSession.includes(button.dataset.action) && !session);
+      }
+      // Switch on is offered only while the computer does not answer; its
+      // menu stays open for it.
+      for (const button of viewerActions.querySelectorAll('button[data-action="wake"]')) {
+        button.hidden = reachable;
+        button.disabled = reachable;
       }
     }
   }
@@ -357,6 +361,11 @@ document.addEventListener('keydown', (event) => {
 
 const outcomeWords = { done: 'done', off: 'switched off or not reachable', skipped: 'skipped', failed: 'failed' };
 const detailOrder = ['failed', 'skipped', 'off', 'done'];
+
+// Switch on counts packets sent, never computers started: "Switch on:
+// 3 sent · 2 already on · 1 address unknown".
+Object.assign(outcomeWords, { sent: 'sent', on: 'already on', unknown: 'address unknown' });
+detailOrder.push('unknown', 'on', 'sent');
 
 // One line such as "Lock: 8 done · 12 switched off or not reachable · 1 failed";
 // under Details, the computers that need a look come first.

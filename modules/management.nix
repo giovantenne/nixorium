@@ -1082,6 +1082,11 @@ in
         UMask = "0007";
         RuntimeDirectory = "nixorium-classroom";
         RuntimeDirectoryMode = "0770";
+        # Learned network card addresses for Switch on (Wake-on-LAN), kept
+        # across reboots outside Git and the store; the administrator's own
+        # Nixorium shares them as the same user.
+        StateDirectory = "nixorium/classroom";
+        StateDirectoryMode = "0700";
         Environment = [
           "XDG_CACHE_HOME=/var/cache/nixorium/admin"
           "XDG_STATE_HOME=/home/admin/.local/state"

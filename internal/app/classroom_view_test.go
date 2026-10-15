@@ -142,3 +142,42 @@ func TestClassroomFailureStates(t *testing.T) {
 		}
 	}
 }
+
+func TestClassroomViewHubReportsComputersThatAnswered(t *testing.T) {
+	connector := &fakeAgentConnector{
+		errors: map[string]error{
+			"pc02": classroomview.AgentError{Code: classroomview.CodeNoSession},
+			"pc03": classroomview.ErrUnreachable,
+		},
+	}
+	hosts := []domain.HostMeta{{Name: "pc01"}, {Name: "pc02"}, {Name: "pc03"}}
+	hub := NewClassroomViewHub(func(context.Context) ([]domain.HostMeta, error) { return hosts, nil }, connector)
+	hub.interval, hub.idle = 10*time.Millisecond, 100*time.Millisecond
+	var mutex sync.Mutex
+	answered := map[string]bool{}
+	hub.Answered = func(host domain.HostMeta) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		answered[host.Name] = true
+	}
+	if _, err := hub.Computers(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		mutex.Lock()
+		done := answered["pc01"] && answered["pc02"]
+		mutex.Unlock()
+		if done || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	mutex.Lock()
+	defer mutex.Unlock()
+	// Nobody signed in still answers over the network; a computer that is
+	// off does not.
+	if !answered["pc01"] || !answered["pc02"] || answered["pc03"] {
+		t.Fatalf("answered = %v", answered)
+	}
+}

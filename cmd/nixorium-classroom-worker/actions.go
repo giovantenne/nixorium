@@ -50,6 +50,7 @@ type pendingAction struct {
 	lock      *domain.LockPlan
 	internet  *domain.InternetPlan
 	power     *domain.ShutdownPlanReport
+	wake      *domain.WakePlan
 	expires   time.Time
 }
 
@@ -100,6 +101,8 @@ type computerLabels struct {
 	// powerAway: the computer has stopped answering since the restart.
 	powerRestart bool
 	powerAway    bool
+	// powerStart: the label waits for a computer switched on to answer.
+	powerStart bool
 }
 
 func decodePageJSON(writer http.ResponseWriter, request *http.Request, value any) bool {
@@ -184,6 +187,8 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			break
 		}
 		review, pending = powerReview(*response.PowerPlan)
+	case actionWake:
+		review, pending = server.planWake(ctx, operation)
 	case actionLock, actionUnlock:
 		operation.Operation = domain.ClassroomLockPlanOperation
 		operation.LockAction = domain.LockOff
@@ -500,6 +505,8 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 				})
 			}
 		}
+	case pending.wake != nil:
+		result = server.applyWake(ctx, *pending.wake)
 	default:
 		result.State, result.Message = "failed", "Unknown action."
 	}
@@ -573,6 +580,10 @@ func (server *viewServer) labelsFor(name, state string) (string, string) {
 	switch {
 	case server.now().After(labels.powerExpiry):
 		labels.power = ""
+	case labels.powerStart:
+		if state != app.ClassroomUnreachable && state != app.ClassroomConnecting {
+			labels.power = ""
+		}
 	case state == app.ClassroomUnreachable && !labels.powerRestart:
 		labels.power = ""
 	case state == app.ClassroomUnreachable:
@@ -582,6 +593,7 @@ func (server *viewServer) labelsFor(name, state string) (string, string) {
 	}
 	if labels.power == "" {
 		labels.powerExpiry, labels.powerRestart, labels.powerAway = time.Time{}, false, false
+		labels.powerStart = false
 	}
 	server.labels[name] = labels
 	return labels.internet, labels.power

@@ -39,6 +39,11 @@ const (
 	// ClassroomViewOpenOperation returns a one-time address of the
 	// classroom view page.
 	ClassroomViewOpenOperation ClassroomOperation = "view-open"
+	// Switching on student computers with Wake-on-LAN: review which ones
+	// receive a packet, then send. Applying reads the hardware addresses
+	// from the controller's own record, never from the request.
+	ClassroomWakePlanOperation  ClassroomOperation = "wake-plan"
+	ClassroomWakeApplyOperation ClassroomOperation = "wake-apply"
 )
 
 func (o ClassroomOperation) Valid() bool {
@@ -50,7 +55,8 @@ func (o ClassroomOperation) Valid() bool {
 		ClassroomShareBeginOperation, ClassroomShareChunkOperation,
 		ClassroomSharePlanOperation, ClassroomShareApplyOperation,
 		ClassroomDesktopWaitOperation, ClassroomDesktopReadyOperation,
-		ClassroomViewOpenOperation:
+		ClassroomViewOpenOperation,
+		ClassroomWakePlanOperation, ClassroomWakeApplyOperation:
 		return true
 	default:
 		return false
@@ -79,6 +85,8 @@ type ClassroomRequest struct {
 	DesktopError   string                `json:"desktopError,omitempty"`
 	// DesktopCancelled: the user closed the file chooser without a choice.
 	DesktopCancelled bool `json:"desktopCancelled,omitempty"`
+	// WakePlan is the reviewed switch-on request to apply.
+	WakePlan *WakePlan `json:"wakePlan,omitempty"`
 }
 
 // Send files from the classroom view page: what the user's file chooser
@@ -111,6 +119,9 @@ type ClassroomResponse struct {
 	ShareReport    *ShareReport         `json:"shareReport,omitempty"`
 	DesktopJob     string               `json:"desktopJob,omitempty"`
 	DesktopKind    string               `json:"desktopKind,omitempty"`
+	// Switch-on review and its result.
+	WakePlan   *WakePlan   `json:"wakePlan,omitempty"`
+	WakeReport *WakeReport `json:"wakeReport,omitempty"`
 }
 
 func NewClassroomRequest(operation ClassroomOperation) (ClassroomRequest, error) {
