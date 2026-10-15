@@ -95,6 +95,20 @@ func TestLockPlanAndApply(t *testing.T) {
 	}
 }
 
+func TestLockPlanSaysWhenMonitoringStoppedOnAComputer(t *testing.T) {
+	source := lockLab()
+	source.away["pc02"] = classroomview.AgentError{Code: classroomview.CodeNoAgent}
+	// The agent answers but its Shell extension is not in the session.
+	source.away["pc03"] = classroomview.AgentError{Code: classroomview.CodeLockUnavailable}
+	plan := NewLockManager(source).Plan(context.Background(), "/srv/lab", "pc01,pc02,pc03", domain.LockOn)
+	if plan.Targets[1].Eligible || plan.Targets[1].Detail != "Monitoring stopped on this PC." {
+		t.Fatalf("stopped agent = %+v", plan.Targets[1])
+	}
+	if plan.Targets[2].Eligible || plan.Targets[2].Detail != "The classroom view is not running on this computer." {
+		t.Fatalf("missing extension = %+v", plan.Targets[2])
+	}
+}
+
 func TestLockApplyRefusesStaleReviews(t *testing.T) {
 	source := lockLab()
 	manager := NewLockManager(source)

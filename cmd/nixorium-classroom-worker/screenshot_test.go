@@ -28,6 +28,8 @@ func (pictureSource) Screenshot(name string) ([]byte, app.ClassroomComputer, err
 		return nil, app.ClassroomComputer{Name: name, State: app.ClassroomLocked}, app.ErrClassroomNoPicture
 	case "pc03":
 		return nil, app.ClassroomComputer{Name: name, State: app.ClassroomUnreachable}, app.ErrClassroomNoPicture
+	case "pc04":
+		return nil, app.ClassroomComputer{Name: name, State: app.ClassroomNoAgent}, app.ErrClassroomNoPicture
 	case "pc05":
 		return nil, app.ClassroomComputer{Name: name, State: app.ClassroomNoSession}, app.ErrClassroomNoPicture
 	case "pc06":
@@ -76,6 +78,7 @@ func TestScreenshotGoesToTheHelperOfThePageUser(t *testing.T) {
 	for computer, want := range map[string]screenshotResult{
 		"pc02": {State: screenshotSkipped, Message: "Idle: the student's screen lock is on."},
 		"pc03": {State: screenshotSkipped, Message: app.ClassroomOffDetail},
+		"pc04": {State: screenshotSkipped, Message: "Monitoring stopped on this PC."},
 		"pc05": {State: screenshotSkipped, Message: "Nobody is signed in."},
 		"pc06": {State: screenshotFailed, Message: "The screen could not be captured; try again."},
 		"pc09": {State: screenshotFailed, Message: "This computer is not on the overview."},

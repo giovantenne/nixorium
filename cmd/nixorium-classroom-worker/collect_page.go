@@ -19,7 +19,7 @@ import (
 const actionCollect = "collect"
 
 // Outcomes of a collection that the page counts besides done, off,
-// skipped and failed.
+// stopped, skipped and failed.
 const (
 	outcomeEmpty   = "empty"
 	outcomeTooMuch = "too-much"
@@ -136,6 +136,9 @@ func (server *viewServer) applyCollect(parent context.Context, request *http.Req
 			}
 			if row.Note == app.ClassroomOffDetail {
 				row.Outcome = outcomeOff
+			}
+			if row.Note == app.ClassroomNoAgentDetail {
+				row.Outcome = outcomeStopped
 			}
 		default:
 			row.Skip, row.Outcome = true, outcomeFailed

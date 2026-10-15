@@ -1,6 +1,7 @@
 package homereset
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -598,8 +600,18 @@ func command(binary string, args ...string) error {
 	return nil
 }
 
+// commandTimeout ends a btrfs, dconf or systemctl run that has not finished.
+// These take seconds; a command stuck for minutes would hold the boot-time
+// reset forever, and the reset fails closed, leaving its pending record for
+// the administrator, instead.
+var commandTimeout = 5 * time.Minute
+
 func commandOutput(binary string, args ...string) ([]byte, error) {
-	cmd := exec.Command(binary, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Env = []string{"LANG=C", "LC_ALL=C"}
+	// Do not wait for a pipe that a stuck child's own children keep open.
+	cmd.WaitDelay = 10 * time.Second
 	return cmd.CombinedOutput()
 }

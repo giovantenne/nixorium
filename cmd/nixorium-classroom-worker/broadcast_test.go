@@ -124,3 +124,21 @@ func TestPageShowsTheTeachersScreen(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+func TestBroadcastReviewSaysWhyAComputerWaits(t *testing.T) {
+	review, _ := broadcastReview(domain.BroadcastPlan{State: "ready", Targets: []domain.LockTarget{
+		{HostMeta: domain.HostMeta{Name: "pc01"}, Eligible: true},
+		{HostMeta: domain.HostMeta{Name: "pc02"}, Detail: app.ClassroomNoAgentDetail},
+		{HostMeta: domain.HostMeta{Name: "pc03"}, Detail: "Nobody is signed in."},
+	}})
+	want := []string{
+		"",
+		"Monitoring stopped on this PC. It gets your screen as soon as monitoring runs again.",
+		"Nobody is signed in. It gets your screen when someone signs in.",
+	}
+	for index, row := range review.Rows {
+		if row.Note != want[index] {
+			t.Fatalf("%s: note = %q, want %q", row.Name, row.Note, want[index])
+		}
+	}
+}

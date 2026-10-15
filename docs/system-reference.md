@@ -394,6 +394,27 @@ giving up on a request after 15 seconds; after two failed requests in a row
 the summary says **Reconnecting…**. **Refresh** asks at once, closes the
 notice of the last action and draws every card again.
 
+A computer that answers over SSH with someone signed in, but whose agent does
+not answer (the socket is missing, or the agent is frozen and gives no answer
+to the relay's own hello within 3 seconds), shows a warning sign over its
+dimmed last picture and **Monitoring stopped on this PC**. The login screen does not count as someone signed in
+(only a session of class `user` does), so a computer waiting at it says
+**Nobody is signed in**. The same words explain the computer wherever an
+action skips it (Lock, Send files, Share screen, Collect from desktop and
+Save screenshot), and a result notice counts such computers apart, as
+"monitoring stopped on this PC". The agent restarts by itself: its user unit
+is `Restart=always` with a one-second delay and no start limit, and both
+classroom user units refuse a manual stop (`RefuseManualStop`), so
+`systemctl --user stop` fails in the student's terminal and a killed agent is
+back within seconds; the card returns to the live picture. The Shell
+extension helper is a one-shot unit, which systemd restarts only after a
+failure. This is a classroom aid, not a security boundary: a student can still
+mask a unit or freeze the process (which the card reports, but nothing
+revives), and loses that at the next boot, when the home is reset. The relay
+never outlives the controller's channel by more than 5 seconds, even when the
+agent is frozen. Because the units refuse a manual stop, an update does not
+restart them either: the new agent starts at the next sign-in.
+
 Clicking a computer opens it in its own browser window, refreshed about ten
 times a second at up to 1920 pixels; the agent sends a frame only when the
 screen changed, and the overview and the large view share one capture. The

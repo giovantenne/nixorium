@@ -21,6 +21,8 @@ func desktopOpenerFor(graphical bool) func(string) error {
 		if err != nil {
 			return err
 		}
+		// A detached launch (own session, released below): the browser must
+		// outlive Nixorium, so it is not bound to a context.
 		command := exec.Command(path, address)
 		command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 		if err := command.Start(); err != nil {

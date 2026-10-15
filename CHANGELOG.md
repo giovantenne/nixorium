@@ -98,6 +98,21 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- A student can no longer switch off the classroom view from the terminal of
+  the session: `systemctl --user stop` is refused for the classroom view and
+  its Shell extension helper, and the classroom view restarts one second after
+  it is killed, however many times. While it is down, the computer's card says
+  "Monitoring stopped on this PC" instead of just dimming, and the same words
+  explain why Lock, Send files, Share screen, Collect from desktop and Save
+  screenshot skipped that computer; the result notice counts it apart. A
+  computer waiting at the login screen still says "Nobody is signed in". A
+  classroom view that is frozen rather than stopped is reported the same way,
+  and a frozen one no longer keeps its connection open on the computer after
+  the controller has gone.
+  This is a classroom aid, not a security boundary: a student who masks the
+  unit gets the classroom view back at the next restart, because the home
+  folder is reset then. An update no longer restarts the classroom view on a
+  computer in use; the new version starts at the next sign-in.
 - After **Update Nixorium** or **Apply to controller** activates the
   controller, Nixorium reopens itself on the newly installed version: the
   result shows "Nixorium <version> is active. The interface reopens in 3 s
@@ -124,6 +139,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A stuck helper program can no longer keep the classroom view busy forever.
+  On a student computer, the session query behind a classroom connection is
+  stopped after 10 seconds and the screen capture program ends with the
+  capture; on the controller, the dark-style lookup of the classroom window
+  ends after 10 seconds. The reset of a student's home at boot stops a program
+  that has not finished after 5 minutes and fails safely, leaving what it
+  found for the administrator, instead of waiting without end.
 - `nixorium send plan|apply` works from the teacher's terminal: like
   `nixorium collect`, it needs only the classroom service and no longer stops
   with "deployment repository not found".

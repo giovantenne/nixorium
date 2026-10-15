@@ -1,11 +1,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
@@ -168,27 +168,12 @@ func collectReply(outgoing **collector, home string, message classroomview.Messa
 
 // probeCollect collects the session's desktop through a command, as the
 // controller does, and saves it into folder: a check of collecting.
-func probeCollect(command []string, folder string, output io.Writer) error {
-	if len(command) == 0 {
-		return errors.New("probe needs a command, for example nixorium-classroom-connect")
-	}
-	process := exec.Command(command[0], command[1:]...)
-	stdin, err := process.StdinPipe()
+func probeCollect(ctx context.Context, command []string, folder string, output io.Writer) error {
+	stdin, stdout, finish, err := startProbe(ctx, command)
 	if err != nil {
 		return err
 	}
-	stdout, err := process.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	process.Stderr = os.Stderr
-	if err := process.Start(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = stdin.Close()
-		_ = process.Wait()
-	}()
+	defer finish()
 	exchange := func(message classroomview.Message, want string) (classroomview.Message, error) {
 		if err := classroomview.Write(stdin, message); err != nil {
 			return classroomview.Message{}, err
