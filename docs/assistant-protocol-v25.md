@@ -1,7 +1,7 @@
 # Assistant protocol v2.5
 
 The v2 endpoints and fields remain unchanged except for the additions below.
-The client executes the twelve v1 deployment tools listed in
+The client executes the thirteen v1 deployment tools listed in
 [assistant-tools-v1.json](assistant-tools-v1.json) and described in the
 [Assistant guide](assistant.md#tools-and-limits). The service alone executes
 `read_core`.
@@ -29,6 +29,15 @@ an absent context for compatibility with existing tests.
 fields are allowed inside `core`. The client computes the context once per
 turn, at the beginning of `Run`, and sends the same object at every step of
 that turn.
+
+## Capabilities
+
+Step requests may carry the optional `X-Nixorium-Capabilities` HTTP header, a
+comma-separated list drawn from `prepare_npm_v1`, `host_diagnostics_v1`,
+`git_history_v1`, `prefetch_v1` and `home_files_v1`. The request JSON is
+unchanged and sharing routes never carry the header. The service offers a
+capability-gated tool only to a controller that lists its capability:
+`prefetch` requires `prefetch_v1`. Older services ignore the header.
 
 ## Service messages event
 

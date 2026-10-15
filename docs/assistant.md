@@ -175,6 +175,7 @@ The model has fixed tools, with no shell or system-operation tool:
 | `prepare_npm` | Capable controllers only: prepare a public npm CLI package/tag and its tested offline dependency artifact |
 | `host_diagnostics` | One exact declared computer and a fixed area; read-only state and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
+| `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
 
 The wire-level step context and service messages are specified in the
 [assistant protocol v2.5](assistant-protocol-v25.md); the tool schemas are in
@@ -304,6 +305,40 @@ network or installation at boot. A switch does not reset or seed a live home.
 Student updates disappear at the next reset; npm and credential snapshot
 exclusions remain intact.
 
+### Prefetched downloads
+
+Controllers advertise `prefetch_v1` through the same optional header. For a
+program its publisher distributes as an AppImage, `.deb` package or tarball at
+a fixed-version address, `prefetch` downloads that one file on the controller
+and returns its `sha256-…` hash, its size in bytes and its Nix store path. The
+Assistant puts the hash in the module it writes, so the administrator never
+computes it. The tool does not read the file or send it to the service, and it
+installs or activates nothing. Like computer diagnostics, it requires the
+updated consent.
+
+The address must be an absolute `https` URL of at most 2,048 characters, with
+no user name, password, fragment, spaces or control characters. Hosts written
+as IP addresses, `localhost` and names ending in `.localhost`, `.local`,
+`.internal` or `.lan` are refused, and so is a host with any loopback, private
+(10/8, 172.16/12, 192.168/16, IPv6 unique-local), link-local, carrier-grade NAT
+(100.64/10) or unspecified address. A first HEAD request (10 seconds, at most
+five redirects, each redirect checked by the same rules) refuses a file whose
+reported size exceeds 1 GiB; a missing size is allowed, and a download that
+turns out larger is refused afterwards. These checks cover the address and the
+redirects seen by the HEAD request; Nix then performs the download itself with
+`nix store prefetch-file`, one at a time on the controller, within 15 minutes.
+Refusals and failures are reported as `invalid_url`, `host_refused`,
+`too_large`, `busy`, `consent_required`, `download_failed` (with a one-line
+reason) or `timeout`.
+
+The file stays in the controller's Nix store without a garbage-collection
+root. Building the candidate finds it there through `fetchurl` with the same
+hash and file name (by default the last component of the address), so it is
+not downloaded twice. The computers never download it: at update time they
+receive the built program from the controller cache. If the store copy was
+collected in the meantime, the controller downloads it again during the build
+and Nix checks the same hash.
+
 ## How affected computers are calculated
 
 `mkLab` exports `nixoriumHostClasses`: a list of records with `representative`
@@ -417,7 +452,8 @@ bypass it. Recovery never applies the system.
 ## Local data and retention
 
 `/var/lib/nixorium/assistant/` is owned by `admin` with mode 0700. It contains
-the token (0600), `consent.json`, and `conversations/<uuid>/`. Conversations
+the token (0600), `consent.json`, `conversations/<uuid>/`, and an empty
+`prefetch/` directory that serves only as the one-download-at-a-time lock. Conversations
 hold metadata with the base commit, creation and last activity dates, title,
 save date and last final answer (up to 2,000 characters), a private transcript,
 `overlay/`, `deleted.json`, `modes.json`, `base-classes.json` and `base-drv-v25.json`.

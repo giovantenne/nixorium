@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -47,6 +48,7 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		Pattern string
 		Query   string
 		Package string
+		URL     string
 	}
 	_ = json.Unmarshal(call.Arguments, &args)
 	switch call.Name {
@@ -74,6 +76,12 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		return "Reading computer diagnostics"
 	case "git_history":
 		return "Reading saved configuration history"
+	case "prefetch":
+		host := "a file"
+		if parsed, err := url.Parse(args.URL); err == nil && parsed.Hostname() != "" {
+			host = parsed.Hostname()
+		}
+		return "Downloading " + host + " to compute its hash"
 	}
 	return "Checking Assistant tool request"
 }
@@ -160,7 +168,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			core = nil
 		}
 	}
-	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1"}}
+	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1"}}
 	if discovery, ok := runner.Store.(interface {
 		HomeFilesSupported(context.Context, domain.AssistantConversation) bool
 	}); ok && discovery.HomeFilesSupported(ctx, conversation) {

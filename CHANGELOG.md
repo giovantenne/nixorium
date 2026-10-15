@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Assistant can download a public file once on the controller and pin its
+  hash itself (`prefetch`), so programs distributed as AppImage, deb or
+  tarball need no manual hash step.
+
 ### Changed
 
 - When something blocks an operation, Nixorium now says it in one plain

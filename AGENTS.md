@@ -415,6 +415,9 @@ release is not finished until the site follows it.
   ancestors of the conversation base, visible safe paths and bounded sanitized
   diffs; it never changes Git or contacts a remote. New observations require
   renewed consent before entering the model transcript.
+  Consent- and capability-gated `prefetch` downloads one public https file into
+  the controller store: keep public-host and per-redirect checks, the 1 GiB,
+  15-minute and one-at-a-time bounds, and return only hash, size and store path.
   Evaluate a temporary clone with IFD disabled and bounded time/output; compare
   `nixoriumHostClasses` representatives. `groupModules` assigns common module
   paths to existing clientGroups; compose overlaps deterministically, preserve

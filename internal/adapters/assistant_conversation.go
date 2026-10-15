@@ -183,12 +183,14 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	}
 	result := ""
 	switch call.Name {
-	case "host_diagnostics", "git_history":
+	case "host_diagnostics", "git_history", "prefetch":
 		accepted, consentErr := tools.Store.ReadConsent()
 		if consentErr != nil || !accepted {
 			result = `{"ok":false,"error":"consent_required"}`
 		} else if call.Name == "git_history" {
 			result = AssistantGitHistory(ctx, workspace, call)
+		} else if call.Name == "prefetch" {
+			result = prefetchAssistantFile(ctx, tools.Store, call)
 		} else if tools.Diagnostics == nil {
 			result = `{"ok":false,"error":"diagnostics_unavailable"}`
 		} else {

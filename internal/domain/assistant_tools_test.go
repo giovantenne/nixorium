@@ -44,6 +44,9 @@ func TestAssistantToolArguments(t *testing.T) {
 		{"host_diagnostics", `{"host":"pc01","area":"cache","area":"system"}`, false},
 		{"git_history", `{}`, true}, {"git_history", `{"limit":20,"path":"modules/course.nix"}`, true},
 		{"git_history", `{"limit":0}`, false}, {"git_history", `{"limit":21}`, false}, {"git_history", `{"limit":1.5}`, false}, {"git_history", `{"command":"show"}`, false},
+		{"prefetch", `{"url":"https://downloads.example.org/tool.AppImage"}`, true},
+		{"prefetch", `{}`, false}, {"prefetch", `{"url":null}`, false}, {"prefetch", `{"url":42}`, false},
+		{"prefetch", `{"url":"https://a.example/x","hash":"sha256-x"}`, false}, {"prefetch", `{"url":"https://a.example/x","url":"https://b.example/y"}`, false},
 	} {
 		if got := ValidateAssistantArguments(test.name, []byte(test.args)); got != test.valid {
 			t.Fatalf("%s %s: %v", test.name, test.args, got)
