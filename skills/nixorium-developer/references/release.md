@@ -18,8 +18,11 @@ Before release:
 5. Run the focused local checks; use `./scripts/validate.sh --full` locally
    when full preflight is practical. GitHub repeats the complete gate regardless.
 6. Commit the metadata as `chore: prepare v<version>` and push it to `master`.
-7. Run `./scripts/release.sh <version>` only with explicit authorization.
-8. Verify the GitHub workflow and published release.
+7. Website release branch: confirm that `release/<version>` exists in
+   `nixorium-website`, is built against this commit and is green on `staging`
+   (see [Website release branch](#website-release-branch)). Do not tag without it.
+8. Run `./scripts/release.sh <version>` only with explicit authorization.
+9. Verify the GitHub workflow and published release.
 
 The release workflow first checks metadata, then calls the full-validation
 workflow, which runs `./scripts/validate.sh --full` on the exact tagged commit
@@ -41,3 +44,28 @@ replace, or push tags as an implicit part of implementation work. If publishing
 fails after the tag is pushed, inspect the tag and workflow before retrying.
 Do not retag a different commit under an existing version; fix forward with a
 new version unless the user explicitly chooses another recovery procedure.
+
+## Website release branch
+
+The website for a release is prepared before the release and published at the
+moment of the release. While the features are developed, `nixorium-website` gets
+a branch `release/<next version>` (for example `release/3.8.0`) from its
+`master`; its copy describes the new features from the product documentation at
+the commit it is built against, with
+`NIXORIUM_PRODUCT_ROOT=<clean product checkout> NIXORIUM_PRODUCT_REV=<commit> npm run build`
+(and `npm run demos:generate` when a demo changes), and it is pushed to
+`staging` for review. A preview branch may pin an unreleased commit.
+
+After the tag, once the release workflow has published the release, finish the
+site in the same session, on that branch:
+
+1. Run `npm run demos:generate` at the tag (or update the pin) and commit
+   "Pin the site to Nixorium v<version> (<sha>)".
+2. Review the technician guide against the released changelog and documentation.
+3. Check with `SITE_RELEASE_CHECK=strict npm run build`, merge into `master`, and
+   push `master` and `master:staging`.
+
+Production therefore changes in the same moment as the release. The website's
+production build fails when its pinned commit is not a published release, so
+`master` cannot move ahead of the tag. The website README, section "Release
+branches", holds the same process.

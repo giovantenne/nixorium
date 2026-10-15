@@ -66,8 +66,16 @@ if [[ "${LOCAL_COMMIT}" != "${REMOTE_COMMIT}" ]]; then
   exit 1
 fi
 
+RELEASE_SHA="$(git rev-parse --short=7 HEAD)"
+
+echo
+echo "NOTICE: confirm before tagging ${TAG} that the website branch release/${VERSION} exists in nixorium-website,"
+echo "        is built against ${RELEASE_SHA} and is green on staging. This script does not check it and does not wait."
+echo
+
 git tag --annotate "${TAG}" --message "Nixorium ${TAG}"
 git push origin "${TAG}"
 
 echo "Pushed ${TAG}. GitHub Actions will publish the release only after full validation succeeds."
-echo "When the release is published, update the website pin (nixorium-website: npm run demos:generate on ${TAG}, review the technician guide, push master and master:staging)."
+echo "When the release is published, publish the website: in nixorium-website, on release/${VERSION}, run npm run demos:generate on ${TAG},"
+echo "commit \"Pin the site to Nixorium ${TAG} (${RELEASE_SHA})\", review the technician guide, merge into master, then push master and master:staging."

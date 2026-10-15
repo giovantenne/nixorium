@@ -118,8 +118,11 @@ Before opening a pull request:
 - avoid drive-by formatting or unrelated cleanup.
 
 Changes that affect releases also follow [the release process](scripts/release.sh)
-and are versioned only after review. The release-tag workflow requires `--full`
-on the tagged commit before publication; local full preflight is optional.
+and are versioned only after review. A release is tagged only when its website
+branch `release/<version>` in `nixorium-website` exists and is green; see
+[the release reference](skills/nixorium-developer/references/release.md).
+The release-tag workflow requires `--full` on the tagged commit before
+publication; local full preflight is optional.
 Ordinary pushes to `master` do not trigger full CI; it runs nightly on
 `master` and can be started from the Actions tab before tagging. Report suspected vulnerabilities through
 [SECURITY.md](SECURITY.md), not a public issue.
