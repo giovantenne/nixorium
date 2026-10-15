@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -88,7 +89,84 @@ func (model dashboardModel) resultSituation() (domain.NextStep, bool) {
 	default:
 		return domain.NextStep{}, false
 	}
-	return noticeSituation(failureNotice("", model.message))
+	if step, found := noticeSituation(failureNotice("", model.message)); found {
+		return step, true
+	}
+	// After an activation past an interrupted client update, Enter opens its
+	// review: updating the computers would only be refused by it.
+	for _, code := range model.heldRecordCodes() {
+		if code == "DEPLOY-PENDING" {
+			return domain.NextStepByCode(code)
+		}
+	}
+	return domain.NextStep{}, false
+}
+
+// recoveryAfterControllerApply observes the blocking records once the
+// controller activation has returned; nil when this session cannot observe
+// them, so the previous observation is kept.
+func (model dashboardModel) recoveryAfterControllerApply() *domain.RecoveryReport {
+	if model.actions.ClassroomMode || model.actions.LoadRecovery == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+	defer cancel()
+	report := model.actions.LoadRecovery(ctx)
+	return &report
+}
+
+// heldRecordCodes names the records that still hold the student computers
+// after this controller was activated past them. Controller activation is
+// allowed while a client update record or a USB reservation exists (the way
+// to the fix is never blocked), so the result must still show them.
+func (model dashboardModel) heldRecordCodes() []string {
+	applied := false
+	switch {
+	case model.screen == dashboardUpdate && model.updates.result.Operation != "":
+		applied = model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired &&
+			controllerVerifiedForSave(model.updates.result.Revision, model.controller.result)
+	case model.screen == dashboardController && model.controller.result.Operation != "":
+		applied = model.controller.result.Applied
+	}
+	if !applied {
+		return nil
+	}
+	var codes []string
+	for _, held := range []struct{ kind, code string }{
+		{domain.RecoveryDeploymentPending, "DEPLOY-PENDING"},
+		{domain.RecoveryUSBReserved, "USB-RESERVED"},
+	} {
+		for _, condition := range model.recovery.Conditions {
+			if condition.Kind == held.kind {
+				codes = append(codes, held.code)
+				break
+			}
+		}
+	}
+	return codes
+}
+
+// heldRecordNotices shows each held record as an attention notice with its
+// catalogued situation.
+func (model dashboardModel) heldRecordNotices() []tuiNotice {
+	var notices []tuiNotice
+	for _, code := range model.heldRecordCodes() {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, code: code})
+	}
+	return notices
+}
+
+// heldDeploymentLine says in one muted line that the student computers still
+// wait for the review of their interrupted update.
+const heldDeploymentLine = "The student computers were not touched: review the interrupted update before updating them."
+
+func (model dashboardModel) holdsInterruptedDeployment() bool {
+	for _, code := range model.heldRecordCodes() {
+		if code == "DEPLOY-PENDING" {
+			return true
+		}
+	}
+	return false
 }
 
 // situationScreenAvailable mirrors recoveryFlow: whether the situation's

@@ -359,7 +359,7 @@ release is not finished until the site follows it.
   is never unattended. Both installers use `ERASE` and ask again after a
   mistyped answer; an empty confirmation cancels.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
-- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist fleet-wide pending evidence before apply. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new operations and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
+- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist fleet-wide pending evidence before apply. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new operations except controller activation (ADR 0027) and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
 - Deployment availability is advisory: probe only selected identities with the
   bounded inventory probe; an open SSH port is not authenticated identity or
   proof of power state. A reachable-only choice creates a fresh explicit-target
@@ -461,11 +461,17 @@ release is not finished until the site follows it.
   failed post-boot verification. Already-private log ancestors need no chmod.
 - A completed USB disk installation may await reboot/verification while the
   controller rebuilds. Only the controller apply job may cross that reservation:
-  check its strictly decoded, identity-bound completion receipt, pause the
+  check its strictly decoded, identity-bound completion receipt (or a session
+  that never dispatched and has no open review), pause the
   worker, acquire the shared lock, and recheck before continuing. Resume the
   worker on every exit and retain its private runtime directory across stops.
   Never infer completion from a state label alone, clear the pending record,
   or apply this exception to active/failed/unknown disk work or client operations.
+- The way to the fix is never blocked (ADR 0027): controller activation (both
+  apply units, in `ControlSystemUnit` and the `operationGate` of the apply
+  job) ignores `deployment-pending.json`, which it never clears; every other
+  unit and gate keeps refusing it. Activation results and the Overview still
+  show the record.
 - Remote lab backup requires an explicit private SSH destination/branch review,
   encrypted original keys and verified remote revision. Keep plaintext private
   keys ignored; only `nixorium-recovery.age` is committed by this workflow.

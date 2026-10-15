@@ -16,10 +16,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Update Nixorium** and **Apply to controller** now work even when an update
+  of the student computers was interrupted or a USB installation was not
+  finished, so a newer release can always reach the controller. The student
+  computers still wait for that review, and the result says so. Only a USB
+  installation that is writing its disk, or waiting for its `ERASE`
+  confirmation, still holds the controller back.
 - When something blocks an operation, Nixorium now says it in one plain
   sentence, why it stops there and what to do next, with the same words on
   the failure screen, the Overview, the review and in the troubleshooting
-  guide. For example, **Update Nixorium** now reports "The controller was not
+  guide. For example, **Update computers** now reports "The computers were not
   updated: a previous update of the student computers was interrupted." The
   technical message is still there behind `d`.
 - On the result of **Update Nixorium**, **Apply to controller** and **Update

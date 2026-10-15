@@ -202,7 +202,7 @@ func TestUpdateResultNoticeOpensTheInterruptedUpdateReview(t *testing.T) {
 	view := plainView(model)
 	for _, want := range []string{
 		"! The controller was not updated: a previous update of the student computers was interrupted.",
-		"  Nixorium does not know how it ended on every computer, so it stops every other operation until you review it.",
+		"  Nixorium does not know how it ended on every computer, so the student computers wait until you review it.",
 		"  Next: Review the interrupted update (Enter)",
 		"Enter Review the interrupted update", "a Retry controller", "d Details", "Esc Maintenance",
 	} {
@@ -278,5 +278,72 @@ func TestControllerRefusalOffersTheInterruptedUpdateReview(t *testing.T) {
 	}
 	if back := cleanupPress(t, review, keyPress("esc")); back.screen != dashboardController || back.message != pendingRefusal {
 		t.Fatalf("Esc returned to screen %d", back.screen)
+	}
+}
+
+// Controller activation is allowed past an interrupted client update (the
+// way to the fix is never blocked); its result must still show the record.
+func TestUpdateResultAfterActivationPastInterruptedUpdateKeepsItsReview(t *testing.T) {
+	fixture := &recoveryFixture{}
+	revision := "0123456789abcdef0123456789abcdef01234567"
+	started := time.Date(2026, 10, 15, 15, 4, 0, 0, time.Local)
+	held := domain.RecoveryReport{Conditions: []domain.BlockingCondition{
+		{Kind: domain.RecoveryDeploymentPending, Title: situationTitle("DEPLOY-PENDING"), Detail: "Update of 2026-10-15 15:04 to pc01; how it ended is unknown.", Since: &started},
+	}}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: fixture.actions(), width: 160, height: 44, screen: dashboardUpdate,
+		updates: updateModel{applying: true, result: domain.UpdateApplyReport{Operation: "update-save", State: "saved", Updated: true, Revision: revision, Target: "v3.7.0"}}}
+	updated, _ := model.Update(dashboardUpdateControllerMsg{
+		plan:     domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "ready", Revision: revision},
+		report:   domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Revision: revision, Applied: true, Verified: true},
+		recovery: &held,
+	})
+	model = updated.(dashboardModel)
+	view := plainView(model)
+	for _, want := range []string{
+		"Nixorium and this controller are updated",
+		heldDeploymentLine,
+		"! A previous update of the student computers was interrupted.",
+		"  Next: Review the interrupted update (Enter)",
+		"Enter Review the interrupted update",
+	} {
+		if !contains(view, want) {
+			t.Fatalf("update result omits %q:\n%s", want, view)
+		}
+	}
+	if contains(view, "Enter Update computers") {
+		t.Fatalf("update result offers updating the computers past the record:\n%s", view)
+	}
+	review := runRead(model.Update(keyPress("enter")))
+	if review.screen != dashboardRecoveryReview || fixture.applied != 0 {
+		t.Fatalf("Enter did not open the review (screen %d):\n%s", review.screen, plainView(review))
+	}
+	home := cleanupPress(t, cleanupPress(t, review, keyPress("esc")), keyPress("esc"))
+	found := false
+	for _, task := range home.pendingTasks() {
+		found = found || task.id == "pending-deploy-recovery"
+	}
+	if home.screen != dashboardHome || !found {
+		t.Fatalf("the Overview lost the interrupted update (screen %d): %+v", home.screen, home.pendingTasks())
+	}
+}
+
+func TestControllerResultPastUSBReservationShowsItWithoutTheClientLine(t *testing.T) {
+	revision := "0123456789abcdef0123456789abcdef01234567"
+	held := domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryUSBReserved, Title: situationTitle("USB-RESERVED")}}}
+	model := dashboardModel{report: testDashboardReport("ready"), width: 160, height: 40, screen: dashboardController, controller: controllerModel{applying: true}}
+	updated, _ := model.Update(dashboardControllerResultMsg{
+		report:   domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Revision: revision, Applied: true, Verified: true},
+		recovery: &held,
+	})
+	model = updated.(dashboardModel)
+	view := plainView(model)
+	if !contains(view, "Applied to this controller and verified") || !contains(view, "! A USB installation was not finished.") ||
+		!contains(view, "Next: Resume or close the USB installation") || contains(view, heldDeploymentLine) {
+		t.Fatalf("controller result does not show the USB reservation:\n%s", view)
+	}
+	// Without a record the result stays as before.
+	model.recovery = domain.RecoveryReport{}
+	if view := plainView(model); contains(view, "USB installation was not finished") || contains(view, heldDeploymentLine) {
+		t.Fatalf("controller result shows a record that is not there:\n%s", view)
 	}
 }

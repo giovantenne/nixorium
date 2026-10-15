@@ -39,7 +39,7 @@ var nextSteps = map[string]NextStep{
 	"DEPLOY-PENDING": {
 		Code:   "DEPLOY-PENDING",
 		Title:  "A previous update of the student computers was interrupted",
-		Why:    "Nixorium does not know how it ended on every computer, so it stops every other operation until you review it.",
+		Why:    "Nixorium does not know how it ended on every computer, so the student computers wait until you review it.",
 		Action: "Review the interrupted update",
 		TUI:    "Overview", Command: "nixorium deploy recover plan", Screen: RecoveryDeploymentPending,
 	},

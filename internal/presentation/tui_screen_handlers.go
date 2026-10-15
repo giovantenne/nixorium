@@ -1537,13 +1537,14 @@ func (model dashboardModel) startReviewedControllerApply() (tea.Model, tea.Cmd) 
 	plan := model.controller.plan
 	operation := func() tea.Msg {
 		report := model.actions.ApplyController(plan)
+		recovery := model.recoveryAfterControllerApply()
 		if model.actions.Refresh == nil {
-			return dashboardControllerResultMsg{report: report}
+			return dashboardControllerResultMsg{report: report, recovery: recovery}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
 		defer cancel()
 		status, err := model.actions.Refresh(ctx)
-		return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
+		return dashboardControllerResultMsg{report: report, status: status, statusErr: err, recovery: recovery}
 	}
 	return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
 }

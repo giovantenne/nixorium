@@ -2,7 +2,12 @@ package adapters
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func TestStartSystemUnitRejectsUnknownUnit(t *testing.T) {
@@ -75,5 +80,63 @@ func TestSystemctlArgumentsDisableAskPassword(t *testing.T) {
 	got := systemctlArguments("show", "unit")
 	if len(got) != 3 || got[2] != "--no-ask-password" || got[0] != "show" {
 		t.Fatalf("unexpected arguments: %v", got)
+	}
+}
+
+// An interrupted client update must never stop a newer release from reaching
+// the controller (owner decision 2026-10-15), while every other start stays
+// refused by the record.
+func TestControlSystemUnitStartsControllerApplyWithPendingDeployment(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, deploymentPendingName), []byte("{}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	noConflict := func(context.Context) error { return nil }
+	for _, test := range []struct {
+		verb    string
+		unit    string
+		started bool
+	}{
+		{verb: "start", unit: "nixorium-apply-controller.service", started: true},
+		{verb: "start", unit: "nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service", started: true},
+		{verb: "start", unit: "nixorium-pxe-recover.service", started: true},
+		{verb: "stop", unit: "nixorium-pxe.service", started: true},
+		{verb: "start", unit: "nixorium-prepare-pxe.service"},
+		{verb: "start", unit: "nixorium-pxe.service"},
+		{verb: "start", unit: "nixorium-remote-install.service"},
+		{verb: "start", unit: "nixorium-install-secrets.service"},
+		{verb: "start", unit: "nixorium-restart-cache.service"},
+		{verb: "start", unit: "nixorium-clean-generations@0123456789abcdef.service"},
+	} {
+		var calls [][]string
+		runner := func(_ context.Context, arguments ...string) error {
+			calls = append(calls, arguments)
+			return nil
+		}
+		err := controlSystemUnit(context.Background(), directory, noConflict, runner, test.verb, test.unit)
+		if test.started {
+			if err != nil || len(calls) != 1 || calls[0][0] != test.verb || calls[0][1] != test.unit {
+				t.Fatalf("%s %s with a pending record: err=%v calls=%v", test.verb, test.unit, err, calls)
+			}
+			continue
+		}
+		if code, _ := domain.BlockedCodeOf(err); err == nil || len(calls) != 0 || code != "DEPLOY-PENDING" {
+			t.Fatalf("%s %s was not refused by the pending record: err=%v calls=%v", test.verb, test.unit, err, calls)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(directory, deploymentPendingName)); err != nil {
+		t.Fatalf("controller apply changed the pending record: %v", err)
+	}
+}
+
+func TestControlSystemUnitKeepsManagedJobConflictForControllerApply(t *testing.T) {
+	busy := errors.New("nixorium-prepare-pxe.service is already running")
+	called := false
+	err := controlSystemUnit(context.Background(), t.TempDir(), func(context.Context) error { return busy }, func(context.Context, ...string) error {
+		called = true
+		return nil
+	}, "start", "nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service")
+	if !errors.Is(err, busy) || called {
+		t.Fatalf("controller apply ignored a managed job in flight: err=%v called=%t", err, called)
 	}
 }

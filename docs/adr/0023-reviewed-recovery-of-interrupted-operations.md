@@ -1,6 +1,6 @@
 # ADR-0023: Reviewed recovery of interrupted operations
 
-- Status: accepted; confirmation amended by [ADR 0026](0026-proportionate-confirmation-for-recovery.md)
+- Status: accepted; confirmation amended by [ADR 0026](0026-proportionate-confirmation-for-recovery.md); controller activation amended by [ADR 0027](0027-controller-activation-past-client-records.md)
 - Date: 2026-10-01
 
 ## Context
@@ -8,7 +8,9 @@
 An interrupted client update leaves `deployment-pending.json`, and an
 interrupted deployment template reset leaves `.git/nixorium-template-reset.json`.
 Both deliberately block every operation, including classroom controls, until
-an administrator confirms what happened. Until now the only way out was a
+an administrator confirms what happened. (Amended by ADR 0027 on 2026-10-15:
+controller activation stays allowed while a client update record exists,
+because it changes only the controller.) Until now the only way out was a
 manual procedure: holding the operation lock while moving the record, or
 completing a Git compare-and-swap by hand. Administrators who are not Git or
 Nix experts could not leave that state without help.

@@ -641,6 +641,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.controller.applying = false
 		model.controller.result = message.report
+		if message.recovery != nil {
+			model.observeRecoveryController(*message.recovery)
+		}
 		model.observeControllerResult(message.report)
 		model.message = message.report.Message
 		model.controller.details = false
@@ -850,6 +853,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.updates.applying = false
 		model.controller.plan = message.plan
 		model.controller.result = message.report
+		if message.recovery != nil {
+			model.observeRecoveryController(*message.recovery)
+		}
 		model.observeControllerPlan(message.plan)
 		model.observeControllerResult(message.report)
 		if message.plan.HasErrors() {

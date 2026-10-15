@@ -7,7 +7,11 @@ let
     runtimeInputs = [ pkgs.coreutils pkgs.diffutils pkgs.util-linux ];
     text = builtins.readFile ../scripts/migrate-known-hosts.sh;
   };
-  operationGate = allowCompletedUSB: ''
+  # controllerApply: only the controller apply job may proceed while a client
+  # update record exists (it changes only the controller, owner decision
+  # 2026-10-15, ADR 0023 amendment) and may cross a USB reservation whose disk
+  # work completed or never started. Every other job keeps both refusals.
+  operationGate = controllerApply: ''
     COORDINATION_DIRECTORY=/var/lib/nixorium/coordination
     COORDINATION_LOCK="$COORDINATION_DIRECTORY/operation.lock"
     USB_RESERVATION="$COORDINATION_DIRECTORY/usb-reservation.json"
@@ -18,25 +22,28 @@ let
         && "$(stat -c '%U:%G:%a' "$COORDINATION_LOCK")" == root:nixorium-operations:660 ]] \
       || fail "managed operation lock is unsafe"
     check_usb_reservation() {
-      [[ ! -e "$COORDINATION_DIRECTORY/deployment-pending.json" && ! -L "$COORDINATION_DIRECTORY/deployment-pending.json" ]] \
-        || fail "an unfinished client deployment requires reviewed recovery before another operation"
+      ${lib.optionalString (!controllerApply) ''
+        [[ ! -e "$COORDINATION_DIRECTORY/deployment-pending.json" && ! -L "$COORDINATION_DIRECTORY/deployment-pending.json" ]] \
+          || fail "an unfinished client deployment requires reviewed recovery before another operation"
+      ''}
       if [[ -e "$USB_RESERVATION" || -L "$USB_RESERVATION" ]]; then
-        ${if allowCompletedUSB then ''
+        ${if controllerApply then ''
           runuser -u admin -- ${nixoriumPackage}/bin/nixorium-remote-worker --controller-rebuild-check \
-            || fail "USB disk installation has not been confirmed complete; controller apply cannot interrupt it"
+            || fail "a USB disk installation is in progress or unresolved; controller apply cannot interrupt it"
         '' else ''
           fail "a USB installation remains reserved; reconcile it before starting another operation"
         ''}
       fi
     }
     check_usb_reservation
-    ${lib.optionalString allowCompletedUSB ''
+    ${lib.optionalString controllerApply ''
       if [[ -e "$USB_RESERVATION" || -L "$USB_RESERVATION" ]]; then
-        # A completed client no longer depends on the controller cache/worker.
-        # Keep its durable reservation and resume verification after this job.
+        # A completed client no longer depends on the controller cache/worker,
+        # and an installation that never started has not touched its disk.
+        # Keep the durable reservation and resume the worker after this job.
         USB_WORKER_PAUSED=true
         systemctl --no-ask-password stop nixorium-remote-install.service \
-          || fail "could not pause the completed USB installation worker"
+          || fail "could not pause the USB installation worker"
       fi
     ''}
     exec 9<>"$COORDINATION_LOCK"

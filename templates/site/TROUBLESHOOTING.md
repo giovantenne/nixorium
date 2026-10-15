@@ -56,8 +56,8 @@ situation, why it stops there and the next step. In the TUI the notice reads,
 for example:
 
 ```text
-! The controller was not updated: a previous update of the student computers was interrupted.
-  Nixorium does not know how it ended on every computer, so it stops every other operation until you review it.
+! The computers were not updated: a previous update of the student computers was interrupted.
+  Nixorium does not know how it ended on every computer, so the student computers wait until you review it.
   Next: Review the interrupted update (Enter)
 ```
 
@@ -369,14 +369,22 @@ a replacement installation to clear this block. Successful recovery returns to
 a fresh deployment review with the same selected computers and requires a new
 deployment confirmation. It never starts deployment automatically.
 
+**Update Nixorium** and **Maintenance → Apply to controller** stay available
+while a USB installation is reserved, unless its disk is being installed.
 Controller rebuild may proceed while a completed USB installation still awaits
-reboot or verification, even if the client is offline. The controller validates
-the persisted disk-completion receipt, pauses the worker without deleting its
-state or credentials, holds the normal operation lock, and resumes the worker
-on success or failure. Active, failed, or unknown disk work remains protected;
-other client operations still respect the reservation. Older controller apply
-services that block every reserved installation need the corrected apply
-service as well as the worker; never remove their coordination files manually.
+reboot or verification, even if the client is offline, and while a reserved
+installation never started (the disk was never touched and no reviewed
+installation waits for its `ERASE` confirmation). The controller validates the
+persisted session, pauses the worker without deleting its state or credentials,
+holds the normal operation lock, and resumes the worker on success or failure.
+An open installation review, active, failed, or unknown disk work remains
+protected: cancel the review safely or wait for the disk work.
+Other client operations still respect the reservation, and the result of the
+activation still shows **A USB installation was not finished**. Older
+controller apply services that block every reserved installation need the
+corrected apply service as well as the worker; never remove their coordination
+files manually. The [last resort](#last-resort-activate-the-controller-with-nixos)
+applies here too.
 
 Complete `install usb verify --id OPERATION_ID` when the installed client is
 available. Verification checks the preserved host key, hostname, exact system
@@ -538,16 +546,27 @@ mode-0600 `/var/lib/nixorium/coordination/deployment-pending.json`, containing
 the repository, reviewed revision, selected names/addresses and start time.
 A normal successful Colmena return clears it. A failed/disconnected/timed-out
 apply, terminal loss or process death retains it, even across controller reboot.
-New managed deployments, controller applies, installation starts and fleet
-mutations are refused. Inventory and logs remain readable. Malformed or unsafe
-pending evidence also blocks operations rather than being silently removed.
+New managed deployments, installation starts, network installation and fleet
+mutations, including classroom controls, are refused. Inventory and logs remain
+readable. Malformed or unsafe pending evidence also blocks operations rather
+than being silently removed.
+
+**Update Nixorium** and **Maintenance → Apply to controller** stay available,
+so a newer release can always reach the controller, even when the fix is in
+the recovery itself. Activation changes only the controller, not the computers
+the record describes; it does not clear the record either. The result still
+shows **A previous update of the student computers was interrupted**, and
+Enter opens its review. After **Update Nixorium** it also says: "The student
+computers were not touched: review the interrupted update before updating
+them." Another running operation, an interrupted template reset, a failed
+evaluation and an open network installation still stop the activation.
 
 Recovery is reviewed, never automatic: there is no automatic retry or
 force-unlock (ADR 0023; confirmation as in ADR 0026). When an update started
 from **Computers → Update computers** stops this way, Nixorium opens the review
 at once. Otherwise open it from the Overview row **A previous update of the
 student computers was interrupted**, or press Enter on a failure notice that
-names it (for example after **Update Nixorium**).
+names it (for example on the result of **Update Nixorium**).
 
 **Review the interrupted update** lists every recorded computer, checked over
 authenticated SSH (running revision, queued systemd jobs, running activation):
@@ -599,6 +618,25 @@ Only when the guided review cannot run, recover by hand:
    recreate the lock files, and never bypass them with old binaries or raw
    Colmena.
 5. Check the computers again and authorize a fresh reviewed update.
+
+### Last resort: activate the controller with NixOS
+
+If an older Nixorium still refuses to activate the controller, **Update
+Nixorium** has already saved the configuration, and it points at the new
+release. Activate it without Nixorium's service, as `admin` in the deployment
+folder:
+
+```sh
+cd ~/nixorium-deployment
+sudo nixos-rebuild switch --flake "$(nixorium config source --repo "$PWD")"
+```
+
+`nixorium config source` adds the account passwords that Git does not store;
+without it the system would be built without them. This touches only the
+controller. The record stays and still blocks client operations until you
+review it with the new version. Do not use it while a USB disk installation is
+running. Then open Nixorium and run **Maintenance → Apply to controller** once,
+so it records the verified activation.
 
 For controller builds, `l` expands managed phase details in both the dedicated
 controller screen and framework/package/software update follow-ups. These

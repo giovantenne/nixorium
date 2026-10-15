@@ -37,6 +37,19 @@ func TestControllerUSBGuardPreservesPendingVerificationAndRejectsUnsafeStates(t 
 		},
 		"wrong-host":    func(s *domain.RemoteInstallSession) { s.Preparation.Host.StaticIP = "10.0.0.2" },
 		"wrong-receipt": func(s *domain.RemoteInstallSession) { s.Receipt.OperationID = "ffffffffffffffffffffffffffffffff" },
+		// A reservation whose installation never started does not hold the
+		// controller back, unless its reviewed ERASE could be confirmed now.
+		"never-dispatched":           neverDispatched("prepared"),
+		"never-dispatched-artifacts": neverDispatched("artifacts-ready"),
+		"review-open":                neverDispatched("review-ready"),
+		"dispatching": func(s *domain.RemoteInstallSession) {
+			neverDispatched("dispatching")(s)
+			s.TokenConsumed = true
+		},
+		"dispatch-uncertain": func(s *domain.RemoteInstallSession) {
+			neverDispatched("reconciliation-required")(s)
+			s.DispatchUncertain = true
+		},
 	}
 	for name, mutate := range mutations {
 		t.Run(name, func(t *testing.T) {
@@ -72,7 +85,7 @@ func TestControllerUSBGuardPreservesPendingVerificationAndRejectsUnsafeStates(t 
 				t.Fatal(err)
 			}
 			err = checkControllerUSBReservationAt(coordination, state, false)
-			allowed := name == "completed" || name == "ready-before-reboot"
+			allowed := name == "completed" || name == "ready-before-reboot" || name == "never-dispatched" || name == "never-dispatched-artifacts"
 			if (err == nil) != allowed {
 				t.Fatalf("guard error = %v", err)
 			}
@@ -88,6 +101,14 @@ func TestControllerUSBGuardPreservesPendingVerificationAndRejectsUnsafeStates(t 
 				t.Fatal("guard released the worker lock")
 			}
 		})
+	}
+}
+
+func neverDispatched(state string) func(*domain.RemoteInstallSession) {
+	return func(s *domain.RemoteInstallSession) {
+		s.State = state
+		s.TokenConsumed, s.DispatchUncertain, s.RebootRequested, s.BootVerified = false, false, false, false
+		s.Receipt = nil
 	}
 }
 

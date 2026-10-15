@@ -627,6 +627,7 @@ type dashboardControllerResultMsg struct {
 	report    domain.ControllerRebuildExecutionReport
 	status    domain.StatusReport
 	statusErr error
+	recovery  *domain.RecoveryReport
 }
 
 type dashboardControllerProgressTickMsg struct {
@@ -682,6 +683,9 @@ type dashboardUpdateResultMsg struct {
 type dashboardUpdateControllerMsg struct {
 	plan   domain.ControllerRebuildPlanReport
 	report domain.ControllerRebuildExecutionReport
+	// recovery is observed after the activation, so the result names the
+	// records that still hold the student computers; nil when unavailable.
+	recovery *domain.RecoveryReport
 }
 
 type dashboardSettingsMsg struct {
@@ -1832,10 +1836,14 @@ func (model dashboardModel) updateView() string {
 		} else if model.updates.result.Updated && !model.updates.result.HasErrors() {
 			lines = append(lines, "The update is saved safely. Retry controller activation after resolving the detail below.")
 		}
+		if model.holdsInterruptedDeployment() {
+			lines = append(lines, tuiMuted(heldDeploymentLine, model.isDark))
+		}
 		notices := []tuiNotice{}
 		if model.message != "" {
 			notices = append(notices, failureNotice(model.updateFailurePrefix(), model.message))
 		}
+		notices = append(notices, model.heldRecordNotices()...)
 		retry := tuiAction{key: "n", label: "New update"}
 		if model.updates.result.RecoveryRequired {
 			retry = tuiAction{key: "s", label: "Complete save"}
@@ -2075,7 +2083,8 @@ func (model dashboardModel) startUpdateControllerApply() (tea.Model, tea.Cmd) {
 		if plan.HasErrors() {
 			return dashboardUpdateControllerMsg{plan: plan}
 		}
-		return dashboardUpdateControllerMsg{plan: plan, report: model.actions.ApplyController(plan)}
+		report := model.actions.ApplyController(plan)
+		return dashboardUpdateControllerMsg{plan: plan, report: report, recovery: model.recoveryAfterControllerApply()}
 	}
 	command := model.trackControllerApply(operation)
 	return model, command
@@ -2206,6 +2215,7 @@ func (model dashboardModel) controllerView() string {
 		if model.message != "" {
 			notices = append(notices, failureNotice("The controller was not updated", model.message))
 		}
+		notices = append(notices, model.heldRecordNotices()...)
 		detailsLabel := "Show details"
 		if model.controller.details {
 			detailsLabel = "Hide details"

@@ -140,6 +140,10 @@ step. Apply these rules to every operation, refusal and recovery state:
    shows its Title, Why and Action, never the raw error; the raw text stays
    behind `d`. Offer the way out where the failure happens: on a result
    screen, Enter opens the situation's screen.
+10. The way to the fix is never blocked: a record that holds the student
+    computers (interrupted client update, USB reservation) never refuses
+    activating the controller, so a newer release can always arrive. The
+    activation result and the Overview still show the record (ADR 0027).
 
 Before finishing a change, answer: what does the operator see if this stops
 halfway; does the residual state block other work and appear on the

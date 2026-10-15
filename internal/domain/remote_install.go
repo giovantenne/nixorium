@@ -282,6 +282,15 @@ func RemoteInstallNeverDispatched(session RemoteInstallSession) bool {
 	return false
 }
 
+// RemoteInstallIdleForControllerRebuild reports a never-dispatched session
+// that a controller activation may pause: the disk was never touched and no
+// reviewed installation is waiting for its ERASE confirmation, so stopping
+// the worker cannot interrupt a dispatch. An open review still blocks: its
+// confirmation could start the disk installation at any moment.
+func RemoteInstallIdleForControllerRebuild(session RemoteInstallSession) bool {
+	return RemoteInstallNeverDispatched(session) && session.State != "review-ready"
+}
+
 // Status phrases of the USB worker that say whether the computer answered
 // the last status request; screens put them in plain words.
 const (

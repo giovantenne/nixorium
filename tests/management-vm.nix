@@ -946,10 +946,13 @@ in
     controller.succeed("jq -e '.state == \"failed\" and .phase == \"apply\" and .buildCompleted and (.applyCompleted | not) and (.retrySafe | not) and .recoveryRequired and .verification.verified == 1 and .verification.recorded == 0' /tmp/deploy-failed.json")
     controller.succeed("test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/deployment-pending.json)\" = admin:users:600; jq -e '.schemaVersion == 1 and (.revision | length) == 40 and .targets[0].name == \"pc01\"' /var/lib/nixorium/coordination/deployment-pending.json")
     controller.fail("su - admin -c 'revision=$(git -C ~/nixorium-deployment rev-parse HEAD); nixorium deploy apply --repo ~/nixorium-deployment --on pc01 --expect \"$revision\" --yes --json'")
-    controller.fail("systemctl start nixorium-apply-controller.service")
+    # The way to the fix is never blocked: controller activation changes only
+    # the controller, so the record neither refuses it nor is cleared by it.
+    controller.succeed("su - admin -c 'revision=$(git -C ~/nixorium-deployment rev-parse HEAD); nixorium controller apply --repo ~/nixorium-deployment --expect \"$revision\" --yes --json' | jq -e '.state == \"completed\" and .verified'")
+    controller.succeed("test -f /var/lib/nixorium/coordination/deployment-pending.json; su - admin -c 'nixorium recovery status --repo ~/nixorium-deployment --json' | jq -e 'any(.conditions[]; .kind == \"deployment-pending\")'")
     controller.fail("systemctl start nixorium-prepare-pxe.service")
     controller.fail("systemctl start nixorium-pxe-network.service")
-    controller.succeed("journalctl -u nixorium-apply-controller.service --no-pager | grep -F 'unfinished client deployment'; journalctl -u nixorium-pxe-network.service --no-pager | grep -F 'unfinished client deployment'")
+    controller.succeed("journalctl -u nixorium-pxe-network.service --no-pager | grep -F 'unfinished client deployment'")
     # The fixture's failed Colmena did not dispatch a real activation. Explicitly
     # archive its reviewed evidence under the existing fleet lock before retry.
     controller.succeed("su - admin -c 'flock -n /var/lib/nixorium/coordination/operation.lock mv -T -- /var/lib/nixorium/coordination/deployment-pending.json /var/lib/nixorium/coordination/deployment-reviewed-test.json'; sync; systemctl reset-failed")

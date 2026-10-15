@@ -68,10 +68,10 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 			}
 			detail = fmt.Sprintf("Update of %s to %s; how it ended is unknown.", started.Local().Format("2006-01-02 15:04"), computerList(affects))
 		}
-		add(domain.RecoveryDeploymentPending, "DEPLOY-PENDING", detail, "Every controller and client operation, including classroom controls.", since, affects)
+		add(domain.RecoveryDeploymentPending, "DEPLOY-PENDING", detail, "Every other controller and client operation, including classroom controls. Update Nixorium and Apply to controller stay available.", since, affects)
 	}
 	if inspector.source.RemoteReservationPresent() {
-		add(domain.RecoveryUSBReserved, "USB-RESERVED", "Resume it to verify the installed computer, or close it if it was abandoned.", "Other controller and client operations.", nil, nil)
+		add(domain.RecoveryUSBReserved, "USB-RESERVED", "Resume it to verify the installed computer, or close it if it was abandoned.", "Other controller and client operations. Apply to controller waits only while an installation is under way or unresolved.", nil, nil)
 	}
 	if inspector.source.TemplateResetPending(root) {
 		add(domain.RecoveryResetPending, "RESET-PENDING", "Open it to finish or undo the reset.", "Every operation that reads the configuration.", nil, nil)
