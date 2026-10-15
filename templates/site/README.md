@@ -875,6 +875,52 @@ that, each student computer must:
 When a computer stays off, check those points, then start it by hand and
 let the classroom view or the inventory see it once more.
 
+#### Schedule
+
+A **schedule** switches the student computers on in the morning and shuts
+them down in the evening by themselves. It has at most one switch-on time and
+one shut-down time (either may be left out) for the weekdays you choose, for
+example on at 07:50 and off at 18:00 from Monday to Friday, and it applies to
+every student computer. Times are those of the controller's time zone, which
+the dialog shows.
+
+In the classroom view page open **Power → Schedule…**: it shows the current
+schedule, with two times, the weekdays and **Save**, and **Clear** removes the
+schedule. The menu opens without selecting computers. From a terminal, as the
+administrator or the teacher:
+
+```sh
+nixorium schedule show
+nixorium schedule set --on 07:50 --off 18:00 --days mon-fri
+nixorium schedule set --off 17:30 --days mon,wed,fri
+nixorium schedule clear
+```
+
+`--days` takes `mon-fri`, `all` or a list such as `mon,wed,fri`; `set`
+replaces the whole schedule and `--json` gives the answer in a form for
+scripts. At each set time the controller does what it does for **Switch on**
+or **Shut down** on all student computers, with these differences:
+
+- the switch-on skips computers that are already on and those whose network
+  address is not known yet, so the points of [Switch computers
+  on](#switch-computers-on) apply, in particular that each computer must
+  allow waking from the network;
+- the shut-down never interrupts a person: a computer that someone is using,
+  or whose session cannot be read, stays on, and so does one that is off or
+  does not answer. A computer where the student is logged in but has not
+  touched keyboard or mouse for ten minutes does shut down;
+- nothing is made up afterwards: a minute in which the controller was off or
+  busy with another operation (a deployment, for example) is simply missed.
+
+Every run that does something is a line in the operation history that
+`nixorium logs` lists for the administrator (`schedule-run`, with counts only)
+and in the journal of `nixorium-classroom-schedule.service`
+(`journalctl -u nixorium-classroom-schedule`), which lists each computer. The
+schedule is kept on the controller only, in
+`/var/lib/nixorium/classroom/schedule.json`: it is not part of the
+configuration in Git or of the backup, so **set it again after replacing the
+controller**.
+
 ### Operation logs
 
 To prepare a minimized support report, run `nixorium support preview --json`

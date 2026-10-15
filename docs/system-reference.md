@@ -427,6 +427,37 @@ opened and no service is added. A sent packet is not proof that a computer
 starts: see [Network interfaces](#network-interfaces) for what the client
 and its firmware need.
 
+**Power → Schedule…** switches the student computers on and off by
+themselves, so nobody has to be there at 07:50 or 18:00. The dialog sets at
+most one switch-on time and one shut-down time (either may be left out) for a
+set of weekdays, in the controller's time zone, for every client computer;
+**Save** replaces the schedule and **Clear** removes it. It is an operational
+aid like blocking the Internet, not laboratory configuration: it takes no
+review token and changes no system, and `nixorium schedule show`, `set --on
+HH:MM --off HH:MM --days mon-fri|all|<list>`, `clear` and `--json` do the same
+for the teacher and the administrator, through the classroom service's typed
+`schedule-get` and `schedule-set` operations. The schedule is
+`/var/lib/nixorium/classroom/schedule.json` (`{"schemaVersion":1,"on":"07:50",
+"off":"18:00","days":["mon",…,"fri"],"lastRun":"2026-10-15T07:50"}`), beside
+the learned addresses: the service's own state directory, replaced
+atomically with mode 0600 under a lock, and a missing or damaged file reads as
+"no schedule". It is not in Git or in the backup, so set it again after
+replacing the controller. `nixorium-classroom-schedule.timer` starts
+`nixorium schedule run` every minute as `admin`, the classroom service's user
+(the service does not start while the file is missing). In a minute the
+schedule names, the run sends the ordinary Switch on to every client, which
+skips the computers already on and those with no known address yet, or the
+ordinary reviewed shut-down with the `skip-active` session policy: a computer
+someone is using, or whose session state cannot be read, is left on, both in
+the review and in the check just before each request, and the usual client
+operation lock and installation checks apply. The minute is recorded as
+`lastRun` under the lock before anything is sent, so no minute runs twice;
+a minute in which the controller was off is not made up afterwards. A run
+prints one line per computer and a summary to the journal of
+`nixorium-classroom-schedule.service`, adds a `schedule-run` record with counts
+only to the operation history, and prints nothing when nothing is due. The
+computers must allow waking from the network, as for Switch on.
+
 **Lock** asks the agent to have the bundled Shell extension cover the whole
 screen with "Eyes on the teacher" and take the keyboard and mouse (a modal
 grab); the extension offers this only on the session bus. A locked computer

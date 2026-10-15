@@ -759,6 +759,15 @@ release is not finished until the site follows it.
   never from a request, `lab-settings.json` or Git. Send only unprivileged
   UDP to port 9 (lab broadcast and 255.255.255.255), open no port, and never
   report a sent packet as a computer that started.
+  The schedule (`schedule-get`/`schedule-set`, `nixorium schedule`, **Power →
+  Schedule…**) is an operational aid, not laboratory configuration: it lives
+  only in `schedule.json` in the same state directory (mode 0600, atomic,
+  damaged reads as none), never in `lab-settings.json`, Git or the backup.
+  `nixorium-classroom-schedule.timer` runs `nixorium schedule run` as the
+  service user; it claims the minute in the file before acting, so a minute
+  never runs twice, switches on with the ordinary wake operation and shuts
+  down with the reviewed shutdown under the `skip-active` policy, which never
+  interrupts a person: a session in use or unknown stays on.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet
   lock. Recheck authenticated boot ID and state before every fixed helper

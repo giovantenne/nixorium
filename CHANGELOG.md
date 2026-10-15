@@ -62,6 +62,21 @@ The project follows [Semantic Versioning](https://semver.org/).
   review token; `--into <folder>` collects into another existing folder.
   Update the student computers first: one that is not updated is listed as
   not able to collect yet.
+- **Schedule** switches the student computers on and off by themselves, at
+  most one switch-on time and one shut-down time for a set of weekdays, for
+  example on at 07:50 and off at 18:00 from Monday to Friday, in the
+  controller's time zone. Set it in the classroom view (**Power → Schedule…**,
+  with **Save** and **Clear**) or in a terminal, as the teacher or the
+  administrator: `nixorium schedule set --on 07:50 --off 18:00 --days mon-fri`,
+  `nixorium schedule show`, `nixorium schedule clear`. A timer on the
+  controller (`nixorium-classroom-schedule.timer`) runs it every minute: the
+  switch-on is the ordinary **Switch on** (computers without a known network
+  address are skipped), and the shut-down never interrupts a person, since a
+  computer that someone is using, or whose session cannot be read, stays on.
+  Each run leaves a line in the operation history and the journal. The
+  schedule lives on the controller only, outside the configuration and the
+  backup: set it again after replacing the controller. The computers must
+  allow waking from the network, as for **Switch on**.
 
 ### Changed
 
