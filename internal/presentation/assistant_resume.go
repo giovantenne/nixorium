@@ -137,11 +137,20 @@ func (model dashboardModel) updateAssistantResumeKey(key tea.KeyPressMsg) (tea.M
 	}
 	if model.assistant.state == "history" {
 		switch key.String() {
+		case "up", "k":
+			return model.scrollAssistantHistory(1), nil
+		case "down", "j":
+			return model.scrollAssistantHistory(-1), nil
 		case "pgup":
 			return model.scrollAssistantHistory(4), nil
 		case "pgdown":
 			return model.scrollAssistantHistory(-4), nil
-		case "up", "down", "tab":
+		case "home":
+			return model.scrollAssistantHistory(1 << 30), nil
+		case "end":
+			model.assistant.historyScroll = 0
+			return model, nil
+		case "tab", "shift+tab", "left", "right":
 			model.assistant.readOnlyCursor = 1 - model.assistant.readOnlyCursor
 		case "enter":
 			if model.assistant.readOnlyCursor == 1 {

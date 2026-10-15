@@ -89,7 +89,7 @@ func TestAssistantResumeCurrentAndReadOnlyNeverOpenTurn(t *testing.T) {
 						t.Fatal("readonly action", key)
 					}
 				}
-				updated, _ = m.Update(keyPress("down"))
+				updated, _ = m.Update(keyPress("tab"))
 				m = updated.(dashboardModel)
 				updated, cmd = m.Update(keyPress("enter"))
 				m = updated.(dashboardModel)
@@ -158,6 +158,66 @@ func TestAssistantResumePrefillDatesAndLayouts(t *testing.T) {
 				t.Fatal("history cannot scroll")
 			}
 		}
+	}
+}
+
+func TestAssistantReadOnlyHistoryKeysScrollAndChoose(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("history keys use the network") })
+	m.width, m.height = 100, 30
+	m.assistant.state = "history"
+	m.assistant.readOnlyHistory.Messages = []domain.AssistantMessage{{Role: "assistant", Content: strings.Repeat("History line\n", 80)}}
+	press := func(key string) {
+		t.Helper()
+		updated, cmd := m.Update(keyPress(key))
+		if cmd != nil {
+			t.Fatal("history key started a command", key)
+		}
+		m = updated.(dashboardModel)
+	}
+	press("up")
+	if m.assistant.historyScroll != 1 || m.assistant.readOnlyCursor != 0 {
+		t.Fatal("up must scroll without moving the choice", m.assistant.historyScroll, m.assistant.readOnlyCursor)
+	}
+	press("k")
+	press("up")
+	if m.assistant.historyScroll != 3 {
+		t.Fatal("up and k scroll one line", m.assistant.historyScroll)
+	}
+	press("down")
+	press("j")
+	if m.assistant.historyScroll != 1 || m.assistant.readOnlyCursor != 0 {
+		t.Fatal("down and j scroll back", m.assistant.historyScroll, m.assistant.readOnlyCursor)
+	}
+	press("pgup")
+	if m.assistant.historyScroll != 5 {
+		t.Fatal("pgup scrolls four lines", m.assistant.historyScroll)
+	}
+	press("home")
+	top := m.assistant.historyScroll
+	if top <= 5 {
+		t.Fatal("home goes to the top", top)
+	}
+	press("up")
+	if m.assistant.historyScroll != top {
+		t.Fatal("scrolling stops at the top")
+	}
+	press("end")
+	if m.assistant.historyScroll != 0 {
+		t.Fatal("end goes to the bottom")
+	}
+	press("down")
+	if m.assistant.historyScroll != 0 || m.assistant.readOnlyCursor != 0 {
+		t.Fatal("down at the bottom changes nothing")
+	}
+	for _, key := range []string{"tab", "left", "right", "shift+tab"} {
+		before := m.assistant.readOnlyCursor
+		press(key)
+		if m.assistant.readOnlyCursor != 1-before || m.assistant.historyScroll != 0 {
+			t.Fatal("choice key", key)
+		}
+	}
+	if !strings.Contains(ansi.Strip(m.View().Content), "↑/↓ PgUp/PgDn scroll · Tab choose · Enter select · Esc back") {
+		t.Fatal("history hint")
 	}
 }
 

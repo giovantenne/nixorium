@@ -32,6 +32,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   line asks "Mark this update as reviewed? [y/N]"; `--yes` still skips it.
 - `nixorium deploy apply` prints what to do when the update needs a review.
 
+### Fixed
+
+- In a resumed Assistant chat that is read-only, the arrow keys now scroll the
+  conversation; Tab chooses between continuing in a new chat and going back.
+
 ### Documentation
 
 - The troubleshooting guide has a new section, "Computer not reachable", for a

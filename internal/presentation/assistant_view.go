@@ -506,7 +506,7 @@ func (model dashboardModel) assistantChatView() string {
 	body = lipgloss.NewStyle().Height(capacity).Render(body)
 	hint := assistantInputHint
 	if model.assistant.state == "history" {
-		hint = "Enter select · Esc back · PgUp/PgDn scroll"
+		hint = "↑/↓ PgUp/PgDn scroll · Tab choose · Enter select · Esc back"
 	}
 	return lipgloss.NewStyle().Padding(1, 2).Render(model.assistantHeader(width) + "\n\n" + body + "\n" + fixedText + "\n" + tuiMuted(hint, model.isDark))
 }

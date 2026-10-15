@@ -445,7 +445,8 @@ A conversation based on the current configuration continues normally; use
 **Ctrl+R** to review its unsaved proposal. Saved conversations and those based
 on an older configuration open as read-only history. Choose **Continue in a
 new chat** to prepare a new chat on the current configuration, or **Back** to
-return to the list. Continuing fills the input with the previous title and up
+return to the list. The arrows, PgUp/PgDn, Home and End scroll the conversation,
+and Tab chooses between the two. Continuing fills the input with the previous title and up
 to 600 characters of the last final answer, leaving a blank line for your
 request. It does not send the text. Older conversations use the last nonempty
 assistant message without tool calls; when absent, only the title is filled.
