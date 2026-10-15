@@ -11,8 +11,8 @@
 # restarts after one second however it ends, and neither runs out of start
 # attempts. This is a classroom aid, not a security boundary: a student can
 # still mask a unit or freeze the process, and loses that at the next boot,
-# when the home directory is reset. While the agent is down the teacher's
-# card says "Monitoring stopped on this PC". NixOS does not restart a unit
+# when the home directory is reset. While the agent is down or frozen the
+# teacher's card says "Monitoring stopped on this PC". NixOS does not restart a unit
 # that refuses a manual stop when an update changes it, so the new agent
 # starts at the next sign-in.
 let

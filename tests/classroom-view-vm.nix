@@ -162,6 +162,15 @@ pkgs.testers.runNixOSTest {
     client.wait_until_succeeds(f"pid=$(systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent); test \"$pid\" != 0 -a \"$pid\" != {old_pid}", timeout=30)
     client.wait_until_succeeds("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1'", timeout=30)
 
+    # A frozen agent (SIGSTOP) keeps its socket but answers nothing: the relay
+    # gives up on it within seconds and says no-agent, never "off", and it
+    # works again after SIGCONT.
+    frozen = client.succeed("systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent").strip()
+    client.succeed(f"kill -STOP {frozen}")
+    client.succeed("(timeout 30 ${agent} probe nixorium-classroom-connect || true) | grep -F 'code=no-agent'")
+    client.succeed(f"kill -CONT {frozen}")
+    client.wait_until_succeeds("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1'", timeout=30)
+
     # While the agent does not answer (its socket is gone) the controller gets
     # a clear error, not a hang: the card says "Monitoring stopped on this PC".
     client.succeed("rm /run/user/1000/nixorium-classroom.sock")

@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -52,9 +53,9 @@ func main() {
 			err = errors.New("connect must run as root")
 			break
 		}
-		// The relay lives as long as the controller's channel: it ends when
-		// the channel closes, so only the loginctl calls and the dial of the
-		// agent socket have their own deadlines.
+		// The relay lives as long as the controller's channel and ends soon
+		// after it closes; loginctl, the dial and the first hello of the
+		// agent have their own deadlines (see connect).
 		err = connect(context.Background(), os.Stdin, os.Stdout, loginctl, "/run/user")
 	case "probe":
 		ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
@@ -388,12 +389,18 @@ func thumbnailReply(capture capturer, width int, since int64) classroomview.Mess
 // commandRunner runs loginctl with fixed arguments and returns its output.
 type commandRunner func(ctx context.Context, arguments ...string) (string, error)
 
-// loginctlTimeout and dialTimeout keep a stuck loginctl or a frozen agent
-// from holding the controller's channel: the controller then sees the
-// failure instead of waiting.
+// Deadlines that keep a stuck loginctl or a frozen agent from holding the
+// controller's channel: the controller then sees the failure instead of
+// waiting. helloTimeout is how long an agent has to answer the relay's own
+// hello before it counts as stopped; relayGrace is how long the agent has to
+// finish after the controller closed its side; relayWriteTimeout bounds one
+// write to an agent that stopped reading.
 var (
-	loginctlTimeout = 10 * time.Second
-	dialTimeout     = 5 * time.Second
+	loginctlTimeout   = 10 * time.Second
+	dialTimeout       = 5 * time.Second
+	helloTimeout      = 3 * time.Second
+	relayGrace        = 5 * time.Second
+	relayWriteTimeout = 30 * time.Second
 )
 
 func loginctl(ctx context.Context, arguments ...string) (string, error) {
@@ -453,6 +460,10 @@ func agentSocket(runtimeBase string, uid int) (string, error) {
 
 // connect relays the controller's stream to the active session's agent. A
 // failure is reported as a protocol error message so the controller can show it.
+// An agent whose socket exists but that does not answer a hello within a few
+// seconds (stopped with SIGSTOP, or hung) is reported as no-agent, like a
+// missing socket, and the relay never outlives the controller's channel by
+// more than a few seconds, even when the agent is frozen.
 func connect(ctx context.Context, input io.Reader, output io.Writer, run commandRunner, runtimeBase string) error {
 	uid, err := activeSeatUser(ctx, run)
 	if err != nil {
@@ -467,13 +478,79 @@ func connect(ctx context.Context, input io.Reader, output io.Writer, run command
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: "the classroom agent does not answer"})
 	}
 	defer connection.Close()
+	reply, err := agentHello(connection)
+	if err != nil {
+		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: "the classroom agent does not answer"})
+	}
+	if reply.Type != classroomview.TypeHello {
+		// The agent refuses (too many channels, for example) and closes the
+		// connection: the controller gets the refusal itself.
+		return classroomview.Write(output, reply)
+	}
+	return relay(input, output, connection)
+}
+
+// agentHello asks the agent for its hello within helloTimeout. The controller
+// sends its own hello afterwards through the same connection.
+func agentHello(connection net.Conn) (classroomview.Message, error) {
+	_ = connection.SetDeadline(time.Now().Add(helloTimeout))
+	defer connection.SetDeadline(time.Time{})
+	if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+		return classroomview.Message{}, err
+	}
+	return classroomview.Read(connection)
+}
+
+// relay copies between the controller and the agent until either side ends.
+// When the controller closes its side the agent gets relayGrace to finish; a
+// write that cannot complete within relayWriteTimeout closes the connection.
+func relay(input io.Reader, output io.Writer, connection net.Conn) error {
+	grace, writeTimeout := relayGrace, relayWriteTimeout
+	finished := make(chan struct{})
+	defer close(finished)
+	var lingered atomic.Bool
+	inputDone := make(chan struct{})
 	go func() {
-		_, _ = io.Copy(connection, input)
+		defer close(inputDone)
+		buffer := make([]byte, 32<<10)
+		for {
+			count, readErr := input.Read(buffer)
+			if count > 0 {
+				_ = connection.SetWriteDeadline(time.Now().Add(writeTimeout))
+				if _, err := connection.Write(buffer[:count]); err != nil {
+					lingered.Store(true)
+					_ = connection.Close()
+					return
+				}
+			}
+			if readErr != nil {
+				break
+			}
+		}
 		if unix, ok := connection.(*net.UnixConn); ok {
 			_ = unix.CloseWrite()
 		}
 	}()
-	_, err = io.Copy(output, connection)
+	go func() {
+		select {
+		case <-inputDone:
+		case <-finished:
+			return
+		}
+		timer := time.NewTimer(grace)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+			lingered.Store(true)
+			_ = connection.Close()
+		case <-finished:
+		}
+	}()
+	_, err := io.Copy(output, connection)
+	if lingered.Load() {
+		// The relay ended the connection itself: nothing is left to report.
+		return nil
+	}
 	return err
 }
 

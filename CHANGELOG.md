@@ -72,7 +72,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   "Monitoring stopped on this PC" instead of just dimming, and the same words
   explain why Lock, Send files, Share screen, Collect from desktop and Save
   screenshot skipped that computer; the result notice counts it apart. A
-  computer waiting at the login screen still says "Nobody is signed in".
+  computer waiting at the login screen still says "Nobody is signed in". A
+  classroom view that is frozen rather than stopped is reported the same way,
+  and a frozen one no longer keeps its connection open on the computer after
+  the controller has gone.
   This is a classroom aid, not a security boundary: a student who masks the
   unit gets the classroom view back at the next restart, because the home
   folder is reset then. An update no longer restarts the classroom view on a

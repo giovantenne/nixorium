@@ -358,7 +358,8 @@ the summary says **Reconnecting…**. **Refresh** asks at once, closes the
 notice of the last action and draws every card again.
 
 A computer that answers over SSH with someone signed in, but whose agent does
-not answer, shows a warning sign over its dimmed last picture and **Monitoring
+not answer (the socket is missing, or the agent is frozen and gives no answer
+to the relay's own hello within 3 seconds), shows a warning sign over its dimmed last picture and **Monitoring
 stopped on this PC**. The login screen does not count as someone signed in
 (only a session of class `user` does), so a computer waiting at it says
 **Nobody is signed in**. The same words explain the computer wherever an
@@ -371,8 +372,10 @@ classroom user units refuse a manual stop (`RefuseManualStop`), so
 back within seconds; the card returns to the live picture. The Shell
 extension helper is a one-shot unit, which systemd restarts only after a
 failure. This is a classroom aid, not a security boundary: a student can still
-mask a unit or freeze the process, and loses that at the next boot, when the
-home is reset. Because the units refuse a manual stop, an update does not
+mask a unit or freeze the process (which the card reports, but nothing
+revives), and loses that at the next boot, when the home is reset. The relay
+never outlives the controller's channel by more than 5 seconds, even when the
+agent is frozen. Because the units refuse a manual stop, an update does not
 restart them either: the new agent starts at the next sign-in.
 
 Clicking a computer opens it in its own browser window, refreshed about ten
