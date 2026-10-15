@@ -34,7 +34,20 @@ type LabMeta struct {
 		ClientInterface string `json:"clientIfaceName,omitempty"`
 		CachePort       int    `json:"cachePort"`
 		PXEHTTPPort     int    `json:"pxeHttpPort"`
+		// Transition is present only during a change of laboratory network.
+		Transition *NetworkTransitionMeta `json:"transition,omitempty"`
 	} `json:"network"`
+}
+
+// NetworkTransitionMeta describes the previous laboratory network during a
+// change of laboratory network: the controller still carries ControllerIP and
+// each client's previous address is listed by name.
+type NetworkTransitionMeta struct {
+	Base         string     `json:"base"`
+	PrefixLength int        `json:"prefixLength"`
+	ControllerIP string     `json:"controllerIp"`
+	StartedAt    string     `json:"startedAt"`
+	Clients      []HostMeta `json:"clients"`
 }
 
 type HostMeta struct {

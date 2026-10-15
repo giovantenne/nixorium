@@ -117,6 +117,25 @@
       clientNetworkUpgradeVmTest = pkgs.testers.runNixOSTest (import ./tests/client-network-upgrade-vm.nix {
         networkingModule = ./modules/networking.nix;
       });
+      networkTransitionVmTest = pkgs.testers.runNixOSTest (import ./tests/network-transition-vm.nix {
+        transitionLab = mkLab {
+          deploymentSelf = self;
+          labConfig = (import ./lab-config.nix) // {
+            networkBase = "10.1.0.0";
+            pcCount = 1;
+            ifaceName = "eth1";
+            networkTransition = {
+              previousBase = "10.0.0.0";
+              previousPrefixLength = 24;
+              startedAt = "2026-10-15T08:00:00Z";
+            };
+          };
+          publicKeys = {
+            cache = ./tests/fixtures/remote-vm-cache-public-key;
+            ssh = ./tests/fixtures/remote-vm-admin.pub;
+          };
+        };
+      });
       remoteInstallerDeploymentRevision = "0123456789abcdef0123456789abcdef01234567";
       remoteInstallerTestLab = mkLab {
         deploymentSelf = self;
@@ -244,6 +263,7 @@
         client-installer-vm = clientInstallerVmTest;
         remote-client-installer-vm = remoteClientInstallerVmTest;
         client-network-upgrade-vm = clientNetworkUpgradeVmTest;
+        network-transition-vm = networkTransitionVmTest;
         management-vm = managementVmTest;
         assistant-vm = assistantVmTest;
         host-diagnostics-vm = hostDiagnosticsVmTest;

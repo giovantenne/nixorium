@@ -10,6 +10,14 @@ let
   ifaceExplicit = labSettings.ifaceExplicit or true;
   byType = laboratoryEnabled && !isController && !ifaceExplicit;
   prefixLength = labSettings.networkPrefixLength;
+  # During a change of laboratory network the controller also keeps its
+  # previous address on the laboratory interface, so computers not yet moved
+  # still reach it. Clients take only the new address.
+  transition = labSettings.networkTransition or null;
+  previousControllerAddress = lib.optional (isController && transition != null) {
+    address = transition.masterIp;
+    prefixLength = transition.prefixLength;
+  };
 in
 {
   networking.hostName = hostName;
@@ -22,7 +30,7 @@ in
           address = hostIp;
           prefixLength = prefixLength;
         }
-      ];
+      ] ++ previousControllerAddress;
     };
   };
 
