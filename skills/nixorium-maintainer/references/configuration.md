@@ -30,6 +30,8 @@ reset policy and SSH trust are operator-controlled. Do not change them here.
 A controller DHCP hint must not overlap the static laboratory prefix. On
 supporting pins, saved clients prevent managed changes to subnet, prefix and
 controller host number. Never remove clients or edit JSON to bypass this.
+A `lab.networkTransition` record belongs to the guided change of the
+laboratory network; never propose adding, editing or removing it.
 There is no assumed guided network migration capability; the refusal code is
 `NETWORK-LOCKED`.
 

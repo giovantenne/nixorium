@@ -36,14 +36,18 @@ The project follows [Semantic Versioning](https://semver.org/).
   controller's current DHCP addresses, with the saved value preselected;
   Other… still accepts a typed address, with a warning when the controller
   does not have it. The command line is unchanged.
+- Nixorium can run the laboratory on two networks at once while the computers
+  move from the old one to the new one; the guided change of the laboratory
+  network builds on it.
 
 ### Changed
 
 - Changing the laboratory network address, prefix length or controller number
   while computers are configured is refused with a clearer message and the new
   situation code `NETWORK-LOCKED`: the computers would keep their old addresses
-  and lose the controller; a guided change of the laboratory network is
-  planned, until then keep the saved value.
+  and lose the controller. The message points to the guided change of the
+  laboratory network (Maintenance → Change network addressing); the controller
+  number stays locked.
 
 - The review of an Assistant proposal reuses the evaluation Assistant already
   ran when nothing changed since, instead of evaluating the laboratory a second

@@ -537,8 +537,15 @@ release is not finished until the site follows it.
   `networkPrefixLength` and `masterHostNumber` when the saved client count is
   nonzero, both in planning and before writing a reviewed candidate. Reducing
   the candidate count must not bypass this rule. This is separate from schema
-  validation and does not implement network migration; the refusal is the
-  `NETWORK-LOCKED` situation. Interface reviews must
+  validation; the refusal is the `NETWORK-LOCKED` situation. The only
+  exception is a change of laboratory network: a base/prefix change whose
+  candidate `lab.networkTransition` names exactly the saved base/prefix (and,
+  while a record is saved, only a return to its previous network). The record
+  makes the configuration dual (controller on both addresses, clients trusting
+  both controller addresses, new cache first); without it every host must stay
+  byte-identical to the single-network configuration. Without clients it is
+  ignored with a warning in Nix and refused by the Go validator. The
+  controller number stays locked. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first
   order for network changes. Device-name and DHCP-hint changes get a read-only
   network preflight in the plan (`networkPreflight`): `/sys/class/net` plus

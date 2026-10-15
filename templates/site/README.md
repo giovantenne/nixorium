@@ -104,9 +104,12 @@ review the controller update. The number must be greater than `pcCount` and fit
 inside the subnet. Once clients are configured, managed settings block changes
 to this number, the static network address and its prefix: installed clients
 would retain their previous network settings. The refusal carries the code
-`NETWORK-LOCKED`: a guided change of the laboratory network is planned; until
-then keep the saved values, and do not reduce the client count to bypass the
-block.
+`NETWORK-LOCKED`: keep the saved values in Settings and move the computers with
+the guided change of the laboratory network (**Maintenance → Change network
+addressing**); do not reduce the client count to bypass the block. While such a
+change is in progress `lab-settings.json` holds a `lab.networkTransition`
+record with the previous network; it is managed by the guided change, so do not
+add, edit or remove it by hand.
 
 Changes to network devices remain available, and the review checks them before
 saving without changing any computer. For the controller's device it lists the
