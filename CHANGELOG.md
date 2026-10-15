@@ -27,6 +27,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 - The review of an Assistant proposal reuses the evaluation Assistant already
   ran when nothing changed since, instead of evaluating the laboratory a second
   time.
+- When an Assistant answer ends early because the service stream was cut off,
+  Assistant now says the service interrupted the answer and asks you to send
+  the message again, instead of asking you to update Nixorium. The reason for
+  any refused response is kept in a private per-chat record on the controller
+  and is never sent to the service.
 
 ## [3.7.0] - 2026-10-15
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,12 @@ type AssistantTurnRunner struct {
 	Version string
 	// Qualification only; production leaves it nil.
 	CoreOverride *domain.AssistantCore
+}
+
+// assistantProtocolFailure marks a response the controller refused, with a short
+// private reason.
+func assistantProtocolFailure(reason string) error {
+	return &domain.AssistantError{Code: "protocol_error", Detail: reason}
 }
 
 func assistantSafeText(text, token string) string {
@@ -113,6 +120,16 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 	if !accepted {
 		return result, &domain.AssistantError{Code: "consent_required"}
 	}
+	// Keep the reason a turn failed in the conversation's private record only;
+	// the transcript is sent to the service, so the detail never goes there.
+	defer func() {
+		var failure *domain.AssistantError
+		if recorder, ok := runner.Store.(interface {
+			RecordTurnError(domain.AssistantConversation, time.Time, string, string) error
+		}); ok && errors.As(runErr, &failure) && failure.Detail != "" {
+			_ = recorder.RecordTurnError(conversation, time.Now(), failure.Code, failure.Detail)
+		}
+	}()
 	messages, err := runner.Store.ReadTranscript(conversation)
 	if err != nil {
 		return result, err
@@ -231,8 +248,10 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			}
 		})
 		flushText(true)
-		if overflow || invalidService {
-			err = &domain.AssistantError{Code: "protocol_error"}
+		if overflow {
+			err = assistantProtocolFailure("text exceeds limit")
+		} else if invalidService {
+			err = assistantProtocolFailure("service_messages are not valid")
 		}
 		if err != nil {
 			if stepText != "" {
@@ -271,7 +290,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			return result, &domain.AssistantError{Code: terminal.Code}
 		case "tool_calls":
 			if len(terminal.Calls) == 0 {
-				return result, &domain.AssistantError{Code: "protocol_error"}
+				return result, assistantProtocolFailure("tool_calls event has no calls")
 			}
 			for _, call := range terminal.Calls {
 				known := false
@@ -281,7 +300,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 					}
 				}
 				if !known {
-					return result, &domain.AssistantError{Code: "protocol_error"}
+					return result, assistantProtocolFailure("unknown tool " + strconv.Quote(call.Name))
 				}
 			}
 			for i := range terminal.Calls {
@@ -302,7 +321,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 				return result, err
 			}
 		default:
-			return result, &domain.AssistantError{Code: "protocol_error"}
+			return result, assistantProtocolFailure("step ended without a terminal event")
 		}
 	}
 	return result, &domain.AssistantError{Status: 429, Code: "step_limit", Message: fmt.Sprintf("Assistant reached its limit of %d steps.", turn.Limits.Steps)}

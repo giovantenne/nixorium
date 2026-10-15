@@ -398,6 +398,9 @@ func TestAssistantRunnerServiceMessages(t *testing.T) {
 				if mode == "error" {
 					expected = "model_error"
 				}
+				if mode == "interrupted" {
+					expected = "service_interrupted"
+				}
 				if !errors.As(err, &failure) || failure.Code != expected || len(result.Messages) != 1 {
 					t.Fatal(result, err)
 				}

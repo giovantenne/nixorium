@@ -76,6 +76,7 @@ type assistantModel struct {
 	conversation                 domain.AssistantConversation
 	account                      domain.AssistantAccount
 	accessError                  string
+	noticeDetail                 assistantNoticeDetailLine
 	offer                        domain.AssistantOffer
 	entries                      []assistantEntry
 	started                      time.Time
@@ -279,6 +280,7 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 		}
 		model.assistant.state = "chat"
 		model.message = model.assistantNotice(message.err)
+		model.assistant.noticeDetail = assistantNoticeDetail(model.message, message.err)
 		var serviceError *domain.AssistantError
 		if errors.As(message.err, &serviceError) {
 			model.assistant.noteAccessError(serviceError.Code)
@@ -536,6 +538,7 @@ func (model dashboardModel) finishAssistantAccount(message assistantAccountMsg) 
 	}
 	if message.err != nil && model.message == "" {
 		model.message = model.assistantNotice(message.err)
+		model.assistant.noticeDetail = assistantNoticeDetail(model.message, message.err)
 	}
 	cmd := model.scheduleAssistantAccountTick()
 	return model, cmd

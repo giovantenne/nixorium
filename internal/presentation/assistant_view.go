@@ -481,6 +481,9 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 		} else {
 			lines = append(lines, model.assistantBox("! "+model.message, width, tuiStatusAttention))
 		}
+		if detail := model.assistant.noticeDetail; detail.detail != "" && detail.message == model.message {
+			lines = append(lines, tuiMuted("  "+detail.detail, model.isDark))
+		}
 	}
 	body := lipgloss.NewStyle().Width(width).Render(assistantLinkify(strings.Join(lines, "\n")))
 	bodyLines = strings.Split(body, "\n")

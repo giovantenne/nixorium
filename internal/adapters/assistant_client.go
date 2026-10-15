@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,18 +30,64 @@ var assistantUpgradeSignaturePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 var assistantShortUpgradePathPattern = regexp.MustCompile(`^/u/[A-Za-z0-9_-]{40}$`)
 var assistantClientVersionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$`)
 
-func assistantProtocolError() error {
-	return &domain.AssistantError{Code: "protocol_error", Message: "The Assistant service returned an invalid response."}
+// assistantProtocolError reports data the client refuses to accept. The reason
+// is a short, specific, private diagnostic for the controller; it is never sent
+// to the service.
+func assistantProtocolError(reason string) error {
+	return &domain.AssistantError{Code: "protocol_error", Message: "The Assistant service returned an invalid response.", Detail: assistantErrorDetail(reason)}
 }
 
-func assistantDecodeStrict(data []byte, target any) error {
+// assistantInterruptedError reports a stream that ended before the answer was
+// complete. It is a service interruption, not invalid data.
+func assistantInterruptedError(reason string) error {
+	return &domain.AssistantError{Code: "service_interrupted", Message: "The Assistant service interrupted the answer. Send the message again.", Detail: assistantErrorDetail(reason)}
+}
+
+// assistantErrorDetail keeps a reason short and printable: it may quote a field
+// name chosen by the service.
+func assistantErrorDetail(reason string) string {
+	var out []rune
+	for _, r := range reason {
+		if r < ' ' || r == 0x7f || (r >= 0x80 && r < 0xa0) {
+			r = '?'
+		}
+		out = append(out, r)
+		if len(out) == 160 {
+			break
+		}
+	}
+	return string(out)
+}
+
+// assistantDecodeReason returns "" when data is exactly one JSON value that fits
+// target without unknown fields, otherwise a short reason.
+func assistantDecodeReason(data []byte, target any) string {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
-		return assistantProtocolError()
+		var typeError *json.UnmarshalTypeError
+		var syntaxError *json.SyntaxError
+		switch {
+		case strings.HasPrefix(err.Error(), "json: unknown field "):
+			return "unexpected field " + strings.TrimPrefix(err.Error(), "json: unknown field ")
+		case errors.As(err, &typeError) && typeError.Field != "":
+			return "field " + typeError.Field + " has the wrong type"
+		case errors.As(err, &typeError):
+			return "value has the wrong type"
+		case errors.As(err, &syntaxError), errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+			return "malformed JSON"
+		}
+		return "JSON does not match the expected shape"
 	}
 	if decoder.Decode(&struct{}{}) != io.EOF {
-		return assistantProtocolError()
+		return "extra data after the JSON value"
+	}
+	return ""
+}
+
+func assistantDecodeStrict(data []byte, target any) error {
+	if reason := assistantDecodeReason(data, target); reason != "" {
+		return assistantProtocolError(reason)
 	}
 	return nil
 }
@@ -50,7 +98,7 @@ func (client AssistantClient) request(ctx context.Context, method, path, token s
 	if body != nil {
 		data, err = json.Marshal(body)
 		if err != nil {
-			return nil, assistantProtocolError()
+			return nil, assistantProtocolError("request body cannot be encoded")
 		}
 		if len(data) > 2000000 {
 			return nil, &domain.AssistantError{Status: 413, Code: "request_too_large"}
@@ -58,7 +106,7 @@ func (client AssistantClient) request(ctx context.Context, method, path, token s
 	}
 	request, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(client.Endpoint, "/")+path, bytes.NewReader(data))
 	if err != nil {
-		return nil, assistantProtocolError()
+		return nil, assistantProtocolError("request cannot be built")
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
@@ -108,7 +156,7 @@ func assistantResponse(response *http.Response, expected int, target any) error 
 		return err
 	}
 	if len(data) > 65536 {
-		return assistantProtocolError()
+		return assistantProtocolError("response body exceeds 64 KiB")
 	}
 	if response.StatusCode != expected {
 		var wire struct {
@@ -117,8 +165,11 @@ func assistantResponse(response *http.Response, expected int, target any) error 
 				Message string `json:"message"`
 			} `json:"error"`
 		}
-		if assistantDecodeStrict(data, &wire) != nil || wire.Error.Code == "" {
-			return assistantProtocolError()
+		if reason := assistantDecodeReason(data, &wire); reason != "" {
+			return assistantProtocolError("error response: " + reason)
+		}
+		if wire.Error.Code == "" {
+			return assistantProtocolError("error response has no code")
 		}
 		return &domain.AssistantError{Status: response.StatusCode, Code: wire.Error.Code, Message: wire.Error.Message}
 	}
@@ -143,7 +194,7 @@ func (client AssistantClient) Activate(ctx context.Context, code string) (domain
 	}
 	if !assistantTokenPattern.MatchString(result.Token) || result.Account.Name == "" || result.Account.Plan == "" || result.Account.PeriodEnd == "" ||
 		!validAssistantTrialRequests(result.Account) {
-		return domain.AssistantActivation{}, assistantProtocolError()
+		return domain.AssistantActivation{}, assistantProtocolError("activation response has an invalid token or account")
 	}
 	return result, nil
 }
@@ -163,9 +214,11 @@ func (client AssistantClient) Offer(ctx context.Context) (domain.AssistantOffer,
 			(link.Scheme == "https" || (link.Scheme == "http" && (link.Hostname() == "localhost" || link.Hostname() == "127.0.0.1")))
 	}
 	if offer.TrialRequests < 1 || offer.TrialRequests > domain.AssistantTrialRequestsMax ||
-		offer.TrialDays < 0 || offer.TrialDays > domain.AssistantTrialDaysMax ||
-		!validLink(offer.TrialURL) || !validLink(offer.SubscribeURL) {
-		return domain.AssistantOffer{}, assistantProtocolError()
+		offer.TrialDays < 0 || offer.TrialDays > domain.AssistantTrialDaysMax {
+		return domain.AssistantOffer{}, assistantProtocolError("offer out of range")
+	}
+	if !validLink(offer.TrialURL) || !validLink(offer.SubscribeURL) {
+		return domain.AssistantOffer{}, assistantProtocolError("offer link is not valid")
 	}
 	return offer, nil
 }
@@ -186,13 +239,13 @@ func (client AssistantClient) Account(ctx context.Context, token string) (domain
 
 func (client AssistantClient) checkedAccount(account domain.AssistantAccount) (domain.AssistantAccount, error) {
 	if account.Status != "active" && account.Status != "inactive" {
-		return domain.AssistantAccount{}, assistantProtocolError()
+		return domain.AssistantAccount{}, assistantProtocolError("account status is not active or inactive")
 	}
 	if account.UpgradeURL != "" && (account.Plan != "trial" || !client.validUpgradeURL(account.UpgradeURL)) {
-		return domain.AssistantAccount{}, assistantProtocolError()
+		return domain.AssistantAccount{}, assistantProtocolError("account upgrade link is not valid")
 	}
 	if !validAssistantTrialRequests(account) {
-		return domain.AssistantAccount{}, assistantProtocolError()
+		return domain.AssistantAccount{}, assistantProtocolError("account trial allowance is out of range")
 	}
 	return account, nil
 }
@@ -258,7 +311,7 @@ func (client AssistantClient) BillingPortal(ctx context.Context, token string) (
 	}
 	link, err := url.Parse(wire.URL)
 	if err != nil || link.Scheme != "https" || link.Host != "billing.stripe.com" || link.User != nil || link.Fragment != "" || link.Opaque != "" {
-		return "", assistantProtocolError()
+		return "", assistantProtocolError("billing portal link is not valid")
 	}
 	return wire.URL, nil
 }
@@ -279,15 +332,18 @@ func (client AssistantClient) OpenTurn(ctx context.Context, token string) (domai
 	if err = assistantResponse(response, 201, &result); err != nil {
 		return domain.AssistantTurn{}, err
 	}
-	if !assistantTurnPattern.MatchString(result.TurnID) || result.Limits.Steps < 1 || result.Limits.Steps > 24 || result.Limits.Seconds < 1 || result.Limits.Seconds > 900 || result.Limits.MaxRequestBytes < 1 || result.Limits.MaxRequestBytes > 2000000 {
-		return domain.AssistantTurn{}, assistantProtocolError()
+	if !assistantTurnPattern.MatchString(result.TurnID) {
+		return domain.AssistantTurn{}, assistantProtocolError("turn id is not valid")
+	}
+	if result.Limits.Steps < 1 || result.Limits.Steps > 24 || result.Limits.Seconds < 1 || result.Limits.Seconds > 900 || result.Limits.MaxRequestBytes < 1 || result.Limits.MaxRequestBytes > 2000000 {
+		return domain.AssistantTurn{}, assistantProtocolError("turn limits out of range")
 	}
 	return result, nil
 }
 
 func (client AssistantClient) Cancel(ctx context.Context, token, turnID string) error {
 	if !assistantTurnPattern.MatchString(turnID) {
-		return assistantProtocolError()
+		return assistantProtocolError("turn id is not valid")
 	}
 	response, err := client.request(ctx, "POST", "/turns/"+turnID+"/cancel", token, nil, 15*time.Second)
 	if err != nil {
@@ -298,7 +354,7 @@ func (client AssistantClient) Cancel(ctx context.Context, token, turnID string) 
 
 func (client AssistantClient) Step(ctx context.Context, token, turnID string, request domain.AssistantStepRequest, emit func(domain.AssistantEvent)) error {
 	if !assistantTurnPattern.MatchString(turnID) {
-		return assistantProtocolError()
+		return assistantProtocolError("turn id is not valid")
 	}
 	response, err := client.request(ctx, "POST", "/turns/"+turnID+"/steps", token, request, 5*time.Minute)
 	if err != nil {
@@ -309,9 +365,15 @@ func (client AssistantClient) Step(ctx context.Context, token, turnID string, re
 	}
 	defer response.Body.Close()
 	if strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0]) != "text/event-stream" {
-		return assistantProtocolError()
+		return assistantProtocolError("content-type is not text/event-stream")
 	}
-	return parseAssistantSSE(response.Body, emit)
+	err = parseAssistantSSE(response.Body, emit)
+	var serviceError *domain.AssistantError
+	if errors.As(err, &serviceError) && serviceError.Code == "service_interrupted" && errors.Is(ctx.Err(), context.Canceled) {
+		// The user (or the runner) cancelled the request: not a service interruption.
+		return assistantProtocolError("request cancelled")
+	}
+	return err
 }
 
 type assistantCountingReader struct {
@@ -323,7 +385,7 @@ func (reader *assistantCountingReader) Read(buffer []byte) (int, error) {
 	n, err := reader.source.Read(buffer)
 	reader.bytes += n
 	if reader.bytes > 4*1024*1024 {
-		return n, assistantProtocolError()
+		return n, assistantProtocolError("stream exceeds 4 MiB")
 	}
 	return n, err
 }
@@ -341,25 +403,28 @@ func parseAssistantSSE(source io.Reader, emit func(domain.AssistantEvent)) error
 			eventBytes = 0
 			return nil
 		}
-		if terminal || name == "" || data == "" {
-			return assistantProtocolError()
+		if terminal {
+			return assistantProtocolError("event after terminal")
+		}
+		if name == "" {
+			return assistantProtocolError("event without a name")
+		}
+		if data == "" {
+			return assistantProtocolError("event " + name + " has no data")
 		}
 		if serviceSeen && name != "tool_calls" && name != "final" && name != "error" {
-			return assistantProtocolError()
+			return assistantProtocolError("event " + name + " after service_messages")
 		}
 		event, err := decodeAssistantEvent(name, []byte(strings.TrimSuffix(data, "\n")))
 		if err != nil {
 			return err
 		}
 		if name == "service_messages" {
-			if serviceSeen {
-				return assistantProtocolError()
-			}
 			serviceSeen = true
 		}
 		textBytes += len(event.Delta) + len(event.Summary)
 		if textBytes > domain.AssistantTextLimit {
-			return assistantProtocolError()
+			return assistantProtocolError("text exceeds limit")
 		}
 		terminal = name == "tool_calls" || name == "final" || name == "error"
 		emit(event)
@@ -376,36 +441,46 @@ func parseAssistantSSE(source io.Reader, emit func(domain.AssistantEvent)) error
 		}
 		eventBytes += len(line) + 1
 		if eventBytes > 256*1024 {
-			return assistantProtocolError()
+			return assistantProtocolError("event exceeds 256 KiB")
 		}
 		if strings.HasPrefix(line, ":") {
 			continue
 		}
 		field, value, found := strings.Cut(line, ":")
 		if !found {
-			return assistantProtocolError()
+			return assistantProtocolError("line without a field")
 		}
 		value = strings.TrimPrefix(value, " ")
 		switch field {
 		case "event":
 			if name != "" {
-				return assistantProtocolError()
+				return assistantProtocolError("duplicate event name")
 			}
 			name = value
 		case "data":
 			data += value + "\n"
 		default:
-			return assistantProtocolError()
+			return assistantProtocolError("unknown stream field " + strconv.Quote(field))
 		}
 	}
-	if scanner.Err() != nil {
-		return assistantProtocolError()
+	if err := scanner.Err(); err != nil {
+		var serviceError *domain.AssistantError
+		switch {
+		case errors.As(err, &serviceError):
+			return err
+		case errors.Is(err, bufio.ErrTooLong):
+			return assistantProtocolError("event exceeds 256 KiB")
+		}
+		return assistantInterruptedError("stream read failed: " + err.Error())
 	}
 	if name != "" || data != "" {
-		return assistantProtocolError()
+		if terminal {
+			return assistantProtocolError("event after terminal")
+		}
+		return assistantInterruptedError("stream ended inside an event")
 	}
 	if !terminal {
-		return assistantProtocolError()
+		return assistantInterruptedError("stream ended before a terminal event")
 	}
 	return nil
 }
@@ -445,14 +520,14 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 			Message string `json:"message"`
 		}{}
 	default:
-		return event, assistantProtocolError()
+		return event, assistantProtocolError("unknown event name " + strconv.Quote(name))
 	}
-	if err := assistantDecodeStrict(data, target); err != nil {
-		return event, err
+	if reason := assistantDecodeReason(data, target); reason != "" {
+		return event, assistantProtocolError(name + " event: " + reason)
 	}
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(data, &fields) != nil {
-		return event, assistantProtocolError()
+		return event, assistantProtocolError(name + " event is not a JSON object")
 	}
 	required := map[string][]string{
 		"text": {"delta"}, "activity": {"text"}, "tool_calls": {"calls"}, "final": {"summary"},
@@ -462,7 +537,7 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 	for _, field := range required[name] {
 		value, exists := fields[field]
 		if !exists || string(value) == "null" {
-			return event, assistantProtocolError()
+			return event, assistantProtocolError(name + " event is missing field " + field)
 		}
 	}
 	// Decode again into the event payload only after its exact schema passed.
@@ -478,24 +553,27 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 		OutputTokens int
 	}
 	if json.Unmarshal(data, &payload) != nil {
-		return event, assistantProtocolError()
+		return event, assistantProtocolError(name + " event payload cannot be decoded")
 	}
 	event.Delta, event.Text, event.Calls, event.Summary, event.Code, event.Message, event.InputTokens, event.OutputTokens = payload.Delta, payload.Text, payload.Calls, payload.Summary, payload.Code, payload.Message, payload.InputTokens, payload.OutputTokens
 	event.Messages = payload.Messages
 	if name == "usage" && (event.InputTokens < 0 || event.OutputTokens < 0) {
-		return event, assistantProtocolError()
+		return event, assistantProtocolError("usage event has negative token counts")
 	}
 	if name == "error" && event.Code == "" {
-		return event, assistantProtocolError()
+		return event, assistantProtocolError("error event has an empty code")
 	}
 	if name == "tool_calls" {
 		if len(event.Calls) == 0 {
-			return event, assistantProtocolError()
+			return event, assistantProtocolError("tool_calls event has no calls")
 		}
 		ids := map[string]bool{}
 		for _, call := range event.Calls {
-			if call.ID == "" || ids[call.ID] {
-				return event, assistantProtocolError()
+			if call.ID == "" {
+				return event, assistantProtocolError("tool call without an id")
+			}
+			if ids[call.ID] {
+				return event, assistantProtocolError("duplicate tool call id")
 			}
 			ids[call.ID] = true
 			known := false
@@ -506,10 +584,10 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 				}
 			}
 			if !known {
-				return event, assistantProtocolError()
+				return event, assistantProtocolError("unknown tool " + strconv.Quote(call.Name))
 			}
 			if len(call.Arguments) == 0 {
-				return event, assistantProtocolError()
+				return event, assistantProtocolError("tool call " + call.Name + " has no arguments")
 			}
 		}
 	}
@@ -518,7 +596,7 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 
 func (client AssistantClient) ShareConversation(ctx context.Context, token, id string, payload domain.AssistantStepRequest) error {
 	if !assistantTurnPattern.MatchString(id) {
-		return assistantProtocolError()
+		return assistantProtocolError("conversation id is not valid")
 	}
 	response, err := client.request(ctx, "POST", "/conversations/"+id, token, payload, 15*time.Second)
 	if err != nil {
@@ -528,7 +606,7 @@ func (client AssistantClient) ShareConversation(ctx context.Context, token, id s
 }
 func (client AssistantClient) ReportConversation(ctx context.Context, token, id, rating, comment string, payload domain.AssistantStepRequest) error {
 	if !assistantTurnPattern.MatchString(id) || (rating != "helpful" && rating != "wrong") || len([]rune(comment)) > 500 {
-		return assistantProtocolError()
+		return assistantProtocolError("conversation id, rating or comment is not valid")
 	}
 	body := struct {
 		Conversation string `json:"conversation"`

@@ -161,6 +161,9 @@ type AssistantError struct {
 	Status  int
 	Code    string
 	Message string
+	// Detail is a short private diagnostic kept on the controller; it is never
+	// sent to the service.
+	Detail string `json:"detail,omitempty"`
 }
 
 func (err *AssistantError) Error() string { return "Assistant service: " + err.Code }

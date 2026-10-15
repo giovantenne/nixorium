@@ -3,6 +3,8 @@ package presentation
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 
@@ -11,6 +13,7 @@ import (
 
 const assistantNetworkNotice = "The Assistant service could not be reached. Check the controller's Internet connection and try again."
 const assistantProviderBusyNotice = "The AI provider is busy right now. Your request was not completed; try again in a minute."
+const assistantInterruptedNotice = "The Assistant service interrupted the answer. Send the message again."
 const assistantFailedNotice = "The Assistant could not complete this request. Try again in a minute."
 const assistantConsentText = "Your messages, configuration files and saved configuration history read by\nAssistant are sent to the Nixorium Assistant service and its AI provider.\nAssistant may also read system state and limited recent logs from declared\ncomputers. Known secret patterns and common private identifiers are filtered;\nfiltering is best effort and may leave personal or sensitive text.\nStudent home files are not read. The service does not keep configuration files.\nIt keeps messages and answers for 30 days to detect abuse, then deletes them.\nWhole conversations, including files and diagnostics read, are kept for\n90 days only if you report an answer or turn on sharing below.\nEach message you send uses one request."
 
@@ -36,6 +39,8 @@ func assistantServiceNotice(err error, subscribeURL string) string {
 			return "This Assistant request reached its limit. Start a new request."
 		case "protocol_error":
 			return "The Assistant service returned an invalid response. Try again after updating Nixorium."
+		case "service_interrupted":
+			return assistantInterruptedNotice
 		case "model_unavailable":
 			return assistantProviderBusyNotice
 		default:
@@ -44,6 +49,28 @@ func assistantServiceNotice(err error, subscribeURL string) string {
 		}
 	}
 	return assistantNetworkNotice
+}
+
+// assistantNoticeDetailLimit is the longest private diagnostic worth showing
+// under a notice; longer ones stay in the conversation's private record.
+const assistantNoticeDetailLimit = 80
+
+// assistantNoticeDetailLine ties a diagnostic to the notice text it explains, so
+// it disappears as soon as another notice replaces that text.
+type assistantNoticeDetailLine struct {
+	message, detail string
+}
+
+func assistantNoticeDetail(message string, err error) assistantNoticeDetailLine {
+	var serviceError *domain.AssistantError
+	if !errors.As(err, &serviceError) {
+		return assistantNoticeDetailLine{}
+	}
+	detail := strings.TrimSpace(assistantDisplayText(serviceError.Detail))
+	if detail == "" || strings.ContainsAny(detail, "\n\t") || utf8.RuneCountInString(detail) > assistantNoticeDetailLimit {
+		return assistantNoticeDetailLine{}
+	}
+	return assistantNoticeDetailLine{message: message, detail: detail}
 }
 
 const assistantActivationInvalidNotice = "This controller's Assistant activation is no longer valid. Activate it again to send your request."
