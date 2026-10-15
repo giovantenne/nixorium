@@ -99,7 +99,9 @@ function updateSelection() {
   selectAll.checked = chosen.size > 0 && chosen.size === cards.size;
   selectAll.indeterminate = chosen.size > 0 && chosen.size < cards.size;
   for (const button of toolbarButtons) button.disabled = chosen.size === 0 && !(button.dataset.action === 'show-screen' && casting);
-  for (const menu of document.querySelectorAll('.toolbar .actions-menu')) menu.classList.toggle('disabled', chosen.size === 0);
+  // A menu with data-always keeps opening without a selection: it holds an
+  // entry about the whole classroom (Power: Schedule…).
+  for (const menu of document.querySelectorAll('.toolbar .actions-menu')) menu.classList.toggle('disabled', chosen.size === 0 && !menu.hasAttribute('data-always'));
 }
 
 selectAll.addEventListener('change', () => {

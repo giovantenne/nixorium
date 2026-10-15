@@ -245,6 +245,10 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		}
 	case "/api/screenshot", "/api/screenshot/file":
 		server.screenshot(writer, request)
+	case "/schedule.js":
+		server.scheduleAsset(writer)
+	case "/api/schedule":
+		server.schedulePage(writer, request)
 	case "/api/input":
 		if request.Method != http.MethodPost {
 			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)

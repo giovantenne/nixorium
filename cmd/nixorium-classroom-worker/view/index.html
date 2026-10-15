@@ -6,6 +6,7 @@
 <title>Classroom view</title>
 <link rel="stylesheet" href="/style.css">
 <script src="/app.js" defer></script>
+<script src="/schedule.js" defer></script>
 </head>
 <body>
 <svg class="icons" aria-hidden="true">
@@ -44,12 +45,14 @@
         <button type="button" data-action="send-folder">A folder…</button>
       </div>
     </details>
-    <details class="actions-menu power-menu">
+    <details class="actions-menu power-menu" data-always>
       <summary>Power</summary>
       <div class="menu">
         <button type="button" data-action="wake" title="Send a Wake-on-LAN packet to the selected computers that are off">Switch on</button>
         <button type="button" data-action="restart">Restart</button>
         <button type="button" data-action="shutdown">Shut down</button>
+        <hr>
+        <button type="button" id="schedule-open" title="Switch the computers on and off at set times on set weekdays">Schedule…</button>
       </div>
     </details>
     <button type="button" id="refresh" title="Ask every computer for its state again now">Refresh</button>
@@ -97,6 +100,38 @@
   <div class="dialog-buttons">
     <button type="button" id="action-cancel">Cancel</button>
     <button type="button" id="action-confirm" class="primary" hidden></button>
+  </div>
+</dialog>
+<dialog id="schedule-dialog" aria-labelledby="schedule-title">
+  <h2 id="schedule-title">Schedule</h2>
+  <p id="schedule-current">Loading…</p>
+  <div id="schedule-fields" class="schedule-fields">
+    <div class="schedule-time">
+      <label><input type="checkbox" id="schedule-on-enabled"> Switch on at</label>
+      <input type="time" id="schedule-on" step="60" value="07:50" aria-label="Switch-on time">
+    </div>
+    <div class="schedule-time">
+      <label><input type="checkbox" id="schedule-off-enabled"> Shut down at</label>
+      <input type="time" id="schedule-off" step="60" value="18:00" aria-label="Shut-down time">
+    </div>
+    <fieldset class="schedule-days">
+      <legend>On these days</legend>
+      <label><input type="checkbox" name="schedule-day" value="mon"> Mon</label>
+      <label><input type="checkbox" name="schedule-day" value="tue"> Tue</label>
+      <label><input type="checkbox" name="schedule-day" value="wed"> Wed</label>
+      <label><input type="checkbox" name="schedule-day" value="thu"> Thu</label>
+      <label><input type="checkbox" name="schedule-day" value="fri"> Fri</label>
+      <label><input type="checkbox" name="schedule-day" value="sat"> Sat</label>
+      <label><input type="checkbox" name="schedule-day" value="sun"> Sun</label>
+    </fieldset>
+  </div>
+  <p id="schedule-zone" class="schedule-note"></p>
+  <p class="schedule-note">The computers must allow waking from the network, and a computer that someone is using is never shut down.</p>
+  <p id="schedule-problem" class="schedule-problem" role="alert" hidden></p>
+  <div class="dialog-buttons">
+    <button type="button" id="schedule-clear">Clear</button>
+    <button type="button" id="schedule-cancel">Cancel</button>
+    <button type="button" id="schedule-save" class="primary">Save</button>
   </div>
 </dialog>
 <div id="toast" class="toast" role="status" title="Click to close" hidden>

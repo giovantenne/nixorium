@@ -109,3 +109,20 @@ body.screen-mode #viewer-panel { display: flex; flex-direction: column; height: 
 #viewer-panel:fullscreen .viewer-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 1; background: var(--card); box-shadow: 0 2px 12px rgb(0 0 0 / 0.5); transform: translateY(-100%); transition: transform 0.15s ease-out; }
 #viewer-panel:fullscreen.show-bar .viewer-bar { transform: none; }
 #viewer-image.control:focus { outline: 3px solid var(--warning); }
+/* Schedule dialog (Power → Schedule…). */
+.actions-menu .menu hr { width: 100%; margin: 0.1rem 0; border: 0; border-top: 1px solid var(--line); }
+#schedule-dialog { width: min(30rem, 92vw); padding: 1.2rem 1.4rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
+#schedule-dialog::backdrop { background: rgb(0 0 0 / 0.55); }
+#schedule-dialog h2 { margin: 0 0 0.6rem; font-size: 1.15rem; }
+#schedule-dialog p { margin: 0.4rem 0; }
+.schedule-fields { display: flex; flex-direction: column; gap: 0.7rem; margin: 0.8rem 0; }
+.schedule-time { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.schedule-time label, .schedule-days label { display: inline-flex; align-items: center; gap: 0.4rem; }
+.schedule-time input[type="time"] { padding: 0.25rem 0.4rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background); color: inherit; font: inherit; }
+.schedule-time input[type="time"]:disabled { opacity: 0.45; }
+.schedule-days { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; margin: 0; padding: 0.5rem 0.7rem; border: 1px solid var(--line); border-radius: 8px; }
+.schedule-days legend { padding: 0 0.3rem; color: var(--muted); }
+.schedule-note { color: var(--muted); font-size: 0.9rem; }
+#schedule-zone:empty { display: none; }
+.schedule-problem { color: var(--warning); }
+#schedule-dialog .dialog-buttons #schedule-clear { margin-right: auto; }

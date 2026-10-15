@@ -62,6 +62,7 @@ func run() error {
 		share:      app.NewShareManager(lockSource{local, adapters.ClassroomAgentConnector{}}, shares),
 		records:    local,
 		wake:       app.NewWakeManager(local),
+		schedule:   app.NewScheduleManager(local),
 	}
 	// Files collected from students' desktops wait in the private
 	// temporary folder too, until the user who asked saves them.
@@ -101,6 +102,7 @@ type classroomWorker struct {
 	collected  *collectStore       // until the user who asked saves them
 	records    app.OperationRecordSink
 	wake       *app.WakeManager
+	schedule   *app.ScheduleManager // shows and sets the schedule the timer runs
 }
 
 // lockSource reads the laboratory identities and reaches the classroom agents.
@@ -220,6 +222,8 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		}
 	case domain.ClassroomWakePlanOperation, domain.ClassroomWakeApplyOperation:
 		return worker.handleWake(ctx, request)
+	case domain.ClassroomScheduleGetOperation, domain.ClassroomScheduleSetOperation:
+		return worker.handleSchedule(ctx, request)
 	case domain.ClassroomViewOpenOperation:
 		if worker.view == nil || worker.viewOn == nil || !worker.viewOn() {
 			return domain.ClassroomResponse{State: "failed", Message: errViewDisabled.Error()}
