@@ -24,6 +24,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- After **Update Nixorium** or **Apply to controller** activates the
+  controller, Nixorium reopens itself on the newly installed version: the
+  result shows "Nixorium <version> is active. The interface reopens in 3 s
+  with it (Esc keeps this one)." Enter reopens at once, and Esc keeps the
+  running interface with the previous "Reopen Nixorium" reminder.
+- The notification on a student computer after an update that needs no restart
+  now says: "The update is in place; programs you open from now on use it. If
+  something does not work as expected, restart the computer."
 - The review of an Assistant proposal reuses the evaluation Assistant already
   ran when nothing changed since, instead of evaluating the laboratory a second
   time.

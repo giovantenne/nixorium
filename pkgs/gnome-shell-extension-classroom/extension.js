@@ -108,7 +108,7 @@ export default class NixoriumClassroomExtension extends Extension {
         this._notice?.destroy();
         const body = notice.restart
             ? 'Restart it to finish the update. Save your work first.'
-            : 'The changes are ready to use.';
+            : 'The update is in place; programs you open from now on use it. If something does not work as expected, restart the computer.';
         this._notice = new MessageTray.Notification({
             source: MessageTray.getSystemSource(),
             title: 'This computer was updated',

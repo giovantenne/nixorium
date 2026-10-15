@@ -777,8 +777,11 @@ update again. From a terminal: `deploy apply ... --queue-unreachable`,
 `deploy queue status`, `deploy queue cancel --on pc02` (or `@all`).
 
 After any update the person at the computer sees a GNOME notification that it
-was updated; when the kernel or systemd changed it asks for a restart, with a
-**Restart** button. The computer never restarts on its own.
+was updated. Without a restart the notification says the update is in place,
+that programs opened from now on use it, and to restart the computer if
+something does not work as expected. When the kernel or systemd changed it asks
+for a restart, with a **Restart** button. The computer never restarts on its
+own.
 
 ### Power controls
 
