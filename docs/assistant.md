@@ -120,6 +120,13 @@ key material are redacted from model-facing output. The laboratory token is
 kept separate from the transcript. Only bounded journal excerpts from fixed
 core units are diagnostic inputs; arbitrary logs, student home files and other
 files outside the workspace are not tool inputs.
+Assistant sees only the lab configuration folder on the controller (normally
+`/home/admin/nixorium-deployment`; the exact path is recorded in
+`/etc/nixorium/deployment-path`), never your home folder or `Downloads`. For a
+program available from an official download, such as an AppImage, it proposes
+a package that the controller downloads with a pinned hash when it builds the
+update; a private file must first be copied into that folder and committed to
+its Git before a new chat can use it.
 
 ## Subscription and payments
 
