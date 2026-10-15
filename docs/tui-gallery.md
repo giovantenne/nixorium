@@ -943,8 +943,8 @@ Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 Nixorium  /  Computers
 
 Classroom controls
-Check computers, watch and lock students' screens, send files, control temporary Internet access, or review a
-shutdown or restart. Administrative configuration is not available here.
+Check computers, watch and lock students' screens, send files, control temporary Internet access, or switch
+computers on, shut them down or restart them after a review. Administrative configuration is not available here.
 
 › [v] Classroom view
   [h] Computer inventory

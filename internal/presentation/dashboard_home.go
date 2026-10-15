@@ -42,7 +42,7 @@ func (model dashboardModel) homeAreas() []dashboardTask {
 var computersAreaTasks = []dashboardTask{
 	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Check reachability and compare observed systems with the intended revision"},
 	{id: "deploy", shortcut: "d", title: "Update computers", description: "Make the selected client computers run the saved configuration"},
-	{id: "shutdown", shortcut: "x", title: "Power controls", description: "Shut down or restart selected client computers after review"},
+	{id: "shutdown", shortcut: "x", title: "Power controls", description: "Switch on, shut down or restart selected client computers after review"},
 	{id: "internet", shortcut: "i", title: "Internet access", description: "Temporarily block or restore Internet on selected clients"},
 }
 
@@ -280,7 +280,7 @@ func (model dashboardModel) computersAreaView() string {
 	description := "Observed state is loaded only by Computer inventory or an operation that needs it."
 	if model.actions.ClassroomMode {
 		title = "Classroom controls"
-		description = "Check computers, watch and lock students' screens, send files, control temporary Internet access, or review a shutdown or restart. Administrative configuration is not available here."
+		description = "Check computers, watch and lock students' screens, send files, control temporary Internet access, or switch computers on, shut them down or restart them after a review. Administrative configuration is not available here."
 	}
 	return model.areaView(
 		"Computers",

@@ -73,6 +73,12 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 			}
 			return *response.PowerReport
 		},
+		PlanWake: func(ctx context.Context, requested string) domain.WakePlan {
+			return classroomWakePlan(ctx, requested)
+		},
+		ApplyWake: func(plan domain.WakePlan) domain.WakeReport {
+			return classroomWakeApply(ctx, plan)
+		},
 		PlanInternet: func(ctx context.Context, requested string, action domain.InternetAction) domain.InternetPlan {
 			response, err := classroomRequest(ctx, domain.ClassroomInternetPlanOperation, func(request *domain.ClassroomRequest) {
 				request.Requested = requested

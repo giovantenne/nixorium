@@ -83,6 +83,8 @@ type DashboardActions struct {
 	PlanShutdown            func(context.Context, string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
 	PlanPower               func(context.Context, string, domain.ShutdownSessionPolicy, domain.ClientPowerAction) domain.ShutdownPlanReport
 	ApplyShutdown           func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
+	PlanWake                func(context.Context, string) domain.WakePlan
+	ApplyWake               func(domain.WakePlan) domain.WakeReport
 	PlanDeployment          func(context.Context, string) domain.DeploymentPlanReport
 	PlanReachableDeployment func(context.Context, domain.DeploymentPlanReport) domain.DeploymentPlanReport
 	ApplyDeployment         func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
