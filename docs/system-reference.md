@@ -396,8 +396,8 @@ notice of the last action and draws every card again.
 
 A computer that answers over SSH with someone signed in, but whose agent does
 not answer (the socket is missing, or the agent is frozen and gives no answer
-to the relay's own hello within 3 seconds), shows a warning sign over its dimmed last picture and **Monitoring
-stopped on this PC**. The login screen does not count as someone signed in
+to the relay's own hello within 3 seconds), shows a warning sign over its
+dimmed last picture and **Monitoring stopped on this PC**. The login screen does not count as someone signed in
 (only a session of class `user` does), so a computer waiting at it says
 **Nobody is signed in**. The same words explain the computer wherever an
 action skips it (Lock, Send files, Share screen, Collect from desktop and

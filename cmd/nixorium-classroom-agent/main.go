@@ -494,7 +494,7 @@ func connect(ctx context.Context, input io.Reader, output io.Writer, run command
 // sends its own hello afterwards through the same connection.
 func agentHello(connection net.Conn) (classroomview.Message, error) {
 	_ = connection.SetDeadline(time.Now().Add(helloTimeout))
-	defer connection.SetDeadline(time.Time{})
+	defer func() { _ = connection.SetDeadline(time.Time{}) }()
 	if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
 		return classroomview.Message{}, err
 	}
