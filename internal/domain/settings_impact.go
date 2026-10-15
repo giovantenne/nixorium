@@ -21,19 +21,81 @@ var controllerOnlySettings = map[string]bool{
 // SettingsTransitionIssues protects the management connection while clients are
 // configured. Use the saved count, including when the candidate removes clients.
 // This is a transition rule, not a restriction on valid initial configurations.
+//
+// The laboratory network (base and prefix) may change only as a change of
+// laboratory network: the candidate records the saved network as the previous
+// one, so the controller keeps both addresses and the clients accept both
+// controller addresses until the record is removed. The controller number
+// stays locked.
 func SettingsTransitionIssues(base, candidate LabSettingsFile) []ValidationIssue {
 	if base.Lab.PCCount <= 0 {
 		return nil
 	}
+	migration := movesFromSavedNetwork(base, candidate) || undoesSavedChange(base, candidate)
 	var issues []ValidationIssue
 	for _, change := range DiffLabSettings(base, candidate) {
 		switch change.Field {
-		case "lab.networkBase", "lab.networkPrefixLength", "lab.masterHostNumber":
-			issues = append(issues, ValidationIssue{Field: change.Field, Message: fmt.Sprintf(
-				"Cannot change laboratory addressing while %d client computers are configured. They would keep their old network settings and could lose contact with the controller. Keep the saved value; guided network migration is not available yet.", base.Lab.PCCount)})
+		case "lab.networkBase", "lab.networkPrefixLength":
+			if !migration {
+				issues = append(issues, BlockedIssue(change.Field, "NETWORK-LOCKED", NetworkLockedMessage(base.Lab.PCCount)))
+			}
+		case "lab.networkTransition":
+			// Removing the record finishes a change; any other edit must
+			// come with the network it describes.
+			if candidate.Lab.NetworkTransition != nil && !migration {
+				issues = append(issues, BlockedIssue(change.Field, "NETWORK-LOCKED", NetworkLockedMessage(base.Lab.PCCount)))
+			}
+		case "lab.masterHostNumber":
+			issues = append(issues, BlockedIssue(change.Field, "NETWORK-LOCKED", ControllerNumberLockedMessage(base.Lab.PCCount)))
 		}
 	}
 	return issues
+}
+
+// movesFromSavedNetwork reports whether the candidate is a change of
+// laboratory network away from the saved one: it records the saved base and
+// prefix as the previous network. While a change is already in progress only
+// going back to its previous network is accepted, because computers still on
+// that network would otherwise lose the controller.
+func movesFromSavedNetwork(base, candidate LabSettingsFile) bool {
+	transition := candidate.Lab.NetworkTransition
+	if transition == nil || transition.PreviousBase != base.Lab.NetworkBase || transition.PreviousPrefixLength != base.Lab.NetworkPrefix {
+		return false
+	}
+	if saved := base.Lab.NetworkTransition; saved != nil {
+		return candidate.Lab.NetworkBase == saved.PreviousBase && candidate.Lab.NetworkPrefix == saved.PreviousPrefixLength
+	}
+	return true
+}
+
+// undoesSavedChange reports whether the candidate undoes the saved change of
+// laboratory network: it restores the previous network and removes the
+// record. Until the controller is applied it keeps both addresses, and
+// clients keep the previous address during the change, so every computer
+// stays reachable on the restored network.
+func undoesSavedChange(base, candidate LabSettingsFile) bool {
+	saved := base.Lab.NetworkTransition
+	return saved != nil && candidate.Lab.NetworkTransition == nil &&
+		candidate.Lab.NetworkBase == saved.PreviousBase && candidate.Lab.NetworkPrefix == saved.PreviousPrefixLength
+}
+
+func configuredComputers(computers int) string {
+	if computers == 1 {
+		return "1 computer is"
+	}
+	return fmt.Sprintf("%d computers are", computers)
+}
+
+// NetworkLockedMessage is the refusal for an addressing change while
+// computers are configured (situation NETWORK-LOCKED).
+func NetworkLockedMessage(computers int) string {
+	return fmt.Sprintf("The laboratory network cannot be changed while %s configured: they would keep their old addresses and lose the controller. To move them to a new network use Maintenance → Change network addressing; here keep the saved value.", configuredComputers(computers))
+}
+
+// ControllerNumberLockedMessage is the refusal for a controller number change
+// while computers are configured (situation NETWORK-LOCKED).
+func ControllerNumberLockedMessage(computers int) string {
+	return fmt.Sprintf("The controller number cannot be changed while %s configured: it sets the controller's laboratory address, so they would lose the controller. Keep the saved value.", configuredComputers(computers))
 }
 
 // SettingsImpacts classifies reviewed changes into what happens next.
@@ -82,6 +144,10 @@ func SettingsImpacts(base, candidate LabSettingsFile, changes []SettingChange) [
 			impacts = append(impacts, SettingImpact{Kind: "network-interface", Warning: true,
 				Detail: detail + " Verify the old and new device names, cabling and access to each affected computer's local console before applying."})
 		}
+	}
+	if (changed["lab.clientIfaceName"] || changed["lab.ifaceName"] || changed["lab.hostIfaceNames"]) && candidate.Lab.DeploymentMode != "controller" {
+		impacts = append(impacts, SettingImpact{Kind: "network-interface-order",
+			Detail: "Update one computer first and check it answers before updating the others."})
 	}
 	if candidate.Lab.PCCount < base.Lab.PCCount {
 		impacts = append(impacts, SettingImpact{Kind: "computers-removed", Warning: true,

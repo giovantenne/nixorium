@@ -42,6 +42,9 @@ main { padding: 1.5rem; }
 .cover .icon { display: grid; place-items: center; width: 3.6rem; height: 3.6rem; border-radius: 50%; background: rgb(0 0 0 / 0.6); }
 .cover svg { width: 2rem; height: 2rem; }
 .cover .caption { padding: 0.1rem 0.6rem; border-radius: 999px; background: rgb(0 0 0 / 0.6); font-weight: 600; }
+.cover .caption { text-align: center; max-width: 92%; }
+.cover.stopped .icon { color: #f0b45a; }
+.cover.stopped .caption { border-radius: 0.8rem; }
 .cover.off { background: #262a31; color: #c8ced8; }
 .cover.off .icon, .cover.off .caption { background: none; }
 .viewer-screen .cover .icon { width: 7rem; height: 7rem; }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net"
 	"strings"
@@ -145,10 +146,10 @@ func TestAgentMessageDoesNotEndWithTheConnection(t *testing.T) {
 }
 
 func TestProbeMessageRefusesAnUnknownDuration(t *testing.T) {
-	if err := probeMessage([]string{"true"}, true, "Wait", "soon", &strings.Builder{}); err == nil {
+	if err := probeMessage(context.Background(), []string{"true"}, true, "Wait", "soon", &strings.Builder{}); err == nil {
 		t.Fatal("a duration that is not a number of seconds was accepted")
 	}
-	if err := probeMessage(nil, true, "Wait", "0", &strings.Builder{}); err == nil || errors.Is(err, errMessageUnavailable) {
+	if err := probeMessage(context.Background(), nil, true, "Wait", "0", &strings.Builder{}); err == nil || errors.Is(err, errMessageUnavailable) {
 		t.Fatalf("a probe without a command = %v", err)
 	}
 }

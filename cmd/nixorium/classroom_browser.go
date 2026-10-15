@@ -32,6 +32,8 @@ func runClassroomBrowser(address string) int {
 	if err != nil {
 		return 1
 	}
+	// No context on purpose: the browser is the teacher's own window and
+	// lasts as long as they keep it open, so no deadline of ours may kill it.
 	browser := exec.Command(path, arguments[1:]...)
 	if err := browser.Start(); err != nil {
 		return 1

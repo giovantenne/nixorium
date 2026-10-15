@@ -153,3 +153,34 @@ func TestClassroomViewOpensOnlyWhenTurnedOn(t *testing.T) {
 		t.Fatalf("response = %+v", response)
 	}
 }
+
+func TestPageNamesAComputerWhoseMonitoringStopped(t *testing.T) {
+	script, err := viewAssets.ReadFile("view/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := viewAssets.ReadFile("view/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The card says it with the words the reviews and commands use, in its
+	// own cover, and the result notice counts it apart from the computers
+	// that are off.
+	for _, words := range []string{
+		"'no-agent': '" + app.ClassroomNoAgentLabel + "'",
+		"caption: '" + app.ClassroomNoAgentLabel + "'",
+		"if (computer.state === 'no-agent') return 'stopped';",
+		"stopped: '" + strings.ToLower(app.ClassroomNoAgentLabel[:1]) + app.ClassroomNoAgentLabel[1:] + "'",
+		// The other states keep their words.
+		"locked: 'Idle'",
+		"unreachable: 'Off or not reachable'",
+		"off: 'switched off or not reachable'",
+	} {
+		if !strings.Contains(string(script), words) {
+			t.Fatalf("app.js lacks %s", words)
+		}
+	}
+	if !strings.Contains(string(page), `id="icon-alert"`) {
+		t.Fatal("index.html lacks the warning icon of the stopped state")
+	}
+}

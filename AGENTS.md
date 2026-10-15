@@ -82,6 +82,7 @@ scripts/
   create-home-template.sh  # Builds clean home directory template
   validate.sh              # Tiered upstream validation entry point
   security-check.sh        # Pinned staticcheck and govulncheck entry point
+  lint.sh                  # Pinned ShellCheck and errcheck entry point
 assets/
   empty-*                  # Neutral fallbacks for optional deployment assets
 templates/site/            # Private deployment repository template
@@ -110,7 +111,8 @@ Use the smallest gate appropriate to the change:
 # Edit-test loop: cached Go tests; accepts package paths and go test flags
 ./scripts/test-go.sh
 
-# Reproducible gate: syntax, shell regressions, guidance, schemas, Go package
+# Reproducible gate: syntax, shell regressions, ShellCheck, errcheck, guidance,
+# schemas, Go package
 ./scripts/validate.sh --quick
 
 # Add full mkLab evaluation for Nix API or host-composition changes
@@ -120,11 +122,24 @@ Use the smallest gate appropriate to the change:
 nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell
 go test ./...
 
+# ShellCheck and errcheck alone, with the pinned tools (the quick gate runs them)
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix lint-shell --command ./scripts/lint.sh
+
 # Dedicated Go security and static analysis with the locked toolchain
 nix --extra-experimental-features 'nix-command flakes' \
   develop --file tests/source-checks.nix security-shell \
   --command ./scripts/security-check.sh
 ```
+
+The quick gate runs ShellCheck (warnings and errors) over every `*.sh` file and
+errcheck over the non-test Go code. Fix a finding; do not disable a check
+globally. Where a ShellCheck finding is a false positive or the fix would
+change what an installer does, put `# shellcheck disable=SCxxxx # reason` above
+that command. Where dropping a Go error is the decision, write `_ = call()`.
+`.errcheck-exclude` lists only calls whose error never matters (closing a
+handle that was only read, `os.Remove`, `fmt.Fprint*`); a write, lock or commit
+must be checked. See [development validation](docs/development-validation.md).
 
 Use the affected management or client-installer VM only when changing its
 integration boundary. Reserve `--full` for cross-cutting system-build changes
@@ -173,13 +188,17 @@ nightly on `master` and on demand, so failures surface before a tag; ordinary
 pushes do not run it. Each job has a 240-minute limit; failure or timeout of
 any shard must block publication.
 
-After the GitHub Release is published, update the website in the same session:
-in `nixorium-website`, regenerate the product pin on the tagged commit
+Before tagging, the website branch `release/<version>` of `nixorium-website`
+must exist, be built against the commit to release and be green on `staging`.
+After the GitHub Release is published, finish the site in the same session: on
+that branch, regenerate the product pin on the tagged commit
 (`NIXORIUM_PRODUCT_ROOT=… NIXORIUM_PRODUCT_REV=<tag commit> npm run
-demos:generate`), review the technician guide against the new changelog, build,
-and push `master` (production) and `master:staging`. The site shows the pinned
-version in its footer and on `/docs/`, linked to that release's notes, so a
-release is not finished until the site follows it.
+demos:generate`), commit "Pin the site to Nixorium v<version> (<sha>)", review
+the technician guide against the new changelog, build, merge into `master`, and
+push `master` (production) and `master:staging`. The site's production build
+refuses a pin whose tag is missing, points elsewhere or has no published GitHub
+release. It shows the pinned version in its footer and on `/docs/`, linked to
+that release's notes, so a release is not finished until the site follows it.
 
 ## Architecture Notes
 
@@ -501,6 +520,22 @@ release is not finished until the site follows it.
   and exact confirmation. Preserve secret/content-transform checks, atomic
   compare-and-update of HEAD, path-only index reconciliation, unrelated index/
   worktree state, disabled hooks/signing, and the no-remote/no-push boundary.
+- `nixorium git undo plan`/`apply` reverts the last saved change as a new saved
+  change (`internal/app/git_undo.go`). Keep its refusals: unsaved changes
+  (`GIT-DIRTY`), detached HEAD or an unfinished Git operation, a first version,
+  merge or earlier undo, any change to `flake.nix`/`flake.lock` (updates own
+  their recovery; name `UPDATES.md`), keys and the recovery file, private
+  paths, links, submodules, Git attribute rules, a change of the laboratory
+  network (guided change only), a managed file whose earlier version is not
+  valid, and files that cannot go back safely. Reuse the commit boundary:
+  fixed Git commands, content-bound token, typed `UNDO`, compare-and-update of
+  HEAD, two-tree `read-tree` for the files, no hook, signing, remote or push.
+  It never applies to the controller or computers; its review names those
+  steps. The Git review screen offers it with `u` through the typed
+  `PlanGitUndo`/`ApplyGitUndo` callbacks: presentation shows the review, the
+  refusal with its catalogued next step and the typed word, and never decides
+  what can be undone. Enter on a saved undo chains to the ordinary controller
+  review through `continueSavedConfiguration`, like a settings save.
 - Upstream update planning must preserve the configured source identity, accept
   only the exact `master` branch or an explicit SemVer tag, generate the
   candidate lock outside the checkout,
@@ -537,9 +572,40 @@ release is not finished until the site follows it.
   `networkPrefixLength` and `masterHostNumber` when the saved client count is
   nonzero, both in planning and before writing a reviewed candidate. Reducing
   the candidate count must not bypass this rule. This is separate from schema
-  validation and does not implement network migration. Interface reviews must
+  validation; the refusal is the `NETWORK-LOCKED` situation. The only
+  exception is a change of laboratory network: a base/prefix change whose
+  candidate `lab.networkTransition` names exactly the saved base/prefix (and,
+  while a record is saved, only a return to its previous network). The record
+  makes the configuration dual (controller on both addresses, clients trusting
+  both controller addresses, new cache first); without it every host must stay
+  byte-identical to the single-network configuration. Without clients it is
+  ignored with a warning in Nix and refused by the Go validator. The
+  controller number stays locked. An undo restores the previous network and
+  removes the record in one candidate. During a change every client also
+  keeps its previous address (by-type clients reapply the changed profile),
+  so the update that moves it keeps its SSH session and an undo finds it.
+  The guided change (`internal/app/network_migration.go`, Maintenance →
+  Change network addressing, `nixorium network migrate`) is a sequence of
+  reviewed saves followed by the ordinary controller and deployment reviews;
+  it never applies a system itself, refuses to finish while a client is not
+  on the new network with the saved configuration, and keeps undo possible
+  until then (ADR 0028). During a change labMeta decoding copies each
+  client's previous address into `HostMeta.PreviousIP`: every per-computer
+  probe tries the new address first, then the previous one, and Colmena
+  reaches a computer on the previous network through `HostName` entries in
+  its SSH configuration. Trusted host keys are copied from the previous to
+  the new address in the managed known-hosts file before any contact there;
+  never replace a different key or relax checking. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first
-  order for network changes.
+  order for network changes. Device-name and DHCP-hint changes get a read-only
+  network preflight in the plan (`networkPreflight`): `/sys/class/net` plus
+  bounded `ip -4 -j address` on the controller, the fixed read-only device
+  listing over the inventory's bounded parallel SSH for affected reachable
+  clients (only clients configured by name; by-type clients are not probed).
+  The settings save manager refuses a controller device that is not a present
+  wired device, and a device missing on a reachable client unless exactly that
+  computer is acknowledged; unreachable clients are listed, never blocking.
+  `config apply` does not run the preflight.
 - `lib/eval-workspace-profile.nix` accepts raw JSON text so duplicate keys are
   rejected before they can disappear in `builtins.fromJSON`. Keep it aligned
   with `internal/domain/workspace.go` through `tests/workspace-validation-cases.json`.

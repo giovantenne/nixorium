@@ -89,7 +89,9 @@ After activation, the screen shows **Free trial · N of M left**, where M is the
 trial allowance the service reports for your account. An ended trial
 shows **Free trial ended**; exhausted annual quota shows **No requests left**.
 The controller checks account metadata without sending your draft or files,
-and refreshes that count after a request.
+and refreshes that count after a request. A request that the service interrupts
+before an answer (a service error or its safety limit) is not counted; a request
+you stop yourself is.
 
 When the trial expires or its requests are used, Assistant shows a signed
 purchase link from the service. The link lasts seven days; reopening Assistant
@@ -176,6 +178,10 @@ The model has fixed tools, with no shell or system-operation tool:
 | `host_diagnostics` | One exact declared computer and a fixed area; read-only state and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
 | `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
+
+Assistant never changes the laboratory network; for a new network address or
+prefix it refers the administrator to the guided change (Maintenance → Change
+network addressing, `nixorium network migrate`).
 
 A program downloaded by hand runs on these computers thanks to nix-ld, but
 that is a convenience for one user; the `prefetch` route remains the one that

@@ -25,7 +25,9 @@ const stateText = {
   connecting: 'Connecting…',
   viewing: '',
   'no-session': 'Nobody is signed in',
-  'no-agent': 'Classroom view is not running here',
+  // Somebody is signed in and the computer answers, but the classroom
+  // agent of that session does not: it was stopped and restarts by itself.
+  'no-agent': 'Monitoring stopped on this PC',
   // The student's own lock screen (after a while without use, or Super+L):
   // GNOME does not let it be captured.
   locked: 'Idle',
@@ -35,17 +37,20 @@ const stateText = {
 
 // An icon over the screen tells the states apart at a glance: the
 // student's idle lock screen (a moon, over the dimmed last picture), the
-// teacher's lock (a padlock over the live picture) and a computer that is
-// off (a power symbol instead of the picture).
+// teacher's lock (a padlock over the live picture), a computer whose
+// monitoring stopped (a warning sign over the dimmed last picture) and a
+// computer that is off (a power symbol instead of the picture).
 const covers = {
   idle: { icon: 'moon', caption: 'Idle', title: "The student's screen lock is on: the computer was left unused, or the student locked it. The screen shows again once the student unlocks it." },
   lock: { icon: 'lock', caption: '', title: 'Locked: the student sees "Eyes on the teacher".' },
+  stopped: { icon: 'alert', caption: 'Monitoring stopped on this PC', title: 'Somebody is signed in on this computer but its classroom view stopped, so nobody is watching this screen. It starts again by itself within seconds; if this stays, ask the administrator.' },
   off: { icon: 'power', caption: 'Off or not reachable', title: 'Switched off or not reachable.' },
 };
 
 function coverOf(computer) {
   if (computer.state === 'unreachable') return 'off';
   if (computer.state === 'locked') return 'idle';
+  if (computer.state === 'no-agent') return 'stopped';
   if (computer.state === 'viewing' && computer.locked) return 'lock';
   return '';
 }
@@ -363,8 +368,8 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !toast.hidden && !controlling && !actionDialog.open) hideToast();
 });
 
-const outcomeWords = { done: 'done', empty: 'nothing to collect', off: 'switched off or not reachable', skipped: 'skipped', 'too-much': 'too much to collect', failed: 'failed' };
-const detailOrder = ['failed', 'too-much', 'skipped', 'off', 'empty', 'done'];
+const outcomeWords = { done: 'done', empty: 'nothing to collect', off: 'switched off or not reachable', stopped: 'monitoring stopped on this PC', skipped: 'skipped', 'too-much': 'too much to collect', failed: 'failed' };
+const detailOrder = ['failed', 'stopped', 'too-much', 'skipped', 'off', 'empty', 'done'];
 
 // Switch on counts packets sent, never computers started: "Switch on:
 // 3 sent · 2 already on · 1 address unknown".

@@ -6,7 +6,31 @@ import (
 	"slices"
 	"strconv"
 	"testing"
+	"time"
 )
+
+func TestDesktopStyleLookupEndsWhenGsettingsHangs(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+	script := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, "gsettings"), []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	script("echo \"'prefer-dark'\"")
+	if !desktopPrefersDark() {
+		t.Fatal("the dark style was not read")
+	}
+	script("exec sleep 30")
+	old := gsettingsTimeout
+	gsettingsTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { gsettingsTimeout = old })
+	started := time.Now()
+	if desktopPrefersDark() || time.Since(started) > 5*time.Second {
+		t.Fatalf("a hung gsettings held the lookup for %v", time.Since(started))
+	}
+}
 
 func TestClassroomBrowserProfileKeepsSystemFrames(t *testing.T) {
 	state := t.TempDir()

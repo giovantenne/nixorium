@@ -32,6 +32,13 @@ type deferredUpdatesSource interface {
 	DeferredUpdateSummary(context.Context, string) (waiting, attention int)
 }
 
+// networkChangeSource reads a saved change of laboratory network and the
+// controller's addresses, both locally.
+type networkChangeSource interface {
+	SavedNetworkChange(string) (domain.LabSettings, bool)
+	InterfaceAddresses(string) ([]string, error)
+}
+
 type RecoveryInspector struct {
 	source RecoverySource
 	now    func() time.Time
@@ -113,10 +120,33 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 			add(domain.RecoveryDeferredUpdates, "UPDATES-QUEUED", detail, "", nil, nil)
 		}
 	}
+	if changes, ok := inspector.source.(networkChangeSource); ok {
+		if lab, changing := changes.SavedNetworkChange(root); changing {
+			add(domain.RecoveryNetworkChanging, "NETWORK-CHANGING", domain.NetworkChangingDetail(lab, controllerOnBothNetworks(changes, lab)), "", nil, nil)
+		}
+	}
 	if len(report.Conditions) > 0 {
 		report.State = "attention"
 	}
 	return report
+}
+
+// controllerOnBothNetworks reports whether the controller already carries
+// its new and its previous laboratory address, that is, whether it was
+// applied since the change was saved.
+func controllerOnBothNetworks(source networkChangeSource, lab domain.LabSettings) bool {
+	current, err := domain.ControllerStaticAddress(lab)
+	if err != nil || lab.NetworkTransition == nil {
+		return false
+	}
+	previousLab := lab
+	previousLab.NetworkBase, previousLab.NetworkPrefix = lab.NetworkTransition.PreviousBase, lab.NetworkTransition.PreviousPrefixLength
+	previous, err := domain.ControllerStaticAddress(previousLab)
+	if err != nil {
+		return false
+	}
+	addresses, err := source.InterfaceAddresses(lab.ControllerInterface())
+	return err == nil && containsIP(addresses, current) && containsIP(addresses, previous)
 }
 
 // pxeRecoveryDetail says in plain words how an interrupted network

@@ -1027,6 +1027,22 @@ stores that content as a commit under `refs/nixorium/discard-backups/`, and
 only then restores the selected paths to HEAD. Untracked files, new files and
 private-key paths are never touched, and nothing is pushed.
 
+The undo workflow (`git undo plan`/`apply`, or key `u` on **Review Git
+changes**, whose saved result opens the ordinary controller review on Enter)
+reverts the last saved change as a new saved change. It needs a clean tree on a branch and refuses a first
+version, a merge, an earlier undo, an update of Nixorium or of the package base
+(their own recovery), recorded keys or recovery file, a change that belongs to
+the guided change of the laboratory network, links, submodules, private files,
+Git attribute rules, a managed file whose earlier version is not valid, and
+files that cannot go back safely (an ignored file in the way, assume-unchanged
+entries, secret-like content returning). Because the last commit is reverted,
+the undo commit has the tree of its parent: Apply repeats the review, compares
+the token, creates the commit object, moves the index and worktree with a
+two-tree `read-tree` (which refuses to overwrite edited files, so a refusal
+leaves HEAD where it was) and then advances HEAD only from the reviewed
+revision. Hooks, signing, remotes and push do not run, and Apply to controller
+and Update computers stay separate reviews.
+
 ## Guided upstream update
 
 The normal upgrade surface is a separate typed workflow:

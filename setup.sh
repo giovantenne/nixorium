@@ -24,10 +24,11 @@ usage() {
 prompt_input() {
   local PROMPT_TEXT="$1"
   local TARGET_VAR="$2"
+  # TARGET_VAR names the variable to fill; "${TARGET_VAR?}" marks that on purpose.
   if [[ -r /dev/tty ]]; then
-    read -r -p "$PROMPT_TEXT" "$TARGET_VAR" < /dev/tty
+    read -r -p "$PROMPT_TEXT" "${TARGET_VAR?}" < /dev/tty
   else
-    read -r -p "$PROMPT_TEXT" "$TARGET_VAR"
+    read -r -p "$PROMPT_TEXT" "${TARGET_VAR?}"
   fi
 }
 

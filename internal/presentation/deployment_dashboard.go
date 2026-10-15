@@ -204,6 +204,8 @@ func deploymentAvailabilityLabel(plan domain.DeploymentPlanReport, name, ip stri
 			continue
 		}
 		switch {
+		case observed.Network == domain.HostNetworkPrevious:
+			return "Reachable on its previous address; it moves with this update"
 		case observed.Reachability == domain.ReachabilityUnreachable:
 			return "Not reached at last check"
 		case observed.Reachability == domain.ReachabilityReachable && observed.SSH == domain.SSHAvailable:

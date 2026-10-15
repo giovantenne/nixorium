@@ -129,7 +129,71 @@ func TestClassroomViewHubShowsEveryComputerAndStopsWhenNobodyLooks(t *testing.T)
 	}
 }
 
+// stoppableConnector reaches a computer whose agent can be stopped and
+// started again, as systemd does after a student kills it.
+type stoppableConnector struct {
+	mutex   sync.Mutex
+	stopped bool
+}
+
+func (connector *stoppableConnector) setStopped(stopped bool) {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	connector.stopped = stopped
+}
+
+func (connector *stoppableConnector) Connect(_ context.Context, host domain.HostMeta) (classroomview.Session, error) {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	if connector.stopped {
+		return nil, classroomview.AgentError{Code: classroomview.CodeNoAgent}
+	}
+	var closed, inputs int
+	reply := classroomview.Message{Type: classroomview.TypeThumbnail, Width: 320, Height: 200, Image: []byte(host.Name), CapturedAt: 1, Frame: 3}
+	return fakeAgentSession{mutex: &sync.Mutex{}, closed: &closed, inputs: &inputs, reply: reply}, nil
+}
+
+func TestClassroomCardSaysWhenMonitoringStoppedAndRecovers(t *testing.T) {
+	connector := &stoppableConnector{stopped: true}
+	hub := NewClassroomViewHub(func(context.Context) ([]domain.HostMeta, error) {
+		return []domain.HostMeta{{Name: "pc01"}}, nil
+	}, connector)
+	hub.interval, hub.idle = 10*time.Millisecond, 2*time.Second
+	waitFor := func(state string) ClassroomComputer {
+		t.Helper()
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			computers, err := hub.Computers(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if computers[0].State == state || time.Now().After(deadline) {
+				return computers[0]
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	// Somebody is signed in and the computer answers, but not its agent: a
+	// state of its own, neither "Off or not reachable" nor "Nobody is signed in".
+	stopped := waitFor(ClassroomNoAgent)
+	if stopped.State != ClassroomNoAgent || stopped.Detail != "Monitoring stopped on this PC." {
+		t.Fatalf("card = %+v", stopped)
+	}
+	// systemd starts the agent again: the card returns to the live picture.
+	connector.setStopped(false)
+	if card := waitFor(ClassroomViewing); card.State != ClassroomViewing || card.Detail != "" {
+		t.Fatalf("card after the restart = %+v", card)
+	}
+}
+
 func TestClassroomFailureStates(t *testing.T) {
+	// A stopped agent has its own words, apart from the other states.
+	if state, detail := classroomFailureState(classroomview.AgentError{Code: classroomview.CodeNoAgent}); state != ClassroomNoAgent || detail != "Monitoring stopped on this PC." {
+		t.Fatalf("no agent = %s, %q", state, detail)
+	}
+	if _, detail := classroomFailureState(classroomview.ErrUnreachable); detail != ClassroomOffDetail || detail == ClassroomNoAgentDetail {
+		t.Fatalf("an SSH failure says %q", detail)
+	}
 	for code, want := range map[string]string{
 		classroomview.CodeNoSession: ClassroomNoSession,
 		classroomview.CodeNoAgent:   ClassroomNoAgent,

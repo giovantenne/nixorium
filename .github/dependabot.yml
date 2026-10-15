@@ -1,0 +1,20 @@
+# Dependency update proposals. Dependabot only opens pull requests: nothing is
+# merged automatically, and every proposal goes through the normal gates.
+# A Go update also changes the vendor hash in pkgs/nixorium.nix; see
+# docs/development-validation.md.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

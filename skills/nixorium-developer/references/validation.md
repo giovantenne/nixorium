@@ -19,9 +19,28 @@ go test ./...
 ```
 
 Finish a coherent change with `./scripts/validate.sh --quick`. It checks shell
-regressions, schemas, generated docs, canonical copies, agent guidance, the
-packaged Go application and its isolated runtime wrapper. Package tests must
-cover `./...`, not just the installed command list.
+regressions, ShellCheck over every shell script, errcheck over the non-test Go
+code, schemas, generated docs, canonical copies, agent guidance, the packaged
+Go application and its isolated runtime wrapper. Package tests must cover
+`./...`, not just the installed command list.
+
+When the lint fails (`scripts/lint.sh`, from the pinned `lint-shell`; run it
+alone with `nix develop --file tests/source-checks.nix lint-shell --command
+./scripts/lint.sh`):
+
+- ShellCheck fails on warnings and errors. Fix the script: quote the
+  expansion, use `read -r`, declare and assign separately, remove the unused
+  variable. For a false positive, or a fix that would change what an installer
+  does (for example variables set for the sourcing caller, SC2034), add
+  `# shellcheck disable=SCxxxx # reason` directly above that command. Never
+  disable a check for a whole file or the repository; there is no
+  `.shellcheckrc` because no global exclusion is justified.
+- errcheck reports a dropped `error` in non-test Go code. Handle it, or write
+  `_ = call()` (`defer func() { _ = call() }()` when deferred) when dropping the
+  result is the decision. `.errcheck-exclude` matches by function name
+  everywhere, so add an entry only for a call that never matters (closing a
+  handle that was only read, `os.Remove`, `fmt.Fprint*`); a write, a lock or a
+  commit must be checked, which is why `Flock` is not listed.
 
 Add `--eval` for schemas, the public Nix API, host composition or software
 scopes. Use only the affected VM when behavior crosses process, filesystem,
@@ -44,7 +63,7 @@ host-specific modules. A successful evaluation does not prove that packages
 or affected system roles build. Simulated VM tests do not replace official-ISO
 or physical-hardware evidence.
 
-Pull-request and `master` CI run Go packaging/tests plus `./scripts/validate.sh --ci`. CI splits `--ci` into parallel shards with `NIXORIUM_CI_SHARD` (`lab`, `workspace-a`, `workspace-b`, `template`, `template-dev`, `template-minimal`; each template software scenario is a full NixOS evaluation, so CI runs one per runner); an unassigned check group falls into `lab`, so a new group is never skipped. Without the variable, `--ci` evaluates everything.
+Pull-request and `master` CI run Go packaging/tests, the lint above plus `./scripts/validate.sh --ci`. CI splits `--ci` into parallel shards with `NIXORIUM_CI_SHARD` (`lab`, `workspace-a`, `workspace-b`, `template`, `template-dev`, `template-minimal`; each template software scenario is a full NixOS evaluation, so CI runs one per runner); an unassigned check group falls into `lab`, so a new group is never skipped. Without the variable, `--ci` evaluates everything.
 The latter evaluates all checks and grouped representative source/template
 outputs with import-from-derivation disabled. The release-tag workflow
 calls `full-validation.yml`, which runs `--full` with KVM as parallel

@@ -17,16 +17,19 @@ type SettingChange struct {
 }
 
 type ConfigPlanReport struct {
-	SchemaVersion        int               `json:"schemaVersion"`
-	Operation            string            `json:"operation"`
-	State                string            `json:"state"`
-	Repository           string            `json:"repository"`
-	File                 string            `json:"file"`
-	BaseFingerprint      string            `json:"baseFingerprint,omitempty"`
-	CandidateFingerprint string            `json:"candidateFingerprint,omitempty"`
-	Changes              []SettingChange   `json:"changes"`
-	Impacts              []SettingImpact   `json:"impacts,omitempty"`
-	Issues               []ValidationIssue `json:"issues"`
+	SchemaVersion        int             `json:"schemaVersion"`
+	Operation            string          `json:"operation"`
+	State                string          `json:"state"`
+	Repository           string          `json:"repository"`
+	File                 string          `json:"file"`
+	BaseFingerprint      string          `json:"baseFingerprint,omitempty"`
+	CandidateFingerprint string          `json:"candidateFingerprint,omitempty"`
+	Changes              []SettingChange `json:"changes"`
+	Impacts              []SettingImpact `json:"impacts,omitempty"`
+	// NetworkPreflight holds read-only checks of the network devices a
+	// reviewed interface or DHCP address change would use.
+	NetworkPreflight *NetworkPreflight `json:"networkPreflight,omitempty"`
+	Issues           []ValidationIssue `json:"issues"`
 }
 
 func (r ConfigPlanReport) HasErrors() bool {
@@ -71,6 +74,7 @@ func DiffLabSettings(before, after LabSettingsFile) []SettingChange {
 	add("lab.masterDhcpIp", before.Lab.MasterDHCPIP, after.Lab.MasterDHCPIP)
 	add("lab.networkBase", before.Lab.NetworkBase, after.Lab.NetworkBase)
 	add("lab.networkPrefixLength", before.Lab.NetworkPrefix, after.Lab.NetworkPrefix)
+	add("lab.networkTransition", before.Lab.NetworkTransition, after.Lab.NetworkTransition)
 	add("lab.pcCount", before.Lab.PCCount, after.Lab.PCCount)
 	add("lab.masterHostNumber", before.Lab.MasterHostNumber, after.Lab.MasterHostNumber)
 	add("lab.ifaceName", before.Lab.InterfaceName, after.Lab.InterfaceName)

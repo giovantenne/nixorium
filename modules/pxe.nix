@@ -4,6 +4,9 @@ let
   preparationFile = "/var/lib/nixorium/prepared/prepared.json";
   sessionFile = "/var/lib/nixorium/pxe/session.json";
   lastSessionFile = "/var/lib/nixorium/pxe/last-session.json";
+  # During a change of laboratory network (labSettings.networkTransition) PXE
+  # tracks only the new static address; the previous one stays on the
+  # interface untouched. Network installation is prepared again afterwards.
   networkAction = pkgs.writeShellApplication {
     name = "nixorium-pxe-network-action";
     runtimeInputs = [ pkgs.coreutils pkgs.gawk pkgs.iproute2 pkgs.jq pkgs.util-linux ];

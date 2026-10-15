@@ -194,6 +194,43 @@ computer's firmware must also allow it (BIOS/UEFI options often called "Wake
 on LAN" or "Power on by PCI-E"), and the computer must keep standby power: a
 switched-off power strip or a power cut disarms it.
 
+### Laboratory network transition
+
+While computers move from one laboratory network to another, the settings
+hold a `lab.networkTransition` record
+(`{ "previousBase": "10.0.0.0", "previousPrefixLength": 24, "startedAt": "<RFC 3339>" }`)
+next to the new `networkBase` and `networkPrefixLength`, and the configuration
+is dual. Every host keeps its host number on both networks. The controller
+carries its new and its previous address on the laboratory interface; its
+firewall is interface-scoped, so SSH, the cache and PXE ports are open on both,
+and the cache listens on every address. Clients take the new address and keep
+the previous one next to it (a second address on a named interface,
+`address2` of the `nixorium-lab` profile otherwise, which is applied to the
+running card with `nmcli device reapply` when the profile changes), so the
+update that moves a client keeps its connection and an undo finds every client
+on the restored network. They accept SSH from both controller addresses (two `ip saddr` rules, in the
+firewall allow list and in the `nixorium-client-access` guard), list the new
+controller cache first and the previous one second, and keep both networks
+reachable under the temporary Internet block. PXE preparation and network
+installation keep using the new controller address only: prepare network
+installation again after the change. `labSettings.networkTransition` gives
+modules `{ base, prefixLength, masterIp, hostIps }` of the previous network
+(`hostIps` maps each client name to its previous address), or `null`;
+`labMeta.network.transition` (present only during a change) lists the previous
+controller address and each client's previous address for management tools.
+The previous network must be a valid IPv4 network different from and not
+overlapping the current one, hold every configured host number and exclude the
+controller DHCP address; without client computers the record is ignored (the
+evaluation warns and the management command refuses to save it). Settings
+changes accept a new network base or prefix while computers are configured
+only together with a record naming the saved network, and during a change only
+a return to its previous network, or an undo that restores the previous network
+and removes the record. Without the record the configuration is exactly the
+single-network one; an address a client no longer needs after the record is
+removed disappears at its next start. The guided change (Maintenance → Change
+network addressing, `nixorium network migrate`) writes and removes the record;
+see ADR 0028 and the administrator guide.
+
 ## USB/SSH client installation boundary
 
 The supported remote-install environment is the official NixOS 26.05 Minimal
@@ -356,6 +393,27 @@ cards every two seconds and keeps asking when the controller does not answer,
 giving up on a request after 15 seconds; after two failed requests in a row
 the summary says **Reconnecting…**. **Refresh** asks at once, closes the
 notice of the last action and draws every card again.
+
+A computer that answers over SSH with someone signed in, but whose agent does
+not answer (the socket is missing, or the agent is frozen and gives no answer
+to the relay's own hello within 3 seconds), shows a warning sign over its
+dimmed last picture and **Monitoring stopped on this PC**. The login screen does not count as someone signed in
+(only a session of class `user` does), so a computer waiting at it says
+**Nobody is signed in**. The same words explain the computer wherever an
+action skips it (Lock, Send files, Share screen, Collect from desktop and
+Save screenshot), and a result notice counts such computers apart, as
+"monitoring stopped on this PC". The agent restarts by itself: its user unit
+is `Restart=always` with a one-second delay and no start limit, and both
+classroom user units refuse a manual stop (`RefuseManualStop`), so
+`systemctl --user stop` fails in the student's terminal and a killed agent is
+back within seconds; the card returns to the live picture. The Shell
+extension helper is a one-shot unit, which systemd restarts only after a
+failure. This is a classroom aid, not a security boundary: a student can still
+mask a unit or freeze the process (which the card reports, but nothing
+revives), and loses that at the next boot, when the home is reset. The relay
+never outlives the controller's channel by more than 5 seconds, even when the
+agent is frozen. Because the units refuse a manual stop, an update does not
+restart them either: the new agent starts at the next sign-in.
 
 Clicking a computer opens it in its own browser window, refreshed about ten
 times a second at up to 1920 pixels; the agent sends a frame only when the

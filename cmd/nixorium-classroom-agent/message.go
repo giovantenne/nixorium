@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"strconv"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
@@ -74,10 +72,7 @@ func messageReply(notice messenger, message classroomview.Message) classroomview
 // probeMessage shows a message through a command, as the controller does,
 // or removes it when show is false. duration is 0 (until the student closes
 // it), a number of seconds, or "unlock" (until the computer is unlocked).
-func probeMessage(command []string, show bool, text, duration string, output io.Writer) error {
-	if len(command) == 0 {
-		return errors.New("probe needs a command, for example nixorium-classroom-connect")
-	}
+func probeMessage(ctx context.Context, command []string, show bool, text, duration string, output io.Writer) error {
 	request := classroomview.Message{Type: classroomview.TypeMessageHide}
 	if show {
 		request = classroomview.Message{Type: classroomview.TypeMessageShow, Text: text}
@@ -89,23 +84,11 @@ func probeMessage(command []string, show bool, text, duration string, output io.
 			return errors.New("--message needs a text and 0–600 seconds or \"unlock\"")
 		}
 	}
-	process := exec.Command(command[0], command[1:]...)
-	stdin, err := process.StdinPipe()
+	stdin, stdout, finish, err := startProbe(ctx, command)
 	if err != nil {
 		return err
 	}
-	stdout, err := process.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	process.Stderr = os.Stderr
-	if err := process.Start(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = stdin.Close()
-		_ = process.Wait()
-	}()
+	defer finish()
 	for _, message := range []classroomview.Message{{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}, request} {
 		if err := classroomview.Write(stdin, message); err != nil {
 			return err

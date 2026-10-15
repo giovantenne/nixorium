@@ -208,7 +208,7 @@ func (Local) WriteSoftwareIfUnchanged(repository string, expected []byte, softwa
 	if err := syscall.Flock(rootDescriptor, syscall.LOCK_EX); err != nil {
 		return fmt.Errorf("lock deployment root: %w", err)
 	}
-	defer syscall.Flock(rootDescriptor, syscall.LOCK_UN)
+	defer func() { _ = syscall.Flock(rootDescriptor, syscall.LOCK_UN) }()
 	target := filepath.Join(repository, softwareFileName)
 	current, _, readErr := readRegularFileNoFollowLimit(target, 1024*1024)
 	if readErr != nil || !bytes.Equal(current, expected) {

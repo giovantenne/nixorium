@@ -33,6 +33,9 @@ jobs:
       - name: Check agent guidance against the command parser
         run: bash scripts/check-agent-guidance.sh
 
+      - name: Lint shell scripts and Go error handling
+        run: nix develop --file tests/source-checks.nix lint-shell --command ./scripts/lint.sh
+
       - name: Check generated documentation and canonical copies
         run: |
           nix build --file tests/source-checks.nix documentation-check --no-link

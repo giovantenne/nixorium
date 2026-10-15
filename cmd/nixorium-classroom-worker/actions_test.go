@@ -231,6 +231,9 @@ func TestResultRowsCountOffSkippedAndFailedComputers(t *testing.T) {
 		{false, "Unavailable in the reviewed plan; nothing was sent.", plannedTarget{detail: app.ClassroomOffDetail}, outcomeOff, app.ClassroomOffDetail},
 		{false, "Unavailable in the reviewed plan; nothing was sent.", plannedTarget{detail: "Nobody is signed in."}, outcomeSkipped, "Nobody is signed in."},
 		{false, app.ClassroomOffDetail, plannedTarget{eligible: true}, outcomeOff, app.ClassroomOffDetail},
+		// The agent was stopped at the review, or stopped meanwhile.
+		{false, "Unavailable in the reviewed plan; nothing was sent.", plannedTarget{detail: "Monitoring stopped on this PC."}, outcomeStopped, "Monitoring stopped on this PC."},
+		{false, "Monitoring stopped on this PC.", plannedTarget{eligible: true}, outcomeStopped, "Monitoring stopped on this PC."},
 		{false, "The computer did not confirm; check it before trying again.", plannedTarget{eligible: true}, outcomeFailed, "The computer did not confirm; check it before trying again."},
 	} {
 		row := resultRow("pc01", test.done, test.note, test.planned)

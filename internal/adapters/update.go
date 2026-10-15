@@ -553,7 +553,7 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 	if err := syscall.Flock(rootDescriptor, syscall.LOCK_EX); err != nil {
 		return false, fmt.Errorf("lock deployment root: %w", err)
 	}
-	defer syscall.Flock(rootDescriptor, syscall.LOCK_UN)
+	defer func() { _ = syscall.Flock(rootDescriptor, syscall.LOCK_UN) }()
 	revision, err := local.GitRevision(ctx, repository)
 	if err != nil || revision != expectedRevision {
 		return false, errors.New("deployment HEAD changed after update review")

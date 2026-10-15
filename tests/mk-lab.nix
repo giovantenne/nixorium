@@ -50,6 +50,34 @@ let
     labConfig = labConfig // { hostIfaceNames.pc02 = "enp3s0"; };
   });
   plainLab = mkLab baseArgs;
+  # A change of laboratory network from 10.0.0.0/24 to 10.1.0.0/24.
+  previousNetwork = { previousBase = "10.0.0.0"; previousPrefixLength = 24; startedAt = "2026-10-15T08:00:00Z"; };
+  transitionLab = mkLab (baseArgs // {
+    labConfig = labConfig // { networkBase = "10.1.0.0"; networkTransition = previousNetwork; };
+  });
+  transitionNamedLab = mkLab (baseArgs // {
+    labConfig = labConfig // { networkBase = "10.1.0.0"; clientIfaceName = "enp2s0"; networkTransition = previousNetwork; };
+  });
+  movedLab = mkLab (baseArgs // { labConfig = labConfig // { networkBase = "10.1.0.0"; }; });
+  transitionController = transitionLab.nixosConfigurations.pc99.config;
+  transitionClient = transitionLab.nixosConfigurations.pc01.config;
+  labHttpSubstituters = config: builtins.filter (lib.hasPrefix "http://10.") config.nix.settings.substituters;
+  plainAddresses = addresses: map (entry: { inherit (entry) address prefixLength; }) addresses;
+  transitionRejected = transition: !(builtins.tryEval (builtins.deepSeq
+    (mkLab (baseArgs // { labConfig = labConfig // { networkBase = "10.1.0.0"; networkTransition = transition; }; })).labMeta
+    true)).success;
+  ignoredTransitionLab = mkLab (baseArgs // {
+    labConfig = labConfig // {
+      deploymentMode = "controller";
+      pcCount = 0;
+      teacherPassword = "$6$test$teacher";
+      studentPassword = "$6$test$student";
+      adminPassword = "$6$test$admin";
+      # Not even validated: it names the current network.
+      networkTransition = previousNetwork;
+    };
+    publicKeys = { cache = null; ssh = null; };
+  });
   keyboardLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       keyboardLayout = "it";
@@ -321,6 +349,100 @@ assert hostOnlyInterfaceLab.nixosConfigurations.pc02.config.networking.networkma
 assert hostOnlyInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces == {};
 assert hostOnlyInterfaceLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles ? nixorium-lab;
 assert hostOnlyInterfaceLab.nixosConfigurations.pc99.config.networking.interfaces ? enp0s3;
+# Without a change of laboratory network the network configuration is the
+# single-network one, byte for byte (these literals are the previous output).
+assert !(subnetLab.labMeta.network ? transition);
+assert subnetLab.nixosConfigurations.pc01._module.specialArgs.labSettings.networkTransition == null;
+assert plainAddresses subnetLab.nixosConfigurations.pc99.config.networking.interfaces.enp0s3.ipv4.addresses
+  == [ { address = "10.23.4.227"; prefixLength = 25; } ];
+assert subnetLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules
+  == "ip saddr 10.23.4.227 tcp dport 22 accept\n";
+assert subnetLab.nixosConfigurations.pc01.config.networking.nftables.tables.nixorium-client-access.content
+  == "chain input {\n  type filter hook input priority -10; policy accept;\n  iifname \"lo\" accept\n  ip saddr 10.23.4.227 tcp dport 22 accept\n  tcp dport 22 drop\n  udp dport 5353 drop\n}\n";
+assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules
+  == "iifname \"enp2s0\" ip saddr 10.0.0.99 tcp dport 22 accept\n";
+assert labHttpSubstituters subnetLab.nixosConfigurations.pc01.config == [ "http://10.23.4.227:5000" ];
+assert import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; } == ''
+  table inet nixorium_internet {
+    chain output {
+      type filter hook output priority -10; policy drop;
+      oifname "lo" accept
+      oifname "enp2s0" ip daddr 10.0.0.0/24 accept
+  # Preserve address renewal without permitting ordinary Internet traffic.
+  oifname "enp2s0" udp sport 68 udp dport 67 accept
+  oifname "enp2s0" ip6 daddr ff02::1:2 udp sport 546 udp dport 547 accept
+  oifname "enp2s0" icmpv6 type { nd-router-solicit, nd-neighbor-solicit, nd-neighbor-advert } accept
+
+    }
+    chain forward {
+      type filter hook forward priority -10; policy drop;
+      oifname "enp2s0" ip daddr 10.0.0.0/24 accept
+    }
+  }
+'';
+# During a change of laboratory network the controller carries both addresses
+# on its laboratory interface; the interface-scoped firewall and the cache
+# listening on every address cover both.
+assert plainAddresses transitionController.networking.interfaces.enp0s3.ipv4.addresses == [
+  { address = "10.1.0.99"; prefixLength = 24; }
+  { address = "10.0.0.99"; prefixLength = 24; }
+];
+assert builtins.all (port: builtins.elem port transitionController.networking.firewall.interfaces.enp0s3.allowedTCPPorts) [ 22 5000 8080 ];
+assert builtins.all (port: builtins.elem port transitionController.networking.firewall.interfaces.enp0s3.allowedUDPPorts) [ 67 69 4011 ];
+assert transitionController.services.harmonia.cache.settings.bind == "[::]:5000";
+assert transitionLab.labMeta.controller.staticIp == "10.1.0.99";
+assert transitionLab.labMeta.network.base == "10.1.0.0";
+assert transitionLab.labMeta.network.transition == {
+  base = "10.0.0.0";
+  prefixLength = 24;
+  controllerIp = "10.0.0.99";
+  startedAt = "2026-10-15T08:00:00Z";
+  clients = builtins.genList (index: {
+    name = "pc${if index < 9 then "0" else ""}${toString (index + 1)}";
+    ip = "10.0.0.${toString (index + 1)}";
+  }) 20;
+};
+assert (builtins.head transitionLab.labMeta.clients.hosts).ip == "10.1.0.1";
+assert removeAttrs transitionLab.nixosConfigurations.pc01._module.specialArgs.labSettings.networkTransition [ "hostIps" ]
+  == { base = "10.0.0.0"; prefixLength = 24; masterIp = "10.0.0.99"; };
+assert transitionLab.nixosConfigurations.pc01._module.specialArgs.labSettings.networkTransition.hostIps.pc20 == "10.0.0.20";
+# Clients take the new address and keep the previous one, accept SSH from
+# both controller addresses and try the new controller cache first; the
+# running card takes the changed profile at once.
+assert transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "10.1.0.1/24";
+assert transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address2 == "10.0.0.1/24";
+assert lib.hasInfix "nmcli device reapply" transitionClient.systemd.services.NetworkManager-ensure-profiles.postStart;
+assert !(lib.hasInfix "nmcli device reapply" movedLab.nixosConfigurations.pc01.config.systemd.services.NetworkManager-ensure-profiles.postStart);
+assert !(movedLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4 ? address2);
+assert transitionClient.networking.firewall.extraInputRules
+  == "ip saddr 10.1.0.99 tcp dport 22 accept\nip saddr 10.0.0.99 tcp dport 22 accept\n";
+assert transitionClient.networking.nftables.tables.nixorium-client-access.content
+  == "chain input {\n  type filter hook input priority -10; policy accept;\n  iifname \"lo\" accept\n  ip saddr 10.1.0.99 tcp dport 22 accept\n  ip saddr 10.0.0.99 tcp dport 22 accept\n  tcp dport 22 drop\n  udp dport 5353 drop\n}\n";
+assert labHttpSubstituters transitionClient == [ "http://10.1.0.99:5000" "http://10.0.0.99:5000" ];
+assert plainAddresses transitionNamedLab.nixosConfigurations.pc01.config.networking.interfaces.enp2s0.ipv4.addresses
+  == [ { address = "10.1.0.1"; prefixLength = 24; } { address = "10.0.0.1"; prefixLength = 24; } ];
+assert transitionNamedLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules
+  == "iifname \"enp2s0\" ip saddr 10.1.0.99 tcp dport 22 accept\niifname \"enp2s0\" ip saddr 10.0.0.99 tcp dport 22 accept\n";
+# The classroom Internet block keeps both laboratory networks reachable.
+assert transitionClient.systemd.services.nixorium-internet-block.serviceConfig.ExecStart
+  != movedLab.nixosConfigurations.pc01.config.systemd.services.nixorium-internet-block.serviceConfig.ExecStart;
+assert lib.hasInfix "ip daddr 10.1.0.0/24 accept\nip daddr 10.0.0.0/24 accept\n"
+  (import ../lib/client-internet-rules.nix { interface = null; networkCidr = "10.1.0.0/24"; previousNetworkCidr = "10.0.0.0/24"; });
+assert lib.hasInfix "  oifname \"enp2s0\" ip daddr 10.1.0.0/24 accept\n    oifname \"enp2s0\" ip daddr 10.0.0.0/24 accept\n  }"
+  (import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.1.0.0/24"; previousNetworkCidr = "10.0.0.0/24"; });
+# Invalid previous networks are refused; without clients the record is ignored.
+assert transitionRejected (previousNetwork // { previousBase = "10.1.0.0"; });
+assert transitionRejected (previousNetwork // { previousPrefixLength = 15; });
+assert transitionRejected (previousNetwork // { previousBase = "10.1.0.128"; previousPrefixLength = 25; });
+assert transitionRejected (previousNetwork // { previousPrefixLength = 26; });
+assert transitionRejected (previousNetwork // { startedAt = "yesterday"; });
+assert !(transitionRejected previousNetwork);
+assert !(ignoredTransitionLab.labMeta.network ? transition);
+assert ignoredTransitionLab.nixosConfigurations.pc99._module.specialArgs.labSettings.networkTransition == null;
+assert builtins.elem
+  "lab.networkTransition is ignored because no client computers are configured; remove it from lab-settings.json"
+  ignoredTransitionLab.nixosConfigurations.pc99.config.warnings;
+assert !(builtins.any (lib.hasInfix "networkTransition") controllerOnly.warnings);
 # Temporary Internet block rules: name-based only for explicit names.
 assert builtins.length (lib.splitString "oifname" (import ../lib/client-internet-rules.nix { interface = null; networkCidr = "10.0.0.0/24"; })) == 2;
 assert lib.hasInfix "oifname \"enp2s0\" ip daddr 10.0.0.0/24 accept" (import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; });
@@ -400,6 +522,22 @@ assert !(classroomViewLab.nixosConfigurations.pc99.config.systemd.user.services 
 # The classroom view is on unless a laboratory turns it off.
 assert subnetLab.nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent;
 assert !((mkLab (baseArgs // { labConfig = labConfig // { classroomView = false; }; })).nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent);
+# A student cannot stop the agent or its extension helper from the terminal
+# of the session: both refuse a manual stop and never run out of starts; the
+# agent also restarts after one second however it ends (systemd rejects
+# Restart=always for the oneshot helper).
+assert (
+  let
+    units = classroomViewLab.nixosConfigurations.pc01.config.systemd.user.services;
+    agent = units.nixorium-classroom-agent;
+    helper = units.nixorium-classroom-extension;
+  in
+  agent.serviceConfig.Restart == "always"
+  && agent.serviceConfig.RestartSec == 1
+  && helper.serviceConfig.Restart == "on-failure"
+  && helper.serviceConfig.RestartSec == 1
+  && lib.all (unit: unit.unitConfig.RefuseManualStop == true && unit.unitConfig.StartLimitIntervalSec == 0) [ agent helper ]
+);
 # It adds no network port: the controller reaches it through SSH.
 assert lib.hasInfix "tcp dport 22 accept"
   classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;

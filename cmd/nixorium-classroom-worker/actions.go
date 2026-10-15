@@ -34,10 +34,12 @@ const (
 )
 
 // Outcomes of a computer in an action's result, which the page counts in
-// its one-line notice.
+// its one-line notice. outcomeStopped is a computer that answers with
+// someone signed in while its classroom agent does not.
 const (
 	outcomeDone    = "done"
 	outcomeOff     = "off"
+	outcomeStopped = "stopped"
 	outcomeSkipped = "skipped"
 	outcomeFailed  = "failed"
 )
@@ -302,9 +304,12 @@ func broadcastReview(plan domain.BroadcastPlan) (actionReview, pendingAction) {
 	eligible := 0
 	for _, target := range plan.Targets {
 		row := actionRow{Name: target.Name, Note: target.Detail}
-		if target.Eligible {
+		switch {
+		case target.Eligible:
 			eligible++
-		} else {
+		case target.Detail == app.ClassroomNoAgentDetail:
+			row.Note += " It gets your screen as soon as monitoring runs again."
+		default:
 			row.Note += " It gets your screen when someone signs in."
 		}
 		review.Rows = append(review.Rows, row)
@@ -571,8 +576,13 @@ func resultRow(name string, done bool, note string, planned plannedTarget) actio
 		if planned.detail == app.ClassroomOffDetail {
 			row.Outcome = outcomeOff
 		}
+		if planned.detail == app.ClassroomNoAgentDetail {
+			row.Outcome = outcomeStopped
+		}
 	case note == app.ClassroomOffDetail:
 		row.Outcome = outcomeOff
+	case note == app.ClassroomNoAgentDetail:
+		row.Outcome = outcomeStopped
 	default:
 		row.Outcome = outcomeFailed
 	}

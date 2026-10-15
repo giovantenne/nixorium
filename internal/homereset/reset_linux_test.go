@@ -10,9 +10,24 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
+
+func TestCommandsEndWhenTheyDoNotFinish(t *testing.T) {
+	old := commandTimeout
+	commandTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { commandTimeout = old })
+	started := time.Now()
+	err := command("sleep", "30")
+	if err == nil || time.Since(started) > 5*time.Second {
+		t.Fatalf("a command that never finishes returned %v after %v", err, time.Since(started))
+	}
+	if output, err := commandOutput("sh", "-c", "echo $LANG"); err != nil || strings.TrimSpace(string(output)) != "C" {
+		t.Fatalf("output = %q, %v", output, err)
+	}
+}
 
 func resetVMConfig(t *testing.T) Config {
 	t.Helper()

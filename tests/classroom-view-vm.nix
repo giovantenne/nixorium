@@ -178,10 +178,34 @@ pkgs.testers.runNixOSTest {
     client.succeed("(${agent} probe --thumbnail /tmp/thumb-locked.jpg nixorium-classroom-connect || true) | grep -F 'code=screen-locked'")
     client.succeed("loginctl unlock-sessions")
 
-    # Without a running agent the controller gets a clear error, not a hang.
-    client.succeed("systemctl --user -M student@ stop nixorium-classroom-agent")
+    # The student's terminal cannot stop the agent or its extension helper:
+    # a manual stop is refused, and a killed agent starts again by itself.
+    client.fail("systemctl --user -M student@ stop nixorium-classroom-agent")
+    client.fail("systemctl --user -M student@ stop nixorium-classroom-extension")
+    client.succeed("systemctl --user -M student@ is-active nixorium-classroom-agent")
+    old_pid = client.succeed("systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent").strip()
+    client.succeed(f"kill -9 {old_pid}")
+    client.wait_until_succeeds(f"pid=$(systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent); test \"$pid\" != 0 -a \"$pid\" != {old_pid}", timeout=30)
+    client.wait_until_succeeds("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1'", timeout=30)
+
+    # A frozen agent (SIGSTOP) keeps its socket but answers nothing: the relay
+    # gives up on it within seconds and says no-agent, never "off", and it
+    # works again after SIGCONT.
+    frozen = client.succeed("systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent").strip()
+    client.succeed(f"kill -STOP {frozen}")
+    client.succeed("(timeout 30 ${agent} probe nixorium-classroom-connect || true) | grep -F 'code=no-agent'")
+    client.succeed(f"kill -CONT {frozen}")
+    client.wait_until_succeeds("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1'", timeout=30)
+
+    # While the agent does not answer (its socket is gone) the controller gets
+    # a clear error, not a hang: the card says "Monitoring stopped on this PC".
+    client.succeed("rm /run/user/1000/nixorium-classroom.sock")
     client.fail("${agent} probe nixorium-classroom-connect")
-    client.succeed("${agent} probe nixorium-classroom-connect | grep -F 'code=no-agent' || true")
+    client.succeed("(${agent} probe nixorium-classroom-connect || true) | grep -F 'code=no-agent'")
+    # systemd starts the agent again, with a new socket.
+    pid = client.succeed("systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent").strip()
+    client.succeed(f"kill -9 {pid}")
+    client.wait_until_succeeds("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1'", timeout=30)
     # An ordinary user cannot use the root relay.
     client.fail("su student -s /bin/sh -c '${agent} connect < /dev/null'")
   '';

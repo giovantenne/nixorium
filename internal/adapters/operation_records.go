@@ -104,7 +104,7 @@ func recordOperation(stateRoot string, now time.Time, pid int, record domain.Ope
 	if err := syscall.Flock(lockDescriptor, syscall.LOCK_EX); err != nil {
 		return fmt.Errorf("lock operation records: %w", err)
 	}
-	defer syscall.Flock(lockDescriptor, syscall.LOCK_UN)
+	defer func() { _ = syscall.Flock(lockDescriptor, syscall.LOCK_UN) }()
 
 	store, err := readOperationRecordFile(directory)
 	if errors.Is(err, syscall.ENOENT) {

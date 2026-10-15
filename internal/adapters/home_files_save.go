@@ -277,7 +277,8 @@ func (local Local) RecordHomeFilesCandidate(ctx context.Context, repository, exp
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		for _, id := range draft.CaptureIDs {
-			local.DiscardHomeFilesCapture(cleanup, repository, id)
+			// The commit is made; a leftover capture expires on its own.
+			_ = local.DiscardHomeFilesCapture(cleanup, repository, id)
 		}
 	}
 	return commit, err

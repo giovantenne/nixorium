@@ -220,7 +220,7 @@ func (Local) CaptureHomeFiles(ctx context.Context, repository, sourcePath, desti
 	complete := false
 	defer func() {
 		if !complete {
-			discardHomeStage(root, id, stage)
+			_ = discardHomeStage(root, id, stage)
 		}
 	}()
 	report = domain.HomeFilesCaptureReport{SchemaVersion: 1, State: "captured", CaptureID: id, Destination: destination, Files: []domain.HomeFile{}, Directories: []string{}, Entries: []domain.HomeFilesEntry{}, Issues: []domain.ValidationIssue{}, Message: "Captured a private local copy. Original file changes are not watched. Review destinations and explicit executability before saving; materials enter Git, the Nix store and cache."}

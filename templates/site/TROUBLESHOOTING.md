@@ -77,6 +77,8 @@ and JSON issues carry a `next` object with the same code and texts; the JSON
 | `REVIEW-CHANGED` | Something changed after the review | Create a new review and confirm again |
 | `PXE-ACTIVE` | Network installation is still active | Finish the network installation, or recover the controller network ([The controller network is inconsistent](#the-controller-network-is-inconsistent)) |
 | `SETTINGS-INVALID` | The laboratory settings are not valid | Repair the settings ([Configuration is invalid](#configuration-is-invalid)) |
+| `NETWORK-LOCKED` | The laboratory network cannot be changed while computers are configured | Keep the saved network values in Settings and move the computers with the guided change of the laboratory network (Maintenance → Change network addressing); the controller number stays locked, device names and the controller DHCP address can still change |
+| `NETWORK-CHANGING` | The laboratory network is being changed | Continue the change (Maintenance → Change network addressing; `nixorium network migrate status`): apply to the controller, update the computers, then finish or undo it (administrator guide, "Changing the laboratory network") |
 | `CLIENT-UNCONFIRMED` | A computer did not confirm the request | Check the computer in Computer inventory before trying again |
 | `DISK-LOW` | The controller is low on disk space | Free disk space (Maintenance → Free disk space) |
 | `CONTROLLER-NOT-APPLIED` | The controller is not running its saved configuration | Apply the saved configuration to the controller ([Controller apply failed](#controller-apply-failed)) |
@@ -679,6 +681,32 @@ the current content is first saved under
 `refs/nixorium/discard-backups/…`, then the selected files return to the last
 commit. Untracked files, new files and private keys are never touched. Never add `secret-key`, `admin-ssh`,
 or plaintext credentials.
+
+## The last saved change caused trouble
+
+To go back to the configuration saved before your last change, review and
+apply the undo (in the dashboard: **Maintenance → Advanced → Review Git
+changes**, key `u`), then apply to the controller and update the computers as
+usual:
+
+```sh
+nixorium git undo plan
+nixorium git undo apply --expect REVIEW_TOKEN
+```
+
+The undo is saved as one new change; the undone change stays in the history,
+no computer changes and nothing is pushed. Unsaved changes stop it with
+`GIT-DIRTY` (review and save or discard them first). It also refuses a first
+saved version, a merge, a change that is already an undo, a change that
+recorded keys or the recovery file (see
+[Keys are missing or inconsistent](#keys-are-missing-or-inconsistent)), a
+change of the laboratory network (use **Maintenance → Change network
+addressing**) and files that cannot go back safely; each refusal names what to
+do instead. A change that updated Nixorium or the package base is recovered as
+described in [An upstream update failed](#an-upstream-update-failed) and in
+UPDATES.md, "Recovery and long-term autonomy". A computer that already runs
+the changed configuration returns only when you update it; a computer that
+cannot start can be taken back from its own boot menu.
 
 ## Configuration is invalid
 
