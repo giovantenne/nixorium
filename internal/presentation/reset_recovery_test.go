@@ -154,7 +154,7 @@ func TestResetRecoveryReviewExplainsWhatBlocksIt(t *testing.T) {
 			t.Fatalf("blocked review:\n%s", view)
 		}
 		model = runRead(model.Update(keyPress("enter")))
-		if len(fixture.applied) != 0 {
+		if len(fixture.applied) != 0 || !contains(plainView(model), test.want) {
 			t.Fatal("Enter applied a blocked review")
 		}
 	}
