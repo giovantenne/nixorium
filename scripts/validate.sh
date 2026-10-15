@@ -6,7 +6,8 @@ usage() {
 Usage: ./scripts/validate.sh [MODE]
 
 Modes:
-  --quick                Fast local checks (default)
+  --quick                Fast local checks (default): shell syntax and tests,
+                         ShellCheck, errcheck, schemas, generated docs, Go
   --eval                 Quick checks plus the complete mkLab evaluation
   --management-vm        Quick checks plus the management VM test
   --client-installer-vm  Quick checks plus the client installer VM test
@@ -96,6 +97,9 @@ test -e .pi/skills/nixorium-developer/SKILL.md
 nix eval --file tests/validation-groups-test.nix --json | jq -e '. == true' >/dev/null
 
 run_quick_checks() {
+  # ShellCheck and errcheck from the pinned lint shell, before the longer builds.
+  nix develop --file "${REPO_ROOT}/tests/source-checks.nix" lint-shell \
+    --command bash scripts/lint.sh
   nix build \
     --file "${REPO_ROOT}/tests/source-checks.nix" \
     config-schema \

@@ -1,0 +1,41 @@
+// Calls whose error is intentionally ignored; used by scripts/lint.sh as
+// "errcheck -exclude .errcheck-exclude". errcheck matches function names only,
+// so an entry applies everywhere. Anything that writes, locks or commits must
+// still check its error: do not add such a call here, handle the error instead,
+// or write "_ =" at a call whose result is deliberately dropped.
+
+// Release of a descriptor, file, socket, session or lock holder. These run on
+// error paths or after the work is complete and verified, and a failure cannot
+// be acted on. Writers check the Close that commits their data.
+(io.Closer).Close
+(*os.File).Close
+(*archive/zip.ReadCloser).Close
+(*compress/gzip.Reader).Close
+(net.Conn).Close
+(net.Listener).Close
+(*net.conn).Close
+(*net/http.Server).Close
+(golang.org/x/crypto/ssh.Conn).Close
+(*golang.org/x/crypto/ssh.Session).Close
+(*github.com/godbus/dbus/v5.Conn).Close
+(github.com/giovantenne/nixorium/internal/classroomview.Session).Close
+(*github.com/giovantenne/nixorium/internal/adapters.AssistantWorkspace).Close
+(*github.com/giovantenne/nixorium/internal/adapters.operationGate).Close
+(*github.com/giovantenne/nixorium/internal/adapters.sshAgentSession).Close
+golang.org/x/sys/unix.Close
+syscall.Close
+
+// Best-effort removal of temporary files and staging directories.
+os.Remove
+os.RemoveAll
+golang.org/x/sys/unix.Unlinkat
+
+// Serve always returns an error after Close, and a failed write to an HTTP
+// client has nobody to report to.
+(*net/http.Server).Serve
+(net/http.ResponseWriter).Write
+
+// Messages and rendered reports written to the terminal or a caller's stream.
+fmt.Fprint
+fmt.Fprintf
+fmt.Fprintln
