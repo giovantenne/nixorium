@@ -682,10 +682,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		model.controller.autoApply = false
+		model, reload := model.offerControllerInterfaceReload()
 		if model.actions.LoadControllerProgress != nil {
-			return model, model.loadControllerProgress(model.controller.progressID)
+			return model, tea.Batch(model.loadControllerProgress(model.controller.progressID), reload)
 		}
-		return model, nil
+		return model, reload
 	case dashboardControllerProgressTickMsg:
 		if !model.controller.applying || message.id != model.controller.progressID || model.actions.LoadControllerProgress == nil {
 			return model, nil
@@ -864,7 +865,14 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = message.report.Message
 		}
 		model.screen = dashboardUpdate
+		if !model.updates.packageBase && !message.plan.HasErrors() && model.updates.result.Updated && !model.updates.result.HasErrors() &&
+			!model.updates.result.RecoveryRequired && controllerVerifiedForSave(model.updates.result.Revision, message.report) {
+			return model.offerInterfaceReload()
+		}
+		model.reload = interfaceReloadModel{id: model.reload.id + 1}
 		return model, nil
+	case interfaceReloadTickMsg:
+		return model.updateInterfaceReloadTick(message)
 	default:
 		return model.updateConfigurationMessage(message)
 	}
@@ -1342,6 +1350,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.helpOpen = true
 		model.pageScroll = 0
 		return model, nil
+	}
+	if next, command, handled := model.updateInterfaceReloadKey(key); handled {
+		return next, command
 	}
 	if model.screen == dashboardAssistant {
 		return model.updateAssistantKey(key)

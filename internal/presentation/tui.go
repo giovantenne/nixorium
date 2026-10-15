@@ -21,6 +21,9 @@ import (
 // stop action, not the read-only Esc path. PreparePXE is systemd-owned;
 // ApplyController waits for a managed job while the foreground UI stays protected.
 type DashboardActions struct {
+	// InstalledInterface reports whether the installed Nixorium differs from
+	// the running one. It is nil outside the administrator dashboard.
+	InstalledInterface func() (InterfaceReload, bool)
 	// OpenURL starts the desktop browser without waiting for it. It is nil
 	// when no graphical session is available (for example over SSH).
 	OpenURL                   func(string) error
@@ -466,6 +469,7 @@ type dashboardModel struct {
 	deployment             deploymentModel
 	deferred               deferredModel
 	controller             controllerModel
+	reload                 interfaceReloadModel
 	maintenance            maintenanceModel
 	updates                updateModel
 	settings               settingsModel
@@ -740,6 +744,14 @@ type dashboardShutdownPlanMsg struct{ report domain.ShutdownPlanReport }
 type dashboardShutdownApplyMsg struct{ report domain.ShutdownApplyReport }
 
 func RunLoadingDashboard(actions DashboardActions, setupMode bool) error {
+	_, err := RunLoadingDashboardReload(actions, setupMode)
+	return err
+}
+
+// RunLoadingDashboardReload runs the dashboard and reports whether it ended
+// because the administrator asked to reopen it on the installed Nixorium. The
+// terminal is already restored when it returns.
+func RunLoadingDashboardReload(actions DashboardActions, setupMode bool) (bool, error) {
 	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, actions, false)
 	model.setupMode = setupMode
 	model.initializing = true
@@ -751,8 +763,12 @@ func RunLoadingDashboard(actions DashboardActions, setupMode bool) error {
 		model.disclaimerChecking = true
 		model.busy = "Reading local acknowledgement"
 	}
-	_, err := tea.NewProgram(model).Run()
-	return err
+	final, err := tea.NewProgram(model).Run()
+	reload := false
+	if finished, ok := final.(dashboardModel); ok {
+		reload = finished.reload.state == interfaceReloadRequested
+	}
+	return reload && err == nil, err
 }
 
 func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions, setupMode bool) dashboardModel {
@@ -1830,7 +1846,7 @@ func (model dashboardModel) updateView() string {
 		if success && model.updates.packageBase {
 			lines = append(lines, "Check boot, networking, desktop and services before client distribution; a reboot may be needed.")
 		} else if success {
-			lines = append(lines, "Reopen Nixorium to use the updated interface.")
+			lines = append(lines, model.reload.line())
 		} else if model.updates.result.RecoveryRequired {
 			lines = append(lines, "Files were written but saving needs recovery. Complete the save before controller activation.")
 		} else if model.updates.result.Updated && !model.updates.result.HasErrors() {
@@ -1856,6 +1872,9 @@ func (model dashboardModel) updateView() string {
 			actions = append(actions, tuiAction{key: "Enter", label: "Retry controller"}, tuiAction{key: "a", label: "Retry controller"})
 		}
 		actions = append(actions, retry, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+		if success && !model.updates.packageBase && model.reload.counting() {
+			actions = model.reloadActions()
+		}
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	if model.screen == dashboardUpdateReview {
@@ -2208,6 +2227,10 @@ func (model dashboardModel) controllerView() string {
 			fmt.Sprintf("Last result: %s at phase %s", model.controller.result.State, model.controller.result.Phase),
 			fmt.Sprintf("Applied: %t   Verified: %t", model.controller.result.Applied, model.controller.result.Verified),
 		)
+		controllerReload := !model.controller.result.HasErrors() && model.controller.result.Applied && model.controller.result.Verified && model.reload.state != interfaceReloadNone
+		if controllerReload {
+			lines = append(lines, "", model.reload.line())
+		}
 		if model.controller.details && model.controller.progress.Operation != "" {
 			lines = append(lines, "")
 			lines = append(lines, model.operationProgressView(model.controller.progress, "Last controller apply")...)
@@ -2225,6 +2248,9 @@ func (model dashboardModel) controllerView() string {
 			returnLabel = "Setup"
 		}
 		actions := []tuiAction{{key: "Enter", label: returnLabel}, {key: "d", label: detailsLabel}, {key: "l", label: "Logs"}, {key: "n", label: "New review"}, {key: "F1", label: "Help"}}
+		if controllerReload && model.reload.counting() {
+			actions = model.reloadActions()
+		}
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	lines = append(lines,
