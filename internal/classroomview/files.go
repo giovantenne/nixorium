@@ -49,7 +49,13 @@ func ValidateFileEntries(entries []FileEntry) error {
 	if len(entries) == 0 {
 		return errors.New("nothing to send")
 	}
-	if len(entries) > MaxFileEntries {
+	return validateTree(entries, MaxFileEntries, MaxFileBytes, errors.New("the files are larger than 500 MB"))
+}
+
+// validateTree checks a plain relative tree of named files and folders
+// within a number of entries and a total size.
+func validateTree(entries []FileEntry, maxEntries int, maxBytes int64, tooLarge error) error {
+	if len(entries) > maxEntries {
 		return errors.New("too many files and folders")
 	}
 	var total int64
@@ -73,12 +79,12 @@ func ValidateFileEntries(entries []FileEntry) error {
 			dirs[entry.Path] = true
 			continue
 		}
-		if entry.Size < 0 || entry.Size > MaxFileBytes {
+		if entry.Size < 0 || entry.Size > maxBytes {
 			return errors.New("a file size is out of range")
 		}
 		total += entry.Size
-		if total > MaxFileBytes {
-			return errors.New("the files are larger than 500 MB")
+		if total > maxBytes {
+			return tooLarge
 		}
 	}
 	return nil

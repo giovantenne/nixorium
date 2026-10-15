@@ -19,6 +19,10 @@ type desktopBroker struct {
 	mutex   sync.Mutex
 	waiting map[int]chan desktopOffer
 	jobs    map[string]*desktopJob
+	// saves are files a user's process copies into that user's home
+	// (desktop_save.go); seen is when each user's helper last waited.
+	saves map[string]*desktopSave
+	seen  map[int]time.Time
 }
 
 // desktopOffer is a job handed to a helper: its id and what to choose.
@@ -54,14 +58,11 @@ func (broker *desktopBroker) Wait(ctx context.Context, uid int) desktopOffer {
 	jobs := make(chan desktopOffer, 1)
 	broker.mutex.Lock()
 	broker.waiting[uid] = jobs
+	if broker.seen == nil {
+		broker.seen = map[int]time.Time{}
+	}
+	broker.seen[uid] = time.Now()
 	broker.mutex.Unlock()
-	defer func() {
-		broker.mutex.Lock()
-		if broker.waiting[uid] == jobs {
-			delete(broker.waiting, uid)
-		}
-		broker.mutex.Unlock()
-	}()
 	timer := time.NewTimer(desktopWait)
 	defer timer.Stop()
 	select {
@@ -69,6 +70,20 @@ func (broker *desktopBroker) Wait(ctx context.Context, uid int) desktopOffer {
 		return job
 	case <-timer.C:
 	case <-ctx.Done():
+	}
+	broker.mutex.Lock()
+	taken := broker.waiting[uid] != jobs
+	if !taken {
+		delete(broker.waiting, uid)
+	}
+	broker.mutex.Unlock()
+	// A job handed over just as the wait ended is kept, not lost.
+	if taken {
+		select {
+		case job := <-jobs:
+			return job
+		case <-time.After(time.Second):
+		}
 	}
 	return desktopOffer{}
 }
@@ -127,6 +142,10 @@ func (broker *desktopBroker) Ready(uid int, id, transfer, message string, cancel
 	broker.mutex.Lock()
 	job, found := broker.jobs[id]
 	broker.mutex.Unlock()
+	if !found && message != "" {
+		// A helper that cannot save (an older one) answers a save job here.
+		return broker.SaveDone(uid, id, nil, message)
+	}
 	if !found || job.uid != uid {
 		return false
 	}

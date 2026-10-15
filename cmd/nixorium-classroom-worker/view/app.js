@@ -246,6 +246,7 @@ function render(computers) {
   }
   summary.textContent = viewing + ' of ' + computers.length + ' screens visible. Student computers show a sharing notice while you watch.';
   updateSelection();
+  updateSaveButtons(computers);
 }
 
 // Actions: the controller reviews the computers first; nothing happens until
@@ -456,6 +457,52 @@ async function sendFiles(kind, computers) {
   runAction('send-files', computers, prepared.transfer);
 }
 
+// Save screenshots: the controller takes a picture of each computer's screen
+// at up to 1920 pixels, and Nixorium (which started this browser) saves it
+// in Nixorium/Screenshots in the home folder. A page opened another way
+// downloads the pictures through the browser instead.
+const screenshotButton = document.getElementById('viewer-screenshot');
+
+async function saveScreenshots(computers) {
+  showToast(computers.length === 1 ? 'Saving the screenshot…' : 'Saving the screenshots…', { sticky: true });
+  let result;
+  try {
+    result = await postJSON('/api/screenshots', { computers });
+  } catch (error) {
+    showToast('The controller did not answer; no screenshot was saved.', { sticky: true });
+    return;
+  }
+  const downloads = result.downloads || [];
+  for (const download of downloads) {
+    const link = document.createElement('a');
+    link.href = '/api/screenshots/file?id=' + encodeURIComponent(download.id);
+    link.download = download.name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+  }
+  const rows = result.rows || [];
+  if (rows.length === 1 && rows[0].outcome === 'done' && rows[0].file) {
+    showToast((downloads.length ? 'Screenshot downloaded: ' : 'Screenshot saved: ') + rows[0].file);
+    return;
+  }
+  showResult('Screenshots', result);
+}
+
+// A computer's window offers a screenshot only of a live screen.
+function updateSaveButtons(computers) {
+  if (!selected) return;
+  const computer = computers.find((item) => item.name === selected);
+  if (!computer) return;
+  const live = computer.state === 'viewing';
+  screenshotButton.disabled = !live;
+  screenshotButton.title = live ? 'Save a picture of this screen in Nixorium/Screenshots in your home folder' : (stateText[computer.state] || computer.detail || '');
+}
+
+screenshotButton.addEventListener('click', () => {
+  if (selected) saveScreenshots([selected]);
+});
+
 // Share screen: GNOME asks what to share (the whole screen is offered
 // first; a window or a tab works too, but not this page itself); after the
 // review the page sends a picture whenever it changes, at most five a
@@ -546,6 +593,10 @@ function updateCasting() {
 window.addEventListener('pagehide', () => stopCasting());
 
 function startAction(action, computers) {
+  if (action === 'screenshots') {
+    saveScreenshots(computers);
+    return;
+  }
   if (action === 'send-file' || action === 'send-folder') sendFiles(action === 'send-file' ? 'file' : 'folder', computers);
   else if (action === 'show-screen' && casting) stopCasting();
   else if (action === 'show-screen') showMyScreen(computers);

@@ -59,7 +59,7 @@ func (o ClassroomOperation) Valid() bool {
 		ClassroomWakePlanOperation, ClassroomWakeApplyOperation:
 		return true
 	default:
-		return false
+		return saveOperations[o]
 	}
 }
 
@@ -81,6 +81,7 @@ type ClassroomRequest struct {
 	ShareOffset    int64                 `json:"shareOffset,omitempty"`
 	ShareData      []byte                `json:"shareData,omitempty"`
 	SharePlan      *SharePlan            `json:"sharePlan,omitempty"`
+	SaveNames      []string              `json:"saveNames,omitempty"`
 	DesktopJob     string                `json:"desktopJob,omitempty"`
 	DesktopError   string                `json:"desktopError,omitempty"`
 	// DesktopCancelled: the user closed the file chooser without a choice.
@@ -117,6 +118,9 @@ type ClassroomResponse struct {
 	ShareTransfer  string               `json:"shareTransfer,omitempty"`
 	SharePlan      *SharePlan           `json:"sharePlan,omitempty"`
 	ShareReport    *ShareReport         `json:"shareReport,omitempty"`
+	SaveItems      []ShareFile          `json:"saveItems,omitempty"`
+	SaveTotal      int                  `json:"saveTotal,omitempty"`
+	SaveData       []byte               `json:"saveData,omitempty"`
 	DesktopJob     string               `json:"desktopJob,omitempty"`
 	DesktopKind    string               `json:"desktopKind,omitempty"`
 	// Switch-on review and its result.

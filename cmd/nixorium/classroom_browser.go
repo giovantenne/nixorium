@@ -81,6 +81,10 @@ func serveDesktopJobs(ctx context.Context) {
 		if response.DesktopJob == "" {
 			continue
 		}
+		if _, save := saveFolders[response.DesktopKind]; save {
+			saveDesktopJob(ctx, response.DesktopJob, response.DesktopKind)
+			continue
+		}
 		transfer, message := "", ""
 		item, chosen, chooseErr := chooseShareItem(ctx, response.DesktopKind)
 		if chooseErr == nil && chosen {

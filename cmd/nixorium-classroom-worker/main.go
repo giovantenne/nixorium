@@ -66,6 +66,7 @@ func run() error {
 	// The page's actions go through the same handling as the dashboard.
 	worker.view.actions = worker.handle
 	worker.view.desktops = newDesktopBroker()
+	go worker.view.desktops.expireSaves(ctx, time.Minute)
 	view := worker.view
 	view.internet = &internetWatcher{
 		observe:  local.ObserveInternet,
@@ -195,6 +196,8 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 			worker.shares.Remove(request.SharePlan.Transfer)
 		}
 		response.ShareReport = &report
+	case domain.ClassroomSaveItemsOperation, domain.ClassroomSaveReadOperation, domain.ClassroomSaveDoneOperation:
+		return worker.handleSave(ctx, request)
 	case domain.ClassroomDesktopWaitOperation, domain.ClassroomDesktopReadyOperation:
 		uid, known := adapters.ClassroomPeerUID(ctx)
 		if !known || worker.view == nil || worker.view.desktops == nil {
