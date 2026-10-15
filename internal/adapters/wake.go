@@ -194,14 +194,20 @@ func readSmallFile(path string, limit int64) ([]byte, error) {
 
 // openDirectory opens the private state directory without following links.
 func (store WakeAddressStore) openDirectory() (int, error) {
-	directory, err := unix.Open(store.Directory, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	return openPrivateStateDirectory(store.Directory)
+}
+
+// openPrivateStateDirectory opens a directory of the classroom service's
+// state without following links, only when it is private to this account.
+func openPrivateStateDirectory(path string) (int, error) {
+	directory, err := unix.Open(path, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return -1, err
 	}
 	var stat unix.Stat_t
 	if err := unix.Fstat(directory, &stat); err != nil || stat.Uid != uint32(os.Geteuid()) || stat.Mode&0o077 != 0 {
 		unix.Close(directory)
-		return -1, errors.New("the Wake-on-LAN state directory is not private to this account")
+		return -1, errors.New("the classroom state directory is not private to this account")
 	}
 	return directory, nil
 }
@@ -251,26 +257,11 @@ func (store WakeAddressStore) update(change func(map[string]domain.WakeAddress) 
 		return err
 	}
 	defer unix.Close(directory)
-	lock, err := unix.Openat(directory, wakeAddressLock, unix.O_RDWR|unix.O_CREAT|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0o600)
+	unlock, err := lockPrivateState(directory, wakeAddressLock)
 	if err != nil {
 		return err
 	}
-	defer unix.Close(lock)
-	if !wakeFileSafe(lock) {
-		return errors.New("the Wake-on-LAN lock file is unsafe")
-	}
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		err = unix.Flock(lock, unix.LOCK_EX|unix.LOCK_NB)
-		if err == nil {
-			break
-		}
-		if !errors.Is(err, unix.EWOULDBLOCK) || time.Now().After(deadline) {
-			return errors.New("the Wake-on-LAN record is busy")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	defer unix.Flock(lock, unix.LOCK_UN)
+	defer unlock()
 	addresses := readWakeAddresses(directory)
 	if !change(addresses) {
 		return nil
@@ -294,11 +285,48 @@ func writeWakeAddresses(directory int, addresses map[string]domain.WakeAddress) 
 	if err != nil {
 		return err
 	}
+	return replacePrivateFile(directory, wakeAddressFile, ".wake-addresses-", content)
+}
+
+// lockPrivateState takes an exclusive lock on a small lock file of the state
+// directory, waiting up to two seconds, and returns the function that
+// releases it.
+func lockPrivateState(directory int, name string) (func(), error) {
+	lock, err := unix.Openat(directory, name, unix.O_RDWR|unix.O_CREAT|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if !wakeFileSafe(lock) {
+		unix.Close(lock)
+		return nil, errors.New("a classroom state lock file is unsafe")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		err = unix.Flock(lock, unix.LOCK_EX|unix.LOCK_NB)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, unix.EWOULDBLOCK) || time.Now().After(deadline) {
+			unix.Close(lock)
+			return nil, errors.New("the classroom state record is busy")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return func() {
+		unix.Flock(lock, unix.LOCK_UN)
+		unix.Close(lock)
+	}, nil
+}
+
+// replacePrivateFile writes content to a new mode-0600 file next to target,
+// syncs it, and renames it over target, so a reader sees the old or the new
+// content, never a mix.
+func replacePrivateFile(directory int, target, prefix string, content []byte) error {
 	nonce := make([]byte, 12)
 	if _, err := rand.Read(nonce); err != nil {
 		return err
 	}
-	name := ".wake-addresses-" + hex.EncodeToString(nonce)
+	name := prefix + hex.EncodeToString(nonce)
 	descriptor, err := unix.Openat(directory, name, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0o600)
 	if err != nil {
 		return err
@@ -320,7 +348,7 @@ func writeWakeAddresses(directory int, addresses map[string]domain.WakeAddress) 
 	if closeErr != nil {
 		return closeErr
 	}
-	if err := unix.Renameat(directory, name, directory, wakeAddressFile); err != nil {
+	if err := unix.Renameat(directory, name, directory, target); err != nil {
 		return err
 	}
 	return unix.Fsync(directory)

@@ -30,6 +30,11 @@ func (a ClientPowerAction) Confirmation() string {
 const (
 	ShutdownProtectUnknown     ShutdownSessionPolicy = "protect-unknown"
 	ShutdownAcknowledgeUnknown ShutdownSessionPolicy = "acknowledge-unknown"
+	// ShutdownSkipActive is the form without a person to confirm it, used by
+	// the schedule: a computer someone is using, or whose session state is
+	// unknown, is left on, both in the review and in the check just before
+	// the request is sent.
+	ShutdownSkipActive ShutdownSessionPolicy = "skip-active"
 )
 
 type ShutdownSessionState string

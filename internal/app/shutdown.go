@@ -58,8 +58,8 @@ func (m *ShutdownManager) PlanAction(ctx context.Context, repository, requested 
 		return shutdownPlanIssue(report, "repository", fmt.Sprintf("resolve path: %v", err))
 	}
 	report.Repository = root
-	if policy != domain.ShutdownProtectUnknown && policy != domain.ShutdownAcknowledgeUnknown {
-		return shutdownPlanIssue(report, "policy", "session policy must be protect-unknown or acknowledge-unknown")
+	if policy != domain.ShutdownProtectUnknown && policy != domain.ShutdownAcknowledgeUnknown && policy != domain.ShutdownSkipActive {
+		return shutdownPlanIssue(report, "policy", "session policy must be protect-unknown, acknowledge-unknown or skip-active")
 	}
 	meta, err := m.source.LabMeta(ctx, root)
 	if err != nil {
@@ -249,6 +249,9 @@ func shutdownObservationEligible(observation domain.ShutdownObservation, policy 
 	case domain.ShutdownSessionIdle:
 		return true, "no interactive user session detected"
 	case domain.ShutdownSessionActive:
+		if policy == domain.ShutdownSkipActive {
+			return false, "someone is using it"
+		}
 		return true, "interactive user session active; unsaved work may be lost"
 	case domain.ShutdownSessionUnused:
 		return true, "logged in but not in use (no recent keyboard or mouse input)"
