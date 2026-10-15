@@ -359,6 +359,10 @@ func loginctl(arguments ...string) (string, error) {
 var sessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9]{1,32}$`)
 
 // activeSeatUser returns the user of the active graphical session on seat0.
+// The login screen is a graphical session too, of the display manager's own
+// user: only a session of class "user" counts as someone signed in, so a
+// computer waiting at the login screen is "nobody signed in" and not one
+// whose agent stopped.
 func activeSeatUser(run commandRunner) (int, error) {
 	session, err := run("show-seat", "seat0", "--property=ActiveSession", "--value")
 	if err != nil || !sessionIDPattern.MatchString(session) {
@@ -367,6 +371,10 @@ func activeSeatUser(run commandRunner) (int, error) {
 	kind, err := run("show-session", session, "--property=Type", "--value")
 	if err != nil || (kind != "wayland" && kind != "x11") {
 		return 0, errors.New("the active session on seat0 is not graphical")
+	}
+	class, err := run("show-session", session, "--property=Class", "--value")
+	if err != nil || class != "user" {
+		return 0, errors.New("nobody is signed in on seat0")
 	}
 	value, err := run("show-session", session, "--property=User", "--value")
 	if err != nil {

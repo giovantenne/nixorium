@@ -30,6 +30,7 @@ func graphicalSession(uid int) commandRunner {
 	return fakeLoginctl(map[string]string{
 		"show-seat seat0 --property=ActiveSession --value": "2",
 		"show-session 2 --property=Type --value":           "wayland",
+		"show-session 2 --property=Class --value":          "user",
 		"show-session 2 --property=User --value":           strconv.Itoa(uid),
 	})
 }
@@ -81,15 +82,26 @@ func TestConnectReportsMissingSessionOrAgent(t *testing.T) {
 	for name, run := range map[string]commandRunner{
 		"no session":   fakeLoginctl(map[string]string{"show-seat seat0 --property=ActiveSession --value": ""}),
 		"text session": fakeLoginctl(map[string]string{"show-seat seat0 --property=ActiveSession --value": "3", "show-session 3 --property=Type --value": "tty"}),
-		"no agent":     graphicalSession(os.Getuid()),
+		// The login screen is a graphical session of the display manager's user.
+		"login screen": fakeLoginctl(map[string]string{
+			"show-seat seat0 --property=ActiveSession --value": "c1",
+			"show-session c1 --property=Type --value":          "wayland",
+			"show-session c1 --property=Class --value":         "greeter",
+			"show-session c1 --property=User --value":          "60578",
+		}),
+		"no agent": graphicalSession(os.Getuid()),
 	} {
 		output := &bytes.Buffer{}
 		if err := connect(strings.NewReader(""), output, run, base); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		reply, err := classroomview.Read(output)
-		if err != nil || reply.Type != classroomview.TypeError || (reply.Code != classroomview.CodeNoSession && reply.Code != classroomview.CodeNoAgent) {
-			t.Fatalf("%s: reply = %+v, %v", name, reply, err)
+		want := classroomview.CodeNoSession
+		if name == "no agent" {
+			want = classroomview.CodeNoAgent
+		}
+		if err != nil || reply.Type != classroomview.TypeError || reply.Code != want {
+			t.Fatalf("%s: reply = %+v, %v; want code %s", name, reply, err, want)
 		}
 	}
 }

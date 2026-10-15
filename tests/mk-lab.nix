@@ -400,6 +400,22 @@ assert !(classroomViewLab.nixosConfigurations.pc99.config.systemd.user.services 
 # The classroom view is on unless a laboratory turns it off.
 assert subnetLab.nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent;
 assert !((mkLab (baseArgs // { labConfig = labConfig // { classroomView = false; }; })).nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent);
+# A student cannot stop the agent or its extension helper from the terminal
+# of the session: both refuse a manual stop and never run out of starts; the
+# agent also restarts after one second however it ends (systemd rejects
+# Restart=always for the oneshot helper).
+assert (
+  let
+    units = classroomViewLab.nixosConfigurations.pc01.config.systemd.user.services;
+    agent = units.nixorium-classroom-agent;
+    helper = units.nixorium-classroom-extension;
+  in
+  agent.serviceConfig.Restart == "always"
+  && agent.serviceConfig.RestartSec == 1
+  && helper.serviceConfig.Restart == "on-failure"
+  && helper.serviceConfig.RestartSec == 1
+  && lib.all (unit: unit.unitConfig.RefuseManualStop == true && unit.unitConfig.StartLimitIntervalSec == 0) [ agent helper ]
+);
 # It adds no network port: the controller reaches it through SSH.
 assert lib.hasInfix "tcp dport 22 accept"
   classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
