@@ -49,7 +49,7 @@ func RunResolver(node, name, version string) error {
 		defer response.Body.Close()
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(response.StatusCode)
-		io.Copy(w, io.LimitReader(response.Body, MaxMetadataBytes+1))
+		_, _ = io.Copy(w, io.LimitReader(response.Body, MaxMetadataBytes+1))
 	})}
 	go server.Serve(listener)
 	defer server.Close()
