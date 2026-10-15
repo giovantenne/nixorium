@@ -181,9 +181,9 @@ that branch, regenerate the product pin on the tagged commit
 demos:generate`), commit "Pin the site to Nixorium v<version> (<sha>)", review
 the technician guide against the new changelog, build, merge into `master`, and
 push `master` (production) and `master:staging`. The site's production build
-refuses a pin that is not a published tag. It shows the pinned version in its
-footer and on `/docs/`, linked to that release's notes, so a release is not
-finished until the site follows it.
+refuses a pin whose tag is missing, points elsewhere or has no published GitHub
+release. It shows the pinned version in its footer and on `/docs/`, linked to
+that release's notes, so a release is not finished until the site follows it.
 
 ## Architecture Notes
 

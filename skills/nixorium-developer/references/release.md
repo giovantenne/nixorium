@@ -56,8 +56,9 @@ the commit it is built against, with
 (and `npm run demos:generate` when a demo changes), and it is pushed to
 `staging` for review. A preview branch may pin an unreleased commit.
 
-After the tag, once the release workflow has published the release, finish the
-site in the same session, on that branch:
+After the tag, once the release workflow has published the GitHub release, finish
+the site in the same session, on that branch (until the release is published the
+website's production build refuses the pin):
 
 1. Run `npm run demos:generate` at the tag (or update the pin) and commit
    "Pin the site to Nixorium v<version> (<sha>)".
@@ -66,6 +67,7 @@ site in the same session, on that branch:
    push `master` and `master:staging`.
 
 Production therefore changes in the same moment as the release. The website's
-production build fails when its pinned commit is not a published release, so
-`master` cannot move ahead of the tag. The website README, section "Release
-branches", holds the same process.
+production build fails unless the tag `v<version>` points at its pinned commit
+and the GitHub release of that tag is published, so `master` cannot move ahead of
+the release. The website README, section "Release branches", holds the same
+process.
