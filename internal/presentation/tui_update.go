@@ -764,6 +764,28 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = ""
 		model.screen = dashboardGitCommitReview
 		return model, nil
+	case dashboardGitUndoPlanMsg:
+		model.busy = ""
+		model.maintenance.gitUndoPlan = message.report
+		model.confirmation = ""
+		model.maintenance.gitScroll = 0
+		model.message = ""
+		model.screen = dashboardGitUndoReview
+		return model, nil
+	case dashboardGitUndoResultMsg:
+		model.computers.hosts = domain.HostsReport{}
+		model.busy = ""
+		if !message.report.HasErrors() && message.report.Committed {
+			model.noteControllerSave(message.report.Revision)
+		}
+		model.maintenance.gitUndoResult = message.report
+		model.maintenance.gitCommitResult = domain.GitCommitReport{}
+		model.maintenance.gitReview = message.review
+		model.maintenance.gitScroll = 0
+		model.confirmation = ""
+		model.message = message.report.Message
+		model.screen = dashboardGitReview
+		return model, nil
 	case dashboardGitCommitResultMsg:
 		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
@@ -771,6 +793,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.noteControllerSave(message.report.Revision)
 		}
 		model.maintenance.gitCommitResult = message.report
+		model.maintenance.gitUndoResult = domain.GitUndoReport{}
 		model.maintenance.gitReview = message.review
 		model.maintenance.gitScroll = 0
 		model.confirmation = ""

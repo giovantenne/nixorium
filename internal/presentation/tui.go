@@ -112,6 +112,8 @@ type DashboardActions struct {
 	PlanGitDiscard          func(context.Context, string) domain.GitCommitPlanReport
 	ApplyGitDiscard         func(domain.GitCommitPlanReport) domain.GitCommitReport
 	ApplyGitCommit          func(domain.GitCommitPlanReport) domain.GitCommitReport
+	PlanGitUndo             func(context.Context) domain.GitUndoPlanReport
+	ApplyGitUndo            func(domain.GitUndoPlanReport) domain.GitUndoReport
 	CheckUpdate             func(context.Context) domain.UpdateCheckReport
 	PlanUpdate              func(context.Context, string, bool, bool) domain.UpdatePlanReport
 	PlanUpdateWithProgress  func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
@@ -190,6 +192,7 @@ const (
 	dashboardGitReview
 	dashboardGitCommitSelect
 	dashboardGitCommitReview
+	dashboardGitUndoReview
 	dashboardUpdate
 	dashboardUpdateReview
 	dashboardSettings
@@ -349,9 +352,13 @@ type maintenanceModel struct {
 	gitCommitCursor int
 	gitCommitChosen map[string]bool
 	// gitDiscard switches path selection and review to a reviewed discard.
-	gitDiscard       bool
-	gitCommitPlan    domain.GitCommitPlanReport
-	gitCommitResult  domain.GitCommitReport
+	gitDiscard      bool
+	gitCommitPlan   domain.GitCommitPlanReport
+	gitCommitResult domain.GitCommitReport
+	// gitUndoPlan and gitUndoResult belong to the reviewed undo of the last
+	// saved change, opened with u on the Git review.
+	gitUndoPlan      domain.GitUndoPlanReport
+	gitUndoResult    domain.GitUndoReport
 	gitFromWorkspace bool
 	gitFromHomeFiles bool
 }
@@ -688,6 +695,15 @@ type dashboardGitCommitPlanMsg struct {
 
 type dashboardGitCommitResultMsg struct {
 	report domain.GitCommitReport
+	review domain.GitReviewReport
+}
+
+type dashboardGitUndoPlanMsg struct {
+	report domain.GitUndoPlanReport
+}
+
+type dashboardGitUndoResultMsg struct {
+	report domain.GitUndoReport
 	review domain.GitReviewReport
 }
 
@@ -1314,7 +1330,7 @@ func (model dashboardModel) View() tea.View {
 		content = model.logsView()
 	case dashboardLogDetail:
 		content = model.logDetailView()
-	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
+	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview, dashboardGitUndoReview:
 		content = model.gitReviewView()
 	case dashboardUpdate, dashboardUpdateReview:
 		content = model.updateView()
@@ -1605,6 +1621,9 @@ func (model dashboardModel) gitReviewView() string {
 	if model.screen == dashboardGitCommitReview {
 		return model.gitCommitReviewView()
 	}
+	if model.screen == dashboardGitUndoReview {
+		return model.gitUndoReviewView()
+	}
 	path := []string{"Maintenance", "Changes"}
 	backLabel := "Maintenance"
 	if model.maintenance.gitFromHomeFiles {
@@ -1619,6 +1638,9 @@ func (model dashboardModel) gitReviewView() string {
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
+	}
+	if model.maintenance.gitUndoResult.Operation != "" {
+		return model.gitUndoResultView(path, backLabel)
 	}
 	if model.maintenance.gitCommitResult.Operation != "" {
 		success := !model.maintenance.gitCommitResult.HasErrors() && model.maintenance.gitCommitResult.Committed
@@ -1676,6 +1698,9 @@ func (model dashboardModel) gitReviewView() string {
 		if model.actions.PlanGitDiscard != nil {
 			actions = append(actions, tuiAction{key: "x", label: "Discard changes"})
 		}
+	}
+	if model.actions.PlanGitUndo != nil && model.actions.ApplyGitUndo != nil {
+		actions = append(actions, tuiAction{key: "u", label: "Undo the last saved change"})
 	}
 	actions = append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: backLabel}, tuiAction{key: "F1", label: "Help"})
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})

@@ -112,6 +112,7 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		model.maintenance.gitFromWorkspace = model.screen == dashboardWorkspace
 		model.maintenance.gitFromHomeFiles = model.screen == dashboardHomeFiles
 		model.maintenance.gitCommitResult = domain.GitCommitReport{}
+		model.maintenance.gitUndoResult = domain.GitUndoReport{}
 		model.screen = dashboardGitReview
 		model.busy = "Reviewing Git changes without modifying the worktree"
 		model.message = ""
@@ -1010,7 +1011,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardGitReview:
-		if model.maintenance.gitCommitResult.Operation != "" {
+		if model.maintenance.gitCommitResult.Operation != "" || model.maintenance.gitUndoResult.Operation != "" {
 			switch key.String() {
 			case "enter", "esc", "left":
 				if model.maintenance.gitFromHomeFiles {
@@ -1036,6 +1037,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				}
 			case "r":
 				model.maintenance.gitCommitResult = domain.GitCommitReport{}
+				model.maintenance.gitUndoResult = domain.GitUndoReport{}
 				model.busy = "Refreshing the read-only Git review"
 				model.message = ""
 				return model.startRead(func(ctx context.Context) tea.Msg {
@@ -1105,6 +1107,11 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.maintenance.gitDiscard = false
 			model.message = ""
 			model.screen = dashboardGitCommitSelect
+		case "u":
+			if model.actions.PlanGitUndo == nil || model.actions.ApplyGitUndo == nil {
+				return model, nil
+			}
+			return model.startGitUndoReview()
 		case "x":
 			if model.actions.PlanGitDiscard == nil || len(model.maintenance.gitReview.Changes) == 0 || model.maintenance.gitReview.HasErrors() {
 				model.message = "A clean, unblocked change review is required before discarding changes."
@@ -1212,6 +1219,8 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				model.confirmation += key.Text
 			}
 		}
+	case dashboardGitUndoReview:
+		return model.updateGitUndoReviewKey(key)
 	case dashboardUpdate:
 		if model.updates.result.Operation != "" {
 			switch key.String() {

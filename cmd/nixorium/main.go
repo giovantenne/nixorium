@@ -580,6 +580,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
+		PlanGitUndo: func(ctx context.Context) domain.GitUndoPlanReport {
+			return app.NewGitUndoManager(local).Plan(ctx, repository)
+		},
+		ApplyGitUndo: func(plan domain.GitUndoPlanReport) domain.GitUndoReport {
+			report := app.NewGitUndoManager(local).Apply(ctx, repository, plan.ReviewToken)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
 		PlanGitCommit: func(ctx context.Context, paths string) domain.GitCommitPlanReport {
 			return gitCommitManager.Plan(ctx, repository, paths)
 		},
