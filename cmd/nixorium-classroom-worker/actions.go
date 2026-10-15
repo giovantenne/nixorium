@@ -52,6 +52,7 @@ type pendingAction struct {
 	internet  *domain.InternetPlan
 	power     *domain.ShutdownPlanReport
 	wake      *domain.WakePlan
+	message   *domain.MessagePlan
 	expires   time.Time
 }
 
@@ -60,6 +61,8 @@ type actionPlanRequest struct {
 	Computers []string `json:"computers"`
 	// Transfer names files prepared with /api/share for send-files.
 	Transfer string `json:"transfer,omitempty"`
+	// Message is the text and duration of the message action.
+	Message *domain.MessageContent `json:"message,omitempty"`
 }
 
 type actionApplyRequest struct {
@@ -83,6 +86,9 @@ type actionReview struct {
 	Rows     []actionRow `json:"rows"`
 	Warnings []string    `json:"warnings,omitempty"`
 	Confirm  string      `json:"confirm,omitempty"`
+	// Expires is when the review ends, in Unix milliseconds: exam mode
+	// chains several reviews and checks the time left before it starts.
+	Expires int64 `json:"expires,omitempty"`
 }
 
 type actionResult struct {
@@ -91,6 +97,8 @@ type actionResult struct {
 	Rows    []actionRow `json:"rows"`
 	// Broadcast identifies a started showing of the teacher's screen.
 	Broadcast string `json:"broadcast,omitempty"`
+	// DoneWord replaces "done" in the notice's count, such as "shown".
+	DoneWord string `json:"doneWord,omitempty"`
 }
 
 // computerLabels are short card labels from the latest actions.
@@ -219,6 +227,8 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 		review, pending = shareReview(*response.SharePlan)
 	case actionCollect:
 		review, pending = server.planCollect(ctx, request, operation)
+	case actionMessage, actionMessageHide:
+		review, pending = server.planMessage(ctx, operation, body)
 	default:
 		http.Error(writer, "Unknown action.", http.StatusBadRequest)
 		return
@@ -234,6 +244,7 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 		server.pending[id] = pending
 		server.mutex.Unlock()
 		review.ID = id
+		review.Expires = pending.expires.UnixMilli()
 	}
 	writePageJSON(writer, review)
 }
@@ -442,6 +453,8 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 	case pending.collect != nil:
 		// Collecting and saving can take longer than the other actions.
 		result = server.applyCollect(request.Context(), request, pending.collect)
+	case pending.message != nil:
+		result = server.applyMessage(ctx, pending.message)
 	case pending.lock != nil:
 		operation.Operation = domain.ClassroomLockApplyOperation
 		operation.LockPlan = pending.lock

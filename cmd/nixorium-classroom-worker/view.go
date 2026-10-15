@@ -20,7 +20,7 @@ import (
 	"github.com/giovantenne/nixorium/internal/classroomview"
 )
 
-//go:embed view/index.html view/app.js view/style.css
+//go:embed view/index.html view/app.js view/message.js view/style.css
 var viewAssets embed.FS
 
 const (
@@ -145,6 +145,8 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		server.asset(writer, "view/index.html", "text/html; charset=utf-8")
 	case "/app.js":
 		server.asset(writer, "view/app.js", "text/javascript; charset=utf-8")
+	case "/message.js":
+		server.asset(writer, "view/message.js", "text/javascript; charset=utf-8")
 	case "/style.css":
 		server.asset(writer, "view/style.css", "text/css; charset=utf-8")
 	case "/api/computers":

@@ -100,6 +100,7 @@ function updateSelection() {
   selectAll.indeterminate = chosen.size > 0 && chosen.size < cards.size;
   for (const button of toolbarButtons) button.disabled = chosen.size === 0 && !(button.dataset.action === 'show-screen' && casting);
   for (const menu of document.querySelectorAll('.toolbar .actions-menu')) menu.classList.toggle('disabled', chosen.size === 0);
+  classroomTools.updateExamButton();
 }
 
 selectAll.addEventListener('change', () => {
@@ -199,6 +200,7 @@ function render(computers) {
     if (computer.showing) labels.push('Sharing your screen');
     // The teacher's lock is known only while the screen answers.
     if (computer.locked && (computer.state === 'viewing' || computer.state === 'locked')) labels.push('Locked');
+    if (classroomTools.inExam(computer.name)) labels.push('Exam mode');
     if (computer.internet === 'blocked') labels.push('Internet off');
     if (computer.power) labels.push(computer.power);
     if (labels.join('|') !== entry.badgeText) {
@@ -231,7 +233,7 @@ function render(computers) {
       viewerScreen.title = cover ? covers[cover].title : '';
       // This computer's menu offers only the change that applies.
       const offer = { lock: !computer.locked, unlock: Boolean(computer.locked), 'internet-block': computer.internet !== 'blocked', 'internet-allow': computer.internet === 'blocked' };
-      const needsSession = ['lock', 'unlock', 'show-screen', 'send-file', 'send-folder'];
+      const needsSession = ['lock', 'unlock', 'show-screen', 'send-file', 'send-folder', 'message', 'message-hide'];
       for (const button of viewerActions.querySelectorAll('button[data-action]')) {
         if (button.dataset.action in offer) button.hidden = !offer[button.dataset.action];
         button.disabled = !reachable || (needsSession.includes(button.dataset.action) && !session);
@@ -295,7 +297,7 @@ async function postJSON(path, body) {
   return response.json();
 }
 
-async function runAction(action, computers, transfer) {
+async function runAction(action, computers, transfer, extra) {
   // The dialog takes the keyboard: let go of every key on the student's side.
   if (controlling) {
     pressedCodes.clear();
@@ -310,7 +312,7 @@ async function runAction(action, computers, transfer) {
   actionCancel.textContent = 'Cancel';
   if (!actionDialog.open) actionDialog.showModal();
   try {
-    const review = await postJSON('/api/actions/plan', transfer ? { action, computers, transfer } : { action, computers });
+    const review = await postJSON('/api/actions/plan', { action, computers, ...(transfer ? { transfer } : {}), ...extra });
     actionTitle.textContent = review.title;
     actionMessage.textContent = review.ready ? '' : (review.message || 'This action is not possible now.');
     showRows(actionRows, review.rows);
@@ -377,7 +379,9 @@ function showResult(title, result) {
   for (const row of rows) counts[outcomeOf(row)] = (counts[outcomeOf(row)] || 0) + 1;
   const finished = result.state === 'completed' || result.state === 'started';
   const failed = Boolean(counts.failed) || (rows.length === 0 && !finished);
-  const parts = Object.keys(outcomeWords).filter((outcome) => counts[outcome]).map((outcome) => counts[outcome] + ' ' + outcomeWords[outcome]);
+  // A result may name what "done" was, such as "shown" for a message.
+  const words = { ...outcomeWords, done: result.doneWord || outcomeWords.done };
+  const parts = Object.keys(words).filter((outcome) => counts[outcome]).map((outcome) => counts[outcome] + ' ' + words[outcome]);
   let line = result.message || (finished ? 'Done.' : 'The action did not complete.');
   if (parts.length) line = title + ': ' + parts.join(' · ');
   showToast(line, {
@@ -597,6 +601,8 @@ function startAction(action, computers) {
   if (action === 'send-file' || action === 'send-folder') sendFiles(action === 'send-file' ? 'file' : 'folder', computers);
   else if (action === 'show-screen' && casting) stopCasting();
   else if (action === 'show-screen') showMyScreen(computers);
+  else if (action === 'message') classroomTools.message(computers);
+  else if (action === 'exam') classroomTools.exam(computers);
   else runAction(action, computers);
 }
 

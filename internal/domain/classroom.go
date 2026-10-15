@@ -59,7 +59,7 @@ func (o ClassroomOperation) Valid() bool {
 		ClassroomWakePlanOperation, ClassroomWakeApplyOperation:
 		return true
 	default:
-		return saveOperations[o] || collectOperations[o]
+		return saveOperations[o] || collectOperations[o] || messageOperations[o]
 	}
 }
 
@@ -90,6 +90,11 @@ type ClassroomRequest struct {
 	DesktopCancelled bool `json:"desktopCancelled,omitempty"`
 	// WakePlan is the reviewed switch-on request to apply.
 	WakePlan *WakePlan `json:"wakePlan,omitempty"`
+	// Messages to the students (message.go): show or hide, the text and
+	// its duration, and the reviewed plan to apply.
+	MessageAction  MessageAction   `json:"messageAction,omitempty"`
+	MessageContent *MessageContent `json:"messageContent,omitempty"`
+	MessagePlan    *MessagePlan    `json:"messagePlan,omitempty"`
 }
 
 // Send files from the classroom view page: what the user's file chooser
@@ -130,6 +135,9 @@ type ClassroomResponse struct {
 	// Switch-on review and its result.
 	WakePlan   *WakePlan   `json:"wakePlan,omitempty"`
 	WakeReport *WakeReport `json:"wakeReport,omitempty"`
+	// Message review and its result.
+	MessagePlan   *MessagePlan   `json:"messagePlan,omitempty"`
+	MessageReport *MessageReport `json:"messageReport,omitempty"`
 }
 
 func NewClassroomRequest(operation ClassroomOperation) (ClassroomRequest, error) {
