@@ -102,8 +102,8 @@ Its journal has `kind: "assistant-save"` and its original backup uses
 shared template-reset title; the recovery report identifies the Assistant save.
 See [Assistant recovery](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md#interrupted-save).
 
-**Guided recovery.** The dashboard opens in safe mode with **A deployment
-template reset was interrupted**; open it, or run:
+**Guided recovery.** The dashboard opens in safe mode with **A reset of the
+configuration template was interrupted**; open it, or run:
 
 ```sh
 nixorium template-reset recover plan

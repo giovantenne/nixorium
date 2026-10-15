@@ -129,8 +129,14 @@ step. Apply these rules to every operation, refusal and recovery state:
    later or to ask the administrator, with a short code.
 7. Every loss of access (password, keys, controller disk) has a recovery
    procedure exercised at least in a VM.
-8. Recovery adds a review; it never removes review tokens, rechecks,
-   privilege boundaries or typed confirmations.
+8. Recovery adds a review; it never removes review tokens, rechecks or
+   privilege boundaries. A typed word stays for destructive or uncertain
+   actions; a recovery that changes nothing on any computer and only archives
+   a record is confirmed with Enter (ADR 0026).
+9. A refusal caused by a catalogued situation (`internal/domain/next_steps.go`)
+   shows its Title, Why and Action, never the raw error; the raw text stays
+   behind `d`. Offer the way out where the failure happens: on a result
+   screen, Enter opens the situation's screen.
 
 Before finishing a change, answer: what does the operator see if this stops
 halfway; does the residual state block other work and appear on the

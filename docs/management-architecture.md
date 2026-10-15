@@ -69,7 +69,8 @@ client host-key rotation, the declaration-only student workspace editor, local
 support export ([contract](support-report.md)), deployment template reset
 ([guide](deployment-template-reset.md)), removal of old system generations
 ([ADR 0022](adr/0022-reviewed-generation-cleanup.md)), recovery of interrupted
-operations ([ADR 0023](adr/0023-reviewed-recovery-of-interrupted-operations.md)),
+operations ([ADR 0023](adr/0023-reviewed-recovery-of-interrupted-operations.md),
+confirmation per [ADR 0026](adr/0026-proportionate-confirmation-for-recovery.md)),
 encrypted controller backups
 ([ADR 0024](adr/0024-encrypted-controller-backups.md), supplemented by
 [private Git recovery](adr/0025-private-git-lab-backups.md)) and discard of mistaken
@@ -1195,3 +1196,4 @@ The following decisions are recorded separately:
 - [ADR-0022: reviewed cleanup of old system generations](adr/0022-reviewed-generation-cleanup.md)
 - [ADR-0023: reviewed recovery of interrupted operations](adr/0023-reviewed-recovery-of-interrupted-operations.md)
 - [ADR-0024: encrypted controller backups](adr/0024-encrypted-controller-backups.md)
+- [ADR-0026: proportionate confirmation for recovery](adr/0026-proportionate-confirmation-for-recovery.md)

@@ -6,7 +6,39 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- When something blocks an operation, Nixorium now says it in one plain
+  sentence, why it stops there and what to do next, with the same words on
+  the failure screen, the Overview, the review and in the troubleshooting
+  guide. For example, **Update Nixorium** now reports "The controller was not
+  updated: a previous update of the student computers was interrupted." The
+  technical message is still there behind `d`.
+- On the result of **Update Nixorium**, **Apply to controller** and **Update
+  computers**, Enter opens the screen that solves the problem (for example the
+  review of the interrupted update); Esc closes the result as before and
+  **Retry controller** stays on `a`.
+- When an update of the student computers stops before Nixorium can see how
+  it ended, the review of that update opens at once instead of leaving you on
+  the failure screen. It is no longer refused because Nixorium itself was
+  "still running".
+- The review of an interrupted update, now titled **Review the interrupted
+  update**, says for each computer whether it finished, is still updating or
+  does not answer. Press `c` to continue without the computers that do not
+  answer and Enter to mark the update as reviewed: typing `RECOVERED` is no
+  longer needed, because confirming changes nothing on the computers. It also
+  says when a computer that does not answer belongs to an unfinished USB
+  installation, or when a network installation is still open. The command
+  line asks "Mark this update as reviewed? [y/N]"; `--yes` still skips it.
+- `nixorium deploy apply` prints what to do when the update needs a review.
+
 ### Documentation
+
+- The troubleshooting guide has a new section, "Computer not reachable", for a
+  computer that does not answer at its laboratory address (switched off, still
+  on an old version, or connected with a second network card), and its
+  "Interrupted client deployment" section follows the new review. ADR 0026
+  records which recoveries need a typed word and which only Enter.
 
 - The Assistant guide now states that the free trial is per laboratory: the same
   email address can register several laboratories, each under its own name.

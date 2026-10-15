@@ -1,6 +1,6 @@
 # ADR-0023: Reviewed recovery of interrupted operations
 
-- Status: accepted
+- Status: accepted; confirmation amended by [ADR 0026](0026-proportionate-confirmation-for-recovery.md)
 - Date: 2026-10-01
 
 ## Context
@@ -30,7 +30,9 @@ Interrupted client update (`deploy recover`):
 - The token binds the record, the observations, the acknowledgement and an
   expiry. Apply re-reads the record, rechecks the reachable computers and,
   under the operation lock, renames the record into `recovered/` without
-  overwriting. The confirmation word is `RECOVERED`.
+  overwriting. The confirmation word is `RECOVERED`. (Amended by ADR 0026:
+  this review changes nothing on any computer, so Enter, or a yes/no question
+  in the CLI, confirms it.)
 
 Interrupted template reset (`template-reset recover`):
 

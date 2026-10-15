@@ -768,11 +768,11 @@ in
       if [[ $- == *i* && "''${USER:-}" == admin && -t 1 ]]; then
         echo "Nixorium: manage the laboratory with 'nixorium' (or the Nixorium icon)."
         [[ -e /var/lib/nixorium/coordination/deployment-pending.json ]] \
-          && echo "  Attention: an interrupted client update blocks other operations. Open nixorium."
+          && echo "  Attention: a previous update of the student computers was interrupted. Open nixorium to review it."
         [[ -e /var/lib/nixorium/coordination/usb-reservation.json ]] \
-          && echo "  Attention: a USB installation is unfinished. Open nixorium → Installation."
+          && echo "  Attention: a USB installation was not finished. Open nixorium → Installation."
         [[ -e ${lib.escapeShellArg cfg.deploymentPath}/.git/nixorium-template-reset.json ]] \
-          && echo "  Attention: a deployment template reset was interrupted. See the troubleshooting guide."
+          && echo "  Attention: a reset of the configuration template was interrupted. Open nixorium to finish or undo it."
         true
       fi
     '';

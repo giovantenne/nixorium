@@ -52,27 +52,37 @@ output in journald, so use the exact unit named by the failed report.
 ## Error codes and next steps
 
 When an operation is refused or its result is uncertain, Nixorium names the
-next step: the TUI adds a `Next:` line to the notice, a failed CLI command
-ends with `Next (CODE): …`, and JSON issues carry a `next` object with the
-same code. The codes are stable:
+situation, why it stops there and the next step. In the TUI the notice reads,
+for example:
+
+```text
+! The controller was not updated: a previous update of the student computers was interrupted.
+  Nixorium does not know how it ended on every computer, so it stops every other operation until you review it.
+  Next: Review the interrupted update (Enter)
+```
+
+On a result screen, Enter opens the screen that resolves the situation and `d`
+shows the technical message. A failed CLI command ends with `Next (CODE): …`,
+and JSON issues carry a `next` object with the same code and texts; the JSON
+`message` keeps the technical text. The codes are stable:
 
 | Code | Situation | Next step |
 |---|---|---|
-| `OP-BUSY` | Another operation holds the lock | Wait or open its progress; see [Another operation is already running](#another-operation-is-already-running) |
-| `DEPLOY-PENDING` | An interrupted client update blocks operations | [Interrupted client deployment](#interrupted-client-deployment) |
-| `USB-RESERVED` | A USB installation is unfinished | [A USB installation was interrupted](#a-usb-installation-was-interrupted) |
-| `RESET-PENDING` | A deployment template reset or Assistant save was interrupted | [Deployment template reset recovery](https://github.com/giovantenne/nixorium/blob/master/docs/deployment-template-reset.md#backup-and-recovery) |
-| `GIT-DIRTY` | The configuration has uncommitted changes | [The Git tree is dirty](#the-git-tree-is-dirty) |
+| `DEPLOY-PENDING` | A previous update of the student computers was interrupted | Review the interrupted update ([Interrupted client deployment](#interrupted-client-deployment)) |
+| `OP-BUSY` | Another Nixorium operation is still running | Wait for it to finish, or open its progress from the Overview ([Another operation is already running](#another-operation-is-already-running)) |
+| `USB-RESERVED` | A USB installation was not finished | Resume or close the USB installation ([A USB installation was interrupted](#a-usb-installation-was-interrupted)) |
+| `RESET-PENDING` | A reset of the configuration template was interrupted | Finish or undo the reset ([Deployment template reset recovery](https://github.com/giovantenne/nixorium/blob/master/docs/deployment-template-reset.md#backup-and-recovery); also an interrupted Assistant save) |
+| `GIT-DIRTY` | The configuration has unsaved changes | Review the changes and save or discard them ([The Git tree is dirty](#the-git-tree-is-dirty)) |
 | `REVIEW-EXPIRED` | The review is too old | Create a new review and confirm again |
-| `REVIEW-CHANGED` | Computers or files changed after the review | Create a new review and confirm again |
-| `PXE-ACTIVE` | Network installation is active or needs recovery | [The controller network is inconsistent](#the-controller-network-is-inconsistent) |
-| `SETTINGS-INVALID` | The laboratory settings no longer validate | [Configuration is invalid](#configuration-is-invalid) |
-| `CLIENT-UNCONFIRMED` | A request to a computer could not be confirmed | Check the computer in Computer inventory before retrying |
-| `DISK-LOW` | The Nix store is low on space | Maintenance → Free disk space |
-| `CONTROLLER-NOT-APPLIED` | The controller does not run the saved configuration | [Controller apply failed](#controller-apply-failed) |
-| `BACKUP-DUE` | No recent backup, or keys or settings changed since it | [Backups and restoration](#backups-and-restoration) |
-| `UPDATES-QUEUED` | Computers that were off wait for a queued update | Nothing to do; Computers → Queued updates shows them. Review again those marked as changed |
-| `EVAL-FAILED` | The configuration does not evaluate | Run `nixorium doctor`; fix the first reported error; do not retry other operations |
+| `REVIEW-CHANGED` | Something changed after the review | Create a new review and confirm again |
+| `PXE-ACTIVE` | Network installation is still active | Finish the network installation, or recover the controller network ([The controller network is inconsistent](#the-controller-network-is-inconsistent)) |
+| `SETTINGS-INVALID` | The laboratory settings are not valid | Repair the settings ([Configuration is invalid](#configuration-is-invalid)) |
+| `CLIENT-UNCONFIRMED` | A computer did not confirm the request | Check the computer in Computer inventory before trying again |
+| `DISK-LOW` | The controller is low on disk space | Free disk space (Maintenance → Free disk space) |
+| `CONTROLLER-NOT-APPLIED` | The controller is not running its saved configuration | Apply the saved configuration to the controller ([Controller apply failed](#controller-apply-failed)) |
+| `UPDATES-QUEUED` | Some computers will update when they are switched on | Nothing to do (Computers → Queued updates shows them; review again those marked as changed) |
+| `BACKUP-DUE` | A backup of this laboratory is due | Back up the lab ([Backups and restoration](#backups-and-restoration)) |
+| `EVAL-FAILED` | The configuration has an error | Open Diagnostics and fix the first reported error (`nixorium doctor`; do not retry other operations) |
 
 ## The controller DHCP lease changed
 
@@ -353,10 +363,10 @@ technical cause stays in `journalctl -u nixorium-classroom.service`.
 
 | Code | Meaning | What the administrator does |
 |---|---|---|
-| `OP-BUSY` | Another Nixorium operation is running | Let it finish; see [Another operation is already running](#another-operation-is-already-running) |
-| `DEPLOY-PENDING` | An interrupted client update blocks operations | Follow [Interrupted client deployment](#interrupted-client-deployment) |
-| `USB-RESERVED` | A USB installation is unfinished | Finish, verify or close it ([A USB installation was interrupted](#a-usb-installation-was-interrupted)) |
-| `PXE-ACTIVE` | Network installation is running or needs recovery | Finish installation or run `nixorium pxe recover` |
+| `OP-BUSY` | Another Nixorium operation is still running | Let it finish; see [Another operation is already running](#another-operation-is-already-running) |
+| `DEPLOY-PENDING` | A previous update of the student computers was interrupted | Review the interrupted update ([Interrupted client deployment](#interrupted-client-deployment)) |
+| `USB-RESERVED` | A USB installation was not finished | Resume or close the USB installation ([A USB installation was interrupted](#a-usb-installation-was-interrupted)) |
+| `PXE-ACTIVE` | Network installation is still active | Finish installation or run `nixorium pxe recover` |
 | `CLASSROOM-LOAD` | The classroom service could not read the committed configuration | Read the service journal; fix and commit the configuration |
 | `CLASSROOM-SERVICE` | The classroom service is not running or not answering | `systemctl status nixorium-classroom.service`; apply the controller configuration if it is missing |
 | `CLASSROOM-VIEW-OFF` | The classroom view is turned off for this laboratory | Remove `"classroomView": false` from `lab-settings.json` (or set it to `true`), apply the controller and update the client computers |
@@ -375,6 +385,38 @@ Check power, cabling/VLAN, the configured address, and SSH on that client. Treat
 a changed host key as a security event; do not delete `known_hosts` entries
 blindly. Clients installed before the fixed host-state helper remain `unknown`
 until their next normal deployment.
+
+## Computer not reachable
+
+A computer that does not answer at its laboratory address is not necessarily
+switched off. The review of an interrupted update, the inventory and a client
+update all reach a computer only at its static laboratory address. It may also
+be:
+
+- still running an old version that never took the laboratory address;
+- connected with a second network card, so the laboratory profile came up on
+  the card without the cable;
+- the computer of an unfinished USB or network installation, which never
+  reached its installed system.
+
+At the computer's console, as the administrator account:
+
+```sh
+ip -4 addr                          # is the laboratory address on a card with a link?
+nmcli connection show --active      # is the nixorium-lab profile active, and on which device?
+nmcli connection up nixorium-lab    # bring the laboratory profile up
+systemctl list-jobs                 # is an activation or start-up job still running?
+```
+
+Add `ifname DEVICE` to `nmcli connection up nixorium-lab` to choose the card
+that has the cable. Without an interface name, the laboratory profile is active
+on the first wired card that comes up; for a computer with several wired cards,
+name the right one with a `hostIfaceNames` entry in the private deployment
+(`"lab": { "hostIfaceNames": { "pc07": "enp3s0" } }` in `lab-settings.json`),
+save it through the reviewed settings change, apply the controller and update
+that computer. Finish or close an unfinished USB installation from
+**Installation → USB over SSH**, and a network installation from
+**Installation → Network boot (PXE)**, before installing that computer again.
 
 ## A client was deliberately reinstalled and its SSH key changed
 
@@ -448,46 +490,62 @@ mutations are refused. Inventory and logs remain readable. Malformed or unsafe
 pending evidence also blocks operations rather than being silently removed.
 
 Recovery is reviewed, never automatic: there is no automatic retry or
-force-unlock. Use the guided recovery (ADR 0023): the Overview row
-**An interrupted client update blocks other operations**, or
+force-unlock (ADR 0023; confirmation as in ADR 0026). When an update started
+from **Computers → Update computers** stops this way, Nixorium opens the review
+at once. Otherwise open it from the Overview row **A previous update of the
+student computers was interrupted**, or press Enter on a failure notice that
+names it (for example after **Update Nixorium**).
+
+**Review the interrupted update** lists every recorded computer, checked over
+authenticated SSH (running revision, queued systemd jobs, running activation):
+
+- *finished, running the new version* or *finished, but running another
+  version*: nothing to do now;
+- *still updating*: wait a minute and press `r` to check again; the review
+  cannot be confirmed meanwhile;
+- *not answering*: switch the computer on and press `r`, or press `c` to
+  continue without the computers that do not answer (`c` again includes them).
+  See [Computer not reachable](#computer-not-reachable). The review also says
+  when that computer is the one of an unfinished USB installation, or when a
+  network installation session is still open.
+
+The review also refuses while another Nixorium window or terminal that started
+the update is still open; the window that just ran the update is accepted once
+its apply has returned. Press Enter to mark the update as reviewed. Nothing
+changes on the computers: the exact reviewed record is archived under
+`/var/lib/nixorium/coordination/recovered/` (holding the operation lock, never
+overwriting an earlier archive) and other operations are unblocked. The old
+update is not declared successful: then use **Computers → Update computers** so
+every computer runs the current version. Esc leaves the review without
+changing anything.
+
+From the command line:
 
 ```sh
 nixorium deploy recover plan
 nixorium deploy recover apply --expect REVIEW_TOKEN
 ```
 
-The review confirms that the Nixorium process that started the update has
-exited, checks every recorded computer over authenticated SSH (running
-revision, queued systemd jobs, running activation) and refuses while any of
-them is still applying. Computers that cannot be checked must be inspected at
-their console and acknowledged explicitly (`u` in the TUI,
-`--acknowledge-unreachable` in the CLI). Typing `RECOVERED` archives the exact
-reviewed record under `/var/lib/nixorium/coordination/recovered/`, holding the
-operation lock and never overwriting an earlier archive. It does not declare
-the old update successful: create a fresh deployment review afterwards.
+Add `--acknowledge-unreachable` to both to continue without the computers that
+do not answer.
+`apply` asks `Mark this update as reviewed? [y/N]`; `--yes` skips the question
+for scripts. The token binds the reviewed observations; a changed computer or
+record requires a fresh plan.
 
-The manual procedure below remains the fallback when the guided review cannot
-run:
+Only when the guided review cannot run, recover by hand:
 
-1. Read the private operation log and pending record locally. Do not post either
-   without reviewing sensitive values. Do not overwrite or delete the evidence.
-2. Confirm the original controller process and its Colmena/SSH children have
-   exited. A stored PID is only a hint, not proof of identity or completion.
-3. Inspect **every recorded client**, through authenticated SSH or its physical
-   console, for still-running activation processes and pending systemd jobs.
-   Resolve any unfinished activation first. A matching `/run/current-system`,
-   an inventory “current” label, or loss of connectivity is insufficient.
-   If a client cannot be inspected, keep the reservation and do not retry.
-4. With explicit administrator approval and no operation still running, hold
-   the existing fleet `operation.lock` exclusively and archive the exact pending
-   record to a new private, non-overwriting recovery file. Preserve the record
-   and log for investigation; sync the directory before releasing the lock.
-   Never delete/recreate `operation.lock` or `deploy.lock` to bypass ownership.
-   This step acknowledges reviewed recovery; it does not declare the old apply
-   successful. Do not run old Nixorium binaries or raw Colmena to bypass it.
-5. Inspect live client state again, correct the underlying problem and authorize
-   a fresh reviewed deployment. Reboots, if needed, are separate disruptive
-   actions and require their own approval.
+1. Keep the private operation log and the pending record; do not delete or
+   overwrite them, and review them before sharing.
+2. Confirm that the Nixorium process that started the update and its Colmena
+   and SSH children have exited (a stored PID is only a hint).
+3. Inspect every recorded computer, over SSH or at its console, for running
+   activation and pending systemd jobs; resolve them first. A matching
+   revision or a lost connection is not proof that activation finished.
+4. With no operation running, hold `operation.lock` exclusively and move the
+   exact record to a new private file under `recovered/`; never delete or
+   recreate the lock files, and never bypass them with old binaries or raw
+   Colmena.
+5. Check the computers again and authorize a fresh reviewed update.
 
 For controller builds, `l` expands managed phase details in both the dedicated
 controller screen and framework/package/software update follow-ups. These
