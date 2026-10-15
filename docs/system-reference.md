@@ -461,7 +461,8 @@ administrator, with a path that starts at the user's home) and
 `nixorium send plan|apply --file <file-or-folder> --on <clients|@lab>` read
 the chosen file or folder as whoever runs Nixorium and send it through the
 classroom service the same way; `send apply` prepares the files again and
-requires the token of the review.
+requires the token of the review. Like `collect`, the command needs no
+deployment repository, so the teacher can run it from a terminal.
 
 **Save screenshot**, in the window of one computer whose screen is live,
 asks that computer for a picture at up to 1920 pixels through the

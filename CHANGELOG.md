@@ -82,6 +82,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   any refused response is kept in a private per-chat record on the controller
   and is never sent to the service.
 
+### Fixed
+
+- `nixorium send plan|apply` works from the teacher's terminal: like
+  `nixorium collect`, it needs only the classroom service and no longer stops
+  with "deployment repository not found".
+
 ## [3.7.0] - 2026-10-15
 
 ### Added

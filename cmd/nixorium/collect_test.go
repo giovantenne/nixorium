@@ -128,3 +128,12 @@ func TestCollectWithoutIntoUsesTheHomeFolder(t *testing.T) {
 		t.Fatalf("missing folder = %+v", plan)
 	}
 }
+
+func TestCollectWorksWithoutTheDeploymentRepository(t *testing.T) {
+	noDeployment(t)
+	replaceSaveRequest(t, collectService(collectedItems, map[int]string{2: "essay", 4: "abc"}))
+	var stdout, stderr bytes.Buffer
+	if code := run(context.Background(), []string{"collect", "plan", "--on", "pc01"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "Review token:") || strings.Contains(stderr.String(), "repository") {
+		t.Fatalf("plan = %d %s %s", code, stdout.String(), stderr.String())
+	}
+}

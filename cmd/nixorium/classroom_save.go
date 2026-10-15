@@ -15,8 +15,9 @@ import (
 // (screenshots, collected desktops) are copied into a folder of that user,
 // as that user, through the classroom socket.
 
-// saveRequest reaches the classroom service; tests replace it.
-var saveRequest = classroomRequest
+// classroomCall reaches the classroom service for sending, collecting and
+// saving files; tests replace it.
+var classroomCall = classroomRequest
 
 // saveFolders are the folders of the user's home that the classroom view
 // page's saves go to.
@@ -36,7 +37,7 @@ func saveDesktopJob(ctx context.Context, id, kind string) {
 	for _, name := range placed {
 		names = append(names, saveFolders[kind]+"/"+name)
 	}
-	_, _ = saveRequest(ctx, domain.ClassroomSaveDoneOperation, func(request *domain.ClassroomRequest) {
+	_, _ = classroomCall(ctx, domain.ClassroomSaveDoneOperation, func(request *domain.ClassroomRequest) {
 		request.DesktopJob, request.SaveNames, request.DesktopError = id, names, message
 	})
 }
@@ -83,7 +84,7 @@ func receiveSave(ctx context.Context, id, destination string) (string, []string,
 			continue
 		}
 		for offset := int64(0); offset < entry.Size; {
-			response, requestErr := saveRequest(ctx, domain.ClassroomSaveReadOperation, func(request *domain.ClassroomRequest) {
+			response, requestErr := classroomCall(ctx, domain.ClassroomSaveReadOperation, func(request *domain.ClassroomRequest) {
 				request.DesktopJob, request.ShareIndex, request.ShareOffset = id, index, offset
 			})
 			if requestErr != nil || len(response.SaveData) == 0 {
@@ -105,7 +106,7 @@ func receiveSave(ctx context.Context, id, destination string) (string, []string,
 func saveItems(ctx context.Context, id string) (string, []domain.ShareFile, error) {
 	kind, items := "", []domain.ShareFile{}
 	for {
-		response, err := saveRequest(ctx, domain.ClassroomSaveItemsOperation, func(request *domain.ClassroomRequest) {
+		response, err := classroomCall(ctx, domain.ClassroomSaveItemsOperation, func(request *domain.ClassroomRequest) {
 			request.DesktopJob, request.ShareIndex = id, len(items)
 		})
 		if err != nil {

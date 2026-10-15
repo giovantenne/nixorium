@@ -54,9 +54,9 @@ func (service *fakeSaveService) request(_ context.Context, operation domain.Clas
 
 func replaceSaveRequest(t *testing.T, service *fakeSaveService) {
 	t.Helper()
-	previous := saveRequest
-	saveRequest = service.request
-	t.Cleanup(func() { saveRequest = previous })
+	previous := classroomCall
+	classroomCall = service.request
+	t.Cleanup(func() { classroomCall = previous })
 }
 
 var collectedItems = []domain.ShareFile{

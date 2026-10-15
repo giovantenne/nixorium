@@ -124,7 +124,11 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		fmt.Fprintln(stdout, message)
 		return 0
 	}
-	// Collecting desktops needs only the classroom service, like the view.
+	// Sending and collecting files need only the classroom service, like
+	// the view: the teacher cannot read the deployment repository.
+	if options.command == "send" {
+		return runSendCommand(ctx, options, stdout, stderr)
+	}
 	if options.command == "collect" {
 		return runCollectCommand(ctx, options, stdout, stderr)
 	}
@@ -232,8 +236,6 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		return runInternetCommand(ctx, repository, options, stdout, stderr)
 	case "lock":
 		return runLockCommand(ctx, repository, options, stdout, stderr)
-	case "send":
-		return runSendCommand(ctx, options, stdout, stderr)
 	case "cleanup":
 		return runCleanupCommand(ctx, repository, options, stdout, stderr)
 	case "shutdown", "restart":

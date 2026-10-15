@@ -274,9 +274,10 @@ executable, and a name already on a student's desktop is kept as
 "name (2)". A restart empties the student's home, as usual. In the classroom
 view page, **Send files** offers **A file…** and **A folder…**, which open
 the system file chooser in your home folder.
-From a terminal: `nixorium send plan --file <file-or-folder> --on @lab`,
-then `nixorium send apply --file <file-or-folder> --on @lab --expect` with
-the review token.
+From a terminal, as the teacher or the administrator: `nixorium send plan
+--file <file-or-folder> --on @lab`, then `nixorium send apply --file
+<file-or-folder> --on @lab --expect` with the review token; it needs only the
+classroom service, not the deployment repository.
 
 In the classroom view page, **Share screen** shows your screen (or the
 window or tab you choose) on the selected computers, over their whole screen and with their keyboard

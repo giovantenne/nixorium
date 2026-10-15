@@ -149,7 +149,7 @@ func planCollect(ctx context.Context, requested, folder string) domain.CollectPl
 	if err != nil {
 		return collectFailure(err.Error() + ".")
 	}
-	response, err := saveRequest(ctx, domain.ClassroomCollectPlanOperation, func(request *domain.ClassroomRequest) {
+	response, err := classroomCall(ctx, domain.ClassroomCollectPlanOperation, func(request *domain.ClassroomRequest) {
 		request.Requested, request.CollectFolder = requested, destination
 	})
 	if err != nil || response.CollectPlan == nil {
@@ -163,7 +163,7 @@ func planCollect(ctx context.Context, requested, folder string) domain.CollectPl
 func applyCollect(ctx context.Context, plan domain.CollectPlan) domain.CollectReport {
 	ctx, cancel := context.WithTimeout(ctx, collectApplyTime)
 	defer cancel()
-	response, err := saveRequest(ctx, domain.ClassroomCollectApplyOperation, func(request *domain.ClassroomRequest) {
+	response, err := classroomCall(ctx, domain.ClassroomCollectApplyOperation, func(request *domain.ClassroomRequest) {
 		request.CollectPlan = &plan
 	})
 	if err != nil || response.CollectReport == nil {
@@ -198,7 +198,7 @@ func applyCollect(ctx context.Context, plan domain.CollectPlan) domain.CollectRe
 		report.Folder = filepath.Join(plan.Destination, placed[0])
 		report.Message += " Saved in " + report.Folder + "."
 	}
-	_, _ = saveRequest(ctx, domain.ClassroomSaveDoneOperation, func(request *domain.ClassroomRequest) {
+	_, _ = classroomCall(ctx, domain.ClassroomSaveDoneOperation, func(request *domain.ClassroomRequest) {
 		request.DesktopJob, request.SaveNames, request.DesktopError = save, names, message
 	})
 	return report
