@@ -55,6 +55,43 @@ func (store AssistantWorkspaceStore) WriteTranscript(conversation domain.Assista
 	}
 	return assistantWriteState(workspace.root, "transcript.json", data)
 }
+
+// assistantTurnErrorsFile is a private per-conversation diagnostic record. It is
+// separate from the transcript, which is sent to the service on every step.
+const assistantTurnErrorsFile = "turn-errors-v1.json"
+const assistantTurnErrorsKept = 20
+
+type assistantTurnErrorRecord struct {
+	At     string `json:"at"`
+	Code   string `json:"code"`
+	Detail string `json:"detail"`
+}
+
+// RecordTurnError appends why a turn failed to the conversation's private
+// record, keeping the latest entries. It is best effort and local only.
+func (store AssistantWorkspaceStore) RecordTurnError(conversation domain.AssistantConversation, at time.Time, code, detail string) error {
+	workspace, err := store.Open(conversation.ID)
+	if err != nil {
+		return err
+	}
+	defer workspace.Close()
+	var records []assistantTurnErrorRecord
+	if data, err := assistantReadStateLimit(workspace.root, assistantTurnErrorsFile, 64*1024); err == nil {
+		if assistantDecodeStrict(data, &records) != nil {
+			records = nil
+		}
+	}
+	records = append(records, assistantTurnErrorRecord{At: at.UTC().Format(time.RFC3339), Code: code, Detail: assistantErrorDetail(detail)})
+	if len(records) > assistantTurnErrorsKept {
+		records = records[len(records)-assistantTurnErrorsKept:]
+	}
+	data, err := json.Marshal(records)
+	if err != nil {
+		return err
+	}
+	return assistantWriteState(workspace.root, assistantTurnErrorsFile, append(data, '\n'))
+}
+
 func (store AssistantWorkspaceStore) VisibleFiles(conversation domain.AssistantConversation) ([]string, error) {
 	workspace, err := store.Open(conversation.ID)
 	if err != nil {
