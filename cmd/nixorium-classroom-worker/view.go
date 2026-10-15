@@ -62,6 +62,8 @@ type viewServer struct {
 	// downloads keeps screenshots no helper saved until the page downloads
 	// them (screenshot.go).
 	downloads *screenshotDownloads
+	// exams remembers the computers in exam mode (exam.go).
+	exams examBook
 	// internet reads the computers' real Internet state while the page is
 	// open; nil keeps only the page's own changes.
 	internet *internetWatcher
@@ -162,6 +164,8 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			Internet string `json:"internet,omitempty"`
 			Power    string `json:"power,omitempty"`
 			Showing  bool   `json:"showing,omitempty"`
+			// Exam is set while exam mode runs on the computer.
+			Exam *examView `json:"exam,omitempty"`
 		}
 		if server.internet != nil {
 			server.internet.Touch()
@@ -173,7 +177,7 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		list := make([]pageComputer, 0, len(computers))
 		for _, computer := range computers {
 			internet, power := server.labelsFor(computer.Name, computer.State)
-			list = append(list, pageComputer{ClassroomComputer: computer, Internet: internet, Power: power, Showing: showing[computer.Name]})
+			list = append(list, pageComputer{ClassroomComputer: computer, Internet: internet, Power: power, Showing: showing[computer.Name], Exam: server.exams.view(computer.Name, computer.State, internet)})
 		}
 		header.Set("Content-Type", "application/json")
 		_ = json.NewEncoder(writer).Encode(map[string]any{"computers": list})

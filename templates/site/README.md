@@ -243,9 +243,11 @@ picture through the browser instead. **Message** shows a short text over the
 screens of the selected computers, until the students close it, for 30 seconds
 or 2 minutes, or until you unlock them. **Exam mode** blocks Internet, locks the
 screens and shows a message on the selected computers with one confirmation;
-**End exam mode** undoes it and offers **Collect from desktop**. Update the
-student computers and have the students sign in again first: a computer that is
-not updated is listed as unable to show messages yet.
+**End exam mode** undoes it and offers **Collect from desktop**; a reopened page,
+or another teacher's, shows the same. Restarting the classroom service forgets
+exam mode: then use **Remove message**, **Unlock** and **Allow Internet**.
+Update the student computers and have the students sign in again first: a
+computer that is not updated is listed as unable to show messages yet.
 
 ## Temporary Internet access
 

@@ -560,18 +560,25 @@ editable; it stays until the screens are unlocked). After one combined review
 and one button such as "Start exam mode on 12 computers", the page applies
 three existing reviewed actions in this order: Internet block, lock, message.
 Each keeps its own review that applies once, and each computer's result lists
-the three steps. It is a composition in the page only: the service and the
-computers keep no exam state, and the page remembers which computers it
-started exam mode on, and with which steps, while it stays open (the cards
-show "Exam mode"). A review lasts at most five minutes, so close to its end
-the page makes the reviews again before it starts, and asks again when the
-computers that qualify changed: an expired review never leaves exam mode half
-started. **End exam mode** (the same button, when a selected computer is in
-exam mode) reverses the steps that were started, in this order: remove the
-message, unlock, allow Internet. Then it opens the usual **Collect from
-desktop** review for the same computers; nothing is collected unless the
-teacher confirms it. A page that was closed forgets exam mode: use **Remove
-message**, **Unlock** and **Allow Internet**.
+the three steps. The page composes the chain and the computers keep no exam
+state. The classroom service remembers, in memory only, which steps it applied
+for exam mode on each computer and since when: the page tags each step of the
+chain, and a step counts once the computer confirmed it. The service sends
+that with the list of computers (`exam`), so a page opened later, and another
+user's page, show the same: the cards say "Exam mode" and the button reads
+**End exam mode**. The service also drops what it can see end: nobody signed in
+ends the lock and the message, an Internet state that reads as allowed again
+ends that step, and a restart or shutdown from the page ends all of them. A
+review lasts at most five minutes, so close to its end the page makes the
+reviews again before it starts, and asks again when the computers that qualify
+changed: an expired review never leaves exam mode half started. **End exam
+mode** (the same button, when a selected computer is in exam mode) reverses the
+steps that are in effect, in this order: remove the message, unlock, allow
+Internet. Then it opens the usual **Collect from desktop** review for the same
+computers; nothing is collected unless the teacher confirms it. Restarting the
+classroom service (`nixorium-classroom.service`) forgets exam mode while the
+computers stay locked and blocked: then use **Remove message**, **Unlock** and
+**Allow Internet**.
 
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a

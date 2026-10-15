@@ -4,9 +4,10 @@
 //
 // A message is one more reviewed action. Exam mode is the page's own
 // composition of three existing reviewed actions (block Internet, lock,
-// show a message), confirmed once; the computers keep no exam state, and the
-// page only remembers which computers it started exam mode on while it is
-// open.
+// show a message), confirmed once. The computers keep no exam state; the
+// classroom service remembers which steps it applied for exam mode on each
+// computer, and the page only reads that with the list of computers, so a
+// page opened later, or another user's page, shows the same.
 'use strict';
 
 const classroomTools = (() => {
@@ -84,8 +85,9 @@ const classroomTools = (() => {
   const startOrder = ['internet', 'lock', 'message'];
   const endOrder = ['message', 'lock', 'internet'];
   const examDefaultText = 'Exam in progress. Wait for the teacher.';
-  // Computers exam mode was started on from this page, and with which steps.
-  const started = new Map();
+  // Computers in exam mode, with the steps in effect, as the service
+  // reported them with the last list of computers.
+  let reading = new Map();
   // The computers the exam dialog was opened for, and the chain waiting for
   // the teacher's confirmation in the action dialog.
   let examTargets = [];
@@ -95,8 +97,12 @@ const classroomTools = (() => {
   const names = (run) => [...new Set(run.parts.flatMap((part) => part.computers))].sort();
   const rowOf = (rows, name) => (rows || []).find((row) => row.name === name);
 
+  function read(computers) {
+    reading = new Map(computers.filter((computer) => computer.exam).map((computer) => [computer.name, computer.exam.steps]));
+  }
+
   function updateExamButton() {
-    const ending = [...chosen].some((name) => started.has(name));
+    const ending = [...chosen].some((name) => reading.has(name));
     examButton.textContent = ending ? 'End exam mode' : 'Exam mode';
     examButton.classList.toggle('primary', ending);
   }
@@ -126,7 +132,7 @@ const classroomTools = (() => {
     const extra = { message: { text: examText.value.trim(), untilUnlock: true } };
     const parts = keys.map((key) => ({ key, action: steps[key].actions[0], computers: examTargets, extra: key === 'message' ? extra : undefined }));
     examDialog.close();
-    review({ phase: 0, title: 'Exam mode', parts, keys, text: extra.message.text });
+    review({ phase: 0, title: 'Exam mode', parts, text: extra.message.text });
   });
 
   // The action dialog says what is being checked.
@@ -143,7 +149,8 @@ const classroomTools = (() => {
 
   async function plan(run) {
     await Promise.all(run.parts.map(async (part) => {
-      part.review = await postJSON('/api/actions/plan', { action: part.action, computers: part.computers, ...part.extra });
+      // The tag has the service remember what it applies for exam mode.
+      part.review = await postJSON('/api/actions/plan', { action: part.action, computers: part.computers, exam: run.phase === 0 ? 'start' : 'end', ...part.extra });
     }));
   }
 
@@ -282,16 +289,12 @@ const classroomTools = (() => {
       return;
     }
     const rows = summarize(run, outcome.results);
-    for (const row of rows) {
-      const done = row.items.some((item) => item.outcome === 'done');
-      if (run.phase === 0 && done) started.set(row.name, run.keys);
-      // A computer where a step failed stays in exam mode, to end it again.
-      if (run.phase === 1 && !row.items.some((item) => item.outcome === 'failed')) started.delete(row.name);
-    }
     showResult(run.title, { state: rows.every((row) => row.outcome === 'done') ? 'completed' : 'partial', rows });
     chosen.clear();
     for (const row of rows) if (row.skip) chosen.add(row.name);
     updateSelection();
+    // The service has noted what was done: show it at once.
+    refresh();
     // Ending an exam leads to collecting the work, with the usual review;
     // nothing is collected without it. The notice stays while it is decided.
     const offer = run.phase === 1 ? rows.filter((row) => row.outcome !== 'off').map((row) => row.name) : [];
@@ -306,22 +309,23 @@ const classroomTools = (() => {
     waiting = null;
   });
 
-  // End exam mode: the review of the way back on the computers the page
-  // started it on, with the steps it started there.
+  // End exam mode: the review of the way back on the computers in exam
+  // mode, for the steps that are still in effect on each.
   function endExam(computers) {
-    const parts = endOrder.map((key) => ({ key, computers: computers.filter((name) => (started.get(name) || []).includes(key)) })).filter((part) => part.computers.length)
+    const parts = endOrder.map((key) => ({ key, computers: computers.filter((name) => (reading.get(name) || []).includes(key)) })).filter((part) => part.computers.length)
       .map((part) => ({ ...part, action: steps[part.key].actions[1] }));
-    review({ phase: 1, title: 'End exam mode', parts, keys: [] });
+    review({ phase: 1, title: 'End exam mode', parts });
   }
 
   return {
     message: openMessage,
     exam: (computers) => {
-      const running = computers.filter((name) => started.has(name));
+      const running = computers.filter((name) => reading.has(name));
       if (running.length) endExam(running);
       else openExam(computers);
     },
-    inExam: (name) => started.has(name),
+    inExam: (name) => reading.has(name),
+    read,
     updateExamButton,
   };
 })();

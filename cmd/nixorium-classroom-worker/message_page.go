@@ -9,7 +9,8 @@ import (
 // Message and exam mode in the classroom view page. The page reviews a
 // message through the worker's own message plan, and applies it once after
 // the confirmation, like a lock. Exam mode is the page's own composition of
-// reviews of Internet, lock and message; the worker keeps no exam state.
+// reviews of Internet, lock and message; the worker remembers which steps
+// it applied for it (exam.go).
 
 const (
 	actionMessage     = "message"

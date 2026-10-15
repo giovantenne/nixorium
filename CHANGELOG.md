@@ -82,9 +82,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   same button reads **End exam mode** on computers it was started on from the
   open page: it removes the message, unlocks the screens, allows Internet
   again, and then offers **Collect from desktop** for the same computers
-  (nothing is collected unless you confirm). The computers keep no exam state:
-  after you close the page, end the exam with **Remove message**, **Unlock**
-  and **Allow Internet**.
+  (nothing is collected unless you confirm). The classroom service remembers
+  which computers are in exam mode, so a reopened page, or another user's,
+  shows the same; the computers keep no exam state, and restarting the
+  classroom service forgets it (then use **Remove message**, **Unlock** and
+  **Allow Internet**).
 
 ### Changed
 

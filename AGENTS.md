@@ -761,10 +761,15 @@ release is not finished until the site follows it.
   The review keeps the controller's own sentences free of the text, which the
   page prints itself; its token binds the text and the duration, and it takes
   no operation lock. Exam mode is a page-side chain of the existing Internet,
-  lock and message reviews (message.js): the worker keeps no exam state, each
-  review still applies once, and the page makes the reviews again when one is
-  about to expire so an expired review cannot leave an exam half started;
-  ending reverses the steps in order and only offers the collect review.
+  lock and message reviews (message.js): each review still applies once, and
+  the page makes the reviews again when one is about to expire so an expired
+  review cannot leave an exam half started; ending reverses the steps in order
+  and only offers the collect review. The computers keep no exam state. The
+  worker keeps, in memory only (`examBook`), which steps it applied for exam
+  mode per computer and since when, from the exam tag of a plan and the done
+  rows of its apply (never from what a page claims), shares it between pages
+  through `/api/computers`, and drops what it sees end (no session, Internet
+  allowed again, restart or shutdown); a restart of the worker forgets it.
   Switch on (Wake-on-LAN, `wake-plan`/`wake-apply`, `nixorium wake`) takes
   no review token or operation lock, validates names like every classroom
   operation and never targets the controller. Hardware addresses come only

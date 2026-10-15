@@ -163,6 +163,7 @@ let redraw = false;
 
 function render(computers) {
   let viewing = 0;
+  classroomTools.read(computers);
   if (redraw) {
     redraw = false;
     const listed = new Set(computers.map((computer) => computer.name));
