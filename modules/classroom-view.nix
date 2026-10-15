@@ -5,6 +5,16 @@
 # port is opened. Capture uses Mutter's own screen cast interface, so GNOME
 # shows its sharing indicator; the extension keeps it visible but not
 # clickable.
+#
+# The student session has a terminal, so both user units are made hard to
+# stop by accident or on purpose: they refuse a manual stop, the agent
+# restarts after one second however it ends, and neither runs out of start
+# attempts. This is a classroom aid, not a security boundary: a student can
+# still mask a unit or freeze the process, and loses that at the next boot,
+# when the home directory is reset. While the agent is down or frozen the
+# teacher's card says "Monitoring stopped on this PC". NixOS does not restart a unit
+# that refuses a manual stop when an update changes it, so the new agent
+# starts at the next sign-in.
 let
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   enabled = (labSettings.classroomView or true) && laboratoryEnabled
@@ -41,10 +51,14 @@ in
       after = [ "graphical-session.target" ];
       path = [ pkgs.gst_all_1.gstreamer.bin ];
       environment.GST_PLUGIN_SYSTEM_PATH_1_0 = lib.makeSearchPath "lib/gstreamer-1.0" gstreamerPlugins;
+      unitConfig = {
+        RefuseManualStop = true;
+        StartLimitIntervalSec = 0;
+      };
       serviceConfig = {
         ExecStart = "${nixoriumPackage}/bin/nixorium-classroom-agent serve";
-        Restart = "on-failure";
-        RestartSec = 2;
+        Restart = "always";
+        RestartSec = 1;
       };
     };
 
@@ -73,17 +87,22 @@ in
     };
 
     # Enable the indicator extension in every session; gnome-extensions keeps
-    # other enabled extensions.
+    # other enabled extensions. systemd rejects Restart=always for a oneshot
+    # unit, so a failed enable is retried (on-failure) after one second.
     systemd.user.services.nixorium-classroom-extension = {
       description = "Enable the Nixorium classroom GNOME Shell extension";
       wantedBy = [ "graphical-session.target" ];
       partOf = [ "graphical-session.target" ];
       after = [ "graphical-session.target" ];
+      unitConfig = {
+        RefuseManualStop = true;
+        StartLimitIntervalSec = 0;
+      };
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${pkgs.gnome-shell}/bin/gnome-extensions enable ${extensionUuid}";
         Restart = "on-failure";
-        RestartSec = 3;
+        RestartSec = 1;
       };
     };
   };

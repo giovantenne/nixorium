@@ -121,9 +121,12 @@ build_pxe_outputs() {
   ACTUAL_ROOTS="$(find "$BUILD_DIRECTORY" -mindepth 1 -maxdepth 1 -type l -exec readlink {} \; | sort -u)"
   [[ "$ACTUAL_ROOTS" == "$EXPECTED_ROOTS" ]] || fail "Nix build returned unexpected output roots"
 
-  KERNEL_PATH="${OUTPUTS[0]}"
-  INITRD_PATH="${OUTPUTS[1]}"
-  IPXE_SCRIPT_PATH="${OUTPUTS[2]}"
-  FIRMWARE_PATH="${OUTPUTS[3]}"
-  CLIENT_PATHS=("${OUTPUTS[@]:4}")
+  # shellcheck disable=SC2034 # Results for the caller of this function.
+  {
+    KERNEL_PATH="${OUTPUTS[0]}"
+    INITRD_PATH="${OUTPUTS[1]}"
+    IPXE_SCRIPT_PATH="${OUTPUTS[2]}"
+    FIRMWARE_PATH="${OUTPUTS[3]}"
+    CLIENT_PATHS=("${OUTPUTS[@]:4}")
+  }
 }

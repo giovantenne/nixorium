@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -60,9 +61,9 @@ func NormalizeScheduleTime(value string) (string, error) {
 	if match == nil {
 		return "", fmt.Errorf("%q is not a time; write it as HH:MM, for example 07:50", value)
 	}
-	var hour, minute int
-	fmt.Sscanf(match[1], "%d", &hour)
-	fmt.Sscanf(match[2], "%d", &minute)
+	// Both groups are digits: the pattern allows nothing else.
+	hour, _ := strconv.Atoi(match[1])
+	minute, _ := strconv.Atoi(match[2])
 	if hour > 23 || minute > 59 {
 		return "", fmt.Errorf("%q is not a time of day; use 00:00 to 23:59", value)
 	}
@@ -166,9 +167,10 @@ func (s Schedule) Normalize() (Schedule, error) {
 // scheduleGap is the distance in minutes between two HH:MM times on the
 // clock face, the shorter way round midnight.
 func scheduleGap(a, b string) int {
+	// Both are canonical HH:MM.
 	minutes := func(value string) int {
-		var hour, minute int
-		fmt.Sscanf(value, "%d:%d", &hour, &minute)
+		hour, _ := strconv.Atoi(value[:2])
+		minute, _ := strconv.Atoi(value[3:])
 		return hour*60 + minute
 	}
 	gap := minutes(a) - minutes(b)

@@ -6,6 +6,7 @@
 <title>Classroom view</title>
 <link rel="stylesheet" href="/style.css">
 <script src="/app.js" defer></script>
+<script src="/message.js" defer></script>
 <script src="/schedule.js" defer></script>
 </head>
 <body>
@@ -13,6 +14,7 @@
   <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></symbol>
   <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20.5 14.3A8.5 8.5 0 1 1 9.7 3.5a6.8 6.8 0 0 0 10.8 10.8z"/></symbol>
   <symbol id="icon-power" viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.7 6.7a7.5 7.5 0 1 0 10.6 0"/></symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 3.5 22 20.5H2z"/><path d="M12 10v4.5"/><path d="M12 17.6v.01"/></symbol>
 </svg>
 <header>
   <div class="title">
@@ -36,6 +38,14 @@
         <button type="button" data-action="internet-allow">Allow Internet</button>
       </div>
     </details>
+    <details class="actions-menu">
+      <summary>Message</summary>
+      <div class="menu">
+        <button type="button" data-action="message" title="Show a message over the screens of the selected computers">Send a message…</button>
+        <button type="button" data-action="message-hide" title="Take the message off the screens of the selected computers">Remove message</button>
+      </div>
+    </details>
+    <button type="button" data-action="exam" title="Block Internet, lock the screens and show a message on the selected computers, with one confirmation">Exam mode</button>
     <button type="button" data-action="show-screen" title="Share your screen, a window or a tab on the selected computers, with their keyboard and mouse blocked">Share screen</button>
     <button type="button" data-action="collect" title="Copy the files on the desktops of the selected computers into Nixorium/Collected in your home folder">Collect from desktop</button>
     <details class="actions-menu send-menu" title="Copy a file or a folder to the desktops of the selected computers">
@@ -74,6 +84,8 @@
         <button type="button" data-action="unlock">Unlock</button>
         <button type="button" data-action="internet-block">Block Internet</button>
         <button type="button" data-action="internet-allow">Allow Internet</button>
+        <button type="button" data-action="message">Send a message…</button>
+        <button type="button" data-action="message-hide">Remove message</button>
         <button type="button" data-action="show-screen">Share screen</button>
         <button type="button" data-action="collect">Collect from desktop</button>
         <button type="button" data-action="send-file">Send a file…</button>
@@ -132,6 +144,37 @@
     <button type="button" id="schedule-clear">Clear</button>
     <button type="button" id="schedule-cancel">Cancel</button>
     <button type="button" id="schedule-save" class="primary">Save</button>
+    </div>
+</dialog>
+<dialog id="message-dialog" class="tool-dialog" aria-labelledby="message-title">
+  <h2 id="message-title">Message to the students</h2>
+  <label for="message-text">What should the students read?</label>
+  <textarea id="message-text" rows="4" maxlength="300"></textarea>
+  <p class="count"><span id="message-count">0</span> of 300 characters</p>
+  <label for="message-duration">How long should it stay?</label>
+  <select id="message-duration">
+    <option value="close">Until the student closes it (Close appears after 10 seconds)</option>
+    <option value="30">30 seconds</option>
+    <option value="120">2 minutes</option>
+    <option value="unlock">Until the computer is unlocked</option>
+  </select>
+  <p id="message-problem" class="problem" hidden></p>
+  <div class="dialog-buttons">
+    <button type="button" id="message-cancel">Cancel</button>
+    <button type="button" id="message-review" class="primary">Review</button>
+  </div>
+</dialog>
+<dialog id="exam-dialog" class="tool-dialog" aria-labelledby="exam-title">
+  <h2 id="exam-title">Exam mode</h2>
+  <p>Prepare the selected computers for an exam. You see the computers before anything happens.</p>
+  <label class="check"><input type="checkbox" id="exam-internet" checked> Block Internet</label>
+  <label class="check"><input type="checkbox" id="exam-lock" checked> Lock the screens now (until you unlock them)</label>
+  <label class="check"><input type="checkbox" id="exam-message" checked> Show a message</label>
+  <textarea id="exam-text" rows="3" maxlength="300" aria-label="Message"></textarea>
+  <p id="exam-problem" class="problem" hidden></p>
+  <div class="dialog-buttons">
+    <button type="button" id="exam-cancel">Cancel</button>
+    <button type="button" id="exam-review" class="primary">Review</button>
   </div>
 </dialog>
 <div id="toast" class="toast" role="status" title="Click to close" hidden>

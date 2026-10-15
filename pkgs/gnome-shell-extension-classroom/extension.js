@@ -14,6 +14,14 @@
 // the lock included, shows the latest picture the agent received, again
 // with keyboard and mouse taken. When it ends, the lock (if any) remains.
 //
+// The teacher can also show a message: a centered panel above everything,
+// the lock and the teacher's screen included, with plain text only. It does
+// not take the keyboard or the mouse; the student keeps them unless the
+// computer is locked or shows the teacher's screen. A message stays until the
+// student closes it (the Close button appears after a few seconds), for a
+// number of seconds, or until the computer is unlocked. A new message
+// replaces the previous one, and logging out removes it.
+//
 // When an update from the controller replaces the running system, the system
 // writes /run/nixorium/update-notice.json; a notification tells the person at
 // the computer, with a Restart button when a restart finishes the update.
@@ -22,6 +30,7 @@ import Cogl from 'gi://Cogl';
 import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Pango from 'gi://Pango';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -33,6 +42,8 @@ const NoticeDirectory = '/run/nixorium';
 const NoticeFile = 'update-notice.json';
 // An update without a needed restart is announced only while it is recent.
 const RecentNoticeSeconds = 30 * 60;
+// A message that stays until the student closes it offers Close after this.
+const MessageCloseSeconds = 10;
 
 const BusName = 'org.nixorium.Classroom';
 const ObjectPath = '/org/nixorium/Classroom';
@@ -47,6 +58,13 @@ const Interface = `<node>
     </method>
     <method name="StopBroadcast"/>
     <property name="Broadcasting" type="b" access="read"/>
+    <method name="ShowMessage">
+      <arg type="s" direction="in" name="text"/>
+      <arg type="i" direction="in" name="seconds"/>
+      <arg type="b" direction="in" name="untilUnlock"/>
+    </method>
+    <method name="HideMessage"/>
+    <property name="MessageShown" type="b" access="read"/>
   </interface>
 </node>`;
 
@@ -65,6 +83,7 @@ export default class NixoriumClassroomExtension extends Extension {
         this._noticeMonitor = null;
         this._notice?.destroy();
         this._notice = null;
+        this.HideMessage();
         this.StopBroadcast();
         this._setLocked(false);
         if (this._nameId) {
@@ -169,6 +188,7 @@ export default class NixoriumClassroomExtension extends Extension {
         this._screen = null;
         this._picture = null;
         this._service?.emit_property_changed('Broadcasting', GLib.Variant.new_boolean(false));
+        this._updateMessage();
     }
 
     _showScreen() {
@@ -195,11 +215,14 @@ export default class NixoriumClassroomExtension extends Extension {
         Main.layoutManager.uiGroup.set_child_above_sibling(screen, null);
         this._screenGrab = Main.pushModal(screen, {actionMode: Shell.ActionMode.NONE});
         screen.grab_key_focus();
-        this._screenRaiseId = Main.layoutManager.uiGroup.connect('child-added', () =>
-            Main.layoutManager.uiGroup.set_child_above_sibling(screen, null));
+        this._screenRaiseId = Main.layoutManager.uiGroup.connect('child-added', () => {
+            Main.layoutManager.uiGroup.set_child_above_sibling(screen, null);
+            this._updateMessage();
+        });
         this._screen = screen;
         this._picture = picture;
         this._service?.emit_property_changed('Broadcasting', GLib.Variant.new_boolean(true));
+        this._updateMessage();
     }
 
     _setLocked(locked) {
@@ -244,10 +267,12 @@ export default class NixoriumClassroomExtension extends Extension {
             Main.layoutManager.uiGroup.set_child_above_sibling(cover, null);
             if (this._screen)
                 Main.layoutManager.uiGroup.set_child_above_sibling(this._screen, null);
+            this._updateMessage();
         });
         if (this._screen)
             Main.layoutManager.uiGroup.set_child_above_sibling(this._screen, null);
         this._cover = cover;
+        this._updateMessage();
     }
 
     _unlock() {
@@ -259,6 +284,131 @@ export default class NixoriumClassroomExtension extends Extension {
         }
         this._cover.destroy();
         this._cover = null;
+        // A message that was to stay until the unlock ends here.
+        if (this._message?.untilUnlock)
+            this.HideMessage();
+        else
+            this._updateMessage();
+    }
+
+    // D-Bus: called by the classroom agent, which has checked the text and
+    // the duration: seconds is 0 or a number of seconds, and untilUnlock
+    // excludes seconds.
+    ShowMessage(text, seconds, untilUnlock) {
+        this.HideMessage();
+        // The panel sits in a transparent layer that the pointer passes
+        // through; only the panel itself takes clicks.
+        const layer = new St.Widget({
+            name: 'nixoriumClassroomMessage',
+            layout_manager: new Clutter.BinLayout(),
+        });
+        layer.add_constraint(new Clutter.BindConstraint({
+            source: global.stage,
+            coordinate: Clutter.BindCoordinate.ALL,
+        }));
+        const panel = new St.BoxLayout({
+            orientation: Clutter.Orientation.VERTICAL,
+            reactive: true,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+            x_expand: true,
+            y_expand: true,
+            style: 'background-color: #20242b; border: 2px solid #78aef0; border-radius: 16px; padding: 32px 40px; spacing: 20px; max-width: 760px;',
+        });
+        panel.add_child(new St.Label({
+            text: 'Message from your teacher',
+            style: 'color: #a2aab6; font-size: 16px;',
+            x_align: Clutter.ActorAlign.CENTER,
+        }));
+        // St.Label shows plain text, never markup.
+        const label = new St.Label({
+            text,
+            style: 'color: #ffffff; font-size: 28px; text-align: center;',
+            x_align: Clutter.ActorAlign.CENTER,
+        });
+        label.clutter_text.set({
+            line_wrap: true,
+            line_wrap_mode: Pango.WrapMode.WORD_CHAR,
+            ellipsize: Pango.EllipsizeMode.NONE,
+        });
+        panel.add_child(label);
+        // Without a lock to end it, "until unlocked" lets the student close
+        // the message instead.
+        const untilLock = untilUnlock && Boolean(this._cover);
+        const closable = seconds === 0 && !untilLock;
+        let close = null;
+        if (closable) {
+            close = new St.Button({
+                label: 'Close',
+                // Its place is kept from the start, so the panel does not
+                // change size when Close appears (see _updateMessage).
+                opacity: 0,
+                reactive: false,
+                can_focus: true,
+                x_align: Clutter.ActorAlign.CENTER,
+                style: 'background-color: #78aef0; color: #101317; font-size: 18px; font-weight: bold; padding: 8px 32px; border-radius: 8px;',
+            });
+            close.connect('clicked', () => this.HideMessage());
+            panel.add_child(close);
+        }
+        layer.add_child(panel);
+        Main.layoutManager.uiGroup.add_child(layer);
+        const message = {
+            layer,
+            close,
+            // Close is offered once this delay has passed.
+            ready: false,
+            untilUnlock: untilLock,
+            timer: 0,
+            raiseId: Main.layoutManager.uiGroup.connect('child-added', () => this._updateMessage()),
+        };
+        if (seconds > 0) {
+            message.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, Math.min(seconds, 600), () => {
+                message.timer = 0;
+                this.HideMessage();
+                return GLib.SOURCE_REMOVE;
+            });
+        } else if (closable) {
+            message.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, MessageCloseSeconds, () => {
+                message.timer = 0;
+                message.ready = true;
+                this._updateMessage();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+        this._message = message;
+        this._updateMessage();
+        this._service?.emit_property_changed('MessageShown', GLib.Variant.new_boolean(true));
+    }
+
+    HideMessage() {
+        const message = this._message;
+        if (!message)
+            return;
+        this._message = null;
+        if (message.timer)
+            GLib.source_remove(message.timer);
+        Main.layoutManager.uiGroup.disconnect(message.raiseId);
+        message.layer.destroy();
+        this._service?.emit_property_changed('MessageShown', GLib.Variant.new_boolean(false));
+    }
+
+    get MessageShown() {
+        return Boolean(this._message);
+    }
+
+    // Keeps the message above everything else, and offers Close only while
+    // the student can click: a lock or the teacher's screen takes the mouse.
+    _updateMessage() {
+        const message = this._message;
+        if (!message)
+            return;
+        Main.layoutManager.uiGroup.set_child_above_sibling(message.layer, null);
+        if (message.close) {
+            const offered = message.ready && !this._cover && !this._screen;
+            message.close.opacity = offered ? 255 : 0;
+            message.close.reactive = offered;
+        }
     }
 
     _quietIndicator() {

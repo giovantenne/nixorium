@@ -126,6 +126,32 @@ pkgs.testers.runNixOSTest {
     client.succeed("${agent} probe --lock off nixorium-classroom-connect")
     client.succeed(super_key)
 
+    # The teacher's message is drawn above everything, the lock included,
+    # and takes no keyboard unless the computer is locked. Markup is only
+    # text, "unlock" ends with the lock, a number of seconds ends by itself,
+    # and a new message replaces the previous one.
+    client.succeed("${agent} probe --lock on nixorium-classroom-connect")
+    client.succeed("${agent} probe --message '<b>Exam</b> in progress. Wait for the teacher.' unlock nixorium-classroom-connect | grep -F 'message.shown'")
+    client.succeed(classroom_property + "MessageShown' | grep -F true")
+    client.sleep(1)
+    client.screenshot("classroom-message-locked")
+    client.fail(super_key)
+    client.succeed("${agent} probe --lock off nixorium-classroom-connect")
+    client.wait_until_succeeds(classroom_property + "MessageShown' | grep -F false", timeout=10)
+    client.succeed("${agent} probe --message 'Back in a minute' 0 nixorium-classroom-connect | grep -F 'message.shown'")
+    client.succeed(classroom_property + "MessageShown' | grep -F true")
+    client.succeed(super_key)
+    client.succeed("${agent} probe --message 'Second message' 4 nixorium-classroom-connect | grep -F 'message.shown'")
+    client.sleep(1)
+    client.screenshot("classroom-message")
+    client.wait_until_succeeds(classroom_property + "MessageShown' | grep -F false", timeout=20)
+    client.succeed("${agent} probe --message 'To be removed' 0 nixorium-classroom-connect")
+    client.succeed("${agent} probe --message-hide nixorium-classroom-connect | grep -F 'message.hidden'")
+    client.succeed(classroom_property + "MessageShown' | grep -F false")
+    client.fail("${agent} probe --message \"$(printf 'a\\tb')\" 0 nixorium-classroom-connect")
+    client.succeed(classroom_property + "MessageShown' | grep -F false")
+    client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
+
     # Files sent to the desktop belong to the student and are never
     # executable; links are not sent and nothing on the desktop is replaced.
     client.succeed("mkdir -p /tmp/share/Lesson && echo notes > /tmp/share/Lesson/notes.txt && printf 'ls\\n' > /tmp/share/run.sh && chmod 755 /tmp/share/run.sh && ln -s /etc/shadow /tmp/share/secret")
@@ -152,10 +178,34 @@ pkgs.testers.runNixOSTest {
     client.succeed("(${agent} probe --thumbnail /tmp/thumb-locked.jpg nixorium-classroom-connect || true) | grep -F 'code=screen-locked'")
     client.succeed("loginctl unlock-sessions")
 
-    # Without a running agent the controller gets a clear error, not a hang.
-    client.succeed("systemctl --user -M student@ stop nixorium-classroom-agent")
+    # The student's terminal cannot stop the agent or its extension helper:
+    # a manual stop is refused, and a killed agent starts again by itself.
+    client.fail("systemctl --user -M student@ stop nixorium-classroom-agent")
+    client.fail("systemctl --user -M student@ stop nixorium-classroom-extension")
+    client.succeed("systemctl --user -M student@ is-active nixorium-classroom-agent")
+    old_pid = client.succeed("systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent").strip()
+    client.succeed(f"kill -9 {old_pid}")
+    client.wait_until_succeeds(f"pid=$(systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent); test \"$pid\" != 0 -a \"$pid\" != {old_pid}", timeout=30)
+    client.wait_until_succeeds("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1'", timeout=30)
+
+    # A frozen agent (SIGSTOP) keeps its socket but answers nothing: the relay
+    # gives up on it within seconds and says no-agent, never "off", and it
+    # works again after SIGCONT.
+    frozen = client.succeed("systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent").strip()
+    client.succeed(f"kill -STOP {frozen}")
+    client.succeed("(timeout 30 ${agent} probe nixorium-classroom-connect || true) | grep -F 'code=no-agent'")
+    client.succeed(f"kill -CONT {frozen}")
+    client.wait_until_succeeds("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1'", timeout=30)
+
+    # While the agent does not answer (its socket is gone) the controller gets
+    # a clear error, not a hang: the card says "Monitoring stopped on this PC".
+    client.succeed("rm /run/user/1000/nixorium-classroom.sock")
     client.fail("${agent} probe nixorium-classroom-connect")
-    client.succeed("${agent} probe nixorium-classroom-connect | grep -F 'code=no-agent' || true")
+    client.succeed("(${agent} probe nixorium-classroom-connect || true) | grep -F 'code=no-agent'")
+    # systemd starts the agent again, with a new socket.
+    pid = client.succeed("systemctl --user -M student@ show -p MainPID --value nixorium-classroom-agent").strip()
+    client.succeed(f"kill -9 {pid}")
+    client.wait_until_succeeds("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1'", timeout=30)
     # An ordinary user cannot use the root relay.
     client.fail("su student -s /bin/sh -c '${agent} connect < /dev/null'")
   '';

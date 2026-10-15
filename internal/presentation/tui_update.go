@@ -13,6 +13,9 @@ import (
 
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
+	if updated, command, handled := model.handleNetworkChangeMessage(message); handled {
+		return updated, command
+	}
 	switch message := message.(type) {
 	case assistantBillingMsg:
 		return model.finishAssistantBilling(message)
@@ -682,6 +685,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		model.controller.autoApply = false
+		if model.screen == dashboardNetworkChange && model.networkChange.result.Operation == "" {
+			// Back to the change in progress: read it again, the controller
+			// now carries other addresses.
+			message := model.message
+			next, read := model.loadNetworkChange()
+			updated := next.(dashboardModel)
+			updated.message = message
+			return updated, read
+		}
 		model, reload := model.offerControllerInterfaceReload()
 		if model.actions.LoadControllerProgress != nil {
 			return model, tea.Batch(model.loadControllerProgress(model.controller.progressID), reload)
@@ -752,6 +764,28 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = ""
 		model.screen = dashboardGitCommitReview
 		return model, nil
+	case dashboardGitUndoPlanMsg:
+		model.busy = ""
+		model.maintenance.gitUndoPlan = message.report
+		model.confirmation = ""
+		model.maintenance.gitScroll = 0
+		model.message = ""
+		model.screen = dashboardGitUndoReview
+		return model, nil
+	case dashboardGitUndoResultMsg:
+		model.computers.hosts = domain.HostsReport{}
+		model.busy = ""
+		if !message.report.HasErrors() && message.report.Committed {
+			model.noteControllerSave(message.report.Revision)
+		}
+		model.maintenance.gitUndoResult = message.report
+		model.maintenance.gitCommitResult = domain.GitCommitReport{}
+		model.maintenance.gitReview = message.review
+		model.maintenance.gitScroll = 0
+		model.confirmation = ""
+		model.message = message.report.Message
+		model.screen = dashboardGitReview
+		return model, nil
 	case dashboardGitCommitResultMsg:
 		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
@@ -759,6 +793,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.noteControllerSave(message.report.Revision)
 		}
 		model.maintenance.gitCommitResult = message.report
+		model.maintenance.gitUndoResult = domain.GitUndoReport{}
 		model.maintenance.gitReview = message.review
 		model.maintenance.gitScroll = 0
 		model.confirmation = ""
@@ -899,6 +934,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		}
 		model.settings.current = message.settings
 		model.settings.repair = message.repair
+		model.settings.addresses = message.addresses
 		model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 		model.settings.fromAccounts = false
 		if model.installation.startingLabSetup {
@@ -913,21 +949,13 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				model.settings.current.Lab.PCCount = 20
 			}
 			model.settings.collectPasswords = !domain.CredentialsFromSettings(model.settings.current).Ready()
-			model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
-			model.settings.editor.width = model.width
-			model.settings.editor.height = model.height
-			model.settings.editor.isDark = model.isDark
-			model.settings.editor.prepareCurrentField()
+			model.settings.editor = model.newSettingsEditor(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
 			model.message = ""
 			model.screen = dashboardSettingsEdit
 			return model, nil
 		}
 		if model.settings.returnScreen == dashboardSetup {
-			model.settings.editor = newSettingsEditorModel(model.settings.current, settingsFields, "First setup / Laboratory settings")
-			model.settings.editor.width = model.width
-			model.settings.editor.height = model.height
-			model.settings.editor.isDark = model.isDark
-			model.settings.editor.prepareCurrentField()
+			model.settings.editor = model.newSettingsEditor(model.settings.current, settingsFields, "First setup / Laboratory settings")
 			model.message = ""
 			model.screen = dashboardSettingsEdit
 			return model, nil
@@ -939,8 +967,17 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.busy = ""
 		model.settings.editor = settingsWizardModel{}
 		model.settings.plan = message.report
+		model.settings.saveAnyway = false
+		failure := ""
 		if message.report.HasErrors() {
-			model.message = "The proposed settings did not pass validation: " + settingsIssueMessage(message.report.Issues)
+			failure = "The proposed settings did not pass validation: " + settingsIssueMessage(message.report.Issues)
+		} else if refusal := message.report.NetworkPreflight.SaveRefusal(); model.installation.flow && refusal != "" {
+			// Installation saves without a separate review, so a failed
+			// network check returns to the form instead.
+			failure = "The network check refused these settings: " + refusal
+		}
+		if failure != "" {
+			model.message = failure
 			if model.settings.returnScreen == dashboardSetup || model.installation.flow {
 				title := "First setup / Laboratory settings"
 				if model.installation.flow {
@@ -950,7 +987,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				if model.installation.flow {
 					fields = installationSettingsFields
 				}
-				model.settings.editor = newSettingsEditorModel(model.settings.candidate, fields, title)
+				model.settings.editor = model.newSettingsEditor(model.settings.candidate, fields, title)
 				model.settings.editor.index = len(model.settings.editor.fields) - 1
 				model.settings.editor.accepted = false
 				model.settings.editor.err = model.message

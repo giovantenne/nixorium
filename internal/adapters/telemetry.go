@@ -102,7 +102,7 @@ func (t Telemetry) TelemetryTransaction(ctx context.Context, wait, repair bool, 
 		case <-time.After(20 * time.Millisecond):
 		}
 	}
-	defer unix.Flock(lock, unix.LOCK_UN)
+	defer func() { _ = unix.Flock(lock, unix.LOCK_UN) }()
 	s := domain.TelemetryState{SchemaVersion: 1, Consent: "undecided"}
 	fd, e := unix.Openat(dir, "state.json", unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
 	if e == nil {

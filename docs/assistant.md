@@ -89,7 +89,9 @@ After activation, the screen shows **Free trial · N of M left**, where M is the
 trial allowance the service reports for your account. An ended trial
 shows **Free trial ended**; exhausted annual quota shows **No requests left**.
 The controller checks account metadata without sending your draft or files,
-and refreshes that count after a request.
+and refreshes that count after a request. A request that the service interrupts
+before an answer (a service error or its safety limit) is not counted; a request
+you stop yourself is.
 
 When the trial expires or its requests are used, Assistant shows a signed
 purchase link from the service. The link lasts seven days; reopening Assistant
@@ -113,10 +115,11 @@ only if you report an answer or turn on sharing. Sharing is off by default. Do n
 
 The model sees tracked files from the chat's base commit plus its own candidate
 files. Untracked and ignored files, private-key paths, `keys/`, `.git`, `.ssh`,
-`.env*`, credentials and agent-instruction directories are hidden. Settings,
-input locks, instruction files and Git control files are read-only. Sensitive
-settings fields are withheld; known token formats, password hashes and private
-key material are redacted from model-facing output. The laboratory token is
+`.env*`, credentials and agent-instruction directories are hidden. Input
+locks, instruction files and Git control files are read-only, and so are the
+settings except the few listed under [Laboratory settings](#laboratory-settings).
+Sensitive settings fields are withheld; known token formats, password hashes and
+private key material are redacted from model-facing output. The laboratory token is
 kept separate from the transcript. Only bounded journal excerpts from fixed
 core units are diagnostic inputs; arbitrary logs, student home files and other
 files outside the workspace are not tool inputs.
@@ -166,7 +169,7 @@ The model has fixed tools, with no shell or system-operation tool:
 | `list_files` | Visible workspace paths; at most 2,000 entries |
 | `read_file` | UTF-8 text; at most 64 KiB per call |
 | `search` | RE2 regular expression; at most 200 matches, 300 characters per matching line |
-| `write_file` | Candidate text only; 512 KiB per file, 4 MiB and 200 changed paths per conversation |
+| `write_file` | Candidate text only; 512 KiB per file, 4 MiB and 200 changed paths per conversation; `lab-settings.json` only for the settings under [Laboratory settings](#laboratory-settings) |
 | `delete_file` | Existing, unprotected candidate files only |
 | `search_packages` | Deployment's pinned package search; at most 50 results, 60-second timeout |
 | `evaluate` | Isolated temporary Git clone; five minutes, bounded output, no import-from-derivation |
@@ -176,6 +179,10 @@ The model has fixed tools, with no shell or system-operation tool:
 | `host_diagnostics` | One exact declared computer and a fixed area; read-only state and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
 | `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
+
+Assistant never changes the laboratory network; for a new network address or
+prefix it refers the administrator to the guided change (Maintenance → Change
+network addressing, `nixorium network migrate`).
 
 A program downloaded by hand runs on these computers thanks to nix-ld, but
 that is a convenience for one user; the `prefetch` route remains the one that
@@ -342,6 +349,57 @@ not downloaded twice. The computers never download it: at update time they
 receive the built program from the controller cache. If the store copy was
 collected in the meantime, the controller downloads it again during the build
 and Nix checks the same hash.
+
+### Laboratory settings
+
+Controllers advertise `settings_v1` through the same optional header. The
+Assistant can then propose a change to these settings in `lab-settings.json`,
+reviewed and saved like any other proposal:
+
+| Setting | Field |
+|---|---|
+| Browser homepage | `lab.homepageUrl` |
+| Time zone | `lab.timeZone` |
+| Default and additional language | `lab.defaultLocale`, `lab.extraLocale` |
+| Keyboard layout | `lab.keyboardLayout` |
+| Student Git name and email | `lab.studentGitName`, `lab.studentGitEmail` |
+| Administrator Git name and email | `lab.adminGitName`, `lab.adminGitEmail` |
+
+Everything else stays in the menu (Maintenance → Change settings): the
+network and its addresses, the number of computers, the controller number,
+network devices, the DHCP address hint, account names and passwords, the
+credentials version, the classroom view, the `assistant` switch and the schema
+version. Assistant cannot change them, and it cannot delete the file.
+
+The model reads a copy of the file with sensitive fields withheld and writes it
+back whole. Nixorium never takes that copy as it is: it keeps the saved file,
+takes only the writable values the model changed, checks the result with the
+decoder and validation of the settings menu, and stores it in the form
+Nixorium itself writes. A value the read tool masked is never written back, and
+the file keeps the mode it has in the base commit. A refused write is a tool
+error and leaves the candidate as it was:
+
+| Error | Meaning |
+|---|---|
+| `settings_field_read_only: lab.pcCount` | The copy differs from what the model read in a setting it may not change, or adds or removes one. The message names every such field, even when a writable setting changed too. |
+| `settings_invalid: …` | The content is not a settings file or has an unknown field, a value is not text, a value fails the settings validation (for example `lab.timeZone: must not be empty` or `lab.homepageUrl: must be an absolute http:// or https:// URL`), a value is longer than 128 bytes (256 for a Git name or email, 2,048 for the homepage), has spaces at either end, spans several lines or carries a `[REDACTED]` or `[WITHHELD]` stand-in, or the saved settings no longer validate and must be repaired in the menu first. |
+
+Deleting `lab-settings.json` and writing a file of that name in a subfolder
+remain `protected_path`.
+
+When a proposal changes `lab-settings.json`, the review applies the rules of a
+native settings save to the saved and the proposed file again, whatever wrote
+the candidate. Changing the network or the controller number while computers
+are configured, a file that does not validate or is not in the form Nixorium
+writes, or a change outside the writable settings blocks the save with a
+message. Otherwise **Checked by Nixorium** adds the same lines a native
+settings change shows: apply the settings to the controller, update the
+computers (offline computers keep the old values until updated), and prepare
+network installation again before installing more computers. A change of the
+administrator Git identity reaches the controller only. The save, the backup
+and the follow-up reviews are those of any proposal; the candidate evaluation
+runs the settings through the same Nix validation as the menu, and nothing is
+applied by saving.
 
 ## How affected computers are calculated
 

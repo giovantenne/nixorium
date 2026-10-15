@@ -14,6 +14,20 @@ let
   # can start them; their firmware must allow it too.
   wakeByName = laboratoryEnabled && !isController && !byType;
   ethtool = "${pkgs.ethtool}/bin/ethtool";
+  # During a change of laboratory network every host keeps its previous
+  # address next to the new one: the controller so that computers not yet
+  # moved still reach it, and clients so that the update that moves them
+  # keeps its connection and an undo finds them on the restored network.
+  # The record's removal (finish or undo) drops the other address.
+  transition = labSettings.networkTransition or null;
+  previousHostIp =
+    if transition == null then null
+    else if isController then transition.masterIp
+    else transition.hostIps.${hostName} or null;
+  previousAddress = lib.optional (laboratoryEnabled && previousHostIp != null) {
+    address = previousHostIp;
+    prefixLength = transition.prefixLength;
+  };
 in
 {
   networking.hostName = hostName;
@@ -26,7 +40,7 @@ in
           address = hostIp;
           prefixLength = prefixLength;
         }
-      ];
+      ] ++ previousAddress;
     };
   };
 
@@ -57,6 +71,8 @@ in
       address1 = "${hostIp}/${toString prefixLength}";
       dhcp-timeout = "2147483647";
       may-fail = "false";
+    } // lib.optionalAttrs (previousHostIp != null) {
+      address2 = "${previousHostIp}/${toString transition.prefixLength}";
     };
     ipv6.method = "auto";
   };
@@ -76,6 +92,16 @@ in
         if [ -n "$device" ]; then
           nmcli -w 0 connection up nixorium-lab ifname "$device" || true
         fi
+      fi
+    '' + lib.optionalString (transition != null) ''
+      # During a change of laboratory network the profile gains the new
+      # address next to the previous one; apply it to the running card at
+      # once. The address the activating SSH session uses stays. After the
+      # change the address no longer configured disappears at the next start.
+      device=$(nmcli -t -f NAME,DEVICE connection show --active \
+        | awk -F: '$1 == "nixorium-lab" { print $2; exit }')
+      if [ -n "$device" ]; then
+        nmcli device reapply "$device" || true
       fi
     '';
   };

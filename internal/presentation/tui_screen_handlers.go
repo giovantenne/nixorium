@@ -92,6 +92,8 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		return model.openRestoreLab()
 	case "t":
 		return model.openTemplateReset()
+	case "n":
+		return model.openNetworkChange()
 	case "s":
 		model.screen = dashboardServices
 		model.busy = "Checking managed controller services"
@@ -110,6 +112,7 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		model.maintenance.gitFromWorkspace = model.screen == dashboardWorkspace
 		model.maintenance.gitFromHomeFiles = model.screen == dashboardHomeFiles
 		model.maintenance.gitCommitResult = domain.GitCommitReport{}
+		model.maintenance.gitUndoResult = domain.GitUndoReport{}
 		model.screen = dashboardGitReview
 		model.busy = "Reviewing Git changes without modifying the worktree"
 		model.message = ""
@@ -146,8 +149,7 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		model.busy = "Loading managed laboratory settings"
 		model.message = ""
 		return model.startRead(func(ctx context.Context) tea.Msg {
-			settings, err := model.actions.LoadSettings(ctx)
-			return dashboardSettingsMsg{settings: settings, err: err, repair: model.settingsRepairIssues()}
+			return model.loadSettingsMsg(ctx)
 		})
 	}
 	return model, nil
@@ -696,12 +698,22 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "n", "esc":
 			model.message = "Settings apply cancelled; no file changed."
 			model.screen = dashboardSettings
+		case "c":
+			if len(model.settings.plan.NetworkPreflight.Missing()) > 0 {
+				model.settings.saveAnyway = !model.settings.saveAnyway
+				model.message = ""
+			}
 		case "y", "enter":
+			plan := model.reviewedSettingsPlan()
+			if refusal := plan.NetworkPreflight.SaveRefusal(); refusal != "" {
+				model.message = "Not saved: " + refusal
+				return model, nil
+			}
 			model.busy = "Saving the reviewed laboratory configuration"
 			model.settings.applying = true
 			model.message = ""
 			candidate := model.settings.candidate
-			plan := model.settings.plan
+			model.settings.plan = plan
 			return model, func() tea.Msg {
 				report := model.actions.SaveSettings(candidate, plan)
 				return dashboardSettingsApplyMsg{report: report}
@@ -786,6 +798,8 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		return model.updateShare(key)
 	case dashboardDeferredUpdates:
 		return model.updateDeferredUpdates(key)
+	case dashboardNetworkChange:
+		return model.updateNetworkChange(key)
 	case dashboardCleanup:
 		return model.updateCleanup(key)
 	case dashboardRecovery:
@@ -997,7 +1011,13 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardGitReview:
-		if model.maintenance.gitCommitResult.Operation != "" {
+		if model.maintenance.gitCommitResult.Operation != "" || model.maintenance.gitUndoResult.Operation != "" {
+			// A saved undo continues like a settings save: Enter opens the
+			// ordinary Apply to controller review (or Update computers once the
+			// controller runs the saved revision); Esc returns to Maintenance.
+			if key.String() == "enter" && model.maintenance.gitUndoResult.Operation != "" && hasAction(model.saveFollowupActions(""), "Enter") {
+				return model.continueSavedConfiguration()
+			}
 			switch key.String() {
 			case "enter", "esc", "left":
 				if model.maintenance.gitFromHomeFiles {
@@ -1023,6 +1043,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				}
 			case "r":
 				model.maintenance.gitCommitResult = domain.GitCommitReport{}
+				model.maintenance.gitUndoResult = domain.GitUndoReport{}
 				model.busy = "Refreshing the read-only Git review"
 				model.message = ""
 				return model.startRead(func(ctx context.Context) tea.Msg {
@@ -1092,6 +1113,11 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.maintenance.gitDiscard = false
 			model.message = ""
 			model.screen = dashboardGitCommitSelect
+		case "u":
+			if model.actions.PlanGitUndo == nil || model.actions.ApplyGitUndo == nil {
+				return model, nil
+			}
+			return model.startGitUndoReview()
 		case "x":
 			if model.actions.PlanGitDiscard == nil || len(model.maintenance.gitReview.Changes) == 0 || model.maintenance.gitReview.HasErrors() {
 				model.message = "A clean, unblocked change review is required before discarding changes."
@@ -1199,6 +1225,8 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				model.confirmation += key.Text
 			}
 		}
+	case dashboardGitUndoReview:
+		return model.updateGitUndoReviewKey(key)
 	case dashboardUpdate:
 		if model.updates.result.Operation != "" {
 			switch key.String() {

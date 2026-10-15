@@ -5,9 +5,14 @@ let
   isClient = laboratoryEnabled && !isController;
   # Clients without an explicit interface name are configured by type (ADR 0017).
   ifaceExplicit = labSettings.ifaceExplicit or true;
+  transition = labSettings.networkTransition or null;
   clientRules = import ../lib/client-firewall-rules.nix {
     interface = if ifaceExplicit then labSettings.ifaceName else null;
     masterIp = labSettings.masterIp;
+    # During a change of laboratory network SSH also comes from the
+    # controller's previous address, for example from the deployment that
+    # moves this computer to the new network.
+    previousMasterIp = if transition == null then null else transition.masterIp;
   };
 in
 {
@@ -21,7 +26,8 @@ in
         allowedTCPPorts = lib.optionals isController [
           22 labSettings.cachePort labSettings.pxeHttpPort
         ];
-        allowedUDPPorts = lib.optionals isController [ 5353 67 69 4011 ];
+        # 123: time for the laboratory (chrony, modules/time.nix).
+        allowedUDPPorts = lib.optionals isController [ 5353 67 69 4011 123 ];
       };
     };
     extraInputRules = lib.optionalString isClient clientRules.allow;

@@ -174,7 +174,10 @@ func lockUnavailable(err error) string {
 		switch agentError.Code {
 		case classroomview.CodeNoSession:
 			return "Nobody is signed in."
-		case classroomview.CodeNoAgent, classroomview.CodeLockUnavailable:
+		case classroomview.CodeNoAgent:
+			return ClassroomNoAgentDetail
+		case classroomview.CodeLockUnavailable:
+			// The agent answers, but its Shell extension is not in this session.
 			return "The classroom view is not running on this computer."
 		}
 	}

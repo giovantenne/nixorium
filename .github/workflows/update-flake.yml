@@ -1,0 +1,86 @@
+name: Update nixpkgs
+
+# Once a month, and on demand, propose a newer revision of the locked nixpkgs
+# as a pull request. The proposal is never merged automatically: a newer
+# nixpkgs can change packages, modules and options, so the gates decide.
+#
+# Requires "Allow GitHub Actions to create and approve pull requests" in the
+# repository's Actions settings. GitHub does not start the Validate and
+# Security workflows on a pull request opened by an Action; close and reopen
+# it to run them.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 1 * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-nixpkgs
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    name: Propose nixpkgs update
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out master
+        uses: actions/checkout@v5
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The update report and the pull request text live outside the checkout,
+      # so only flake.lock can change the proposal.
+      - name: Update nixpkgs
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix --extra-experimental-features 'nix-command flakes' \
+            flake update nixpkgs 2>&1 | tee "$RUNNER_TEMP/flake-update.log"
+          {
+            echo 'Monthly proposal of a newer nixpkgs for flake.lock.'
+            echo
+            echo '~~~'
+            sed -n '/^•/,$p' "$RUNNER_TEMP/flake-update.log"
+            echo '~~~'
+            echo
+            printf '%s\n' \
+              "This pull request is never merged automatically. \`./scripts/validate.sh --eval\`" \
+              "and the VM tests decide whether this nixpkgs is accepted, because a newer" \
+              "nixpkgs can change packages, modules and options." \
+              "" \
+              "1. Run \`./scripts/validate.sh --eval\` on this branch." \
+              "2. Run the VM tests the update could affect, for example" \
+              "   \`./scripts/validate.sh --management-vm\`, or start the *Full validation*" \
+              "   workflow on the \`update-nixpkgs\` branch." \
+              "3. Merge only when they pass; otherwise close this pull request." \
+              "" \
+              "GitHub does not run the Validate and Security workflows on a pull request" \
+              "opened by an Action. Close and reopen it to run them."
+          } > "$RUNNER_TEMP/pull-request-body.md"
+
+      - name: Open or update the pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          base: master
+          branch: update-nixpkgs
+          delete-branch: true
+          add-paths: flake.lock
+          commit-message: Update the locked nixpkgs
+          title: Update the locked nixpkgs
+          body-path: ${{ runner.temp }}/pull-request-body.md
+          labels: |
+            dependencies
+            nixpkgs
+            do-not-automerge

@@ -139,6 +139,8 @@ func runGitCommand(ctx context.Context, repository string, options options, stdo
 		}
 	case "discard-apply":
 		return runGitDiscardApply(ctx, app.NewGitDiscardManager(local), repository, options, stdout, stderr)
+	case "undo-plan", "undo-apply":
+		return runGitUndoCommand(ctx, repository, options, stdout, stderr)
 	default:
 		return runGitCommitApply(ctx, app.NewGitCommitManager(local), repository, stdout, stderr, options.paths, options.expect, options.yes, options.json)
 	}

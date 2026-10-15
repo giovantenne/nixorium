@@ -30,10 +30,17 @@ reset policy and SSH trust are operator-controlled. Do not change them here.
 A controller DHCP hint must not overlap the static laboratory prefix. On
 supporting pins, saved clients prevent managed changes to subnet, prefix and
 controller host number. Never remove clients or edit JSON to bypass this.
-There is no assumed guided network migration capability.
+A `lab.networkTransition` record belongs to the guided change of the
+laboratory network; never propose adding, editing or removing it.
+The refusal code is `NETWORK-LOCKED`. On supporting pins the operator moves the
+laboratory to another network with the guided change (Maintenance → Change
+network addressing, `nixorium network migrate status`); refer to it instead of
+proposing settings edits. A change in progress shows `NETWORK-CHANGING`.
 
 Interface changes can disconnect computers; do not prescribe a universal
-controller-first order. USB/SSH can use Wi-Fi on supporting pins, but live-ISO
+controller-first order. On supporting pins the settings review checks the named
+devices read-only (`networkPreflight` in `config plan --json`); point the
+administrator to that review instead of guessing device names. USB/SSH can use Wi-Fi on supporting pins, but live-ISO
 credentials do not configure the installed system. PXE compatibility depends
 on hardware and networking.
 

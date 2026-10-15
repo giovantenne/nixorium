@@ -12,7 +12,7 @@ import (
 )
 
 func runConfigCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
-	manager := app.NewSettingsManager(adapters.Local{})
+	manager := app.NewSettingsManager(adapters.Local{}).WithNetworkObserver(adapters.Local{})
 	var err error
 	switch options.subcommand {
 	case "validate":

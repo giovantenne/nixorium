@@ -15,6 +15,9 @@ const (
 type DeploymentTarget struct {
 	Name string `json:"name"`
 	IP   string `json:"ip"`
+	// PreviousIP is set during a change of laboratory network: a computer
+	// that answers only there is updated over it and checked on both.
+	PreviousIP string `json:"previousIp,omitempty"`
 }
 
 // DeploymentProgress is an in-process, bounded update authored by the
@@ -60,6 +63,7 @@ type DeploymentTargetAvailability struct {
 	IP           string          `json:"ip"`
 	Reachability Reachability    `json:"reachability"`
 	SSH          SSHAvailability `json:"ssh"`
+	Network      HostNetwork     `json:"network,omitempty"`
 }
 
 func (r DeploymentPlanReport) HasErrors() bool {
@@ -104,6 +108,7 @@ type DeploymentTargetVerification struct {
 	Revision         string           `json:"revision,omitempty"`
 	SystemPath       string           `json:"systemPath,omitempty"`
 	Detail           string           `json:"detail,omitempty"`
+	Network          HostNetwork      `json:"network,omitempty"`
 }
 
 type DeploymentVerificationSummary struct {

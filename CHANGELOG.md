@@ -8,6 +8,33 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `nixorium git undo plan` and `nixorium git undo apply --expect <token>` go
+  back from the last saved change (settings, software, student workspace):
+  the review shows its description, date and files, and applying it (typed
+  `UNDO`) saves one new "Undo: ..." change and puts the files back. In the
+  dashboard press `u` on **Maintenance → Review Git changes**; Enter on the
+  result opens Apply to controller. Nothing is pushed and no computer changes;
+  apply to the controller and update the computers as usual. It refuses, and names the next step, unsaved changes, a
+  first version, a merge, an earlier undo, an update of Nixorium or of the
+  package base (see the update recovery), recorded keys, a change of the
+  laboratory network and files that cannot go back safely.
+- Assistant can now change the browser homepage, the time zone, the locale, the
+  keyboard layout and the Git identities in a proposal; everything else in the
+  settings stays in the menu. The change is reviewed and saved like any other
+  proposal, with the same checks and the same "what happens next" lines as a
+  change made in Maintenance → Change settings.
+- Student computers now get the time from the controller. The controller keeps
+  its own clock right from Internet time servers (it needs to reach them) and
+  gives the time to the laboratory network only, opening UDP port 123 on the
+  laboratory network card and nowhere else. Each computer asks the controller
+  and no Internet time server, so a computer whose clock battery is drained
+  starts with the right time even though it has no Internet of its own, and
+  certificates, file dates and logs stay correct, also for a computer that has
+  Internet after a user signs in. If the controller cannot reach the Internet
+  it keeps giving its own clock, starting five minutes after it boots. The
+  change reaches each computer at its next update and the controller when you
+  apply it; there is nothing to configure. Controller-only installations keep
+  their previous time settings.
 - Programs downloaded outside Nix now run on the controller and every client:
   Nixorium enables nix-ld with the common libraries (zlib, libstdc++, glib,
   OpenSSL, ICU and the X11/GTK set that Electron and Java GUI programs need).
@@ -21,6 +48,29 @@ The project follows [Semantic Versioning](https://semver.org/).
   that JDK (`java.jdt.ls.java.home` and `java.configuration.runtimes`), so it
   never depends on a runtime bundled in a Marketplace copy. Reviewed editor
   settings in the profile may still override them.
+- The settings review checks network devices before saving, without changing
+  any computer. A new controller device name is compared with the controller's
+  devices (listed with their addresses, the one carrying the DHCP address
+  marked), and a name the controller does not have as a wired device cannot be
+  saved: "The controller has no network device called enp5s0. Its devices are:
+  …". A new client device name is checked on every affected computer that
+  answers: a missing device blocks the save unless you choose to save anyway
+  for the computers listed, and computers that do not answer are listed to
+  check at their screen. The review also advises updating one computer first.
+  `nixorium config plan --json` reports the same findings in a new
+  `networkPreflight` object.
+- The controller DHCP address in Settings → Network is picked from the
+  controller's current DHCP addresses, with the saved value preselected;
+  Other… still accepts a typed address, with a warning when the controller
+  does not have it. The command line is unchanged.
+- The laboratory can move to a new network without losing a computer:
+  Maintenance → Change network addressing (`nixorium network migrate
+  plan|start|status|finish|undo`) reviews the new address of the controller
+  and of every computer, then continues with Apply to controller and Update
+  computers while the controller and the computers answer on both networks.
+  A computer still on the old network is updated there, computers that are off
+  are queued, the Overview shows the change in progress (`NETWORK-CHANGING`)
+  with its next step, and the change can be undone until it is finished.
 - **Switch on** starts student computers that are off, with Wake-on-LAN. It is
   in **Computers → Power controls** (Tab beside Shut down and Restart, for the
   administrator and the teacher), in the classroom view page (**Power →
@@ -62,6 +112,31 @@ The project follows [Semantic Versioning](https://semver.org/).
   review token; `--into <folder>` collects into another existing folder.
   Update the student computers first: one that is not updated is listed as
   not able to collect yet.
+- **Message** in the classroom view shows a short text over the screens of the
+  selected students' computers, in front of everything, a lock or your shared
+  screen included. It is in the toolbar (**Message → Send a message…**, with
+  **Remove message**) and in a computer's **Actions** menu. You write up to 300
+  characters (plain text, up to 10 lines) and choose how long it stays: until
+  the student closes it (**Close** appears after 10 seconds), 30 seconds, 2
+  minutes, or until you unlock the computer. The students keep their keyboard
+  and mouse, unless the computer is locked. A new message replaces the
+  previous one, and signing out removes it. The review shows the text and the
+  computers, and the result counts them, such as "Message: 12 shown · 1
+  switched off or not reachable". Update the student computers first and have
+  the students sign in again: one that is not updated is listed as unable to
+  show messages yet.
+- **Exam mode** in the classroom view toolbar prepares the selected computers
+  for an exam with one confirmation: it blocks Internet, locks the screens
+  and shows a message ("Exam in progress. Wait for the teacher.", editable),
+  each step optional and each computer's result listing the three steps. The
+  same button reads **End exam mode** on computers it was started on from the
+  open page: it removes the message, unlocks the screens, allows Internet
+  again, and then offers **Collect from desktop** for the same computers
+  (nothing is collected unless you confirm). The classroom service remembers
+  which computers are in exam mode, so a reopened page, or another user's,
+  shows the same; the computers keep no exam state, and restarting the
+  classroom service forgets it (then use **Remove message**, **Unlock** and
+  **Allow Internet**).
 - **Schedule** switches the student computers on and off by themselves, at
   most one switch-on time and one shut-down time for a set of weekdays, for
   example on at 07:50 and off at 18:00 from Monday to Friday, in the
@@ -83,6 +158,21 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- A student can no longer switch off the classroom view from the terminal of
+  the session: `systemctl --user stop` is refused for the classroom view and
+  its Shell extension helper, and the classroom view restarts one second after
+  it is killed, however many times. While it is down, the computer's card says
+  "Monitoring stopped on this PC" instead of just dimming, and the same words
+  explain why Lock, Send files, Share screen, Collect from desktop and Save
+  screenshot skipped that computer; the result notice counts it apart. A
+  computer waiting at the login screen still says "Nobody is signed in". A
+  classroom view that is frozen rather than stopped is reported the same way,
+  and a frozen one no longer keeps its connection open on the computer after
+  the controller has gone.
+  This is a classroom aid, not a security boundary: a student who masks the
+  unit gets the classroom view back at the next restart, because the home
+  folder is reset then. An update no longer restarts the classroom view on a
+  computer in use; the new version starts at the next sign-in.
 - After **Update Nixorium** or **Apply to controller** activates the
   controller, Nixorium reopens itself on the newly installed version: the
   result shows "Nixorium <version> is active. The interface reopens in 3 s
@@ -91,6 +181,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 - The notification on a student computer after an update that needs no restart
   now says: "The update is in place; programs you open from now on use it. If
   something does not work as expected, restart the computer."
+- Changing the laboratory network address, prefix length or controller number
+  while computers are configured is refused with a clearer message and the new
+  situation code `NETWORK-LOCKED`: the computers would keep their old addresses
+  and lose the controller. The message points to the guided change of the
+  laboratory network (Maintenance → Change network addressing); the controller
+  number stays locked.
+
 - The review of an Assistant proposal reuses the evaluation Assistant already
   ran when nothing changed since, instead of evaluating the laboratory a second
   time.
@@ -102,6 +199,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A stuck helper program can no longer keep the classroom view busy forever.
+  On a student computer, the session query behind a classroom connection is
+  stopped after 10 seconds and the screen capture program ends with the
+  capture; on the controller, the dark-style lookup of the classroom window
+  ends after 10 seconds. The reset of a student's home at boot stops a program
+  that has not finished after 5 minutes and fails safely, leaving what it
+  found for the administrator, instead of waiting without end.
 - `nixorium send plan|apply` works from the teacher's terminal: like
   `nixorium collect`, it needs only the classroom service and no longer stops
   with "deployment repository not found".

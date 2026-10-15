@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -266,7 +267,10 @@ func (capture *mutterCapture) startLocked(width int) error {
 	if outputWidth > 640 {
 		quality = 85
 	}
-	pipeline := exec.Command("gst-launch-1.0", "-q",
+	// The pipeline lives as long as this capture: stopping the capture
+	// cancels the context, which kills it.
+	pipelineContext, stopPipeline := context.WithCancel(context.Background())
+	pipeline := exec.CommandContext(pipelineContext, "gst-launch-1.0", "-q",
 		"pipewiresrc", fmt.Sprintf("path=%d", node), "always-copy=true", "!",
 		"videoconvert", "!", "videoscale", "!",
 		fmt.Sprintf("video/x-raw,width=%d,height=%d", outputWidth, height), "!",
@@ -274,9 +278,11 @@ func (capture *mutterCapture) startLocked(width int) error {
 		"multipartmux", "boundary="+frameBoundary, "!", "fdsink", "fd=1")
 	output, err := pipeline.StdoutPipe()
 	if err != nil {
+		stopPipeline()
 		return fail(err)
 	}
 	if err := pipeline.Start(); err != nil {
+		stopPipeline()
 		return fail(fmt.Errorf("start GStreamer: %w", err))
 	}
 	capture.generation++
@@ -287,7 +293,7 @@ func (capture *mutterCapture) startLocked(width int) error {
 	var once sync.Once
 	capture.stop = func() {
 		once.Do(func() {
-			_ = pipeline.Process.Kill()
+			stopPipeline()
 			_ = remote.Call(remoteDesktopName+".Session.Stop", 0).Err
 			connection.Close()
 		})

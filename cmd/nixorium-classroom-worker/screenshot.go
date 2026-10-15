@@ -219,7 +219,7 @@ func noPictureReason(state string) string {
 	case app.ClassroomNoSession:
 		return "Nobody is signed in."
 	case app.ClassroomNoAgent:
-		return "The classroom view is not running on this computer."
+		return app.ClassroomNoAgentDetail
 	case app.ClassroomConnecting:
 		return "Still connecting; try again in a moment."
 	}

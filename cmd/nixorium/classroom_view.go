@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -101,9 +102,17 @@ func classroomBrowserArguments(address, profile string, dark bool) []string {
 	return append(arguments, "--app="+address)
 }
 
+// gsettingsTimeout ends a gsettings that does not answer (a session bus
+// that hangs), so opening the classroom view never waits for it.
+var gsettingsTimeout = 10 * time.Second
+
 // desktopPrefersDark reports GNOME's style for the current user.
 func desktopPrefersDark() bool {
-	output, err := exec.Command("gsettings", "get", "org.gnome.desktop.interface", "color-scheme").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), gsettingsTimeout)
+	defer cancel()
+	command := exec.CommandContext(ctx, "gsettings", "get", "org.gnome.desktop.interface", "color-scheme")
+	command.WaitDelay = time.Second
+	output, err := command.Output()
 	return err == nil && strings.TrimSpace(string(output)) == "'prefer-dark'"
 }
 
@@ -122,6 +131,8 @@ func startBrowser(address string) error {
 		if err != nil {
 			continue
 		}
+		// A detached launch (own session, released below): the window must
+		// outlive this command, so it is not bound to a context.
 		command := exec.Command(path, candidate[1:]...)
 		command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 		if err := command.Start(); err != nil {

@@ -69,6 +69,7 @@ func run() error {
 	worker.collected = newCollectStore(os.TempDir())
 	worker.collect = app.NewCollectManager(lockSource{local, adapters.ClassroomAgentConnector{}}, worker.collected)
 	go worker.collected.expire(ctx, time.Minute)
+	worker.message = app.NewMessageManager(lockSource{local, adapters.ClassroomAgentConnector{}})
 	// The page's actions go through the same handling as the dashboard.
 	worker.view.actions = worker.handle
 	worker.view.desktops = newDesktopBroker()
@@ -102,6 +103,7 @@ type classroomWorker struct {
 	collected  *collectStore       // until the user who asked saves them
 	records    app.OperationRecordSink
 	wake       *app.WakeManager
+	message    *app.MessageManager  // shows a message on students' screens
 	schedule   *app.ScheduleManager // shows and sets the schedule the timer runs
 }
 
@@ -222,6 +224,8 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		}
 	case domain.ClassroomWakePlanOperation, domain.ClassroomWakeApplyOperation:
 		return worker.handleWake(ctx, request)
+	case domain.ClassroomMessagePlanOperation, domain.ClassroomMessageApplyOperation:
+		return worker.handleMessage(ctx, request)
 	case domain.ClassroomScheduleGetOperation, domain.ClassroomScheduleSetOperation:
 		return worker.handleSchedule(ctx, request)
 	case domain.ClassroomViewOpenOperation:

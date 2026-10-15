@@ -25,7 +25,9 @@ const stateText = {
   connecting: 'Connecting…',
   viewing: '',
   'no-session': 'Nobody is signed in',
-  'no-agent': 'Classroom view is not running here',
+  // Somebody is signed in and the computer answers, but the classroom
+  // agent of that session does not: it was stopped and restarts by itself.
+  'no-agent': 'Monitoring stopped on this PC',
   // The student's own lock screen (after a while without use, or Super+L):
   // GNOME does not let it be captured.
   locked: 'Idle',
@@ -35,17 +37,20 @@ const stateText = {
 
 // An icon over the screen tells the states apart at a glance: the
 // student's idle lock screen (a moon, over the dimmed last picture), the
-// teacher's lock (a padlock over the live picture) and a computer that is
-// off (a power symbol instead of the picture).
+// teacher's lock (a padlock over the live picture), a computer whose
+// monitoring stopped (a warning sign over the dimmed last picture) and a
+// computer that is off (a power symbol instead of the picture).
 const covers = {
   idle: { icon: 'moon', caption: 'Idle', title: "The student's screen lock is on: the computer was left unused, or the student locked it. The screen shows again once the student unlocks it." },
   lock: { icon: 'lock', caption: '', title: 'Locked: the student sees "Eyes on the teacher".' },
+  stopped: { icon: 'alert', caption: 'Monitoring stopped on this PC', title: 'Somebody is signed in on this computer but its classroom view stopped, so nobody is watching this screen. It starts again by itself within seconds; if this stays, ask the administrator.' },
   off: { icon: 'power', caption: 'Off or not reachable', title: 'Switched off or not reachable.' },
 };
 
 function coverOf(computer) {
   if (computer.state === 'unreachable') return 'off';
   if (computer.state === 'locked') return 'idle';
+  if (computer.state === 'no-agent') return 'stopped';
   if (computer.state === 'viewing' && computer.locked) return 'lock';
   return '';
 }
@@ -102,6 +107,7 @@ function updateSelection() {
   // A menu with data-always keeps opening without a selection: it holds an
   // entry about the whole classroom (Power: Schedule…).
   for (const menu of document.querySelectorAll('.toolbar .actions-menu')) menu.classList.toggle('disabled', chosen.size === 0 && !menu.hasAttribute('data-always'));
+  classroomTools.updateExamButton();
 }
 
 selectAll.addEventListener('change', () => {
@@ -164,6 +170,7 @@ let redraw = false;
 
 function render(computers) {
   let viewing = 0;
+  classroomTools.read(computers);
   if (redraw) {
     redraw = false;
     const listed = new Set(computers.map((computer) => computer.name));
@@ -201,6 +208,7 @@ function render(computers) {
     if (computer.showing) labels.push('Sharing your screen');
     // The teacher's lock is known only while the screen answers.
     if (computer.locked && (computer.state === 'viewing' || computer.state === 'locked')) labels.push('Locked');
+    if (classroomTools.inExam(computer.name)) labels.push('Exam mode');
     if (computer.internet === 'blocked') labels.push('Internet off');
     if (computer.power) labels.push(computer.power);
     if (labels.join('|') !== entry.badgeText) {
@@ -233,7 +241,7 @@ function render(computers) {
       viewerScreen.title = cover ? covers[cover].title : '';
       // This computer's menu offers only the change that applies.
       const offer = { lock: !computer.locked, unlock: Boolean(computer.locked), 'internet-block': computer.internet !== 'blocked', 'internet-allow': computer.internet === 'blocked' };
-      const needsSession = ['lock', 'unlock', 'show-screen', 'send-file', 'send-folder'];
+      const needsSession = ['lock', 'unlock', 'show-screen', 'send-file', 'send-folder', 'message', 'message-hide'];
       for (const button of viewerActions.querySelectorAll('button[data-action]')) {
         if (button.dataset.action in offer) button.hidden = !offer[button.dataset.action];
         button.disabled = !reachable || (needsSession.includes(button.dataset.action) && !session);
@@ -297,7 +305,7 @@ async function postJSON(path, body) {
   return response.json();
 }
 
-async function runAction(action, computers, transfer) {
+async function runAction(action, computers, transfer, extra) {
   // The dialog takes the keyboard: let go of every key on the student's side.
   if (controlling) {
     pressedCodes.clear();
@@ -312,7 +320,7 @@ async function runAction(action, computers, transfer) {
   actionCancel.textContent = 'Cancel';
   if (!actionDialog.open) actionDialog.showModal();
   try {
-    const review = await postJSON('/api/actions/plan', transfer ? { action, computers, transfer } : { action, computers });
+    const review = await postJSON('/api/actions/plan', { action, computers, ...(transfer ? { transfer } : {}), ...extra });
     actionTitle.textContent = review.title;
     actionMessage.textContent = review.ready ? '' : (review.message || 'This action is not possible now.');
     showRows(actionRows, review.rows);
@@ -362,8 +370,8 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !toast.hidden && !controlling && !actionDialog.open) hideToast();
 });
 
-const outcomeWords = { done: 'done', empty: 'nothing to collect', off: 'switched off or not reachable', skipped: 'skipped', 'too-much': 'too much to collect', failed: 'failed' };
-const detailOrder = ['failed', 'too-much', 'skipped', 'off', 'empty', 'done'];
+const outcomeWords = { done: 'done', empty: 'nothing to collect', off: 'switched off or not reachable', stopped: 'monitoring stopped on this PC', skipped: 'skipped', 'too-much': 'too much to collect', failed: 'failed' };
+const detailOrder = ['failed', 'stopped', 'too-much', 'skipped', 'off', 'empty', 'done'];
 
 // Switch on counts packets sent, never computers started: "Switch on:
 // 3 sent · 2 already on · 1 address unknown".
@@ -379,7 +387,9 @@ function showResult(title, result) {
   for (const row of rows) counts[outcomeOf(row)] = (counts[outcomeOf(row)] || 0) + 1;
   const finished = result.state === 'completed' || result.state === 'started';
   const failed = Boolean(counts.failed) || (rows.length === 0 && !finished);
-  const parts = Object.keys(outcomeWords).filter((outcome) => counts[outcome]).map((outcome) => counts[outcome] + ' ' + outcomeWords[outcome]);
+  // A result may name what "done" was, such as "shown" for a message.
+  const words = { ...outcomeWords, done: result.doneWord || outcomeWords.done };
+  const parts = Object.keys(words).filter((outcome) => counts[outcome]).map((outcome) => counts[outcome] + ' ' + words[outcome]);
   let line = result.message || (finished ? 'Done.' : 'The action did not complete.');
   if (parts.length) line = title + ': ' + parts.join(' · ');
   showToast(line, {
@@ -599,6 +609,8 @@ function startAction(action, computers) {
   if (action === 'send-file' || action === 'send-folder') sendFiles(action === 'send-file' ? 'file' : 'folder', computers);
   else if (action === 'show-screen' && casting) stopCasting();
   else if (action === 'show-screen') showMyScreen(computers);
+  else if (action === 'message') classroomTools.message(computers);
+  else if (action === 'exam') classroomTools.exam(computers);
   else runAction(action, computers);
 }
 

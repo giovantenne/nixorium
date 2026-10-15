@@ -313,8 +313,8 @@ func lockPrivateState(directory int, name string) (func(), error) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	return func() {
-		unix.Flock(lock, unix.LOCK_UN)
-		unix.Close(lock)
+		_ = unix.Flock(lock, unix.LOCK_UN)
+		_ = unix.Close(lock)
 	}, nil
 }
 
@@ -381,7 +381,7 @@ func (Local) SendWakePackets(ctx context.Context, network domain.WakeNetwork, ma
 		}
 		return results
 	}
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 	for mac, err := range sendWakeRounds(ctx, connection, wakeDestinations(network), packets, wakeRounds, wakePause) {
 		results[mac] = err
 	}

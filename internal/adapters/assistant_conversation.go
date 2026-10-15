@@ -232,7 +232,8 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 			result = `{"ok":false,"error":"diagnostics_unavailable"}`
 		} else {
 			var args struct{ Host, Area string }
-			json.Unmarshal(call.Arguments, &args)
+			// Malformed arguments leave an empty host and area, which the tool rejects.
+			_ = json.Unmarshal(call.Arguments, &args)
 			result = tools.Diagnostics(ctx, workspace.Conversation.Repository, args.Host, args.Area)
 		}
 	case "prepare_npm":
@@ -245,7 +246,8 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 		}
 	case "search_packages":
 		var args struct{ Query string }
-		json.Unmarshal(call.Arguments, &args)
+		// Malformed arguments leave the query empty.
+		_ = json.Unmarshal(call.Arguments, &args)
 		searchCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		defer cancel()
 		items, err := (Local{}).SearchSoftwarePackages(searchCtx, workspace.Conversation.Repository, args.Query, 50)

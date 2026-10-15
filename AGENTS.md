@@ -61,9 +61,10 @@ cmd/nixorium-demo/         # Developer-only deterministic website demo exporter
 internal/                  # Domain, application, adapter, and presentation layers
 modules/
   common.nix               # Composition point and shared system defaults
-  firewall.nix             # Interface-scoped SSH, cache, and PXE policy
+  firewall.nix             # Interface-scoped SSH, cache, PXE, and time policy
   desktop.nix              # Core GNOME session, locale and regional policy
   power.nix                # Idle and controller sleep policy
+  time.nix                 # Controller serves time (chrony); clients use only the controller
   nix-ld.nix               # nix-ld loader and common libraries for downloaded Linux binaries
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
@@ -82,6 +83,7 @@ scripts/
   create-home-template.sh  # Builds clean home directory template
   validate.sh              # Tiered upstream validation entry point
   security-check.sh        # Pinned staticcheck and govulncheck entry point
+  lint.sh                  # Pinned ShellCheck and errcheck entry point
 assets/
   empty-*                  # Neutral fallbacks for optional deployment assets
 templates/site/            # Private deployment repository template
@@ -110,7 +112,8 @@ Use the smallest gate appropriate to the change:
 # Edit-test loop: cached Go tests; accepts package paths and go test flags
 ./scripts/test-go.sh
 
-# Reproducible gate: syntax, shell regressions, guidance, schemas, Go package
+# Reproducible gate: syntax, shell regressions, ShellCheck, errcheck, guidance,
+# schemas, Go package
 ./scripts/validate.sh --quick
 
 # Add full mkLab evaluation for Nix API or host-composition changes
@@ -120,11 +123,24 @@ Use the smallest gate appropriate to the change:
 nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell
 go test ./...
 
+# ShellCheck and errcheck alone, with the pinned tools (the quick gate runs them)
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix lint-shell --command ./scripts/lint.sh
+
 # Dedicated Go security and static analysis with the locked toolchain
 nix --extra-experimental-features 'nix-command flakes' \
   develop --file tests/source-checks.nix security-shell \
   --command ./scripts/security-check.sh
 ```
+
+The quick gate runs ShellCheck (warnings and errors) over every `*.sh` file and
+errcheck over the non-test Go code. Fix a finding; do not disable a check
+globally. Where a ShellCheck finding is a false positive or the fix would
+change what an installer does, put `# shellcheck disable=SCxxxx # reason` above
+that command. Where dropping a Go error is the decision, write `_ = call()`.
+`.errcheck-exclude` lists only calls whose error never matters (closing a
+handle that was only read, `os.Remove`, `fmt.Fprint*`); a write, lock or commit
+must be checked. See [development validation](docs/development-validation.md).
 
 Use the affected management or client-installer VM only when changing its
 integration boundary. Reserve `--full` for cross-cutting system-build changes
@@ -173,13 +189,17 @@ nightly on `master` and on demand, so failures surface before a tag; ordinary
 pushes do not run it. Each job has a 240-minute limit; failure or timeout of
 any shard must block publication.
 
-After the GitHub Release is published, update the website in the same session:
-in `nixorium-website`, regenerate the product pin on the tagged commit
+Before tagging, the website branch `release/<version>` of `nixorium-website`
+must exist, be built against the commit to release and be green on `staging`.
+After the GitHub Release is published, finish the site in the same session: on
+that branch, regenerate the product pin on the tagged commit
 (`NIXORIUM_PRODUCT_ROOT=… NIXORIUM_PRODUCT_REV=<tag commit> npm run
-demos:generate`), review the technician guide against the new changelog, build,
-and push `master` (production) and `master:staging`. The site shows the pinned
-version in its footer and on `/docs/`, linked to that release's notes, so a
-release is not finished until the site follows it.
+demos:generate`), commit "Pin the site to Nixorium v<version> (<sha>)", review
+the technician guide against the new changelog, build, merge into `master`, and
+push `master` (production) and `master:staging`. The site's production build
+refuses a pin whose tag is missing, points elsewhere or has no published GitHub
+release. It shows the pinned version in its footer and on `/docs/`, linked to
+that release's notes, so a release is not finished until the site follows it.
 
 ## Architecture Notes
 
@@ -404,7 +424,7 @@ release is not finished until the site follows it.
   requires renewal or a manual agreement rather than a second subscription.
 - Assistant tools write only the private candidate, never the deployment.
   Preserve relative-path confinement, hidden credentials/untracked files and
-  read-only settings/locks/instructions, plus filtering of model-facing
+  read-only locks/instructions, plus filtering of model-facing
   content and separation of the laboratory token. Fixed typed tools only:
   no arbitrary shell, service control, activation or student-home file access.
   Capability-gated diagnostics use fresh declared inventory, strict existing
@@ -419,6 +439,11 @@ release is not finished until the site follows it.
   Consent- and capability-gated `prefetch` downloads one public https file into
   the controller store: keep public-host and per-redirect checks, the 1 GiB,
   15-minute and one-at-a-time bounds, and return only hash, size and store path.
+  Settings are read-only except the `settings_v1` fields (homepage, time zone,
+  locales, keyboard layout, Git identities): `write_file` of `lab-settings.json`
+  merges only those fields onto the saved file (`domain.MergeAssistantSettings`),
+  refuses any other changed field by name, and the save review repeats the
+  native transition rules and impacts (`domain.ReviewAssistantSettings`).
   Evaluate a temporary clone with IFD disabled and bounded time/output; compare
   `nixoriumHostClasses` representatives. `groupModules` assigns common module
   paths to existing clientGroups; compose overlaps deterministically, preserve
@@ -501,6 +526,22 @@ release is not finished until the site follows it.
   and exact confirmation. Preserve secret/content-transform checks, atomic
   compare-and-update of HEAD, path-only index reconciliation, unrelated index/
   worktree state, disabled hooks/signing, and the no-remote/no-push boundary.
+- `nixorium git undo plan`/`apply` reverts the last saved change as a new saved
+  change (`internal/app/git_undo.go`). Keep its refusals: unsaved changes
+  (`GIT-DIRTY`), detached HEAD or an unfinished Git operation, a first version,
+  merge or earlier undo, any change to `flake.nix`/`flake.lock` (updates own
+  their recovery; name `UPDATES.md`), keys and the recovery file, private
+  paths, links, submodules, Git attribute rules, a change of the laboratory
+  network (guided change only), a managed file whose earlier version is not
+  valid, and files that cannot go back safely. Reuse the commit boundary:
+  fixed Git commands, content-bound token, typed `UNDO`, compare-and-update of
+  HEAD, two-tree `read-tree` for the files, no hook, signing, remote or push.
+  It never applies to the controller or computers; its review names those
+  steps. The Git review screen offers it with `u` through the typed
+  `PlanGitUndo`/`ApplyGitUndo` callbacks: presentation shows the review, the
+  refusal with its catalogued next step and the typed word, and never decides
+  what can be undone. Enter on a saved undo chains to the ordinary controller
+  review through `continueSavedConfiguration`, like a settings save.
 - Upstream update planning must preserve the configured source identity, accept
   only the exact `master` branch or an explicit SemVer tag, generate the
   candidate lock outside the checkout,
@@ -537,9 +578,40 @@ release is not finished until the site follows it.
   `networkPrefixLength` and `masterHostNumber` when the saved client count is
   nonzero, both in planning and before writing a reviewed candidate. Reducing
   the candidate count must not bypass this rule. This is separate from schema
-  validation and does not implement network migration. Interface reviews must
+  validation; the refusal is the `NETWORK-LOCKED` situation. The only
+  exception is a change of laboratory network: a base/prefix change whose
+  candidate `lab.networkTransition` names exactly the saved base/prefix (and,
+  while a record is saved, only a return to its previous network). The record
+  makes the configuration dual (controller on both addresses, clients trusting
+  both controller addresses, new cache first); without it every host must stay
+  byte-identical to the single-network configuration. Without clients it is
+  ignored with a warning in Nix and refused by the Go validator. The
+  controller number stays locked. An undo restores the previous network and
+  removes the record in one candidate. During a change every client also
+  keeps its previous address (by-type clients reapply the changed profile),
+  so the update that moves it keeps its SSH session and an undo finds it.
+  The guided change (`internal/app/network_migration.go`, Maintenance →
+  Change network addressing, `nixorium network migrate`) is a sequence of
+  reviewed saves followed by the ordinary controller and deployment reviews;
+  it never applies a system itself, refuses to finish while a client is not
+  on the new network with the saved configuration, and keeps undo possible
+  until then (ADR 0028). During a change labMeta decoding copies each
+  client's previous address into `HostMeta.PreviousIP`: every per-computer
+  probe tries the new address first, then the previous one, and Colmena
+  reaches a computer on the previous network through `HostName` entries in
+  its SSH configuration. Trusted host keys are copied from the previous to
+  the new address in the managed known-hosts file before any contact there;
+  never replace a different key or relax checking. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first
-  order for network changes.
+  order for network changes. Device-name and DHCP-hint changes get a read-only
+  network preflight in the plan (`networkPreflight`): `/sys/class/net` plus
+  bounded `ip -4 -j address` on the controller, the fixed read-only device
+  listing over the inventory's bounded parallel SSH for affected reachable
+  clients (only clients configured by name; by-type clients are not probed).
+  The settings save manager refuses a controller device that is not a present
+  wired device, and a device missing on a reachable client unless exactly that
+  computer is acknowledged; unreachable clients are listed, never blocking.
+  `config apply` does not run the preflight.
 - `lib/eval-workspace-profile.nix` accepts raw JSON text so duplicate keys are
   rejected before they can disappear in `builtins.fromJSON`. Keep it aligned
   with `internal/domain/workspace.go` through `tests/workspace-validation-cases.json`.
@@ -672,8 +744,16 @@ release is not finished until the site follows it.
   all-interface SSH/Avahi openings, and uses nftables. Client TCP 22
   admits only the static controller IPv4 address on the lab interface, with
   a guard before connection tracking preventing IPv6/old-connection bypass.
-  Controller services stay interface-scoped; only it opens Harmonia/PXE.
+  Controller services stay interface-scoped; only it opens Harmonia/PXE and
+  UDP 123 for time. Clients open no port.
   Preserve independently owned runtime tables on firewall reload.
+- `modules/time.nix` runs chrony on a laboratory-mode controller (`allow` for
+  the laboratory network only, `local stratum 10`, UDP 123 only on the
+  laboratory interface) and gives every client `systemd-timesyncd` with the
+  controller's laboratory address as its only server and no fallback pool;
+  both controller addresses are used during a change of laboratory network.
+  Controller-only mode keeps the NixOS defaults. Never list an Internet pool
+  on a client: it has none of its own.
 - The classroom view (`lab.classroomView`, on unless set to false) adds
   only a client user-session agent on a private Unix socket. The controller
   reaches it solely through its existing SSH access with the fixed
@@ -751,6 +831,25 @@ release is not finished until the site follows it.
   teacher chooses with the browser's own consent (never the page itself), posts JPEGs to `/api/broadcast/frame`, and the
   worker keeps one showing at a time, sending each computer only the latest
   picture and ending after ten silent seconds.
+  A message to the students (`message.show/hide`, `MessageManager`, the
+  extension's `ShowMessage`/`HideMessage` on the session bus) is plain text
+  of at most 300 characters and 10 lines without control characters, shown
+  for 0 (until the student closes it), at most 600 seconds, or until unlock;
+  the controller and the agent both validate it (`classroomview.ValidateMessage`),
+  the extension draws it as an `St.Label` (never markup) and takes neither
+  keyboard nor mouse, and it is not tied to the controller's connection.
+  The review keeps the controller's own sentences free of the text, which the
+  page prints itself; its token binds the text and the duration, and it takes
+  no operation lock. Exam mode is a page-side chain of the existing Internet,
+  lock and message reviews (message.js): each review still applies once, and
+  the page makes the reviews again when one is about to expire so an expired
+  review cannot leave an exam half started; ending reverses the steps in order
+  and only offers the collect review. The computers keep no exam state. The
+  worker keeps, in memory only (`examBook`), which steps it applied for exam
+  mode per computer and since when, from the exam tag of a plan and the done
+  rows of its apply (never from what a page claims), shares it between pages
+  through `/api/computers`, and drops what it sees end (no session, Internet
+  allowed again, restart or shutdown); a restart of the worker forgets it.
   Switch on (Wake-on-LAN, `wake-plan`/`wake-apply`, `nixorium wake`) takes
   no review token or operation lock, validates names like every classroom
   operation and never targets the controller. Hardware addresses come only
@@ -783,7 +882,7 @@ release is not finished until the site follows it.
 - GitHub CI disables import-from-derivation: evaluation must never read a derivation output.
 - The `nixorium-staff` group (declared in `modules/users.nix`) lets `admin` and the teacher read the student's home snapshots.
 - `modules/common.nix` is only the composition point for core desktop, firewall,
-  power, SSH and nix-ld modules. Packages, shell preferences, development tools,
+  time, power, SSH and nix-ld modules. Packages, shell preferences, development tools,
   screensaver behavior, and application policy belong in the deployment.
   The one exception, by owner decision, is base software:
   `internal/domain/base-software.json` (Chromium, Ghostty, Git, the

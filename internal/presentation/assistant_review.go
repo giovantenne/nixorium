@@ -245,7 +245,11 @@ func (model dashboardModel) assistantReviewLines() []string {
 	if len(p.CoreOverrideFiles) > 0 {
 		override = assistantCoreOverrideWarning + "\nFiles with overrides: " + strings.Join(p.CoreOverrideFiles, ", ") + "\n\n"
 	}
-	content := fmt.Sprintf("Summary from the assistant\n%s\n\n%sChecked by Nixorium\nFiles: %d added, %d changed, %d removed\nComputers whose system changes: %s\nNix evaluation: %s\n\nFull comparison\n%s", assistantDisplayText(model.assistant.summary), override, len(p.Added), len(p.Changed), len(p.Removed), hosts, evaluation, p.Diff)
+	settings := ""
+	if lines := p.SettingsReviewLines(); len(lines) > 0 {
+		settings = strings.Join(lines, "\n") + "\n"
+	}
+	content := fmt.Sprintf("Summary from the assistant\n%s\n\n%sChecked by Nixorium\nFiles: %d added, %d changed, %d removed\nComputers whose system changes: %s\nNix evaluation: %s\n%s\nFull comparison\n%s", assistantDisplayText(model.assistant.summary), override, len(p.Added), len(p.Changed), len(p.Removed), hosts, evaluation, settings, p.Diff)
 	return strings.Split(lipgloss.NewStyle().Width(max(20, min(106, model.width-10))).Render(assistantLinkify(assistantDisplayText(content))), "\n")
 }
 func (model dashboardModel) assistantReviewView() string {
@@ -297,6 +301,9 @@ func (model dashboardModel) assistantReviewView() string {
 			body += "• " + point + "\n"
 		}
 		body += "\nComputers affected\n" + model.assistantProposalHosts()
+		if lines := r.plan.SettingsReviewLines(); len(lines) > 0 {
+			body += "\n\n" + strings.Join(lines, "\n")
+		}
 		if notice := model.assistantCoreOverrideNotice(); notice != "" {
 			fixed = notice + "\n"
 		}

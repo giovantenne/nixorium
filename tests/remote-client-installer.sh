@@ -72,7 +72,8 @@ SCRIPT
   export NIXORIUM_SYSTEMD_RUN="$fixture/systemd-run"
   export NIXORIUM_REMOTE_PROGRAM="$fixture/remote-program"
   export NIXORIUM_TEST_SYSTEMD_CALLS="$fixture/systemd-calls"
-  export NIXORIUM_OPERATION_OWNER="$(id -u):$(id -g)"
+  NIXORIUM_OPERATION_OWNER="$(id -u):$(id -g)"
+  export NIXORIUM_OPERATION_OWNER
   receipt=$(valid_plan | "${HELPER_COMMAND[@]}" apply)
   jq -e '.state == "accepted" and .phase == "preflight" and .mutationStarted == false and .sequence == 1' <<< "$receipt" >/dev/null
   grep -F "nixorium-remote-install-0123456789abcdef0123456789abcdef" "$fixture/systemd-calls" >/dev/null
@@ -107,7 +108,8 @@ printf '%s\n' "\$*" >> "\$NIXORIUM_TEST_SYSTEMD_CALLS"
 SCRIPT
   chmod 0700 "$fixture/systemd-run"
   export NIXORIUM_OPERATION_ROOT="$fixture/operations"
-  export NIXORIUM_OPERATION_OWNER="$(id -u):$(id -g)"
+  NIXORIUM_OPERATION_OWNER="$(id -u):$(id -g)"
+  export NIXORIUM_OPERATION_OWNER
   export NIXORIUM_SYSTEMD_RUN="$fixture/systemd-run"
   export NIXORIUM_TEST_SYSTEMD_CALLS="$fixture/systemd-calls"
   receipt=$("${HELPER_COMMAND[@]}" reboot "$operation_id")
@@ -137,7 +139,8 @@ exit 1
 SCRIPT
   chmod 0700 "$fixture/systemd-run"
   export NIXORIUM_OPERATION_ROOT="$fixture/operations"
-  export NIXORIUM_OPERATION_OWNER="$(id -u):$(id -g)"
+  NIXORIUM_OPERATION_OWNER="$(id -u):$(id -g)"
+  export NIXORIUM_OPERATION_OWNER
   export NIXORIUM_SYSTEMD_RUN="$fixture/systemd-run"
   if "${HELPER_COMMAND[@]}" reboot "$operation_id" >/dev/null 2>&1; then
     echo "failed reboot scheduling unexpectedly succeeded" >&2

@@ -2,9 +2,14 @@
 let
   isClient = (labSettings.deploymentMode or "laboratory") == "laboratory"
     && hostName != labSettings.masterHostName;
+  transition = labSettings.networkTransition or null;
   rules = pkgs.writeText "nixorium-internet-block.nft" (import ../lib/client-internet-rules.nix {
     interface = if labSettings.ifaceExplicit or true then labSettings.ifaceName else null;
     networkCidr = "${labSettings.networkBase}/${toString labSettings.networkPrefixLength}";
+    # During a change of laboratory network the previous controller address
+    # and the computers not yet moved stay reachable while the block is on.
+    previousNetworkCidr = if transition == null then null
+      else "${transition.base}/${toString transition.prefixLength}";
   });
   helper = pkgs.writeShellApplication {
     name = "nixorium-internet";

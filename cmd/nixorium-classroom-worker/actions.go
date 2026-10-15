@@ -34,10 +34,12 @@ const (
 )
 
 // Outcomes of a computer in an action's result, which the page counts in
-// its one-line notice.
+// its one-line notice. outcomeStopped is a computer that answers with
+// someone signed in while its classroom agent does not.
 const (
 	outcomeDone    = "done"
 	outcomeOff     = "off"
+	outcomeStopped = "stopped"
 	outcomeSkipped = "skipped"
 	outcomeFailed  = "failed"
 )
@@ -52,7 +54,11 @@ type pendingAction struct {
 	internet  *domain.InternetPlan
 	power     *domain.ShutdownPlanReport
 	wake      *domain.WakePlan
-	expires   time.Time
+	message   *domain.MessagePlan
+	// exam and examStep tag an action applied as a step of exam mode.
+	exam     string
+	examStep string
+	expires  time.Time
 }
 
 type actionPlanRequest struct {
@@ -60,6 +66,10 @@ type actionPlanRequest struct {
 	Computers []string `json:"computers"`
 	// Transfer names files prepared with /api/share for send-files.
 	Transfer string `json:"transfer,omitempty"`
+	// Message is the text and duration of the message action.
+	Message *domain.MessageContent `json:"message,omitempty"`
+	// Exam marks the action as a step of exam mode, "start" or "end".
+	Exam string `json:"exam,omitempty"`
 }
 
 type actionApplyRequest struct {
@@ -83,6 +93,9 @@ type actionReview struct {
 	Rows     []actionRow `json:"rows"`
 	Warnings []string    `json:"warnings,omitempty"`
 	Confirm  string      `json:"confirm,omitempty"`
+	// Expires is when the review ends, in Unix milliseconds: exam mode
+	// chains several reviews and checks the time left before it starts.
+	Expires int64 `json:"expires,omitempty"`
 }
 
 type actionResult struct {
@@ -91,6 +104,8 @@ type actionResult struct {
 	Rows    []actionRow `json:"rows"`
 	// Broadcast identifies a started showing of the teacher's screen.
 	Broadcast string `json:"broadcast,omitempty"`
+	// DoneWord replaces "done" in the notice's count, such as "shown".
+	DoneWord string `json:"doneWord,omitempty"`
 }
 
 // computerLabels are short card labels from the latest actions.
@@ -150,6 +165,14 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 	if server.actions == nil || !validActionComputers(body.Computers) {
 		http.Error(writer, "Invalid request.", http.StatusBadRequest)
 		return
+	}
+	step := ""
+	if body.Exam != "" {
+		var known bool
+		if step, known = examStepOf(body.Exam, body.Action); !known {
+			http.Error(writer, "Invalid request.", http.StatusBadRequest)
+			return
+		}
 	}
 	ctx, cancel := context.WithTimeout(request.Context(), 2*time.Minute)
 	defer cancel()
@@ -219,6 +242,8 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 		review, pending = shareReview(*response.SharePlan)
 	case actionCollect:
 		review, pending = server.planCollect(ctx, request, operation)
+	case actionMessage, actionMessageHide:
+		review, pending = server.planMessage(ctx, operation, body)
 	default:
 		http.Error(writer, "Unknown action.", http.StatusBadRequest)
 		return
@@ -229,11 +254,13 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			http.Error(writer, "The action could not start.", http.StatusInternalServerError)
 			return
 		}
+		pending.exam, pending.examStep = body.Exam, step
 		server.mutex.Lock()
 		server.pruneActionsLocked()
 		server.pending[id] = pending
 		server.mutex.Unlock()
 		review.ID = id
+		review.Expires = pending.expires.UnixMilli()
 	}
 	writePageJSON(writer, review)
 }
@@ -277,9 +304,12 @@ func broadcastReview(plan domain.BroadcastPlan) (actionReview, pendingAction) {
 	eligible := 0
 	for _, target := range plan.Targets {
 		row := actionRow{Name: target.Name, Note: target.Detail}
-		if target.Eligible {
+		switch {
+		case target.Eligible:
 			eligible++
-		} else {
+		case target.Detail == app.ClassroomNoAgentDetail:
+			row.Note += " It gets your screen as soon as monitoring runs again."
+		default:
 			row.Note += " It gets your screen when someone signs in."
 		}
 		review.Rows = append(review.Rows, row)
@@ -442,6 +472,8 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 	case pending.collect != nil:
 		// Collecting and saving can take longer than the other actions.
 		result = server.applyCollect(request.Context(), request, pending.collect)
+	case pending.message != nil:
+		result = server.applyMessage(ctx, pending.message)
 	case pending.lock != nil:
 		operation.Operation = domain.ClassroomLockApplyOperation
 		operation.LockPlan = pending.lock
@@ -503,6 +535,7 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		for _, target := range report.Targets {
 			result.Rows = append(result.Rows, resultRow(target.Name, target.State == "accepted", outcomeText(target.State, target.Detail), planned[target.Name]))
 			if target.State == "accepted" {
+				server.exams.forget(target.Name)
 				server.setLabel(target.Name, func(labels *computerLabels) {
 					labels.power, labels.powerExpiry = label, server.now().Add(powerLabelTime)
 					labels.powerRestart, labels.powerAway = pending.power.Action == domain.ClientRestart, false
@@ -515,6 +548,9 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		result = server.applyWake(ctx, *pending.wake)
 	default:
 		result.State, result.Message = "failed", "Unknown action."
+	}
+	if pending.exam != "" {
+		server.exams.record(pending.exam, pending.examStep, result.Rows, server.now())
 	}
 	writePageJSON(writer, result)
 }
@@ -540,8 +576,13 @@ func resultRow(name string, done bool, note string, planned plannedTarget) actio
 		if planned.detail == app.ClassroomOffDetail {
 			row.Outcome = outcomeOff
 		}
+		if planned.detail == app.ClassroomNoAgentDetail {
+			row.Outcome = outcomeStopped
+		}
 	case note == app.ClassroomOffDetail:
 		row.Outcome = outcomeOff
+	case note == app.ClassroomNoAgentDetail:
+		row.Outcome = outcomeStopped
 	default:
 		row.Outcome = outcomeFailed
 	}

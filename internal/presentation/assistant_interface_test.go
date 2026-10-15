@@ -388,7 +388,7 @@ func TestAssistantInlineAccountAndNetworkWarningsKeepDraft(t *testing.T) {
 		{"annual", "subscription_inactive", "Your subscription is not active. Renew at"},
 		{"annual", "quota_exhausted", "All requests for this year are used. They renew on 2099-01-01. Questions: hello@nixorium.org"},
 		{"annual", "model_error", assistantFailedNotice},
-		{"annual", "model_unavailable", "The AI provider is busy right now. Your request was not completed; try again in a minute."},
+		{"annual", "model_unavailable", "The AI provider is busy right now. Your request was not completed; try again in a minute. This request was not counted."},
 	} {
 		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) {})
 		m.assistant.account = domain.AssistantAccount{Plan: test.plan, Status: "inactive", PeriodEnd: "2099-01-01", UpgradeURL: "https://assistant.example/upgrade"}
@@ -423,7 +423,7 @@ func assistantEnableCommands(m *dashboardModel) {
 }
 
 func TestAssistantNoticeSeparatesProviderOutageFromConnectionFailure(t *testing.T) {
-	if got := assistantServiceNotice(&domain.AssistantError{Status: 503, Code: "model_unavailable"}, ""); got != "The AI provider is busy right now. Your request was not completed; try again in a minute." {
+	if got := assistantServiceNotice(&domain.AssistantError{Status: 503, Code: "model_unavailable"}, ""); got != "The AI provider is busy right now. Your request was not completed; try again in a minute. This request was not counted." {
 		t.Fatal(got)
 	}
 	for _, code := range []string{"model_error", "some_future_code", "service_unavailable"} {
@@ -432,12 +432,51 @@ func TestAssistantNoticeSeparatesProviderOutageFromConnectionFailure(t *testing.
 		}
 	}
 	wrapped := fmt.Errorf("stream: %w", &domain.AssistantError{Code: "model_unavailable"})
-	if assistantServiceNotice(wrapped, "") != assistantProviderBusyNotice {
+	if assistantServiceNotice(wrapped, "") != assistantProviderBusyNotice+" "+assistantNotCountedNotice {
 		t.Fatal("wrapped error")
 	}
 	for _, err := range []error{errors.New("dial tcp: lookup assistant: no such host"), context.DeadlineExceeded, nil} {
 		if assistantServiceNotice(err, "") != assistantNetworkNotice {
 			t.Fatal("connection failure lost its notice", err)
+		}
+	}
+}
+
+// The service refunds a request that ends in a provider failure or at its safety
+// budget. The notice says so for exactly those codes; the controller's own round
+// limit shares the step_limit code with the service, so it never claims a refund.
+func TestAssistantNoticeSaysWhenARequestWasNotCounted(t *testing.T) {
+	const sentence = "This request was not counted."
+	for _, test := range []struct {
+		err     *domain.AssistantError
+		counted bool
+	}{
+		{&domain.AssistantError{Code: "model_unavailable"}, true},
+		{&domain.AssistantError{Code: "model_error"}, true},
+		{&domain.AssistantError{Code: "budget_exhausted"}, true},
+		{&domain.AssistantError{Status: 429, Code: "step_limit", Message: "Assistant reached its limit of 24 steps."}, false},
+		{&domain.AssistantError{Code: "step_limit"}, false},
+		{&domain.AssistantError{Code: "turn_interrupted"}, false},
+		{&domain.AssistantError{Code: "service_unavailable"}, false},
+		{&domain.AssistantError{Code: "service_interrupted"}, false},
+		{&domain.AssistantError{Code: "some_future_code"}, false},
+	} {
+		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) {})
+		m.assistant.account = domain.AssistantAccount{Plan: "annual", Status: "active", PeriodEnd: "2099-01-01"}
+		updated, _ := m.finishAssistantAccess(assistantAccessMsg{id: m.assistant.id, err: test.err})
+		m = updated.(dashboardModel)
+		if got := strings.HasSuffix(m.message, sentence); got != test.counted || (!test.counted && strings.Contains(m.message, "not counted")) {
+			t.Fatalf("%s: notice %q, want sentence %v", test.err.Code, m.message, test.counted)
+		}
+		// The notice box wraps long lines, so compare the words it displays.
+		view := strings.Join(strings.Fields(strings.ReplaceAll(ansi.Strip(m.View().Content), "│", " ")), " ")
+		if test.counted && !strings.Contains(view, sentence) {
+			t.Fatalf("%s: the chat does not show %q", test.err.Code, sentence)
+		}
+	}
+	for _, err := range []error{context.Canceled, errors.New("dial tcp: no such host")} {
+		if strings.Contains(assistantServiceNotice(err, ""), "not counted") {
+			t.Fatal("a stopped or unreachable request claims a refund", err)
 		}
 	}
 }

@@ -95,8 +95,9 @@ together. Open **Nixorium** for the restricted classroom dashboard.
   sidebar.
 - **Help students from your desk.** See every student screen at once, open
   one in its own window, take control or save a screenshot of it, lock
-  screens, collect students' files from their desktops, share your own screen,
-  and send a file or folder to the students' desktops.
+  screens, show students a message, start an exam in one click (Internet off,
+  screens locked, a message), collect students' files from their desktops,
+  share your own screen, and send a file or folder to the students' desktops.
 - **Control the room.** See which PCs are on, switch them on from the
   classroom view, pause or restore Internet on selected PCs, and shut them
   down or restart them. Teacher controls do not change the laboratory
@@ -107,8 +108,8 @@ together. Open **Nixorium** for the restricted classroom dashboard.
 
 ## Project status
 
-Nixorium has run the Italian school lab where it began, 30 student PCs and a
-controller, since 2024. The
+Nixorium was born in 2024 in an Italian school lab and has been in daily use
+in school labs since. The
 [original classroom account](https://nixorium.org/case-study/original-classroom/)
 tells that story. It is open source under the MIT license and maintained by a
 teacher; support happens in

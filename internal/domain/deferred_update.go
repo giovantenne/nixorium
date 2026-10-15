@@ -29,8 +29,11 @@ var (
 )
 
 type DeferredUpdate struct {
-	Host        string    `json:"host"`
-	IP          string    `json:"ip"`
+	Host string `json:"host"`
+	IP   string `json:"ip"`
+	// PreviousIP is the computer's address on the previous laboratory
+	// network when it was queued during a change of laboratory network.
+	PreviousIP  string    `json:"previousIp,omitempty"`
 	Revision    string    `json:"revision"`
 	QueuedAt    time.Time `json:"queuedAt"`
 	Attempts    int       `json:"attempts,omitempty"`

@@ -57,6 +57,15 @@ const (
 // ClassroomOffDetail explains a computer that did not answer at all.
 const ClassroomOffDetail = "Switched off or not reachable."
 
+// ClassroomNoAgentLabel is the card's state of a computer that answers over
+// SSH with someone signed in, while the agent of that session does not: it
+// was stopped, killed or is starting again. The page, the reviews of the
+// actions that need the agent and the teacher's commands use these words.
+const (
+	ClassroomNoAgentLabel  = "Monitoring stopped on this PC"
+	ClassroomNoAgentDetail = ClassroomNoAgentLabel + "."
+)
+
 // ClassroomViewHub keeps one agent channel per client while the overview is
 // open, refreshing thumbnails; every channel closes when nobody looks.
 type ClassroomViewHub struct {
@@ -275,7 +284,7 @@ func classroomFailureState(err error) (string, string) {
 		case classroomview.CodeNoSession:
 			return ClassroomNoSession, "Nobody is signed in."
 		case classroomview.CodeNoAgent:
-			return ClassroomNoAgent, "The classroom view is not running on this computer."
+			return ClassroomNoAgent, ClassroomNoAgentDetail
 		case classroomview.CodeLocked:
 			return ClassroomLocked, "The student's screen lock is on."
 		case classroomview.CodeBusy:

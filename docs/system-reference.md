@@ -194,6 +194,79 @@ computer's firmware must also allow it (BIOS/UEFI options often called "Wake
 on LAN" or "Power on by PCI-E"), and the computer must keep standby power: a
 switched-off power strip or a power cut disarms it.
 
+### Laboratory network transition
+
+While computers move from one laboratory network to another, the settings
+hold a `lab.networkTransition` record
+(`{ "previousBase": "10.0.0.0", "previousPrefixLength": 24, "startedAt": "<RFC 3339>" }`)
+next to the new `networkBase` and `networkPrefixLength`, and the configuration
+is dual. Every host keeps its host number on both networks. The controller
+carries its new and its previous address on the laboratory interface; its
+firewall is interface-scoped, so SSH, the cache and PXE ports are open on both,
+and the cache listens on every address. Clients take the new address and keep
+the previous one next to it (a second address on a named interface,
+`address2` of the `nixorium-lab` profile otherwise, which is applied to the
+running card with `nmcli device reapply` when the profile changes), so the
+update that moves a client keeps its connection and an undo finds every client
+on the restored network. They accept SSH from both controller addresses (two `ip saddr` rules, in the
+firewall allow list and in the `nixorium-client-access` guard), list the new
+controller cache first and the previous one second, and keep both networks
+reachable under the temporary Internet block. PXE preparation and network
+installation keep using the new controller address only: prepare network
+installation again after the change. `labSettings.networkTransition` gives
+modules `{ base, prefixLength, masterIp, hostIps }` of the previous network
+(`hostIps` maps each client name to its previous address), or `null`;
+`labMeta.network.transition` (present only during a change) lists the previous
+controller address and each client's previous address for management tools.
+The previous network must be a valid IPv4 network different from and not
+overlapping the current one, hold every configured host number and exclude the
+controller DHCP address; without client computers the record is ignored (the
+evaluation warns and the management command refuses to save it). Settings
+changes accept a new network base or prefix while computers are configured
+only together with a record naming the saved network, and during a change only
+a return to its previous network, or an undo that restores the previous network
+and removes the record. Without the record the configuration is exactly the
+single-network one; an address a client no longer needs after the record is
+removed disappears at its next start. The guided change (Maintenance → Change
+network addressing, `nixorium network migrate`) writes and removes the record;
+see ADR 0028 and the administrator guide.
+
+## Time
+
+The controller keeps the laboratory's time and the client computers take it
+from it, so a computer with a drained clock battery shows the right time
+although it has no Internet of its own (certificates, file dates and logs stay
+correct). `modules/time.nix`, imported by `modules/common.nix`, declares it.
+
+- **Controller.** It runs `chrony`, which replaces `systemd-timesyncd` there.
+  The upstream is the default NixOS Internet pools; the controller needs
+  outbound UDP 123 to them. It answers only the laboratory network
+  (`allow <networkBase>/<networkPrefixLength>`), listens on the controller's
+  laboratory address, and `modules/firewall.nix` opens UDP 123 on the
+  laboratory interface only. When the pools are unreachable it keeps serving
+  its own clock at stratum 10, starting five minutes after boot so that a
+  clock that may still be wrong is not served while the upstream is being
+  reached.
+- **Clients.** They keep `systemd-timesyncd`, with the controller's laboratory
+  address as the only server (`services.timesyncd.servers` and
+  `networking.timeServers`) and no fallback, so no Internet pool is listed and
+  a client never waits for hosts it cannot reach. A client that has Internet
+  after a user signs in still takes the time from the controller. Clients open
+  no port. The defaults are `lib.mkDefault`, so a site module may name another
+  server.
+- **Controller-only mode** has no laboratory network: nothing is served and
+  the controller keeps the NixOS defaults (`systemd-timesyncd` with the
+  Internet pools).
+- **During a change of laboratory network** the controller serves both
+  networks (chrony binds one address only, so it is not bound to the
+  laboratory address meanwhile) and clients list the new controller address
+  first and the previous one second, like the cache.
+
+The change reaches a client at its next update and the controller when the
+controller is applied; until then a computer keeps its previous clock
+configuration. `nixorium doctor` still reports an unsynchronized controller
+clock.
+
 ## USB/SSH client installation boundary
 
 The supported remote-install environment is the official NixOS 26.05 Minimal
@@ -356,6 +429,27 @@ cards every two seconds and keeps asking when the controller does not answer,
 giving up on a request after 15 seconds; after two failed requests in a row
 the summary says **Reconnecting…**. **Refresh** asks at once, closes the
 notice of the last action and draws every card again.
+
+A computer that answers over SSH with someone signed in, but whose agent does
+not answer (the socket is missing, or the agent is frozen and gives no answer
+to the relay's own hello within 3 seconds), shows a warning sign over its
+dimmed last picture and **Monitoring stopped on this PC**. The login screen does not count as someone signed in
+(only a session of class `user` does), so a computer waiting at it says
+**Nobody is signed in**. The same words explain the computer wherever an
+action skips it (Lock, Send files, Share screen, Collect from desktop and
+Save screenshot), and a result notice counts such computers apart, as
+"monitoring stopped on this PC". The agent restarts by itself: its user unit
+is `Restart=always` with a one-second delay and no start limit, and both
+classroom user units refuse a manual stop (`RefuseManualStop`), so
+`systemctl --user stop` fails in the student's terminal and a killed agent is
+back within seconds; the card returns to the live picture. The Shell
+extension helper is a one-shot unit, which systemd restarts only after a
+failure. This is a classroom aid, not a security boundary: a student can still
+mask a unit or freeze the process (which the card reports, but nothing
+revives), and loses that at the next boot, when the home is reset. The relay
+never outlives the controller's channel by more than 5 seconds, even when the
+agent is frozen. Because the units refuse a manual stop, an update does not
+restart them either: the new agent starts at the next sign-in.
 
 Clicking a computer opens it in its own browser window, refreshed about ten
 times a second at up to 1920 pixels; the agent sends a frame only when the
@@ -568,6 +662,60 @@ in a cover above everything, the lock included, with keyboard and mouse
 blocked. **Stop sharing**, closing the page, the end of GNOME's sharing,
 ten seconds without pictures at the service or fifteen at the agent end
 the showing (`broadcast.stop`); a lock stays in place.
+
+**Message** shows a short text over the screens of the selected computers:
+**Message → Send a message…** in the toolbar and in a computer's **Actions**
+menu, with **Remove message** beside it. A dialog asks for the text (at most
+300 characters and 10 lines, plain text, no control characters) and how long
+it stays: until the student closes it (**Close** appears after 10 seconds),
+30 seconds, 2 minutes, or until the computer is unlocked (a computer that is
+not locked lets the student close it). The review shows the text and the
+computers, one button such as "Send the message to 12 computers" confirms,
+and the notice counts them, such as "Message: 12 shown · 1 switched off or not
+reachable"; computers that are off, have nobody signed in or show "Monitoring
+stopped on this PC" are listed and skipped, like for the lock. Like the lock it
+takes no administrative operation lock, and its
+review token binds the text and the duration. The agent answers `message.show`
+(`text`, and `seconds` or `untilUnlock`; checked again against the same
+limits, 600 seconds at most) with `message.shown`, and `message.hide` with
+`message.hidden`; a session whose agent or extension cannot do it answers
+`unsupported` or `message-unavailable`, and the review calls the computer
+unable to show messages until it is updated and the student signs in again
+(the extension loads at login). The agent asks the Shell extension on the
+session bus (`ShowMessage`, `HideMessage`, property `MessageShown`), which
+draws a centered panel above everything, the lock and the teacher's screen
+included. The text is a plain label, never markup. The panel takes neither
+keyboard nor mouse: the student keeps both, unless the computer is locked or
+shows the teacher's screen, and then Close is not offered. A computer has one
+message at a time (a new one replaces the previous); it belongs to the
+session, not to the controller's connection, and logging out clears it.
+
+**Exam mode** (toolbar, selected computers) opens a dialog with three check
+boxes, all on: block Internet, lock the screens now (until you unlock them),
+and show a message (default "Exam in progress. Wait for the teacher.",
+editable; it stays until the screens are unlocked). After one combined review
+and one button such as "Start exam mode on 12 computers", the page applies
+three existing reviewed actions in this order: Internet block, lock, message.
+Each keeps its own review that applies once, and each computer's result lists
+the three steps. The page composes the chain and the computers keep no exam
+state. The classroom service remembers, in memory only, which steps it applied
+for exam mode on each computer and since when: the page tags each step of the
+chain, and a step counts once the computer confirmed it. The service sends
+that with the list of computers (`exam`), so a page opened later, and another
+user's page, show the same: the cards say "Exam mode" and the button reads
+**End exam mode**. The service also drops what it can see end: nobody signed in
+ends the lock and the message, an Internet state that reads as allowed again
+ends that step, and a restart or shutdown from the page ends all of them. A
+review lasts at most five minutes, so close to its end the page makes the
+reviews again before it starts, and asks again when the computers that qualify
+changed: an expired review never leaves exam mode half started. **End exam
+mode** (the same button, when a selected computer is in exam mode) reverses the
+steps that are in effect, in this order: remove the message, unlock, allow
+Internet. Then it opens the usual **Collect from desktop** review for the same
+computers; nothing is collected unless the teacher confirms it. Restarting the
+classroom service (`nixorium-classroom.service`) forgets exam mode while the
+computers stay locked and blocked: then use **Remove message**, **Unlock** and
+**Allow Internet**.
 
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a

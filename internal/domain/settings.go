@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const (
@@ -45,32 +46,90 @@ type LabSettings struct {
 	CredentialsVersion int    `json:"credentialsVersion"`
 	DeploymentMode     string `json:"deploymentMode,omitempty"`
 	// ClassroomView is on unless set to false; see ClassroomViewOn.
-	ClassroomView           *bool             `json:"classroomView,omitempty"`
-	Assistant               *bool             `json:"assistant,omitempty"`
-	MasterDHCPIP            string            `json:"masterDhcpIp"`
-	NetworkBase             string            `json:"networkBase"`
-	NetworkPrefix           int               `json:"networkPrefixLength"`
-	PCCount                 int               `json:"pcCount"`
-	MasterHostNumber        int               `json:"masterHostNumber"`
-	InterfaceName           string            `json:"ifaceName"`
-	ControllerInterfaceName string            `json:"controllerIfaceName,omitempty"`
-	ClientInterfaceName     string            `json:"clientIfaceName,omitempty"`
-	HostInterfaceNames      map[string]string `json:"hostIfaceNames,omitempty"`
-	TeacherUser             string            `json:"teacherUser"`
-	StudentUser             string            `json:"studentUser"`
-	TeacherPassword         string            `json:"teacherPassword,omitempty"`
-	StudentPassword         string            `json:"studentPassword,omitempty"`
-	AdminPassword           string            `json:"adminPassword,omitempty"`
-	HomepageURL             string            `json:"homepageUrl"`
-	StudentGitName          string            `json:"studentGitName"`
-	StudentGitEmail         string            `json:"studentGitEmail"`
-	AdminGitName            string            `json:"adminGitName"`
-	AdminGitEmail           string            `json:"adminGitEmail"`
-	TimeZone                string            `json:"timeZone"`
-	DefaultLocale           string            `json:"defaultLocale"`
-	ExtraLocale             string            `json:"extraLocale"`
-	KeyboardLayout          string            `json:"keyboardLayout"`
-	ConsoleKeyMap           string            `json:"consoleKeyMap,omitempty"`
+	ClassroomView *bool  `json:"classroomView,omitempty"`
+	Assistant     *bool  `json:"assistant,omitempty"`
+	MasterDHCPIP  string `json:"masterDhcpIp"`
+	NetworkBase   string `json:"networkBase"`
+	NetworkPrefix int    `json:"networkPrefixLength"`
+	// NetworkTransition is set only while the laboratory moves from a previous
+	// network to NetworkBase/NetworkPrefix. It is managed by the guided change
+	// of the laboratory network, never typed in the settings form.
+	NetworkTransition       *NetworkTransition `json:"networkTransition,omitempty"`
+	PCCount                 int                `json:"pcCount"`
+	MasterHostNumber        int                `json:"masterHostNumber"`
+	InterfaceName           string             `json:"ifaceName"`
+	ControllerInterfaceName string             `json:"controllerIfaceName,omitempty"`
+	ClientInterfaceName     string             `json:"clientIfaceName,omitempty"`
+	HostInterfaceNames      map[string]string  `json:"hostIfaceNames,omitempty"`
+	TeacherUser             string             `json:"teacherUser"`
+	StudentUser             string             `json:"studentUser"`
+	TeacherPassword         string             `json:"teacherPassword,omitempty"`
+	StudentPassword         string             `json:"studentPassword,omitempty"`
+	AdminPassword           string             `json:"adminPassword,omitempty"`
+	HomepageURL             string             `json:"homepageUrl"`
+	StudentGitName          string             `json:"studentGitName"`
+	StudentGitEmail         string             `json:"studentGitEmail"`
+	AdminGitName            string             `json:"adminGitName"`
+	AdminGitEmail           string             `json:"adminGitEmail"`
+	TimeZone                string             `json:"timeZone"`
+	DefaultLocale           string             `json:"defaultLocale"`
+	ExtraLocale             string             `json:"extraLocale"`
+	KeyboardLayout          string             `json:"keyboardLayout"`
+	ConsoleKeyMap           string             `json:"consoleKeyMap,omitempty"`
+}
+
+// NetworkTransition records a change of laboratory network in progress: the
+// controller keeps its address on the previous network as well and clients
+// accept the management connection from both controller addresses.
+type NetworkTransition struct {
+	PreviousBase         string `json:"previousBase"`
+	PreviousPrefixLength int    `json:"previousPrefixLength"`
+	StartedAt            string `json:"startedAt"`
+}
+
+// String describes the record in reviews; no record reads "none".
+func (t *NetworkTransition) String() string {
+	if t == nil {
+		return "none"
+	}
+	return fmt.Sprintf("from %s/%d since %s", t.PreviousBase, t.PreviousPrefixLength, t.StartedAt)
+}
+
+// rfc3339Pattern is the textual form shared with lib/eval-lab-config.nix;
+// time.Parse additionally checks the calendar.
+var rfc3339Pattern = regexp.MustCompile(`^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$`)
+
+// validateNetworkTransition checks the previous network against the current
+// one. current is valid only when currentOK is true.
+func validateNetworkTransition(lab LabSettings, current netip.Prefix, currentOK bool, add func(field, message string)) {
+	transition := lab.NetworkTransition
+	if lab.PCCount <= 0 {
+		add("lab.networkTransition", "is used only while client computers are configured; remove it")
+		return
+	}
+	previous, err := netip.ParsePrefix(fmt.Sprintf("%s/%d", transition.PreviousBase, transition.PreviousPrefixLength))
+	switch {
+	case err != nil || !previous.Addr().Is4() || transition.PreviousPrefixLength < 1 || transition.PreviousPrefixLength > 30:
+		add("lab.networkTransition.previousBase", "must be an IPv4 network address with a prefix length from 1 to 30")
+	case previous.Masked() != previous:
+		add("lab.networkTransition.previousBase", fmt.Sprintf("must be aligned to /%d", transition.PreviousPrefixLength))
+	default:
+		if currentOK && previous == current {
+			add("lab.networkTransition", "must name a previous network different from the laboratory network")
+		} else if currentOK && previous.Overlaps(current) {
+			add("lab.networkTransition", fmt.Sprintf("previous network %s must not overlap the laboratory network %s", previous, current))
+		}
+		hostCapacity := 1 << (32 - transition.PreviousPrefixLength)
+		if lab.MasterHostNumber >= hostCapacity-1 || lab.PCCount >= hostCapacity-1 {
+			add("lab.networkTransition.previousPrefixLength", "the previous network must hold every configured host number")
+		}
+		if address, err := netip.ParseAddr(lab.MasterDHCPIP); err == nil && address.Is4() && previous.Contains(address) {
+			add("lab.networkTransition", "controller DHCP address must be outside the previous laboratory network too")
+		}
+	}
+	if _, err := time.Parse(time.RFC3339, transition.StartedAt); err != nil || !rfc3339Pattern.MatchString(transition.StartedAt) {
+		add("lab.networkTransition.startedAt", "must be an RFC 3339 time such as 2026-10-15T08:00:00Z")
+	}
 }
 
 func (l LabSettings) ControllerInterface() string {
@@ -161,6 +220,10 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	}
 	if address, err := netip.ParseAddr(lab.MasterDHCPIP); err == nil && address.Is4() && prefixErr == nil && prefix.Addr().Is4() && prefix.Contains(address) {
 		add("lab.network", "controller DHCP address must be outside the static laboratory network; choose a distinct laboratory subnet")
+	}
+	if lab.NetworkTransition != nil {
+		currentOK := prefixErr == nil && prefix.Addr().Is4() && lab.NetworkPrefix >= 1 && lab.NetworkPrefix <= 30 && prefix.Masked() == prefix
+		validateNetworkTransition(lab, prefix, currentOK, add)
 	}
 	if lab.DeploymentMode != "" && lab.DeploymentMode != "laboratory" && lab.DeploymentMode != "controller" {
 		add("lab.deploymentMode", "must be laboratory or controller")

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -17,7 +18,7 @@ import (
 )
 
 func fakeLoginctl(values map[string]string) commandRunner {
-	return func(arguments ...string) (string, error) {
+	return func(_ context.Context, arguments ...string) (string, error) {
 		key := strings.Join(arguments, " ")
 		if value, found := values[key]; found {
 			return value, nil
@@ -30,6 +31,7 @@ func graphicalSession(uid int) commandRunner {
 	return fakeLoginctl(map[string]string{
 		"show-seat seat0 --property=ActiveSession --value": "2",
 		"show-session 2 --property=Type --value":           "wayland",
+		"show-session 2 --property=Class --value":          "user",
 		"show-session 2 --property=User --value":           strconv.Itoa(uid),
 	})
 }
@@ -67,7 +69,7 @@ func TestConnectRelaysHelloToTheSessionAgent(t *testing.T) {
 	if err := classroomview.Write(request, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
 		t.Fatal(err)
 	}
-	if err := connect(request, output, graphicalSession(uid), base); err != nil {
+	if err := connect(context.Background(), request, output, graphicalSession(uid), base); err != nil {
 		t.Fatal(err)
 	}
 	reply, err := classroomview.Read(output)
@@ -81,15 +83,26 @@ func TestConnectReportsMissingSessionOrAgent(t *testing.T) {
 	for name, run := range map[string]commandRunner{
 		"no session":   fakeLoginctl(map[string]string{"show-seat seat0 --property=ActiveSession --value": ""}),
 		"text session": fakeLoginctl(map[string]string{"show-seat seat0 --property=ActiveSession --value": "3", "show-session 3 --property=Type --value": "tty"}),
-		"no agent":     graphicalSession(os.Getuid()),
+		// The login screen is a graphical session of the display manager's user.
+		"login screen": fakeLoginctl(map[string]string{
+			"show-seat seat0 --property=ActiveSession --value": "c1",
+			"show-session c1 --property=Type --value":          "wayland",
+			"show-session c1 --property=Class --value":         "greeter",
+			"show-session c1 --property=User --value":          "60578",
+		}),
+		"no agent": graphicalSession(os.Getuid()),
 	} {
 		output := &bytes.Buffer{}
-		if err := connect(strings.NewReader(""), output, run, base); err != nil {
+		if err := connect(context.Background(), strings.NewReader(""), output, run, base); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		reply, err := classroomview.Read(output)
-		if err != nil || reply.Type != classroomview.TypeError || (reply.Code != classroomview.CodeNoSession && reply.Code != classroomview.CodeNoAgent) {
-			t.Fatalf("%s: reply = %+v, %v", name, reply, err)
+		want := classroomview.CodeNoSession
+		if name == "no agent" {
+			want = classroomview.CodeNoAgent
+		}
+		if err != nil || reply.Type != classroomview.TypeError || reply.Code != want {
+			t.Fatalf("%s: reply = %+v, %v; want code %s", name, reply, err, want)
 		}
 	}
 }
@@ -383,4 +396,230 @@ func TestAgentShowsTheTeachersScreenUntilTheConnectionEnds(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("the showing did not end with its connection")
+}
+
+// hangingCommands puts a loginctl that never answers first in PATH.
+func hangingCommands(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "loginctl"), []byte("#!/bin/sh\nexec sleep 30\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+}
+
+func TestStuckLoginctlEndsAndTheControllerIsTold(t *testing.T) {
+	hangingCommands(t)
+	old := loginctlTimeout
+	loginctlTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { loginctlTimeout = old })
+	output := &bytes.Buffer{}
+	started := time.Now()
+	if err := connect(context.Background(), strings.NewReader(""), output, loginctl, t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(started) > 5*time.Second {
+		t.Fatalf("connect waited %v for loginctl", time.Since(started))
+	}
+	reply, err := classroomview.Read(output)
+	if err != nil || reply.Type != classroomview.TypeError || reply.Code != classroomview.CodeNoSession {
+		t.Fatalf("reply = %+v, %v", reply, err)
+	}
+	// The caller's own context ends it too.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := loginctl(ctx, "show-seat", "seat0"); err == nil {
+		t.Fatal("loginctl ran with a cancelled context")
+	}
+}
+
+func TestProbeEndsWhenItsContextEnds(t *testing.T) {
+	folder := t.TempDir()
+	if err := os.WriteFile(filepath.Join(folder, "notes.txt"), []byte("notes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, run := range map[string]func(context.Context) error{
+		"hello": func(ctx context.Context) error { return probe(ctx, []string{"sleep", "30"}, "", false, io.Discard) },
+		"lock":  func(ctx context.Context) error { return probeLock(ctx, []string{"sleep", "30"}, true, io.Discard) },
+		"collect": func(ctx context.Context) error {
+			return probeCollect(ctx, []string{"sleep", "30"}, t.TempDir(), io.Discard)
+		},
+		"send": func(ctx context.Context) error {
+			return probeSend(ctx, []string{"sleep", "30"}, folder, io.Discard)
+		},
+	} {
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		done := make(chan error, 1)
+		go func() { done <- run(ctx) }()
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Fatalf("%s: a command that never answered was a success", name)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s: the probe waited for a command that never answers", name)
+		}
+		cancel()
+	}
+	// A showing waits for its time, but not past the context.
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	picture := filepath.Join(t.TempDir(), "screen.jpg")
+	if err := os.WriteFile(picture, []byte("\xff\xd8\xff\xd9"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := probeShow(ctx, []string{"cat"}, picture, time.Minute, io.Discard); err == nil {
+		t.Fatal("a showing outlived its context")
+	}
+}
+
+func TestProbeNeedsACommandAndSaneArguments(t *testing.T) {
+	for name, arguments := range map[string][]string{
+		"no command":        nil,
+		"no command (send)": {"--send", t.TempDir()},
+		"too long a show":   {"--show", "screen.jpg", "61", "cat"},
+	} {
+		if err := runProbe(context.Background(), arguments, io.Discard); err == nil {
+			t.Fatalf("%s: accepted", name)
+		}
+	}
+}
+
+// fakeAgent listens like the session's agent, in a temporary runtime
+// directory laid out like /run/user, and hands every connection to behave.
+// release ends the connections that behave leaves open.
+func fakeAgent(t *testing.T, behave func(connection net.Conn, release <-chan struct{})) (string, int) {
+	t.Helper()
+	// Short, because a socket path is limited to about 100 bytes.
+	base, err := os.MkdirTemp("", "cv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(base) })
+	uid := os.Getuid()
+	runtime := filepath.Join(base, strconv.Itoa(uid))
+	if err := os.Mkdir(runtime, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", filepath.Join(runtime, SocketName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		close(release)
+		_ = listener.Close()
+	})
+	go func() {
+		for {
+			connection, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer connection.Close()
+				behave(connection, release)
+			}()
+		}
+	}()
+	return base, uid
+}
+
+func shortRelayDeadlines(t *testing.T) {
+	t.Helper()
+	hello, grace, write := helloTimeout, relayGrace, relayWriteTimeout
+	helloTimeout, relayGrace, relayWriteTimeout = 200*time.Millisecond, 200*time.Millisecond, 200*time.Millisecond
+	t.Cleanup(func() { helloTimeout, relayGrace, relayWriteTimeout = hello, grace, write })
+}
+
+// answersHello is an agent that answers the first hello and then does what
+// afterwards says.
+func answersHello(afterwards func(connection net.Conn, release <-chan struct{})) func(net.Conn, <-chan struct{}) {
+	return func(connection net.Conn, release <-chan struct{}) {
+		if _, err := classroomview.Read(connection); err != nil {
+			return
+		}
+		_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, User: "student"})
+		afterwards(connection, release)
+	}
+}
+
+func connectWithin(t *testing.T, input io.Reader, base string, uid int) *bytes.Buffer {
+	t.Helper()
+	output := &bytes.Buffer{}
+	done := make(chan error, 1)
+	go func() { done <- connect(context.Background(), input, output, graphicalSession(uid), base) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("connect: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("connect lingered on an agent that does not answer")
+	}
+	return output
+}
+
+func TestConnectReportsAFrozenAgentAsNotRunning(t *testing.T) {
+	shortRelayDeadlines(t)
+	// The socket exists and accepts, but nothing ever answers (SIGSTOP).
+	base, uid := fakeAgent(t, func(_ net.Conn, release <-chan struct{}) { <-release })
+	output := connectWithin(t, strings.NewReader(""), base, uid)
+	reply, err := classroomview.Read(output)
+	if err != nil || reply.Type != classroomview.TypeError || reply.Code != classroomview.CodeNoAgent {
+		t.Fatalf("reply = %+v, %v", reply, err)
+	}
+}
+
+func TestConnectForwardsTheRefusalOfABusyAgent(t *testing.T) {
+	shortRelayDeadlines(t)
+	base, uid := fakeAgent(t, func(connection net.Conn, _ <-chan struct{}) {
+		_, _ = classroomview.Read(connection)
+		_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBusy})
+	})
+	reply, err := classroomview.Read(connectWithin(t, strings.NewReader(""), base, uid))
+	if err != nil || reply.Type != classroomview.TypeError || reply.Code != classroomview.CodeBusy {
+		t.Fatalf("reply = %+v, %v", reply, err)
+	}
+}
+
+func TestConnectEndsAfterTheControllerLeavesAFrozenAgent(t *testing.T) {
+	shortRelayDeadlines(t)
+	// The agent answers its first hello, then freezes: it reads nothing more
+	// and never closes. The controller says hello and goes away.
+	base, uid := fakeAgent(t, answersHello(func(_ net.Conn, release <-chan struct{}) { <-release }))
+	request := &bytes.Buffer{}
+	if err := classroomview.Write(request, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+		t.Fatal(err)
+	}
+	output := connectWithin(t, request, base, uid)
+	if output.Len() != 0 {
+		t.Fatalf("the frozen agent answered %q", output.Bytes())
+	}
+}
+
+func TestConnectEndsOnAFrozenAgentThatStopsReading(t *testing.T) {
+	shortRelayDeadlines(t)
+	// More data than a socket buffers, for an agent that stopped reading:
+	// the blocked write must end the relay instead of holding it.
+	base, uid := fakeAgent(t, answersHello(func(_ net.Conn, release <-chan struct{}) { <-release }))
+	connectWithin(t, bytes.NewReader(make([]byte, 32<<20)), base, uid)
+}
+
+func TestConnectKeepsRelayingToAHealthyAgent(t *testing.T) {
+	// A healthy agent still answers the controller's own hello, and the
+	// relay ends with the agent's close, not with the grace period.
+	base, uid := startAgent(t)
+	request := &bytes.Buffer{}
+	for range 2 {
+		if err := classroomview.Write(request, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	output := connectWithin(t, request, base, uid)
+	for range 2 {
+		if reply, err := classroomview.Read(output); err != nil || reply.Type != classroomview.TypeHello {
+			t.Fatalf("reply = %+v, %v", reply, err)
+		}
+	}
 }

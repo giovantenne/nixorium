@@ -9,12 +9,14 @@
 //	         one hello through it, optionally a thumbnail and input, or a
 //	         lock request (--lock on|off), sends a folder's contents to the
 //	         desktop (--send DIR), collects the desktop into a folder
-//	         (--collect DIR), or shows a picture as the teacher's screen for
-//	         some seconds (--show JPEG SECONDS); used by tests and
-//	         diagnostics.
+//	         (--collect DIR), shows a picture as the teacher's screen for
+//	         some seconds (--show JPEG SECONDS), or shows (--message TEXT
+//	         SECONDS|unlock) or removes (--message-hide) the teacher's
+//	         message; used by tests and diagnostics.
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +28,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -51,37 +54,14 @@ func main() {
 			err = errors.New("connect must run as root")
 			break
 		}
-		err = connect(os.Stdin, os.Stdout, loginctl, "/run/user")
+		// The relay lives as long as the controller's channel and ends soon
+		// after it closes; loginctl, the dial and the first hello of the
+		// agent have their own deadlines (see connect).
+		err = connect(context.Background(), os.Stdin, os.Stdout, loginctl, "/run/user")
 	case "probe":
-		arguments, thumbnail, input := os.Args[2:], "", false
-		if len(arguments) >= 3 && arguments[0] == "--show" {
-			seconds, convErr := strconv.Atoi(arguments[2])
-			if convErr != nil || seconds < 0 || seconds > 60 {
-				err = errors.New("--show needs a JPEG file and 0–60 seconds")
-				break
-			}
-			err = probeShow(arguments[3:], arguments[1], time.Duration(seconds)*time.Second, os.Stdout)
-			break
-		}
-		if len(arguments) >= 2 && arguments[0] == "--send" {
-			err = probeSend(arguments[2:], arguments[1], os.Stdout)
-			break
-		}
-		if len(arguments) >= 2 && arguments[0] == "--collect" {
-			err = probeCollect(arguments[2:], arguments[1], os.Stdout)
-			break
-		}
-		if len(arguments) >= 2 && arguments[0] == "--lock" && (arguments[1] == "on" || arguments[1] == "off") {
-			err = probeLock(arguments[2:], arguments[1] == "on", os.Stdout)
-			break
-		}
-		if len(arguments) >= 1 && arguments[0] == "--input" {
-			input, arguments = true, arguments[1:]
-		}
-		if len(arguments) >= 2 && arguments[0] == "--thumbnail" {
-			thumbnail, arguments = arguments[1], arguments[2:]
-		}
-		err = probe(arguments, thumbnail, input, os.Stdout)
+		ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+		err = runProbe(ctx, os.Args[2:], os.Stdout)
+		cancel()
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
@@ -89,6 +69,71 @@ func main() {
 		fmt.Fprintln(os.Stderr, "nixorium-classroom-agent:", err)
 		os.Exit(1)
 	}
+}
+
+// probeTimeout ends a probe, and the command it runs, that has not finished:
+// the longest legitimate one sends or collects a desktop (500 MB at most).
+const probeTimeout = 10 * time.Minute
+
+// runProbe parses the arguments of the probe command and runs the check they
+// name; the command it starts ends when ctx does.
+func runProbe(ctx context.Context, arguments []string, output io.Writer) error {
+	thumbnail, input := "", false
+	if len(arguments) >= 3 && arguments[0] == "--show" {
+		seconds, err := strconv.Atoi(arguments[2])
+		if err != nil || seconds < 0 || seconds > 60 {
+			return errors.New("--show needs a JPEG file and 0–60 seconds")
+		}
+		return probeShow(ctx, arguments[3:], arguments[1], time.Duration(seconds)*time.Second, output)
+	}
+	if len(arguments) >= 3 && arguments[0] == "--message" {
+		return probeMessage(ctx, arguments[3:], true, arguments[1], arguments[2], output)
+	}
+	if len(arguments) >= 1 && arguments[0] == "--message-hide" {
+		return probeMessage(ctx, arguments[1:], false, "", "", output)
+	}
+	if len(arguments) >= 2 && arguments[0] == "--send" {
+		return probeSend(ctx, arguments[2:], arguments[1], output)
+	}
+	if len(arguments) >= 2 && arguments[0] == "--collect" {
+		return probeCollect(ctx, arguments[2:], arguments[1], output)
+	}
+	if len(arguments) >= 2 && arguments[0] == "--lock" && (arguments[1] == "on" || arguments[1] == "off") {
+		return probeLock(ctx, arguments[2:], arguments[1] == "on", output)
+	}
+	if len(arguments) >= 1 && arguments[0] == "--input" {
+		input, arguments = true, arguments[1:]
+	}
+	if len(arguments) >= 2 && arguments[0] == "--thumbnail" {
+		thumbnail, arguments = arguments[1], arguments[2:]
+	}
+	return probe(ctx, arguments, thumbnail, input, output)
+}
+
+// startProbe runs command with its standard input and output for a probe to
+// exchange messages through. The process is killed when ctx ends, which also
+// ends any read of its output; finish closes its input and waits for it.
+func startProbe(ctx context.Context, command []string) (io.Writer, io.Reader, func(), error) {
+	if len(command) == 0 {
+		return nil, nil, nil, errors.New("probe needs a command, for example nixorium-classroom-connect")
+	}
+	process := exec.CommandContext(ctx, command[0], command[1:]...)
+	stdin, err := process.StdinPipe()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	stdout, err := process.StdoutPipe()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	process.Stderr = os.Stderr
+	if err := process.Start(); err != nil {
+		return nil, nil, nil, err
+	}
+	return stdin, stdout, func() {
+		_ = stdin.Close()
+		_ = process.Wait()
+	}, nil
 }
 
 // maxConnections bounds simultaneous controller channels. The controller
@@ -120,7 +165,7 @@ func serve(runtimeDirectory string) error {
 		return err
 	}
 	lock := &extensionLocker{}
-	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}})
+	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}, notice: lock})
 }
 
 // agentContext is what every connection of the session's agent shares.
@@ -130,6 +175,8 @@ type agentContext struct {
 	capture  capturer
 	lock     locker
 	screen   screenShower
+	// notice shows the teacher's message; nil means it cannot.
+	notice messenger
 }
 
 func serveConnections(listener net.Listener, agent agentContext) error {
@@ -225,6 +272,10 @@ func handle(connection net.Conn, agent agentContext) {
 			}
 		case classroomview.TypeLock:
 			if err := classroomview.Write(connection, lockReply(lock, message.Locked)); err != nil {
+				return
+			}
+		case classroomview.TypeMessageShow, classroomview.TypeMessageHide:
+			if err := classroomview.Write(connection, messageReply(agent.notice, message)); err != nil {
 				return
 			}
 		case classroomview.TypeBroadcastFrame, classroomview.TypeBroadcastStop:
@@ -349,26 +400,53 @@ func thumbnailReply(capture capturer, width int, since int64) classroomview.Mess
 }
 
 // commandRunner runs loginctl with fixed arguments and returns its output.
-type commandRunner func(arguments ...string) (string, error)
+type commandRunner func(ctx context.Context, arguments ...string) (string, error)
 
-func loginctl(arguments ...string) (string, error) {
-	output, err := exec.Command("loginctl", arguments...).Output()
+// Deadlines that keep a stuck loginctl or a frozen agent from holding the
+// controller's channel: the controller then sees the failure instead of
+// waiting. helloTimeout is how long an agent has to answer the relay's own
+// hello before it counts as stopped; relayGrace is how long the agent has to
+// finish after the controller closed its side; relayWriteTimeout bounds one
+// write to an agent that stopped reading.
+var (
+	loginctlTimeout   = 10 * time.Second
+	dialTimeout       = 5 * time.Second
+	helloTimeout      = 3 * time.Second
+	relayGrace        = 5 * time.Second
+	relayWriteTimeout = 30 * time.Second
+)
+
+func loginctl(ctx context.Context, arguments ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, loginctlTimeout)
+	defer cancel()
+	command := exec.CommandContext(ctx, "loginctl", arguments...)
+	// Do not wait for a pipe that a stuck child's own children keep open.
+	command.WaitDelay = time.Second
+	output, err := command.Output()
 	return strings.TrimSpace(string(output)), err
 }
 
 var sessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9]{1,32}$`)
 
 // activeSeatUser returns the user of the active graphical session on seat0.
-func activeSeatUser(run commandRunner) (int, error) {
-	session, err := run("show-seat", "seat0", "--property=ActiveSession", "--value")
+// The login screen is a graphical session too, of the display manager's own
+// user: only a session of class "user" counts as someone signed in, so a
+// computer waiting at the login screen is "nobody signed in" and not one
+// whose agent stopped.
+func activeSeatUser(ctx context.Context, run commandRunner) (int, error) {
+	session, err := run(ctx, "show-seat", "seat0", "--property=ActiveSession", "--value")
 	if err != nil || !sessionIDPattern.MatchString(session) {
 		return 0, errors.New("no active session on seat0")
 	}
-	kind, err := run("show-session", session, "--property=Type", "--value")
+	kind, err := run(ctx, "show-session", session, "--property=Type", "--value")
 	if err != nil || (kind != "wayland" && kind != "x11") {
 		return 0, errors.New("the active session on seat0 is not graphical")
 	}
-	value, err := run("show-session", session, "--property=User", "--value")
+	class, err := run(ctx, "show-session", session, "--property=Class", "--value")
+	if err != nil || class != "user" {
+		return 0, errors.New("nobody is signed in on seat0")
+	}
+	value, err := run(ctx, "show-session", session, "--property=User", "--value")
 	if err != nil {
 		return 0, errors.New("the active session has no user")
 	}
@@ -395,8 +473,12 @@ func agentSocket(runtimeBase string, uid int) (string, error) {
 
 // connect relays the controller's stream to the active session's agent. A
 // failure is reported as a protocol error message so the controller can show it.
-func connect(input io.Reader, output io.Writer, run commandRunner, runtimeBase string) error {
-	uid, err := activeSeatUser(run)
+// An agent whose socket exists but that does not answer a hello within a few
+// seconds (stopped with SIGSTOP, or hung) is reported as no-agent, like a
+// missing socket, and the relay never outlives the controller's channel by
+// more than a few seconds, even when the agent is frozen.
+func connect(ctx context.Context, input io.Reader, output io.Writer, run commandRunner, runtimeBase string) error {
+	uid, err := activeSeatUser(ctx, run)
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoSession, Detail: err.Error()})
 	}
@@ -404,49 +486,100 @@ func connect(input io.Reader, output io.Writer, run commandRunner, runtimeBase s
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: err.Error()})
 	}
-	connection, err := net.Dial("unix", path)
+	connection, err := (&net.Dialer{Timeout: dialTimeout}).DialContext(ctx, "unix", path)
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: "the classroom agent does not answer"})
 	}
 	defer connection.Close()
+	reply, err := agentHello(connection)
+	if err != nil {
+		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: "the classroom agent does not answer"})
+	}
+	if reply.Type != classroomview.TypeHello {
+		// The agent refuses (too many channels, for example) and closes the
+		// connection: the controller gets the refusal itself.
+		return classroomview.Write(output, reply)
+	}
+	return relay(input, output, connection)
+}
+
+// agentHello asks the agent for its hello within helloTimeout. The controller
+// sends its own hello afterwards through the same connection.
+func agentHello(connection net.Conn) (classroomview.Message, error) {
+	_ = connection.SetDeadline(time.Now().Add(helloTimeout))
+	defer func() { _ = connection.SetDeadline(time.Time{}) }()
+	if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+		return classroomview.Message{}, err
+	}
+	return classroomview.Read(connection)
+}
+
+// relay copies between the controller and the agent until either side ends.
+// When the controller closes its side the agent gets relayGrace to finish; a
+// write that cannot complete within relayWriteTimeout closes the connection.
+func relay(input io.Reader, output io.Writer, connection net.Conn) error {
+	grace, writeTimeout := relayGrace, relayWriteTimeout
+	finished := make(chan struct{})
+	defer close(finished)
+	var lingered atomic.Bool
+	inputDone := make(chan struct{})
 	go func() {
-		_, _ = io.Copy(connection, input)
+		defer close(inputDone)
+		buffer := make([]byte, 32<<10)
+		for {
+			count, readErr := input.Read(buffer)
+			if count > 0 {
+				_ = connection.SetWriteDeadline(time.Now().Add(writeTimeout))
+				if _, err := connection.Write(buffer[:count]); err != nil {
+					lingered.Store(true)
+					_ = connection.Close()
+					return
+				}
+			}
+			if readErr != nil {
+				break
+			}
+		}
 		if unix, ok := connection.(*net.UnixConn); ok {
 			_ = unix.CloseWrite()
 		}
 	}()
-	_, err = io.Copy(output, connection)
+	go func() {
+		select {
+		case <-inputDone:
+		case <-finished:
+			return
+		}
+		timer := time.NewTimer(grace)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+			lingered.Store(true)
+			_ = connection.Close()
+		case <-finished:
+		}
+	}()
+	_, err := io.Copy(output, connection)
+	if lingered.Load() {
+		// The relay ended the connection itself: nothing is left to report.
+		return nil
+	}
 	return err
 }
 
 // probeSend sends the contents of a folder to the session's desktop through
 // a command, as the controller does. Hidden names, links and special files
 // are skipped.
-func probeSend(command []string, folder string, output io.Writer) error {
-	if len(command) == 0 {
-		return errors.New("probe needs a command, for example nixorium-classroom-connect")
-	}
+func probeSend(ctx context.Context, command []string, folder string, output io.Writer) error {
 	entries, err := classroomview.CollectFolder(folder)
 	if err != nil {
 		return err
 	}
-	process := exec.Command(command[0], command[1:]...)
-	stdin, err := process.StdinPipe()
+	stdin, stdout, finish, err := startProbe(ctx, command)
 	if err != nil {
 		return err
 	}
-	stdout, err := process.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	process.Stderr = os.Stderr
-	if err := process.Start(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = stdin.Close()
-		_ = process.Wait()
-	}()
+	defer finish()
 	exchange := func(message classroomview.Message, want string) (classroomview.Message, error) {
 		if err := classroomview.Write(stdin, message); err != nil {
 			return classroomview.Message{}, err
@@ -498,31 +631,16 @@ func probeSend(command []string, folder string, output io.Writer) error {
 
 // probeShow shows a picture over the session's screen, keeps it for a while
 // and ends the showing, as the controller does.
-func probeShow(command []string, picture string, duration time.Duration, output io.Writer) error {
-	if len(command) == 0 {
-		return errors.New("probe needs a command, for example nixorium-classroom-connect")
-	}
+func probeShow(ctx context.Context, command []string, picture string, duration time.Duration, output io.Writer) error {
 	image, err := os.ReadFile(picture)
 	if err != nil {
 		return err
 	}
-	process := exec.Command(command[0], command[1:]...)
-	stdin, err := process.StdinPipe()
+	stdin, stdout, finish, err := startProbe(ctx, command)
 	if err != nil {
 		return err
 	}
-	stdout, err := process.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	process.Stderr = os.Stderr
-	if err := process.Start(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = stdin.Close()
-		_ = process.Wait()
-	}()
+	defer finish()
 	exchange := func(message classroomview.Message) error {
 		if err := classroomview.Write(stdin, message); err != nil {
 			return err
@@ -543,32 +661,21 @@ func probeShow(command []string, picture string, duration time.Duration, output 
 	if err := exchange(classroomview.Message{Type: classroomview.TypeBroadcastFrame, Image: image}); err != nil {
 		return err
 	}
-	time.Sleep(duration)
+	select {
+	case <-time.After(duration):
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	return exchange(classroomview.Message{Type: classroomview.TypeBroadcastStop})
 }
 
 // probeLock locks or unlocks through a command, as the controller does.
-func probeLock(command []string, locked bool, output io.Writer) error {
-	if len(command) == 0 {
-		return errors.New("probe needs a command, for example nixorium-classroom-connect")
-	}
-	process := exec.Command(command[0], command[1:]...)
-	stdin, err := process.StdinPipe()
+func probeLock(ctx context.Context, command []string, locked bool, output io.Writer) error {
+	stdin, stdout, finish, err := startProbe(ctx, command)
 	if err != nil {
 		return err
 	}
-	stdout, err := process.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	process.Stderr = os.Stderr
-	if err := process.Start(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = stdin.Close()
-		_ = process.Wait()
-	}()
+	defer finish()
 	for _, message := range []classroomview.Message{
 		{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion},
 		{Type: classroomview.TypeLock, Locked: locked},
@@ -589,27 +696,12 @@ func probeLock(command []string, locked bool, output io.Writer) error {
 }
 
 // probe exchanges one hello through a command's standard input and output.
-func probe(command []string, thumbnail string, input bool, output io.Writer) error {
-	if len(command) == 0 {
-		return errors.New("probe needs a command, for example nixorium-classroom-connect")
-	}
-	process := exec.Command(command[0], command[1:]...)
-	stdin, err := process.StdinPipe()
+func probe(ctx context.Context, command []string, thumbnail string, input bool, output io.Writer) error {
+	stdin, stdout, finish, err := startProbe(ctx, command)
 	if err != nil {
 		return err
 	}
-	stdout, err := process.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	process.Stderr = os.Stderr
-	if err := process.Start(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = stdin.Close()
-		_ = process.Wait()
-	}()
+	defer finish()
 	if err := classroomview.Write(stdin, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
 		return err
 	}
