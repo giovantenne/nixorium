@@ -751,6 +751,20 @@ release is not finished until the site follows it.
   teacher chooses with the browser's own consent (never the page itself), posts JPEGs to `/api/broadcast/frame`, and the
   worker keeps one showing at a time, sending each computer only the latest
   picture and ending after ten silent seconds.
+  A message to the students (`message.show/hide`, `MessageManager`, the
+  extension's `ShowMessage`/`HideMessage` on the session bus) is plain text
+  of at most 300 characters and 10 lines without control characters, shown
+  for 0 (until the student closes it), at most 600 seconds, or until unlock;
+  the controller and the agent both validate it (`classroomview.ValidateMessage`),
+  the extension draws it as an `St.Label` (never markup) and takes neither
+  keyboard nor mouse, and it is not tied to the controller's connection.
+  The review keeps the controller's own sentences free of the text, which the
+  page prints itself; its token binds the text and the duration, and it takes
+  no operation lock. Exam mode is a page-side chain of the existing Internet,
+  lock and message reviews (message.js): the worker keeps no exam state, each
+  review still applies once, and the page makes the reviews again when one is
+  about to expire so an expired review cannot leave an exam half started;
+  ending reverses the steps in order and only offers the collect review.
   Switch on (Wake-on-LAN, `wake-plan`/`wake-apply`, `nixorium wake`) takes
   no review token or operation lock, validates names like every classroom
   operation and never targets the controller. Hardware addresses come only

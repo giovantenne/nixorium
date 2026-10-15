@@ -528,6 +528,51 @@ blocked. **Stop sharing**, closing the page, the end of GNOME's sharing,
 ten seconds without pictures at the service or fifteen at the agent end
 the showing (`broadcast.stop`); a lock stays in place.
 
+**Message** shows a short text over the screens of the selected computers:
+**Message → Send a message…** in the toolbar and in a computer's **Actions**
+menu, with **Remove message** beside it. A dialog asks for the text (at most
+300 characters and 10 lines, plain text, no control characters) and how long
+it stays: until the student closes it (**Close** appears after 10 seconds),
+30 seconds, 2 minutes, or until the computer is unlocked (a computer that is
+not locked lets the student close it). The review shows the text and the
+computers, one button such as "Send the message to 12 computers" confirms,
+and the notice counts them, such as "Message: 12 shown · 1 switched off or not
+reachable". Like the lock it takes no administrative operation lock, and its
+review token binds the text and the duration. The agent answers `message.show`
+(`text`, and `seconds` or `untilUnlock`; checked again against the same
+limits, 600 seconds at most) with `message.shown`, and `message.hide` with
+`message.hidden`; a session whose agent or extension cannot do it answers
+`unsupported` or `message-unavailable`, and the review calls the computer
+unable to show messages until it is updated and the student signs in again
+(the extension loads at login). The agent asks the Shell extension on the
+session bus (`ShowMessage`, `HideMessage`, property `MessageShown`), which
+draws a centered panel above everything, the lock and the teacher's screen
+included. The text is a plain label, never markup. The panel takes neither
+keyboard nor mouse: the student keeps both, unless the computer is locked or
+shows the teacher's screen, and then Close is not offered. A computer has one
+message at a time (a new one replaces the previous); it belongs to the
+session, not to the controller's connection, and logging out clears it.
+
+**Exam mode** (toolbar, selected computers) opens a dialog with three check
+boxes, all on: block Internet, lock the screens now (until you unlock them),
+and show a message (default "Exam in progress. Wait for the teacher.",
+editable; it stays until the screens are unlocked). After one combined review
+and one button such as "Start exam mode on 12 computers", the page applies
+three existing reviewed actions in this order: Internet block, lock, message.
+Each keeps its own review that applies once, and each computer's result lists
+the three steps. It is a composition in the page only: the service and the
+computers keep no exam state, and the page remembers which computers it
+started exam mode on, and with which steps, while it stays open (the cards
+show "Exam mode"). A review lasts at most five minutes, so close to its end
+the page makes the reviews again before it starts, and asks again when the
+computers that qualify changed: an expired review never leaves exam mode half
+started. **End exam mode** (the same button, when a selected computer is in
+exam mode) reverses the steps that were started, in this order: remove the
+message, unlock, allow Internet. Then it opens the usual **Collect from
+desktop** review for the same computers; nothing is collected unless the
+teacher confirms it. A page that was closed forgets exam mode: use **Remove
+message**, **Unlock** and **Allow Internet**.
+
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a
 frame and stops after 30 seconds without requests. While it runs, GNOME shows

@@ -62,6 +62,29 @@ The project follows [Semantic Versioning](https://semver.org/).
   review token; `--into <folder>` collects into another existing folder.
   Update the student computers first: one that is not updated is listed as
   not able to collect yet.
+- **Message** in the classroom view shows a short text over the screens of the
+  selected students' computers, in front of everything, a lock or your shared
+  screen included. It is in the toolbar (**Message → Send a message…**, with
+  **Remove message**) and in a computer's **Actions** menu. You write up to 300
+  characters (plain text, up to 10 lines) and choose how long it stays: until
+  the student closes it (**Close** appears after 10 seconds), 30 seconds, 2
+  minutes, or until you unlock the computer. The students keep their keyboard
+  and mouse, unless the computer is locked. A new message replaces the
+  previous one, and signing out removes it. The review shows the text and the
+  computers, and the result counts them, such as "Message: 12 shown · 1
+  switched off or not reachable". Update the student computers first and have
+  the students sign in again: one that is not updated is listed as unable to
+  show messages yet.
+- **Exam mode** in the classroom view toolbar prepares the selected computers
+  for an exam with one confirmation: it blocks Internet, locks the screens
+  and shows a message ("Exam in progress. Wait for the teacher.", editable),
+  each step optional and each computer's result listing the three steps. The
+  same button reads **End exam mode** on computers it was started on from the
+  open page: it removes the message, unlocks the screens, allows Internet
+  again, and then offers **Collect from desktop** for the same computers
+  (nothing is collected unless you confirm). The computers keep no exam state:
+  after you close the page, end the exam with **Remove message**, **Unlock**
+  and **Allow Internet**.
 
 ### Changed
 

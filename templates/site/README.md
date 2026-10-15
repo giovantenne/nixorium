@@ -239,7 +239,13 @@ apply at the student's next login. In a computer's window of the classroom
 view page, **Save screenshot** keeps a picture of its screen in
 `Nixorium/Screenshots` of your home folder, such as
 `pc03-2026-10-15-10.30.12.jpg`; a page not opened from Nixorium downloads the
-picture through the browser instead.
+picture through the browser instead. **Message** shows a short text over the
+screens of the selected computers, until the students close it, for 30 seconds
+or 2 minutes, or until you unlock them. **Exam mode** blocks Internet, locks the
+screens and shows a message on the selected computers with one confirmation;
+**End exam mode** undoes it and offers **Collect from desktop**. Update the
+student computers and have the students sign in again first: a computer that is
+not updated is listed as unable to show messages yet.
 
 ## Temporary Internet access
 
