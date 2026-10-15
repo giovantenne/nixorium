@@ -42,12 +42,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 - In the classroom view, **Save screenshot** in a computer's window keeps a
   picture of the student's screen, up to 1920 pixels wide, in
   `Nixorium/Screenshots` of your home folder, named after the computer, the
-  date and the time (for example `pc03-2026-10-15-10.30.12.jpg`).
-  **Save screenshots** in the toolbar does the same for every selected
-  computer. A picture never replaces an earlier one. Computers that are off,
-  idle behind their own screen lock or without anyone signed in are listed as
-  skipped. When the page was not opened from Nixorium, the browser downloads
-  the picture instead.
+  date and the time (for example `pc03-2026-10-15-10.30.12.jpg`). A picture
+  never replaces an earlier one. The button works only while the screen is
+  live: a computer that is off, idle behind its own screen lock or without
+  anyone signed in has no picture to save. When the page was not opened from
+  Nixorium, the browser downloads the picture instead.
 - **Collect from desktop** copies the files on the desktops of the selected
   students' computers into your home folder, in
   `Nixorium/Collected/<date and time>/<computer>/`, after the usual review

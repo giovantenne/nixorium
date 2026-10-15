@@ -238,8 +238,7 @@ notice while the teacher watches. Changes to the classroom Shell extension
 apply at the student's next login. In a computer's window of the classroom
 view page, **Save screenshot** keeps a picture of its screen in
 `Nixorium/Screenshots` of your home folder, such as
-`pc03-2026-10-15-10.30.12.jpg`; **Save screenshots** in the toolbar does it
-for the selected computers, and a page not opened from Nixorium downloads the
+`pc03-2026-10-15-10.30.12.jpg`; a page not opened from Nixorium downloads the
 picture through the browser instead.
 
 ## Temporary Internet access

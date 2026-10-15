@@ -463,20 +463,20 @@ the chosen file or folder as whoever runs Nixorium and send it through the
 classroom service the same way; `send apply` prepares the files again and
 requires the token of the review.
 
-**Save screenshot** (a computer's window) and **Save screenshots** (the
-toolbar, for the selected computers) ask each computer whose screen is live
-for a picture at up to 1920 pixels through the overview's channel
-(`thumbnail.request`). Computers that are switched off, behind GNOME's own
-lock (Idle) or with nobody signed in are reported as skipped, in the card's
-words. The service hands the pictures to the desktop helper of the page's
-user with a save job through `desktop-wait`; the helper copies them over
-the classroom socket (`save-items`, `save-read` in 512 KB pieces,
+**Save screenshot**, in the window of one computer whose screen is live,
+asks that computer for a picture at up to 1920 pixels through the
+overview's channel (`thumbnail.request`); the button is off while the
+computer is switched off, behind GNOME's own lock (Idle) or without anybody
+signed in, and a computer that changed state meanwhile is reported in the
+card's words. The service hands the picture to the desktop helper of the
+page's user with a save job through `desktop-wait`; the helper copies it
+over the classroom socket (`save-items`, `save-read` in 512 KB pieces,
 `save-done`) and writes
 `~/Nixorium/Screenshots/<computer>-<YYYY-MM-DD>-<HH.MM.SS>.jpg` itself, as
 that user (folders 0755, files 0644), never replacing a file: a taken name
 becomes "name (2)". The notice names the file, such as "Screenshot saved:
 Nixorium/Screenshots/pc03-2026-10-15-10.30.12.jpg". A page opened without
-the helper downloads each picture once through the browser instead
+the helper downloads the picture once through the browser instead
 (`Content-Disposition: attachment`, same name); the service keeps it for two
 minutes. Only the save's own user (the socket's kernel peer credentials) may
 list, read or end a save, and the service itself never writes into a home.

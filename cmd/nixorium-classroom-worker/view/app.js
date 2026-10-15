@@ -457,36 +457,34 @@ async function sendFiles(kind, computers) {
   runAction('send-files', computers, prepared.transfer);
 }
 
-// Save screenshots: the controller takes a picture of each computer's screen
-// at up to 1920 pixels, and Nixorium (which started this browser) saves it
-// in Nixorium/Screenshots in the home folder. A page opened another way
-// downloads the pictures through the browser instead.
+// Save screenshot, in a computer's window: the controller takes a picture
+// of its screen at up to 1920 pixels, and Nixorium (which started this
+// browser) saves it in Nixorium/Screenshots in the home folder. A page
+// opened another way downloads the picture through the browser instead.
 const screenshotButton = document.getElementById('viewer-screenshot');
 
-async function saveScreenshots(computers) {
-  showToast(computers.length === 1 ? 'Saving the screenshot…' : 'Saving the screenshots…', { sticky: true });
+async function saveScreenshot(name) {
+  showToast('Saving the screenshot…', { sticky: true });
   let result;
   try {
-    result = await postJSON('/api/screenshots', { computers });
+    result = await postJSON('/api/screenshot', { computer: name });
   } catch (error) {
     showToast('The controller did not answer; no screenshot was saved.', { sticky: true });
     return;
   }
-  const downloads = result.downloads || [];
-  for (const download of downloads) {
+  if (result.state === 'saved') {
+    showToast('Screenshot saved: ' + result.file);
+  } else if (result.state === 'download') {
     const link = document.createElement('a');
-    link.href = '/api/screenshots/file?id=' + encodeURIComponent(download.id);
-    link.download = download.name;
+    link.href = '/api/screenshot/file?id=' + encodeURIComponent(result.download);
+    link.download = result.file;
     document.body.append(link);
     link.click();
     link.remove();
+    showToast('Screenshot downloaded: ' + result.file);
+  } else {
+    showToast('No screenshot of ' + name + ': ' + (result.message || 'it could not be taken.'), { problem: true, sticky: result.state === 'failed' });
   }
-  const rows = result.rows || [];
-  if (rows.length === 1 && rows[0].outcome === 'done' && rows[0].file) {
-    showToast((downloads.length ? 'Screenshot downloaded: ' : 'Screenshot saved: ') + rows[0].file);
-    return;
-  }
-  showResult('Screenshots', result);
 }
 
 // A computer's window offers a screenshot only of a live screen, and
@@ -503,7 +501,7 @@ function updateSaveButtons(computers) {
 }
 
 screenshotButton.addEventListener('click', () => {
-  if (selected) saveScreenshots([selected]);
+  if (selected) saveScreenshot(selected);
 });
 
 // Share screen: GNOME asks what to share (the whole screen is offered
@@ -596,10 +594,6 @@ function updateCasting() {
 window.addEventListener('pagehide', () => stopCasting());
 
 function startAction(action, computers) {
-  if (action === 'screenshots') {
-    saveScreenshots(computers);
-    return;
-  }
   if (action === 'send-file' || action === 'send-folder') sendFiles(action === 'send-file' ? 'file' : 'folder', computers);
   else if (action === 'show-screen' && casting) stopCasting();
   else if (action === 'show-screen') showMyScreen(computers);

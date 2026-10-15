@@ -737,8 +737,9 @@ release is not finished until the site follows it.
   only that user (classroom socket peer credentials) may use, and writes
   with `classroomview.TreeWriter`: names validated again, private staging,
   explicit 0755/0644 modes, no-follow exclusive creation and "name (2)"
-  instead of replacing anything. A page without the helper downloads
-  screenshots through the browser and does not collect. Collect plan/apply
+  instead of replacing anything. A page without the helper downloads a
+  screenshot (one computer's window only) through the browser and does not
+  collect. Collect plan/apply
   binds the computers and the destination folder and applies once.
   Showing the teacher's screen sends JPEG
   pictures (`broadcast.frame`, at most 2 MB); the agent writes them only to
