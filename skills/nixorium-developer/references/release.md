@@ -21,8 +21,15 @@ Before release:
 7. Website release branch: confirm that `release/<version>` exists in
    `nixorium-website`, is built against this commit and is green on `staging`
    (see [Website release branch](#website-release-branch)). Do not tag without it.
-8. Run `./scripts/release.sh <version>` only with explicit authorization.
-9. Verify the GitHub workflow and published release.
+8. Assistant instructions and capabilities: a feature that changes a menu label,
+   a classroom view action, a document the Assistant cites (troubleshooting,
+   administrator guide, system reference) or adds an Assistant tool updates the
+   private Assistant instructions (`nixorium-assistant`,
+   `skills/nixorium-assistant/SKILL.md`) and, for a tool, the capabilities
+   header, before the release; the service is deployed with the new instructions
+   when the release is published.
+9. Run `./scripts/release.sh <version>` only with explicit authorization.
+10. Verify the GitHub workflow and published release.
 
 The release workflow first checks metadata, then calls the full-validation
 workflow, which runs `./scripts/validate.sh --full` on the exact tagged commit
