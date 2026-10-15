@@ -107,8 +107,8 @@ together. Open **Nixorium** for the restricted classroom dashboard.
 
 ## Project status
 
-Nixorium has run the Italian school lab where it began, 30 student PCs and a
-controller, since 2024. The
+Nixorium was born in 2024 in an Italian school lab and has been in daily use
+in school labs since. The
 [original classroom account](https://nixorium.org/case-study/original-classroom/)
 tells that story. It is open source under the MIT license and maintained by a
 teacher; support happens in

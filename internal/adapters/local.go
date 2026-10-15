@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -101,7 +102,46 @@ func deploymentCommand(phase domain.DeploymentPhase, selector string) ([]string,
 	}
 }
 
-func configureColmenaSSH(command *exec.Cmd) (func(), error) {
+// colmenaRedirects maps the laboratory address of each computer that, during
+// a change of laboratory network, answered only on its previous address to
+// that address. Colmena then reaches it there; SSH still checks the key
+// recorded for the address it connects to.
+func colmenaRedirects(plan domain.DeploymentPlanReport) map[string]string {
+	redirects := map[string]string{}
+	for _, target := range plan.Targets {
+		if target.PreviousIP == "" {
+			continue
+		}
+		for _, observed := range plan.Availability {
+			if observed.Name == target.Name && observed.IP == target.IP && observed.Network == domain.HostNetworkPrevious {
+				redirects[target.IP] = target.PreviousIP
+			}
+		}
+	}
+	return redirects
+}
+
+func colmenaSSHConfig(redirects map[string]string) (string, error) {
+	content := ""
+	addresses := make([]string, 0, len(redirects))
+	for address := range redirects {
+		addresses = append(addresses, address)
+	}
+	slices.Sort(addresses)
+	for _, address := range addresses {
+		if canonicalRemoteIPv4(address) == "" || canonicalRemoteIPv4(redirects[address]) == "" {
+			return "", fmt.Errorf("invalid laboratory address for %s", address)
+		}
+		content += "Host " + address + "\n  HostName " + redirects[address] + "\n"
+	}
+	return content + "Host *\n  BatchMode yes\n  PasswordAuthentication no\n  KbdInteractiveAuthentication no\n  StrictHostKeyChecking accept-new\n  ConnectTimeout 10\n  ConnectionAttempts 1\n  ServerAliveInterval 10\n  ServerAliveCountMax 3\n", nil
+}
+
+func configureColmenaSSH(command *exec.Cmd, redirects map[string]string) (func(), error) {
+	content, err := colmenaSSHConfig(redirects)
+	if err != nil {
+		return nil, err
+	}
 	config, err := os.CreateTemp("", "nixorium-colmena-ssh-*")
 	if err != nil {
 		return nil, err
@@ -110,7 +150,6 @@ func configureColmenaSSH(command *exec.Cmd) (func(), error) {
 	cleanup := func() {
 		_ = os.Remove(path)
 	}
-	content := "Host *\n  BatchMode yes\n  PasswordAuthentication no\n  KbdInteractiveAuthentication no\n  StrictHostKeyChecking accept-new\n  ConnectTimeout 10\n  ConnectionAttempts 1\n  ServerAliveInterval 10\n  ServerAliveCountMax 3\n"
 	if _, err := io.WriteString(config, content); err != nil {
 		_ = config.Close()
 		cleanup()
@@ -360,8 +399,47 @@ func probeCurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout t
 	return probes
 }
 
+// probeCurrentSystem asks the computer for its running system. During a
+// change of laboratory network it asks the new address first and then the
+// previous one, and says which one answered.
 func probeCurrentSystem(ctx context.Context, host domain.HostMeta, timeout time.Duration) domain.HostSystemProbe {
-	return probeCurrentSystemArguments(ctx, timeout, sshCurrentSystemArguments(host, timeout))
+	result := probeCurrentSystemArguments(ctx, timeout, sshCurrentSystemArguments(host, timeout))
+	if host.PreviousIP == "" {
+		return result
+	}
+	if result.Revision != "" || result.HostKeyCondition == domain.HostKeyChanged {
+		result.Network = domain.HostNetworkCurrent
+		return result
+	}
+	fallback := probeCurrentSystemArguments(ctx, timeout, sshCurrentSystemArguments(previousAddressHost(host), timeout))
+	if fallback.Revision != "" || fallback.HostKeyCondition == domain.HostKeyChanged {
+		fallback.Network = domain.HostNetworkPrevious
+		return fallback
+	}
+	result.Network = domain.HostNetworkUnknown
+	return result
+}
+
+// previousAddressHost is the same computer addressed on the previous
+// laboratory network. Its pinned key is recorded for that address.
+func previousAddressHost(host domain.HostMeta) domain.HostMeta {
+	host.IP, host.PreviousIP = host.PreviousIP, ""
+	return host
+}
+
+// sshAddress is the address an SSH command uses for the computer: its
+// laboratory address, or during a change of laboratory network the previous
+// address when only that one accepts connections.
+func sshAddress(host domain.HostMeta, timeout time.Duration) string {
+	if host.PreviousIP == "" {
+		return host.IP
+	}
+	timeout = min(max(timeout, 500*time.Millisecond), 2*time.Second)
+	probe := probeHostSSH(context.Background(), host, timeout)
+	if probe.Network == domain.HostNetworkPrevious {
+		return host.PreviousIP
+	}
+	return host.IP
 }
 
 func probeCurrentSystemArguments(ctx context.Context, timeout time.Duration, arguments []string) domain.HostSystemProbe {
@@ -465,9 +543,33 @@ func probeSSHStatuses(ctx context.Context, hosts []domain.HostMeta, timeout time
 	return statuses
 }
 
+// probeHostSSH checks the SSH port of the computer. During a change of
+// laboratory network (PreviousIP set) it tries the new address first, then
+// the previous one, and records which network answered.
 func probeHostSSH(ctx context.Context, host domain.HostMeta, timeout time.Duration) domain.SSHProbe {
+	return probeTransitionSSH(host, func(address string) domain.SSHProbe { return dialSSH(ctx, address, timeout) })
+}
+
+func probeTransitionSSH(host domain.HostMeta, dial func(string) domain.SSHProbe) domain.SSHProbe {
+	probe := dial(host.IP)
+	if host.PreviousIP == "" {
+		return probe
+	}
+	if probe.Reachability == domain.ReachabilityReachable {
+		probe.Network = domain.HostNetworkCurrent
+		return probe
+	}
+	if previous := dial(host.PreviousIP); previous.Reachability == domain.ReachabilityReachable {
+		previous.Network = domain.HostNetworkPrevious
+		return previous
+	}
+	probe.Network = domain.HostNetworkUnknown
+	return probe
+}
+
+func dialSSH(ctx context.Context, address string, timeout time.Duration) domain.SSHProbe {
 	dialer := net.Dialer{Timeout: timeout}
-	connection, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host.IP, "22"))
+	connection, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(address, "22"))
 	if err == nil {
 		connection.Close()
 		return domain.SSHProbe{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable}

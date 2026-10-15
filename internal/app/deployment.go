@@ -87,7 +87,12 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(report.Targets)),
 	})
 	fmt.Fprintln(output, "\n==> Applying the built configurations with Colmena")
-	applyErr := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4}, output, observe)
+	// Apply over the addresses that answered just now: during a change of
+	// laboratory network a computer not yet moved is reached on its
+	// previous address.
+	applyPlan := plan
+	applyPlan.Availability = verified.Availability
+	applyErr := m.runPhase(ctx, applyPlan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4}, output, observe)
 	var unconfirmed *domain.DeploymentUnconfirmedError
 	report.RecoveryRequired = errors.As(applyErr, &unconfirmed)
 	report.RetrySafe = !report.RecoveryRequired
@@ -141,10 +146,7 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 		Attempted: len(report.Targets),
 		Targets:   make([]domain.DeploymentTargetVerification, 0, len(report.Targets)),
 	}
-	hosts := make([]domain.HostMeta, 0, len(report.Targets))
-	for _, target := range report.Targets {
-		hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP})
-	}
+	hosts := targetHosts(report.Targets)
 	observed := m.source.CurrentSystems(ctx, hosts, deploymentVerificationTimeout)
 	availability := m.source.SSHStatus(ctx, hosts, sshProbeTimeout)
 	updates := map[string]domain.LastSuccessfulDeployment{}
@@ -160,6 +162,7 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 			Revision:         probe.Revision,
 			SystemPath:       probe.SystemPath,
 			Detail:           probe.Detail,
+			Network:          probe.Network,
 		}
 		switch {
 		case !found:
@@ -280,6 +283,7 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 		report.Issues = append(report.Issues, domain.EvaluationIssue("configuration", "labMeta", err))
 		return report
 	}
+	rekeyDuringTransition(m.source, meta)
 	deployment, err := m.source.DeploymentStatus(ctx, root)
 	if err != nil {
 		return deploymentIssue(report, "readiness", fmt.Sprintf("evaluate deploymentStatus: %v", err))
@@ -313,17 +317,15 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 		report = deploymentIssue(report, "selector", issue)
 	}
 	if !report.HasErrors() {
-		hosts := make([]domain.HostMeta, 0, len(targets))
-		for _, target := range targets {
-			hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP})
-		}
-		probes := m.source.SSHStatus(ctx, hosts, sshProbeTimeout)
+		// During a change of laboratory network the probe also tries each
+		// computer's previous address and says which one answered.
+		probes := m.source.SSHStatus(ctx, targetHosts(targets), sshProbeTimeout)
 		for _, target := range targets {
 			probe, found := probes[target.Name]
 			if !found {
 				probe = domain.SSHProbe{Reachability: domain.ReachabilityUnknown, SSH: domain.SSHUnknown}
 			}
-			report.Availability = append(report.Availability, domain.DeploymentTargetAvailability{Name: target.Name, IP: target.IP, Reachability: probe.Reachability, SSH: probe.SSH})
+			report.Availability = append(report.Availability, domain.DeploymentTargetAvailability{Name: target.Name, IP: target.IP, Reachability: probe.Reachability, SSH: probe.SSH, Network: probe.Network})
 		}
 		if err := ctx.Err(); err != nil {
 			return deploymentIssue(report, "availability", "computer availability check cancelled or timed out")
@@ -413,7 +415,7 @@ func selectDeploymentTargets(hosts []domain.HostMeta, requested string) ([]domai
 	targets := make([]domain.DeploymentTarget, 0, len(names))
 	for _, name := range names {
 		host := available[name]
-		targets = append(targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP})
+		targets = append(targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP, PreviousIP: host.PreviousIP})
 	}
 	selector := strings.Join(names, ",")
 	if requested == "@lab" && len(issues) == 0 {
@@ -423,6 +425,16 @@ func selectDeploymentTargets(hosts []domain.HostMeta, requested string) ([]domai
 		issues = append(issues, "no clients were selected")
 	}
 	return targets, selector, issues
+}
+
+// targetHosts addresses the selected computers, with their previous address
+// during a change of laboratory network.
+func targetHosts(targets []domain.DeploymentTarget) []domain.HostMeta {
+	hosts := make([]domain.HostMeta, 0, len(targets))
+	for _, target := range targets {
+		hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP, PreviousIP: target.PreviousIP})
+	}
+	return hosts
 }
 
 func deploymentIssue(report domain.DeploymentPlanReport, field, message string) domain.DeploymentPlanReport {

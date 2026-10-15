@@ -18,10 +18,12 @@ development command.
 | `./scripts/validate.sh --ci` | Evaluation-only source and template graph | CI and release-source evaluation |
 | `./scripts/validate.sh --full` | Complete build, VM, template, and offline-equivalence checkpoint | Required in release-tag CI; local milestone/cross-cutting checks and optional release preflight |
 | `nix develop --file tests/source-checks.nix security-shell --command ./scripts/security-check.sh` | Pinned Go static and known-vulnerability analysis | Security-sensitive Go changes and the dedicated security workflow |
+| `nix develop --file tests/source-checks.nix lint-shell --command ./scripts/lint.sh` | ShellCheck and errcheck alone, with the pinned tools | Shell or Go error-handling edits when only the linters are needed; the default gate runs it |
 
 The default gate checks whitespace, shell syntax, shell regression tests,
-generated documentation, allowlisted canonical-copy coherence, the Nix data
-schemas, and the Go package with its unit tests. It also runs the packaged
+ShellCheck over every shell script, errcheck over the Go code, generated
+documentation, allowlisted canonical-copy coherence, the Nix data schemas, and
+the Go package with its unit tests. It also runs the packaged
 command with an otherwise empty `PATH` to prove that required external tools
 have a wrapper fallback. Its Nix expression imports the exact `nixpkgs` revision
 from `flake.lock` directly. It deliberately avoids evaluating
@@ -106,6 +108,68 @@ ISO acceptance run therefore remains a required separate checkpoint for that
 cross-machine user journey; it must not be represented as covered by the
 simulated remote-client VM.
 
+## Shell and error-handling lint
+
+The default gate runs `scripts/lint.sh` before its Nix builds, in the `lint-shell`
+of `tests/source-checks.nix`: ShellCheck, errcheck and the locked Go compiler from
+the `flake.lock` revision of `nixpkgs`. The management-command CI job runs the
+same command. To run only the linters:
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix lint-shell --command ./scripts/lint.sh
+```
+
+**ShellCheck** reads every tracked or new `*.sh` file: `install.sh`, `setup.sh`,
+`scripts/`, `scripts/lib/`, `templates/site/scripts/` and `tests/`. It fails on
+warnings and errors (`--severity=warning`); style and info notes do not fail
+the gate. There is no `.shellcheckrc` because no global exclusion is justified.
+When it fails:
+
+- Fix the script: quote the expansion, use `read -r`, declare and assign in
+  separate statements, or remove the unused variable.
+- Where a finding is a false positive, or the fix would change what an
+  installer does (for example variables set for the sourcing caller, SC2034),
+  add a `# shellcheck disable=SCxxxx # reason` directive directly above that
+  command. Never disable a check for a whole file or the repository.
+
+**errcheck** runs in its default mode: it reports a call in non-test Go code
+whose returned `error` is dropped. Test files are skipped (`-ignoretests`):
+their fixtures fail through the test's own assertions. When it fails:
+
+- Handle the error, or return it with context like the surrounding code.
+- When dropping the result is the decision (cleanup after a commit, an unlock
+  on the way out), write `_ = call()`. errcheck accepts it and the reader sees
+  the intent; `defer func() { _ = call() }()` does the same for a deferred call.
+- `.errcheck-exclude` lists functions whose error is never worth checking:
+  closing a handle that was only read, `os.Remove`, `os.RemoveAll`, and
+  `fmt.Fprint*` to a terminal or caller-supplied stream. An entry matches by
+  function name everywhere, so add one only for a call that never matters. A
+  write, a lock or a commit must be checked; `Flock` is deliberately absent so a
+  missing lock error is still reported.
+
+## Dependency updates
+
+Both proposals arrive as pull requests that nobody merges automatically.
+
+- **Dependabot** (`.github/dependabot.yml`) opens a weekly pull request for the
+  Go modules, with minor and patch updates in one group, and a weekly one for
+  GitHub Actions. A change to `go.mod` or `go.sum` also changes the vendored
+  dependency hash: update `vendorHash` in `pkgs/nixorium.nix` (set it to
+  `lib.fakeHash`, run `nix build --file tests/source-checks.nix nixorium
+  --no-link`, copy the reported hash), then run `./scripts/validate.sh`.
+- **The monthly nixpkgs proposal** (`.github/workflows/update-flake.yml`) runs on
+  the first day of each month and from the Actions tab. It runs
+  `nix flake update nixpkgs` and opens or refreshes the `update-nixpkgs` pull
+  request, labelled `dependencies`, `nixpkgs` and `do-not-automerge`, with
+  `flake.lock` as its only change. The pull request says that
+  `./scripts/validate.sh --eval` and the VM tests decide: run `--eval` on the
+  branch, add the VM test a changed package or module could affect, and merge
+  only when they pass. Pull requests opened by an Action do not start the
+  Validate and Security workflows; close and reopen the pull request to run
+  them, or start *Full validation* on the branch. The repository setting
+  "Allow GitHub Actions to create and approve pull requests" must be enabled.
+
 ## Selecting the smallest sound gate
 
 - Go domain, application, adapter, or presentation logic: default gate; add
@@ -175,8 +239,8 @@ bound memory use. All declared checks are included, and import-from-derivation
 remains disabled. Profile variants are still evaluated independently because
 they change the temporary deployment's declarations.
 
-Pull requests and pushes to `master` run Go packaging/tests and `--ci`, retaining
-the 15-minute limit per job. Full validation lives in the reusable
+Pull requests and pushes to `master` run Go packaging/tests, the lint described
+below and `--ci`, retaining the 15-minute limit per job. Full validation lives in the reusable
 `full-validation.yml` workflow. The release workflow for `v*.*.*` tags,
 including prereleases, validates metadata first and then calls it; it also runs
 nightly on `master` and on demand from the Actions tab, so failures surface

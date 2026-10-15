@@ -51,6 +51,8 @@ func settingLabel(id string) string {
 		return "Student password"
 	case "lab.network":
 		return "Laboratory network"
+	case "lab.networkTransition":
+		return "Change of laboratory network"
 	case "lab.consoleKeyMap":
 		return "Console keyboard layout"
 	case "lab.defaultLocale":

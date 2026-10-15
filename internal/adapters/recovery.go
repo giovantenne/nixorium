@@ -83,6 +83,20 @@ func (Local) LabSettingsIssues(repository string) []domain.ValidationIssue {
 	return issues
 }
 
+// SavedNetworkChange reads the saved laboratory settings without evaluating
+// anything and reports whether a change of laboratory network is recorded.
+func (Local) SavedNetworkChange(repository string) (domain.LabSettings, bool) {
+	data, err := os.ReadFile(filepath.Join(repository, "lab-settings.json"))
+	if err != nil {
+		return domain.LabSettings{}, false
+	}
+	settings, issues := domain.DecodeLabSettings(data)
+	if len(issues) > 0 || settings.Lab.NetworkTransition == nil {
+		return domain.LabSettings{}, false
+	}
+	return settings.Lab, true
+}
+
 // ControllerActivationDrift reports when this controller runs another system
 // than its last successful reviewed activation, for example after booting an
 // older generation. It is empty when no activation was recorded.

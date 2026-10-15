@@ -512,13 +512,28 @@ func (model dashboardModel) settingsReviewView() string {
 			}
 		}
 	}
+	lines = append(lines, model.settingsNetworkCheckLines()...)
+	question := "Save these settings?"
+	actions := []tuiAction{{key: "Enter", label: "Save"}}
+	if model.reviewedSettingsPlan().NetworkPreflight.SaveRefusal() != "" {
+		question = "Saving is blocked by the network check"
+		actions = nil
+	}
+	if len(model.settings.plan.NetworkPreflight.Missing()) > 0 {
+		label := "Save anyway for the computers listed"
+		if model.settings.saveAnyway {
+			label = "Do not save anyway"
+		}
+		actions = append(actions, tuiAction{key: "c", label: label})
+	}
+	actions = append(actions, tuiAction{key: "Esc", label: "Cancel"}, tuiAction{key: "F1", label: "Help"})
 	lines = append(lines,
 		"",
 		"Only lab-settings.json will be replaced atomically.",
 		"Existing unrelated files and changes are preserved.",
 		"Saving does not rebuild or change any computer.",
 		"",
-		tuiSection("Save these settings?", model.isDark),
+		tuiSection(question, model.isDark),
 	)
 	notices := []tuiNotice{}
 	if model.message != "" {
@@ -528,7 +543,7 @@ func (model dashboardModel) settingsReviewView() string {
 	if model.settings.returnScreen == dashboardSetup {
 		path = []string{"Installation", "Setup", "Settings", "Review"}
 	}
-	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Save"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
 func settingsIssueMessage(issues []domain.ValidationIssue) string {
@@ -573,11 +588,7 @@ func passwordFieldChanged(result domain.ConfigurationSaveReport) bool {
 
 // openSettingsEditor opens the routine form for one settings category.
 func (model dashboardModel) openSettingsEditor(fields []settingsField, title string) dashboardModel {
-	model.settings.editor = newSettingsEditorModel(model.settings.current, fields, title)
-	model.settings.editor.width = model.width
-	model.settings.editor.height = model.height
-	model.settings.editor.isDark = model.isDark
-	model.settings.editor.prepareCurrentField()
+	model.settings.editor = model.newSettingsEditor(model.settings.current, fields, title)
 	model.message = ""
 	model.screen = dashboardSettingsEdit
 	return model

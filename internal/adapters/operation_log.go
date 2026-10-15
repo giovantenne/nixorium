@@ -159,7 +159,7 @@ func openDeploymentOperationWithGate(stateRoot string, now time.Time, gate *oper
 	path := filepath.Join(directory, name)
 	fileDescriptor, err := syscall.Open(path, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_EXCL|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
 	if err != nil {
-		syscall.Flock(lockDescriptor, syscall.LOCK_UN)
+		_ = syscall.Flock(lockDescriptor, syscall.LOCK_UN)
 		lock.Close()
 		return fail(fmt.Errorf("create deployment log: %w", err))
 	}

@@ -183,7 +183,7 @@ func shutdownSSHArguments(host domain.HostMeta, timeout time.Duration, remote ..
 		"-o", "ForwardAgent=no",
 		"-o", "PermitLocalCommand=no",
 		"-o", "LogLevel=ERROR",
-		"root@" + host.IP,
+		"root@" + sshAddress(host, timeout),
 	}
 	return append(arguments, remote...)
 }
