@@ -152,6 +152,11 @@ type Message struct {
 	// Skipped counts the desktop entries a collect.listed reply leaves out
 	// because their names cannot be collected.
 	Skipped int `json:"skipped,omitempty"`
+	// Text, Seconds and UntilUnlock describe the message of message.show
+	// (see message.go).
+	Text        string `json:"text,omitempty"`
+	Seconds     int    `json:"seconds,omitempty"`
+	UntilUnlock bool   `json:"untilUnlock,omitempty"`
 }
 
 // Write encodes a message as a big-endian length followed by JSON.

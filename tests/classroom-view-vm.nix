@@ -126,6 +126,32 @@ pkgs.testers.runNixOSTest {
     client.succeed("${agent} probe --lock off nixorium-classroom-connect")
     client.succeed(super_key)
 
+    # The teacher's message is drawn above everything, the lock included,
+    # and takes no keyboard unless the computer is locked. Markup is only
+    # text, "unlock" ends with the lock, a number of seconds ends by itself,
+    # and a new message replaces the previous one.
+    client.succeed("${agent} probe --lock on nixorium-classroom-connect")
+    client.succeed("${agent} probe --message '<b>Exam</b> in progress. Wait for the teacher.' unlock nixorium-classroom-connect | grep -F 'message.shown'")
+    client.succeed(classroom_property + "MessageShown' | grep -F true")
+    client.sleep(1)
+    client.screenshot("classroom-message-locked")
+    client.fail(super_key)
+    client.succeed("${agent} probe --lock off nixorium-classroom-connect")
+    client.wait_until_succeeds(classroom_property + "MessageShown' | grep -F false", timeout=10)
+    client.succeed("${agent} probe --message 'Back in a minute' 0 nixorium-classroom-connect | grep -F 'message.shown'")
+    client.succeed(classroom_property + "MessageShown' | grep -F true")
+    client.succeed(super_key)
+    client.succeed("${agent} probe --message 'Second message' 4 nixorium-classroom-connect | grep -F 'message.shown'")
+    client.sleep(1)
+    client.screenshot("classroom-message")
+    client.wait_until_succeeds(classroom_property + "MessageShown' | grep -F false", timeout=20)
+    client.succeed("${agent} probe --message 'To be removed' 0 nixorium-classroom-connect")
+    client.succeed("${agent} probe --message-hide nixorium-classroom-connect | grep -F 'message.hidden'")
+    client.succeed(classroom_property + "MessageShown' | grep -F false")
+    client.fail("${agent} probe --message \"$(printf 'a\\tb')\" 0 nixorium-classroom-connect")
+    client.succeed(classroom_property + "MessageShown' | grep -F false")
+    client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
+
     # Files sent to the desktop belong to the student and are never
     # executable; links are not sent and nothing on the desktop is replaced.
     client.succeed("mkdir -p /tmp/share/Lesson && echo notes > /tmp/share/Lesson/notes.txt && printf 'ls\\n' > /tmp/share/run.sh && chmod 755 /tmp/share/run.sh && ln -s /etc/shadow /tmp/share/secret")

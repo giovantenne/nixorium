@@ -9,9 +9,10 @@
 //	         one hello through it, optionally a thumbnail and input, or a
 //	         lock request (--lock on|off), sends a folder's contents to the
 //	         desktop (--send DIR), collects the desktop into a folder
-//	         (--collect DIR), or shows a picture as the teacher's screen for
-//	         some seconds (--show JPEG SECONDS); used by tests and
-//	         diagnostics.
+//	         (--collect DIR), shows a picture as the teacher's screen for
+//	         some seconds (--show JPEG SECONDS), or shows (--message TEXT
+//	         SECONDS|unlock) or removes (--message-hide) the teacher's
+//	         message; used by tests and diagnostics.
 package main
 
 import (
@@ -61,6 +62,14 @@ func main() {
 				break
 			}
 			err = probeShow(arguments[3:], arguments[1], time.Duration(seconds)*time.Second, os.Stdout)
+			break
+		}
+		if len(arguments) >= 3 && arguments[0] == "--message" {
+			err = probeMessage(arguments[3:], true, arguments[1], arguments[2], os.Stdout)
+			break
+		}
+		if len(arguments) >= 1 && arguments[0] == "--message-hide" {
+			err = probeMessage(arguments[1:], false, "", "", os.Stdout)
 			break
 		}
 		if len(arguments) >= 2 && arguments[0] == "--send" {
@@ -120,7 +129,7 @@ func serve(runtimeDirectory string) error {
 		return err
 	}
 	lock := &extensionLocker{}
-	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}})
+	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}, notice: lock})
 }
 
 // agentContext is what every connection of the session's agent shares.
@@ -130,6 +139,8 @@ type agentContext struct {
 	capture  capturer
 	lock     locker
 	screen   screenShower
+	// notice shows the teacher's message; nil means it cannot.
+	notice messenger
 }
 
 func serveConnections(listener net.Listener, agent agentContext) error {
@@ -225,6 +236,10 @@ func handle(connection net.Conn, agent agentContext) {
 			}
 		case classroomview.TypeLock:
 			if err := classroomview.Write(connection, lockReply(lock, message.Locked)); err != nil {
+				return
+			}
+		case classroomview.TypeMessageShow, classroomview.TypeMessageHide:
+			if err := classroomview.Write(connection, messageReply(agent.notice, message)); err != nil {
 				return
 			}
 		case classroomview.TypeBroadcastFrame, classroomview.TypeBroadcastStop:
