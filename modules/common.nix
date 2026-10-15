@@ -2,6 +2,7 @@
 {
   imports = [
     ./desktop.nix
+    ./nix-ld.nix
     ./firewall.nix
     ./client-internet.nix
     ./power.nix

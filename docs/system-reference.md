@@ -260,6 +260,23 @@ Docker images, npm's download cache, and user-installed global npm packages are
 runtime data inside the student home. They are intentionally removed on the
 next reset; source files remain recoverable through the snapshots.
 
+## Programs downloaded outside Nix
+
+`modules/nix-ld.nix`, imported by `modules/common.nix`, enables `programs.nix-ld`
+on the controller and every client with a plain list of free, common libraries
+(zlib, libstdc++, glib, OpenSSL, libxml2, ICU and the X11, GTK 3, NSS, ALSA,
+GL and similar libraries that Electron and Java GUI programs usually need).
+A program that bundles generic Linux binaries, such as the JRE inside a VS Code
+extension installed from the Marketplace, therefore starts instead of stopping
+with "Could not start dynamically linked executable"; another library is a
+deployment change to `programs.nix-ld.libraries` in a shared module. This is a
+convenience for staff, who keep their homes: student homes are restored at each
+boot and the managed profile extensions remain the supported route. When the
+workspace profile selects `redhat.java` and the resolved packages include a
+JDK, the seed's editor settings also set `java.jdt.ls.java.home` and
+`java.configuration.runtimes` to that JDK, which reviewed `vscode.extraSettings`
+may override.
+
 ## Rootless Docker
 
 The default site profile gives each normal account its own rootless Docker user service and subordinate

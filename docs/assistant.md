@@ -177,6 +177,10 @@ The model has fixed tools, with no shell or system-operation tool:
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
 | `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
 
+A program downloaded by hand runs on these computers thanks to nix-ld, but
+that is a convenience for one user; the `prefetch` route remains the one that
+puts a program on every computer.
+
 The wire-level step context and service messages are specified in the
 [assistant protocol v2.5](assistant-protocol-v25.md); the tool schemas are in
 [assistant-tools-v1.json](assistant-tools-v1.json).
