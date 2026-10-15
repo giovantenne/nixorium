@@ -71,10 +71,12 @@ func (model dashboardModel) pxeRecoveryLines() []string {
 		tuiSection("What Nixorium found", model.isDark),
 		"  " + pxeRecoveryFound(state),
 	}
-	lines = append(lines, tuiFields(model.isDark,
+	for _, field := range tuiFields(model.isDark,
 		[2]string{"Network boot service", pxeListenerWords(state.Listener)},
 		[2]string{"Temporary network setup", pxeNetworkWords(state.Network)},
-	)...)
+	) {
+		lines = append(lines, "  "+field)
+	}
 	lines = append(lines, "",
 		tuiSection("What you can do", model.isDark),
 		"  Enter  "+pxeRecoverAction,
