@@ -2216,7 +2216,7 @@ func (model dashboardModel) controllerView() string {
 		"Review the current committed controller configuration before rebuilding.",
 	)
 	if model.message != "" {
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+		notices = append(notices, failureNotice("The controller cannot be updated now", model.message))
 	}
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "n", label: "Create review"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}})
 }

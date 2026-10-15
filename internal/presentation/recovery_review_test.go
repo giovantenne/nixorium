@@ -264,3 +264,19 @@ func TestDeploymentApplyNeedingRecoveryLandsOnTheReview(t *testing.T) {
 		t.Fatalf("result screen does not offer the review:\n%s", view)
 	}
 }
+
+func TestControllerRefusalOffersTheInterruptedUpdateReview(t *testing.T) {
+	fixture := &recoveryFixture{}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: fixture.actions(), width: 160, height: 40, screen: dashboardController, message: pendingRefusal}
+	view := plainView(model)
+	if !contains(view, "! The controller cannot be updated now: a previous update of the student computers was interrupted.") || !contains(view, "Enter Review the interrupted update") || contains(view, "deployment-pending.json") {
+		t.Fatalf("controller refusal:\n%s", view)
+	}
+	review := runRead(model.Update(keyPress("enter")))
+	if review.screen != dashboardRecoveryReview {
+		t.Fatalf("Enter opened screen %d", review.screen)
+	}
+	if back := cleanupPress(t, review, keyPress("esc")); back.screen != dashboardController || back.message != pendingRefusal {
+		t.Fatalf("Esc returned to screen %d", back.screen)
+	}
+}

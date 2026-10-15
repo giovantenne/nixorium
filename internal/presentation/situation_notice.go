@@ -81,7 +81,7 @@ func (model dashboardModel) resultSituation() (domain.NextStep, bool) {
 	}
 	switch {
 	case model.screen == dashboardUpdate && model.updates.result.Operation != "":
-	case model.screen == dashboardController && model.controller.result.Operation != "" && !model.controller.applying:
+	case model.screen == dashboardController && !model.controller.applying:
 	case model.screen == dashboardDeploy && model.deployment.result.Operation != "" && model.deployment.usbRecovery == nil && !model.deployment.applying:
 		notice := model.deploymentResultNotice()
 		return noticeSituation(notice)
@@ -117,7 +117,7 @@ func (model dashboardModel) updateResultSituation(key string) (tea.Model, tea.Cm
 	}
 	switch key {
 	case "d":
-		if model.screen == dashboardController {
+		if model.screen == dashboardController && model.controller.result.Operation != "" {
 			// The controller result already uses d for its details.
 			return model, nil, false
 		}
@@ -158,7 +158,7 @@ func (model dashboardModel) withResultSituation(shell tuiShell) tuiShell {
 	if shown.Code != step.Code {
 		return shell
 	}
-	if model.screen == dashboardController {
+	if model.screen == dashboardController && model.controller.result.Operation != "" {
 		shell.detailsKey, shell.details = true, model.controller.details
 	} else {
 		shell.detailsKey, shell.details = true, model.noticeDetails

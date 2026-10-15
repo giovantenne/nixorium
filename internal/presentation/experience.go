@@ -274,7 +274,7 @@ func (model dashboardModel) helpView() string {
 				"Esc keeps your selection. Successful recovery creates a fresh review requiring DEPLOY again.")
 			break
 		}
-		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers")
+		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers, or the review of an interrupted update   d technical details")
 	case dashboardBackup:
 		lines = append(lines, "Backup is optional and never blocks installation or updates. Choose an encrypted file or a private Git repository.",
 			"An encrypted file contains the entire deployment and Git history. Mount the USB first, choose an existing folder outside the deployment, and enter a passphrase of at least 12 characters. Review, then Enter creates the archive.",
@@ -362,6 +362,12 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   n recover network   r refresh", "l progress details while preparing; q closes only the view")
 	case dashboardController:
 		lines = append(lines, "n new review   d result details   l logs / progress detail", "q closes the view; systemd-owned work continues")
+	case dashboardRecoveryReview:
+		if model.recoveryReview.kind == "deploy" {
+			lines = append(lines, "r check every computer again   c continue without the computers that do not answer (c again includes them)",
+				"Enter marks the update as reviewed once every computer was checked   d technical details of the failure   Esc back",
+				"Marking it as reviewed changes nothing on the computers: it archives the record and unblocks other operations. Then update the computers again.")
+		}
 	case dashboardServices:
 		lines = append(lines, "c review cache restart   r refresh   l logs after result")
 	case dashboardLogs, dashboardLogDetail:
