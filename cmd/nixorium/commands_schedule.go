@@ -63,9 +63,6 @@ func parseScheduleArguments(arguments []string) (options, error) {
 		if o.schedule.on == "" && o.schedule.off == "" {
 			return o, errors.New("schedule set requires --on HH:MM, --off HH:MM or both")
 		}
-		if o.schedule.days == "" {
-			return o, errors.New("schedule set requires --days <mon-fri|all|mon,wed,fri>")
-		}
 		if _, err := scheduleFromArguments(o.schedule); err != nil {
 			return o, err
 		}
@@ -82,8 +79,15 @@ func parseScheduleArguments(arguments []string) (options, error) {
 	return o, nil
 }
 
+// defaultScheduleDays are the weekdays of a schedule set without --days, the
+// ones the classroom view's dialog starts with.
+const defaultScheduleDays = "mon-fri"
+
 // scheduleFromArguments reads and checks the times and the weekdays.
 func scheduleFromArguments(arguments scheduleArguments) (domain.Schedule, error) {
+	if arguments.days == "" {
+		arguments.days = defaultScheduleDays
+	}
 	days, err := domain.ParseScheduleDays(arguments.days)
 	if err != nil {
 		return domain.Schedule{}, err

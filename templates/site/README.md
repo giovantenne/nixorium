@@ -891,14 +891,14 @@ administrator or the teacher:
 
 ```sh
 nixorium schedule show
-nixorium schedule set --on 07:50 --off 18:00 --days mon-fri
+nixorium schedule set --on 07:50 --off 18:00
 nixorium schedule set --off 17:30 --days mon,wed,fri
 nixorium schedule clear
 ```
 
-`--days` takes `mon-fri`, `all` or a list such as `mon,wed,fri`; `set`
-replaces the whole schedule and `--json` gives the answer in a form for
-scripts. At each set time the controller does what it does for **Switch on**
+`--days` takes `mon-fri`, `all` or a list such as `mon,wed,fri`, and is
+Monday to Friday when left out; `set` replaces the whole schedule and
+`--json` gives the answer in a form for scripts. At each set time the controller does what it does for **Switch on**
 or **Shut down** on all student computers, with these differences:
 
 - the switch-on skips computers that are already on and those whose network

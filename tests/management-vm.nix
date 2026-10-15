@@ -852,6 +852,7 @@ in
     controller.succeed("test \"$(stat -c '%U:%a' /var/lib/nixorium/classroom/schedule.json)\" = admin:600")
     controller.succeed("su - teacher -c 'nixorium schedule show --json' | jq -e '.schedule.on == \"03:33\" and .schedule.off == \"03:34\" and .schedule.days == [\"sun\"]'")
     controller.succeed("systemctl start nixorium-classroom-schedule.service; test \"$(systemctl show -p Result --value nixorium-classroom-schedule.service)\" = success")
+    controller.succeed("su - teacher -c 'nixorium schedule set --on 03:33' | grep -F 'Schedule saved. Switch on at 03:33, Monday to Friday.'")
     controller.succeed("su - teacher -c 'nixorium schedule clear' | grep -Fx 'The schedule was cleared.'; test ! -e /var/lib/nixorium/classroom/schedule.json; su - teacher -c 'nixorium schedule show' | grep -Fx 'No schedule.'")
     controller.succeed("systemctl start nixorium-worker-sandbox-check.service")
     controller.succeed("journalctl -u nixorium-worker-sandbox-check.service --no-pager | grep -F -- '--- PASS: TestRemoteWorkerFilesystemSandbox'")

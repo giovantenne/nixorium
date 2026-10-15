@@ -67,8 +67,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   example on at 07:50 and off at 18:00 from Monday to Friday, in the
   controller's time zone. Set it in the classroom view (**Power → Schedule…**,
   with **Save** and **Clear**) or in a terminal, as the teacher or the
-  administrator: `nixorium schedule set --on 07:50 --off 18:00 --days mon-fri`,
-  `nixorium schedule show`, `nixorium schedule clear`. A timer on the
+  administrator: `nixorium schedule set --on 07:50 --off 18:00` (Monday to
+  Friday unless `--days` says otherwise), `nixorium schedule show`,
+  `nixorium schedule clear`. A timer on the
   controller (`nixorium-classroom-schedule.timer`) runs it every minute: the
   switch-on is the ordinary **Switch on** (computers without a known network
   address are skipped), and the shut-down never interrupts a person, since a

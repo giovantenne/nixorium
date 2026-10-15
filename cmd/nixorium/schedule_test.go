@@ -20,6 +20,9 @@ func TestScheduleArguments(t *testing.T) {
 		{[]string{"schedule", "set", "--on", "07:50", "--off", "18:00", "--days", "mon-fri"}, "set", scheduleArguments{on: "07:50", off: "18:00", days: "mon-fri"}},
 		{[]string{"schedule", "set", "--days", "all", "--off", "20:00"}, "set", scheduleArguments{off: "20:00", days: "all"}},
 		{[]string{"schedule", "set", "--on", "8:00", "--days", "mon,wed,fri", "--json"}, "set", scheduleArguments{on: "8:00", days: "mon,wed,fri"}},
+		// Without --days a schedule is for Monday to Friday.
+		{[]string{"schedule", "set", "--on", "07:50", "--off", "18:00"}, "set", scheduleArguments{on: "07:50", off: "18:00"}},
+		{[]string{"schedule", "set", "--off", "18:00"}, "set", scheduleArguments{off: "18:00"}},
 		{[]string{"schedule", "clear"}, "clear", scheduleArguments{}},
 		{[]string{"schedule", "run"}, "run", scheduleArguments{}},
 		{[]string{"schedule", "run", "--repo", "/home/admin/nixorium-deployment"}, "run", scheduleArguments{}},
@@ -40,7 +43,6 @@ func TestScheduleArguments(t *testing.T) {
 		{"schedule", "plan"},
 		{"schedule", "show", "clear"},
 		{"schedule", "set"},
-		{"schedule", "set", "--on", "07:50"},
 		{"schedule", "set", "--days", "mon-fri"},
 		{"schedule", "set", "--on", "7pm", "--days", "mon-fri"},
 		{"schedule", "set", "--on", "25:00", "--days", "mon-fri"},
@@ -114,6 +116,10 @@ func TestScheduleCommandShowsSetsAndClears(t *testing.T) {
 	// Arguments the parser would have refused do not reach the service.
 	if code, _, errOut := run(options{subcommand: "set", schedule: scheduleArguments{on: "7pm", days: "mon"}}); code != 2 || errOut == "" || len(requested) != 2 {
 		t.Fatalf("bad time: %d %q %+v", code, errOut, requested)
+	}
+	// Left out, --days is Monday to Friday, as the dialog starts with.
+	if code, _, _ := run(options{subcommand: "set", schedule: scheduleArguments{on: "07:50"}}); code != 0 || len(requested) != 3 || requested[2].On != "07:50" || requested[2].Off != "" || strings.Join(requested[2].Days, ",") != "mon,tue,wed,thu,fri" {
+		t.Fatalf("default days: %d %+v", code, requested)
 	}
 }
 

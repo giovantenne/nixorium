@@ -1619,7 +1619,7 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       classroom-view opens the classroom view page (teacher and administrator)")
 	fmt.Fprintln(writer, "       wake --on <clients|@lab> [--json] sends Wake-on-LAN packets to the selected computers that are off (teacher and administrator)")
 	fmt.Fprintln(writer, "       schedule show|clear [--json] shows or clears the daily switch-on and shut-down of the computers (teacher and administrator)")
-	fmt.Fprintln(writer, "       schedule set [--on <HH:MM>] [--off <HH:MM>] --days <mon-fri|all|mon,wed,fri> [--json] sets it, replacing the old one")
+	fmt.Fprintln(writer, "       schedule set [--on <HH:MM>] [--off <HH:MM>] [--days <mon-fri|all|mon,wed,fri>] [--json] sets it, replacing the old one; --days is mon-fri when left out")
 	fmt.Fprintln(writer, "       schedule run [--repo <deployment>] [--json] does what is due this minute (started by nixorium-classroom-schedule.timer)")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
 	fmt.Fprintln(writer, "       backup plan --remote <ssh-url> [--branch <branch>] [--repo <deployment>]")

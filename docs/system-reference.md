@@ -433,10 +433,11 @@ most one switch-on time and one shut-down time (either may be left out) for a
 set of weekdays, in the controller's time zone, for every client computer;
 **Save** replaces the schedule and **Clear** removes it. It is an operational
 aid like blocking the Internet, not laboratory configuration: it takes no
-review token and changes no system, and `nixorium schedule show`, `set --on
-HH:MM --off HH:MM --days mon-fri|all|<list>`, `clear` and `--json` do the same
-for the teacher and the administrator, through the classroom service's typed
-`schedule-get` and `schedule-set` operations. The schedule is
+review token and changes no system, and `nixorium schedule show`, `set [--on
+HH:MM] [--off HH:MM] [--days mon-fri|all|<list>]` (Monday to Friday when
+`--days` is left out), `clear` and `--json` do the same for the teacher and
+the administrator, through the classroom service's typed `schedule-get` and
+`schedule-set` operations. The schedule is
 `/var/lib/nixorium/classroom/schedule.json` (`{"schemaVersion":1,"on":"07:50",
 "off":"18:00","days":["mon",…,"fri"],"lastRun":"2026-10-15T07:50"}`), beside
 the learned addresses: the service's own state directory, replaced
