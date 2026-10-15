@@ -423,7 +423,7 @@ that release's notes, so a release is not finished until the site follows it.
   requires renewal or a manual agreement rather than a second subscription.
 - Assistant tools write only the private candidate, never the deployment.
   Preserve relative-path confinement, hidden credentials/untracked files and
-  read-only settings/locks/instructions, plus filtering of model-facing
+  read-only locks/instructions, plus filtering of model-facing
   content and separation of the laboratory token. Fixed typed tools only:
   no arbitrary shell, service control, activation or student-home file access.
   Capability-gated diagnostics use fresh declared inventory, strict existing
@@ -438,6 +438,11 @@ that release's notes, so a release is not finished until the site follows it.
   Consent- and capability-gated `prefetch` downloads one public https file into
   the controller store: keep public-host and per-redirect checks, the 1 GiB,
   15-minute and one-at-a-time bounds, and return only hash, size and store path.
+  Settings are read-only except the `settings_v1` fields (homepage, time zone,
+  locales, keyboard layout, Git identities): `write_file` of `lab-settings.json`
+  merges only those fields onto the saved file (`domain.MergeAssistantSettings`),
+  refuses any other changed field by name, and the save review repeats the
+  native transition rules and impacts (`domain.ReviewAssistantSettings`).
   Evaluate a temporary clone with IFD disabled and bounded time/output; compare
   `nixoriumHostClasses` representatives. `groupModules` assigns common module
   paths to existing clientGroups; compose overlaps deterministically, preserve

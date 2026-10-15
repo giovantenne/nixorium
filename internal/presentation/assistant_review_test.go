@@ -99,6 +99,45 @@ func TestAssistantReviewLayoutsAndScroll(t *testing.T) {
 	}
 }
 
+func TestAssistantReviewShowsSettingsImpacts(t *testing.T) {
+	impacts := []domain.SettingImpact{
+		{Kind: "controller-apply", Detail: "Apply to controller so this controller uses the saved settings."},
+		{Kind: "client-update", Detail: "Update computers so the clients use the saved settings; offline computers keep the old ones until updated."},
+		{Kind: "pxe-prepare", Detail: "Prepare network installation again before installing more computers."},
+	}
+	flat := func(view string) string { return strings.Join(strings.Fields(view), " ") }
+	for _, size := range [][2]int{{80, 24}, {120, 40}} {
+		m := assistantReviewFixture()
+		m.width, m.height = size[0], size[1]
+		if view := ansi.Strip(m.View().Content); strings.Contains(view, "Apply to controller") {
+			t.Fatal("impacts shown for a proposal that does not change the settings", view)
+		}
+		m.assistant.review.plan.Changed = []string{"lab-settings.json"}
+		m.assistant.review.plan.SettingsImpacts = impacts
+		view := ansi.Strip(m.View().Content)
+		wants := []string{"Checked by Nixorium: Apply to controller so this controller uses the saved settings.", "Save and update the controller", "Back"}
+		if size[1] >= 40 {
+			// A short terminal scrolls the lines above the choices; the technical
+			// details below list them all.
+			wants = append(wants, "offline computers keep the old ones until updated", "Prepare network installation again")
+		}
+		for _, want := range wants {
+			if !strings.Contains(flat(view), want) {
+				t.Fatalf("%v missing %q: %s", size, want, view)
+			}
+		}
+		if lipgloss.Height(view) > size[1] || lipgloss.Width(view) > size[0] {
+			t.Fatalf("%v overflow: %s", size, view)
+		}
+		details := strings.Join(m.assistantReviewLines(), "\n")
+		for _, impact := range impacts {
+			if !strings.Contains(flat(details), "Checked by Nixorium: "+impact.Detail) {
+				t.Fatalf("technical details miss %q: %s", impact.Detail, details)
+			}
+		}
+	}
+}
+
 func TestAssistantReviewShowsReusedEvaluationAge(t *testing.T) {
 	m := assistantReviewFixture()
 	m.width, m.height = 80, 24
