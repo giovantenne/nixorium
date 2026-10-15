@@ -902,13 +902,12 @@ Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
 Nixorium  /  Installation  /  USB over SSH
 
 Install one computer from USB
-pc01 is installed and verified.
 
 Next: It now appears among the configured computers.
 
 Technical details are hidden; press d to show them.
 
-✓ verified pc01 at 10.42.0.11 with the reviewed revision and system closure
+✓ pc01 is installed and verified.
 
 r Refresh status  ·  d Details  ·  v Verify installed system  ·  Esc Detach  ·  F1 Help
 ```

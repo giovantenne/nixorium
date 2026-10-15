@@ -39,7 +39,8 @@ Interrupted template reset (`template-reset recover`):
 - The plan classifies the repository from Git state only: already finished,
   only the branch move missing, nothing replaced, or a mixed checkout.
 - The first three finish or clear the reset with `RECOVERED`; the branch move
-  uses compare-and-swap.
+  uses compare-and-swap. (Amended by ADR 0026: they change no file, so Enter,
+  or a yes/no question in the CLI, confirms them.)
 - A mixed checkout is restored with `RESTORE`: the current tracked files are
   kept under a new recovery reference, the original tree is restored and
   committed on top of the current branch, and untracked or ignored files are

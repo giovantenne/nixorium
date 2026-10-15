@@ -140,7 +140,9 @@ Enter offers the appropriate next step. If files are missing or stale, the
 guided preparation reviews lab settings, saves them, creates missing keys,
 activates the controller and prepares client systems. Esc returns to Installation.
 A ready system goes straight to the reviewed PXE start; an active or interrupted
-session offers finish/recovery without repeating setup.
+session offers finish/recovery without repeating setup. An interrupted session
+opens as **Recover the controller network**: it says what Nixorium found and
+Enter recovers the network, which changes only the controller.
 
 The existing controller time zone and keyboard are reused. Importing existing
 keys is available under **Maintenance → Change settings → Controller keys**.
@@ -1179,7 +1181,10 @@ nixorium install usb close --id 0123456789abcdef0123456789abcdef
 ```
 
 `start`, `reboot`, and `close` require an interactive controlling terminal and
-do not accept `--json`; there is no `--yes` path. `prepare` is optional and
+do not accept `--json`; there is no `--yes` path. `status` starts with what
+Nixorium found (does the computer answer, was the disk touched) and the
+command for each way out. `close` asks a yes/no question when the disk was
+never touched and the typed `CLOSE` after the disk was written. `prepare` is optional and
 safe to run early. `cancel` is available before dispatch and after a confirmed
 remote failure that reports no disk mutation; the TUI exposes it as **Cancel
 safely** only when automatic cleanup could not be confirmed. Ordinarily,

@@ -31,6 +31,34 @@ The project follows [Semantic Versioning](https://semver.org/).
   installation, or when a network installation is still open. The command
   line asks "Mark this update as reviewed? [y/N]"; `--yes` still skips it.
 - `nixorium deploy apply` prints what to do when the update needs a review.
+- The review of an interrupted template reset, now titled **Finish or undo
+  the reset**, says what it found in plain words: the reset had already
+  finished, only the branch move is missing, nothing was replaced, or files
+  from before and after the reset are mixed. In the first three cases Enter
+  confirms, because no file changes; typing `RECOVERED` is no longer needed.
+  `RESTORE` is still typed for mixed files, and the screen says in one
+  sentence what it changes and that untracked files are not removed. The
+  command line asks yes/no for the first three cases.
+- An unfinished USB installation opens as **Resume or close the USB
+  installation**: it says whether the computer still answers from the USB
+  stick and whether its disk was touched, then lists what you can do —
+  **Resume the installation**, **Check how far it got**, **Restart the
+  computer**, **Cancel safely** or **Close this record**. Cancelling safely,
+  and closing a record whose disk was never touched (also from the TUI now,
+  when the USB stick computer is gone), ask only for Enter. Closing after the
+  disk was written asks you to type `CLOSE`, in the TUI as on the command
+  line. The headline is plain; the technical message is behind `d`.
+  `nixorium install usb status` starts with the same findings, and `install
+  usb close` asks yes/no when the disk was not touched.
+- After an interrupted network installation, the network installation screen
+  becomes **Recover the controller network**: what Nixorium found (the
+  temporary network setup and the network boot service, in plain words),
+  what you can do (recover the network, or stop the network installation)
+  and Enter to recover, which changes only the controller. The result says
+  whether the controller network is back to normal, and `nixorium pxe
+  recover` and `pxe stop` start with the same sentence.
+- On the result of a USB installation refused because of an interrupted
+  network installation, Enter opens the network recovery.
 
 ### Fixed
 
@@ -44,6 +72,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   on an old version, or connected with a second network card), and its
   "Interrupted client deployment" section follows the new review. ADR 0026
   records which recoveries need a typed word and which only Enter.
+- The troubleshooting sections on an interrupted USB installation and on the
+  controller network, and the template reset recovery guide, follow the new
+  reviews.
 
 - The Assistant guide now states that the free trial is per laboratory: the same
   email address can register several laboratories, each under its own name.

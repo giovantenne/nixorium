@@ -103,22 +103,34 @@ shared template-reset title; the recovery report identifies the Assistant save.
 See [Assistant recovery](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md#interrupted-save).
 
 **Guided recovery.** The dashboard opens in safe mode with **A reset of the
-configuration template was interrupted**; open it, or run:
+configuration template was interrupted**; open it, press Enter on a refusal
+that names it, or run:
 
 ```sh
 nixorium template-reset recover plan
 nixorium template-reset recover apply --expect REVIEW_TOKEN
 ```
 
-The review decides from Git state only: when the reset already completed or
-every file already matches it, typing `RECOVERED` finishes it (moving the
-branch with a compare-and-swap when needed); when no file was replaced, it
-keeps the original configuration. When the files are a mix of both, typing
-`RESTORE` saves the current tracked files under a new
-`refs/nixorium/template-backups/…-recovery` reference and restores the
-configuration from before the reset as a new commit. Untracked and ignored
-files are kept; an untracked file that the restore would overwrite stops the
-review. The marker is archived under `.git/nixorium-recovered/`.
+The review, **Finish or undo the reset**, decides from Git state only and
+says what it found and what confirming does:
+
+- **The reset had already finished**: Enter clears the marker.
+- **Only the branch move is missing** (every file already matches the reset):
+  Enter moves the branch to the reset commit with a compare-and-swap and
+  clears the marker.
+- **Nothing was replaced** (every file still matches the configuration from
+  before the reset): Enter clears the marker and keeps that configuration.
+- **Files from before and after the reset are mixed**: the review lists the
+  files that differ and asks you to type `RESTORE`, which saves the current
+  tracked files under a new `refs/nixorium/template-backups/…-recovery`
+  reference and puts back the configuration from before the reset (as a new
+  commit when the branch moved). Untracked and ignored files are not removed;
+  an untracked file that the restore would overwrite stops the review.
+
+The first three change no file, so Enter is enough (ADR 0026); the command
+line asks a yes/no question for them and keeps the typed `RESTORE` for the
+mixed checkout. `--yes` skips the question. The marker is archived under
+`.git/nixorium-recovered/`.
 
 A multi-file checkout cannot be atomic. An interruption retains
 `.git/nixorium-template-reset.json`, recording the original/candidate revisions,

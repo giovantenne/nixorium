@@ -132,7 +132,10 @@ step. Apply these rules to every operation, refusal and recovery state:
 8. Recovery adds a review; it never removes review tokens, rechecks or
    privilege boundaries. A typed word stays for destructive or uncertain
    actions; a recovery that changes nothing on any computer and only archives
-   a record is confirmed with Enter (ADR 0026).
+   a record is confirmed with Enter (ADR 0026). Every recovery screen has
+   three parts in plain words: what Nixorium found, what you can do (each
+   action named by what it does), and the confirmation, which says what
+   Enter or the typed word will change.
 9. A refusal caused by a catalogued situation (`internal/domain/next_steps.go`)
    shows its Title, Why and Action, never the raw error; the raw text stays
    behind `d`. Offer the way out where the failure happens: on a result

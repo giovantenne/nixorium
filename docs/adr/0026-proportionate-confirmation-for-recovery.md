@@ -24,9 +24,14 @@ to type confirmation words without reading.
 The confirmation is proportionate to what the action can change.
 
 - Enter confirms a recovery that changes nothing on any computer and only
-  archives or clears a record: the review of an interrupted client update, and
+  archives or clears a record: the review of an interrupted client update,
   finishing or clearing an interrupted template reset when every file already
-  matches. The CLI asks a yes/no question; `--yes` keeps working for scripts.
+  matches, cancelling a USB installation safely or closing its record when
+  the disk was never touched, and recovering the controller network after an
+  interrupted network installation, which changes only the controller's own
+  addressing. The CLI asks a yes/no question where it asked a typed word;
+  `--yes` keeps working for scripts. `pxe stop` and `pxe recover` keep asking
+  nothing.
 - A typed word stays for actions that may be destructive or whose effect is
   uncertain: `STOP WAITING` (stopping local supervision of a running update),
   closing a USB installation after a possible disk change, the template reset
@@ -52,6 +57,8 @@ other live Nixorium process is.
 Recovering from an interrupted client update takes one decision instead of a
 word to type, and the screens say in plain words what was checked and what
 confirming does. The typed words that remain are rare enough to keep their
-meaning. The client update review uses this policy from 3.7.0; the template
-reset finish/clear branches follow in the same release line, while `RESTORE`
-keeps its word.
+meaning. The client update review, the template reset finish/clear branches, the
+safe USB cancel and close, and the controller network recovery use this
+policy from 3.7.0, while `RESTORE` and `CLOSE` after a disk change keep their
+words. Every recovery screen has the same three parts: what Nixorium found,
+what you can do, and the confirmation.

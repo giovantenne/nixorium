@@ -117,6 +117,32 @@ recovery procedure instead. Stop when ownership is ambiguous or a session is
 unfinished; do not remove addresses, stop institutional DHCP, disable the
 firewall or start the internal network service to silence a finding.
 
+### Recover the controller network
+
+An interrupted network installation leaves the controller on its temporary
+network setup. The Overview then lists **Network installation is still
+active**; open it, or **Installation → Network boot (PXE)**, or press Enter on
+a refusal that names it. The screen is titled **Recover the controller
+network** and has three parts:
+
+- **What Nixorium found**: how the session was left (the temporary network
+  setup is still in place but nothing serves installations; the network boot
+  service runs without its temporary network setup; or one of its services
+  failed), with the state of the network boot service and of the temporary
+  network setup.
+- **What you can do**: Enter recovers the network (restores the normal
+  address and turns network installation off); `x` stops both network
+  installation services and checks the normal address.
+- **Confirm**: Enter. Recovery changes only the controller's own network and
+  nothing on the student computers, so no word is typed (ADR 0026).
+
+The result says whether the controller network is back to normal; `d` shows
+the technical text of a failed attempt. If the normal controller address did
+not come back, apply the saved configuration to the controller
+(**Maintenance → Apply to controller**) and open Diagnostics. From the
+command line, `nixorium pxe recover` and `nixorium pxe stop` start their
+output with the same sentence and keep their JSON report unchanged.
+
 ## Build resources and controller tools
 
 `DISK-FREE` warns below 10 GiB available or when the filesystem probe failed;
@@ -151,8 +177,9 @@ journalctl -u nixorium-pxe.service -b
 - Check for an institutional DHCP/ProxyDHCP policy, VLAN isolation, or another
   service already using UDP 67/69 or TCP 8080. Do not disable the firewall or
   start a second dnsmasq/HTTP process as a workaround.
-- If a prior session was interrupted, run `nixorium pxe recover`, then prepare
-  and start again. Boot-time recovery also reconciles an unfinished controller
+- If a prior session was interrupted, recover the controller network
+  ([Recover the controller network](#recover-the-controller-network), or
+  `nixorium pxe recover`), then prepare and start again. Boot-time recovery also reconciles an unfinished controller
   network transition when its durable PXE session record exists; with no
   recorded transition it is skipped and cannot interfere with controller
   activation.
@@ -233,9 +260,9 @@ If a connection attempt returns to `artifacts-ready`, only the controller-side
 build is ready; the live SSH session has not been verified. The TUI keeps the
 connection error visible during the current TUI session, even after refreshing
 status, and returns to physical host-key verification before another password
-attempt. When reattaching an artifacts-only operation, use **Connect live
-client** to continue with the same prepared artifacts, or **Cancel safely** to
-release them. Do not interpret `artifacts-ready` as installation progress or
+attempt. When reattaching an artifacts-only operation, use **Resume the
+installation** to continue with the same prepared artifacts, or **Cancel
+safely** to release them. Do not interpret `artifacts-ready` as installation progress or
 disable strict SSH checks. Older versions could hide the initial connection
 error behind `worker does not own the verified live session`; inspect the live
 ISO's `sshd` journal and use an updated CLI/TUI to capture the original error.
@@ -262,10 +289,32 @@ broader target lookup reported the live ISO root filesystem.
 
 ## A USB installation was interrupted
 
-The Overview lists an unfinished USB installation when the dashboard opens;
-open that row or **Installation → USB over SSH** to continue. From the CLI,
-`nixorium install usb status` without `--id` shows the unfinished operation and
-its ID. Then inspect the exact operation without starting another install:
+The Overview lists **A USB installation was not finished** when the dashboard
+opens; open that row, **Installation → USB over SSH**, or press Enter on a
+refusal that names it. The screen is titled **Resume or close the USB
+installation** and has three parts:
+
+- **What Nixorium found**: the computer (it is still booted from the USB
+  stick and answers; it does not answer; Nixorium is no longer connected to
+  it; or it was last seen booted from the USB stick) and the disk (the disk
+  was not touched; it may have been partly written; or the system is
+  installed on it).
+- **What you can do**, each named by what it does: **Resume the
+  installation** (`a`, connect again; the identity is checked before any
+  password), **Check how far it got** (`n`), **Restart the computer** (`b`),
+  **Verify installed system** (`v`), **Cancel safely** (`x`) and **Close this
+  record** (`c`). Only the ways out that are safe in the observed state are
+  offered.
+- **Confirm**: **Cancel safely**, and closing a record whose disk was never
+  touched, ask only for Enter. Closing after the disk was written asks you to
+  type `CLOSE`: the system stays on the disk, but Nixorium does not check that
+  the computer starts correctly.
+
+The headline states the outcome in plain words; `d` shows the worker's own
+message and the raw fields. From the CLI, `nixorium install usb status`
+without `--id` shows the unfinished operation and its ID, and starts with the
+same findings and the command for each way out. Then inspect the exact
+operation without starting another install:
 
 ```sh
 nixorium install usb status
@@ -290,10 +339,12 @@ files by hand. Do not cancel an uncertain or post-mutation failure. Use `reboot`
 only after status reports the installation ready, remove the USB first, and
 verify the installed revision after disk boot. `close` releases a completed or
 deliberately abandoned record; it does not make an uncertain disk safe. If the
-live ISO is gone before any apply was dispatched, explicitly use
-`nixorium install usb close --id OPERATION_ID` and review the `CLOSE` prompt.
-This discards the operation's local access credentials and releases its
-reservation without claiming remote key revocation. The old record is retained;
+live ISO is gone before any apply was dispatched, choose **Close this record**
+(Enter), or run `nixorium install usb close --id OPERATION_ID` and answer the
+yes/no question; closing an installed record before its restart keeps the
+typed `CLOSE`. Closing a never-dispatched record discards the operation's
+local access credentials and releases its reservation without claiming remote
+key revocation. The old record is retained;
 a new installation must establish identity and review the disk again. Any
 consumed apply token, remote receipt, uncertain dispatch, or reboot evidence
 blocks this abandonment path. If apply was dispatched and completion cannot
@@ -306,12 +357,14 @@ the newly installed host passes verification. Never delete the entire
 `known_hosts` file or accept a changed key merely because the address matches.
 
 If **Computers → Update computers** finds an unfinished USB installation, it opens
-**Finish installation** before asking you to confirm deployment. For an
-installed computer awaiting its final check, choose **Verify … and resume**.
-Turn on that computer, boot from the installed disk, and check its network
-cable. Failed verification keeps the operation protected and offers retry and
-technical details. Active or uncertain installations offer **Open installation**
-instead; return with Esc after resolving the existing operation. Do not start
+**Finish installation** before asking you to confirm deployment, with what
+Nixorium found about that computer and its disk. For an installed computer
+awaiting its final check, choose **Verify … and resume**. Turn on that
+computer, boot from the installed disk, and check its network cable. Failed
+verification keeps the operation protected and offers retry and technical
+details. Active or uncertain installations offer **Resume or close the USB
+installation** instead; return with Esc after resolving the existing
+operation. Do not start
 a replacement installation to clear this block. Successful recovery returns to
 a fresh deployment review with the same selected computers and requires a new
 deployment confirmation. It never starts deployment automatically.
