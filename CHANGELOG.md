@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The review of an Assistant proposal reuses the evaluation Assistant already
+  ran when nothing changed since, instead of evaluating the laboratory a second
+  time.
+
 ## [3.7.0] - 2026-10-15
 
 ### Added

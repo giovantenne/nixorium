@@ -23,7 +23,18 @@ import (
 
 var errAssistantPathCollision = errors.New("A file and a folder cannot have the same path.")
 
-type AssistantWorkspaceStore struct{ Directory string }
+// AssistantWorkspaceStore keeps conversations under Directory. Version is the
+// running Nixorium version; evaluation receipts are keyed on it and are neither
+// written nor reused when it is empty.
+type AssistantWorkspaceStore struct {
+	Directory string
+	Version   string
+}
+
+func (store AssistantWorkspaceStore) state() AssistantStateStore {
+	return AssistantStateStore{Directory: store.Directory}
+}
+
 type assistantBaseFile struct {
 	size int
 	mode string
@@ -36,6 +47,7 @@ type AssistantWorkspace struct {
 	modes        map[string]bool
 	deniedBlobs  map[string]bool
 	deniedPaths  map[string]bool
+	version      string
 }
 
 func (workspace *AssistantWorkspace) Close() error { return workspace.root.Close() }
@@ -56,7 +68,7 @@ func assistantDirectory(parent *os.File, name string, create bool) (*os.File, er
 	return os.NewFile(uintptr(fd), name), nil
 }
 func (store AssistantWorkspaceStore) conversations(create bool) (*os.File, error) {
-	root, err := (AssistantStateStore(store)).root()
+	root, err := store.state().root()
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +180,7 @@ func (store AssistantWorkspaceStore) Open(id string) (*AssistantWorkspace, error
 	if err != nil {
 		return nil, errors.New("Assistant file privacy could not be checked. Start a new chat after checking the local repository history.")
 	}
-	workspace := &AssistantWorkspace{Conversation: conversation, root: root, base: map[string]assistantBaseFile{}, deleted: map[string]bool{}, modes: map[string]bool{}, deniedBlobs: denied, deniedPaths: map[string]bool{}}
+	workspace := &AssistantWorkspace{Conversation: conversation, root: root, base: map[string]assistantBaseFile{}, deleted: map[string]bool{}, modes: map[string]bool{}, deniedBlobs: denied, deniedPaths: map[string]bool{}, version: store.Version}
 	// A hidden current blob remains hidden through visible copies as well.
 	for _, entry := range strings.Split(tree, "\x00") {
 		info, path, ok := strings.Cut(entry, "\t")
@@ -502,6 +514,9 @@ func (workspace *AssistantWorkspace) Write(path, content string, executable bool
 	if count > 200 || total > 4*1024*1024 {
 		return errors.New("limit_exceeded")
 	}
+	if err = workspace.invalidateEvaluationReceipt(); err != nil {
+		return err
+	}
 	parent, name, err := assistantParent(overlay, path, true)
 	if err != nil {
 		return err
@@ -533,6 +548,9 @@ func (workspace *AssistantWorkspace) Delete(path string) error {
 	}
 	if len(workspace.deleted) >= 200 && !workspace.deleted[path] {
 		return errors.New("limit_exceeded")
+	}
+	if err := workspace.invalidateEvaluationReceipt(); err != nil {
+		return err
 	}
 	overlay, err := workspace.overlay()
 	if err != nil {

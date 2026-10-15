@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -94,6 +95,28 @@ func TestAssistantReviewLayoutsAndScroll(t *testing.T) {
 			if lipgloss.Height(view) > size[1] {
 				t.Fatal("failure overflow", view)
 			}
+		}
+	}
+}
+
+func TestAssistantReviewShowsReusedEvaluationAge(t *testing.T) {
+	m := assistantReviewFixture()
+	m.width, m.height = 80, 24
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "✓ Checked by Nixorium: the configuration is valid") || strings.Contains(view, "(verified") {
+		t.Fatal(view)
+	}
+	m.assistant.review.plan.EvaluationReused = true
+	m.assistant.review.plan.EvaluationVerifiedAt = time.Now().Add(-40 * time.Second)
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "✓ Checked by Nixorium: the configuration is valid (verified 40 s ago)") || lipgloss.Height(view) > 24 {
+		t.Fatal(view)
+	}
+	m.assistant.review.plan.Evaluation = domain.AssistantEvaluation{OK: false, Error: "broken"}
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "✗ The configuration is not valid") || strings.Contains(view, "Checked by Nixorium: the configuration is valid") {
+		t.Fatal(view)
+	}
+	for age, want := range map[time.Duration]string{-time.Second: "0 s", 59 * time.Second: "59 s", 90 * time.Second: "1 min", 3 * time.Hour: "3 h", 50 * time.Hour: "2 d"} {
+		if got := assistantVerifiedAge(age); got != want {
+			t.Fatalf("%v: %q, want %q", age, got, want)
 		}
 	}
 }

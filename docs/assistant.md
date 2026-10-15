@@ -385,13 +385,19 @@ Start from a clean, committed deployment. If HEAD changes during a chat,
 start a new chat. Once files change, **Ctrl+R** opens **Review the proposal**.
 The assistant's summary is its opinion; **Checked by Nixorium** reports the
 locally computed file counts, affected computers and final evaluation result.
+When nothing changed since the last successful check in this chat, usually
+the assistant's own `evaluate` (same proposal files, base commit, `flake.lock`
+and Nixorium version), the review reuses that result instead of evaluating the
+laboratory again and says how long ago it was verified; any edit evaluates
+afresh.
 Read the full comparison with arrows, PgUp/PgDn and Home/End.
 
 Type **SAVE**, then **Enter**, to record the reviewed proposal. The complete
 diff must fit within 2 MiB and the evaluation must pass. A review expires after
 ten minutes; changes to the candidate or deployment require another review.
-The save repeats evaluation and checks the proposal before taking the managed
-operation gate and replacing files. An active PXE operation blocks checkout.
+The save repeats evaluation, under the same reuse rule, and checks the
+proposal before taking the managed operation gate and replacing files. An
+active PXE operation blocks checkout.
 
 The new commit is `Save reviewed Assistant proposal`. Its parent and a durable
 `refs/nixorium/assistant-backups/…` ref preserve the previous committed tree.
@@ -456,7 +462,8 @@ the token (0600), `consent.json`, `conversations/<uuid>/`, and an empty
 `prefetch/` directory that serves only as the one-download-at-a-time lock. Conversations
 hold metadata with the base commit, creation and last activity dates, title,
 save date and last final answer (up to 2,000 characters), a private transcript,
-`overlay/`, `deleted.json`, `modes.json`, `base-classes.json` and `base-drv-v25.json`.
+`overlay/`, `deleted.json`, `modes.json`, `base-classes.json`, `base-drv-v25.json`
+and, after a successful evaluation, `evaluation-receipt-v25.json` (0600).
 Temporary evaluation clones live inside the conversation and are removed when
 evaluation finishes. Local transcripts and candidates may contain private
 configuration; they are separate from the deployment and its Git history.

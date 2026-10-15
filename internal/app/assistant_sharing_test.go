@@ -102,7 +102,7 @@ func TestAssistantAutomaticSharingOnlyOnFinalOrErrorWithConsentAndWithoutWaiting
 						t.Error("unexpected request")
 					}
 				})
-				local := adapters.AssistantStateStore(store)
+				local := adapters.AssistantStateStore{Directory: store.Directory}
 				if err := local.WriteSharing(share); err != nil {
 					t.Fatal(err)
 				}

@@ -28,6 +28,9 @@ var assistantCommit = configurationCommit{
 }
 
 func PlanAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conversationID string) domain.AssistantSavePlan {
+	return planAssistantSave(ctx, store, conversationID, runBoundedNix)
+}
+func planAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conversationID string, run assistantNixRunner) domain.AssistantSavePlan {
 	plan := domain.AssistantSavePlan{State: "blocked", ConversationID: conversationID, Added: []string{}, Changed: []string{}, Removed: []string{}, ChangedHosts: []string{}}
 	fail := func(message string) domain.AssistantSavePlan {
 		plan.State = "blocked"
@@ -81,7 +84,15 @@ func PlanAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conve
 		return fail("The assistant has not changed any file.")
 	}
 	plan.CoreOverrideFiles = domain.AssistantCoreOverrideFiles(proposal.Candidate, append(append([]string{}, plan.Added...), plan.Changed...))
-	plan.Evaluation, _ = EvaluateAssistantCandidate(ctx, w)
+	// Reuse the evaluation Assistant already ran when every input still matches
+	// its receipt; anything else evaluates again exactly as before.
+	key, keyErr := assistantEvaluationInputs(ctx, w)
+	if receipt, reusable := assistantReusableEvaluation(w, key); keyErr == nil && reusable {
+		plan.Evaluation = receipt.Evaluation
+		plan.EvaluationReused, plan.EvaluationVerifiedAt = true, receipt.VerifiedAt
+	} else {
+		plan.Evaluation, _ = evaluateAssistantCandidate(ctx, w, run)
+	}
 	plan.ChangedHosts = plan.Evaluation.ChangedHosts
 	// Bind the evaluation and review to the same overlay bytes and modes.
 	fresh, err := store.Open(conversationID)
@@ -89,8 +100,13 @@ func PlanAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conve
 		return fail(assistantSaveChanged)
 	}
 	after, err := assistantSaveCandidate(fresh, proposal.Original)
+	var afterKey assistantEvaluationKey
+	afterKeyErr := err
+	if err == nil {
+		afterKey, afterKeyErr = assistantEvaluationInputs(ctx, fresh)
+	}
 	fresh.Close()
-	if err != nil || resetFileDigest(after) != resetFileDigest(proposal.Candidate) {
+	if err != nil || resetFileDigest(after) != resetFileDigest(proposal.Candidate) || (keyErr == nil) != (afterKeyErr == nil) || afterKey != key {
 		return fail(assistantSaveChanged)
 	}
 	plan.Proposal = proposal

@@ -368,7 +368,7 @@ func TestAssistantPrefetchRequiresConsent(t *testing.T) {
 	if got := tools.Execute(t.Context(), w.Conversation, domain.AssistantToolCall{Name: "prefetch", Arguments: []byte(`{"url":"https://downloads.example.org/a","sha256":"x"}`)}); !strings.Contains(got, "invalid_arguments") {
 		t.Fatal(got)
 	}
-	if err := AssistantStateStore(store).WriteConsent(); err != nil {
+	if err := store.state().WriteConsent(); err != nil {
 		t.Fatal(err)
 	}
 	if got := tools.Execute(t.Context(), w.Conversation, domain.AssistantToolCall{Name: "prefetch", Arguments: []byte(`{"url":"http://downloads.example.org/tool.AppImage"}`)}); !strings.Contains(got, `"error":"invalid_url"`) {

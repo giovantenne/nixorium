@@ -67,7 +67,97 @@ func assistantOverlayDigest(w *AssistantWorkspace) (string, error) {
 	return fmt.Sprintf("%x", digest.Sum(nil)), nil
 }
 
+const (
+	assistantEvaluationReceiptName  = "evaluation-receipt-v25.json"
+	assistantEvaluationReceiptLimit = 256 * 1024
+)
+
+// assistantEvaluationKey lists every input that determines an evaluation
+// result. The evaluation reads the repository only through Git objects of the
+// conversation base (the base flake ref and the candidate clone checked out at
+// base), so all files outside the overlay are fixed by Base; flake.lock, which
+// pins every input by hash and can never be in the overlay, is also recorded
+// on its own.
+type assistantEvaluationKey struct {
+	OverlayDigest   string `json:"overlayDigest"`
+	Base            string `json:"base"`
+	FlakeLockDigest string `json:"flakeLockDigest"`
+	NixoriumVersion string `json:"nixoriumVersion"`
+}
+
+// assistantEvaluationReceipt is the private record of a successful evaluation,
+// kept in the conversation's workspace root next to candidate-drv-v25.json.
+type assistantEvaluationReceipt struct {
+	SchemaVersion int                        `json:"schemaVersion"`
+	Key           assistantEvaluationKey     `json:"key"`
+	VerifiedAt    time.Time                  `json:"verifiedAt"`
+	Evaluation    domain.AssistantEvaluation `json:"evaluation"`
+}
+
+// assistantEvaluationInputs is shared by the evaluation, which records the
+// receipt, and by the save review, which binds to and looks up the same keys.
+func assistantEvaluationInputs(ctx context.Context, w *AssistantWorkspace) (assistantEvaluationKey, error) {
+	key := assistantEvaluationKey{Base: w.Conversation.Base, NixoriumVersion: w.version}
+	if key.NixoriumVersion == "" || !assistantBaseCommit.MatchString(key.Base) {
+		return key, errors.New("evaluation inputs unavailable")
+	}
+	var err error
+	if key.OverlayDigest, err = assistantOverlayDigest(w); err != nil {
+		return key, err
+	}
+	entry, err := resetGit(ctx, w.Conversation.Repository, nil, 4096, "ls-tree", "-z", key.Base, "--", "flake.lock")
+	if err != nil {
+		return key, err
+	}
+	key.FlakeLockDigest = "absent"
+	if entry != "" {
+		info, path, ok := strings.Cut(strings.TrimSuffix(entry, "\x00"), "\t")
+		fields := strings.Fields(info)
+		if !ok || path != "flake.lock" || len(fields) != 3 || fields[1] != "blob" {
+			return key, errors.New("invalid flake.lock entry")
+		}
+		data, err := resetGit(ctx, w.Conversation.Repository, nil, 4*1024*1024, "cat-file", "blob", fields[2])
+		if err != nil {
+			return key, err
+		}
+		key.FlakeLockDigest = fmt.Sprintf("%s:%x", fields[0], sha256.Sum256([]byte(data)))
+	}
+	return key, nil
+}
+
+// invalidateEvaluationReceipt runs before any overlay change, so a receipt
+// never outlives the files it describes.
+func (w *AssistantWorkspace) invalidateEvaluationReceipt() error {
+	if err := unix.Unlinkat(int(w.root.Fd()), assistantEvaluationReceiptName, 0); err != nil && !errors.Is(err, unix.ENOENT) {
+		return err
+	}
+	return nil
+}
+
+// assistantReusableEvaluation returns the recorded result only when the
+// receipt is a safe, bounded, well-formed record of a successful evaluation of
+// exactly these inputs. Any other case means a fresh evaluation.
+func assistantReusableEvaluation(w *AssistantWorkspace, key assistantEvaluationKey) (assistantEvaluationReceipt, bool) {
+	var receipt assistantEvaluationReceipt
+	data, err := assistantReadStateLimit(w.root, assistantEvaluationReceiptName, assistantEvaluationReceiptLimit)
+	if err != nil || assistantDecodeStrict(data, &receipt) != nil {
+		return receipt, false
+	}
+	if receipt.SchemaVersion != 1 || receipt.Key != key || receipt.VerifiedAt.IsZero() ||
+		!receipt.Evaluation.OK || receipt.Evaluation.Error != "" || receipt.Evaluation.ChangedHosts == nil ||
+		!sort.StringsAreSorted(receipt.Evaluation.ChangedHosts) {
+		return receipt, false
+	}
+	for _, host := range receipt.Evaluation.ChangedHosts {
+		if !assistantHostName.MatchString(host) {
+			return receipt, false
+		}
+	}
+	return receipt, true
+}
+
 var assistantHostName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
+var assistantBaseCommit = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
 
 const assistantNeedsUpdate = "Update Nixorium in this deployment before using Assistant."
 
@@ -78,6 +168,12 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	result.ChangedHosts = []string{}
+	// A receipt describes only a completed evaluation of unchanged inputs.
+	if err = w.invalidateEvaluationReceipt(); err != nil {
+		result.Error = assistantEvaluationError(err.Error())
+		return result, err
+	}
+	key, keyErr := assistantEvaluationInputs(ctx, w)
 	defer func() {
 		if ctx.Err() != nil {
 			err = ctx.Err()
@@ -272,6 +368,14 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 		return result, err
 	}
 	result.OK = true
+	// Record the receipt only when the inputs did not change while evaluating;
+	// failing to record it never fails the evaluation itself.
+	if after, afterErr := assistantEvaluationInputs(ctx, w); keyErr == nil && afterErr == nil && after == key && after.OverlayDigest == digest {
+		receipt, _ := json.Marshal(assistantEvaluationReceipt{SchemaVersion: 1, Key: key, VerifiedAt: time.Now().UTC(), Evaluation: result})
+		if assistantWriteState(w.root, assistantEvaluationReceiptName, receipt) != nil {
+			_ = w.invalidateEvaluationReceipt()
+		}
+	}
 	return result, nil
 }
 func assistantClassMembership(classes []assistantHostClass) (map[string]string, error) {

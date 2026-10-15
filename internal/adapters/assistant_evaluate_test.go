@@ -49,7 +49,7 @@ func assistantEvaluationFixture(t *testing.T, legacy bool) (*AssistantWorkspace,
 	}
 	workspaceTestGit(t, repo, "add", "-A")
 	workspaceTestGit(t, repo, "commit", "-qm", "Assistant evaluation fixture")
-	store := AssistantWorkspaceStore{Directory: t.TempDir()}
+	store := AssistantWorkspaceStore{Directory: t.TempDir(), Version: "test"}
 	os.Chmod(store.Directory, 0700)
 	conversation, err := store.CreateConversation(repo)
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 )
 
 func (store AssistantWorkspaceStore) ReadToken() (string, error) {
-	return (AssistantStateStore(store)).ReadToken()
+	return store.state().ReadToken()
 }
 func (store AssistantWorkspaceStore) ReadTranscript(conversation domain.AssistantConversation) ([]domain.AssistantMessage, error) {
 	workspace, err := store.Open(conversation.ID)
@@ -242,11 +242,11 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 }
 
 func (store AssistantWorkspaceStore) ReadConsent() (bool, error) {
-	return (AssistantStateStore(store)).ReadConsent()
+	return store.state().ReadConsent()
 }
 
 func (store AssistantWorkspaceStore) ReadSharing() (bool, error) {
-	return AssistantStateStore(store).ReadSharing()
+	return store.state().ReadSharing()
 }
 
 // ErrAssistantProposalConflict reports that files of an unsaved proposal

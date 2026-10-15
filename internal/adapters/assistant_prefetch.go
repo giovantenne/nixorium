@@ -277,7 +277,7 @@ func (prefetcher assistantPrefetcher) Execute(ctx context.Context, store Assista
 // assistantPrefetchRootDirectory holds the prefetch lock beside the npm
 // artifact roots, with the same private ownership checks.
 func assistantPrefetchRootDirectory(store AssistantWorkspaceStore) (*os.File, error) {
-	root, err := (AssistantStateStore(store)).root()
+	root, err := store.state().root()
 	if err != nil {
 		return nil, err
 	}

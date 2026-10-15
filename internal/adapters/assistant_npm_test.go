@@ -8,6 +8,7 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -25,8 +26,14 @@ import (
 func TestAssistantNpmFilesPreflightResumeAndCarryover(t *testing.T) {
 	w, store, repo := assistantWorkspaceFixture(t)
 	files := map[string]string{"npm/pi/manifest.json": `{"schemaVersion":1,"artifactID":"synthetic"}`, "npm/pi/default.nix": "{ pkgs }: pkgs.hello\n"}
+	if err := assistantWriteState(w.root, assistantEvaluationReceiptName, []byte("{}")); err != nil {
+		t.Fatal(err)
+	}
 	if err := assistantNpmFiles(w, files); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := assistantReadStateLimit(w.root, assistantEvaluationReceiptName, assistantEvaluationReceiptLimit); !errors.Is(err, unix.ENOENT) {
+		t.Fatal("npm publication kept the evaluation receipt", err)
 	}
 	fresh, err := store.Open(w.Conversation.ID)
 	if err != nil {

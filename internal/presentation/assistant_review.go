@@ -217,6 +217,20 @@ func (model dashboardModel) assistantCoreOverrideNotice() string {
 	text := assistantCoreOverrideWarning + "\nFiles with overrides: " + strings.Join(files, ", ")
 	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(model.isDark).attention).Render(text)
 }
+
+// assistantVerifiedAge renders how long ago a reused evaluation ran.
+func assistantVerifiedAge(age time.Duration) string {
+	switch {
+	case age < time.Minute:
+		return fmt.Sprintf("%d s", max(0, int(age/time.Second)))
+	case age < time.Hour:
+		return fmt.Sprintf("%d min", int(age/time.Minute))
+	case age < 24*time.Hour:
+		return fmt.Sprintf("%d h", int(age/time.Hour))
+	default:
+		return fmt.Sprintf("%d d", int(age/(24*time.Hour)))
+	}
+}
 func (model dashboardModel) assistantReviewLines() []string {
 	p := model.assistant.review.plan
 	hosts := strings.Join(p.ChangedHosts, ", ")
@@ -286,9 +300,13 @@ func (model dashboardModel) assistantReviewView() string {
 		if notice := model.assistantCoreOverrideNotice(); notice != "" {
 			fixed = notice + "\n"
 		}
-		fixed += "✓ Checked by Nixorium: the configuration is valid"
-		if !r.plan.Evaluation.OK {
-			fixed = strings.TrimSuffix(fixed, "✓ Checked by Nixorium: the configuration is valid") + "✗ The configuration is not valid"
+		switch {
+		case !r.plan.Evaluation.OK:
+			fixed += "✗ The configuration is not valid"
+		case r.plan.EvaluationReused && !r.plan.EvaluationVerifiedAt.IsZero():
+			fixed += "✓ Checked by Nixorium: the configuration is valid (verified " + assistantVerifiedAge(time.Since(r.plan.EvaluationVerifiedAt)) + " ago)"
+		default:
+			fixed += "✓ Checked by Nixorium: the configuration is valid"
 		}
 		fixed += "\nSaving creates a local commit and a backup. Enter on the first choice also updates this controller; you then choose the computers.\n"
 		for i, label := range []string{"Save and update the controller", "Save only — update computers later", "Technical details", "Back"} {

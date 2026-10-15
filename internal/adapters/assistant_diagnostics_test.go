@@ -70,7 +70,7 @@ func TestAssistantNewObservationToolsRequireNewConsentAndSavedRepository(t *test
 	if got := tools.Execute(t.Context(), conversation, domain.AssistantToolCall{Name: "git_history", Arguments: []byte(`{}`)}); !strings.Contains(got, "consent_required") {
 		t.Fatal("previous disclosure authorized history", got)
 	}
-	if err := AssistantStateStore(store).WriteConsent(); err != nil {
+	if err := store.state().WriteConsent(); err != nil {
 		t.Fatal(err)
 	}
 	if got := tools.Execute(t.Context(), conversation, call); got != `{"ok":true}` || calls != 1 {

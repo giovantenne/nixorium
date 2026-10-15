@@ -424,8 +424,11 @@ release is not finished until the site follows it.
   controller exclusion and offline serialization, and include applicable module
   groups in Assistant/update/workspace class keys. Host-name-dependent exceptions must
   declare hostModules or updateValidationHosts. Only the native reviewed save
-  can commit, after fresh evaluation/token checks, under the operation gate,
-  with a durable backup and shared recovery journal. Keep startup free of Nix
+  can commit, after evaluation/token checks, under the operation gate,
+  with a durable backup and shared recovery journal. The review may reuse only
+  the conversation's mode-0600 evaluation receipt of a successful check whose
+  overlay digest, base, flake.lock digest and Nixorium version all still match;
+  every overlay write removes it first. Keep startup free of Nix
   evaluation and keep controller/client application separately reviewed.
   See docs/assistant.md; the external maintainer skill remains proposal-only.
 - Adoption telemetry is controller-only and off without explicit administrator

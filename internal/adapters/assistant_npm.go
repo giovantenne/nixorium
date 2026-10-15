@@ -157,6 +157,9 @@ func assistantNpmFiles(w *AssistantWorkspace, files map[string]string) error {
 			return err
 		}
 	}
+	if err = w.invalidateEvaluationReceipt(); err != nil {
+		return err
+	}
 	// Publish the complete directory in one rename; modes then records the whole
 	// set in one atomic write. A crash cannot create a partially savable artifact.
 	if err = unix.Renameat2(int(stagedParent.Fd()), stagedName, int(parent.Fd()), parts[1], unix.RENAME_NOREPLACE); err != nil {
@@ -501,7 +504,7 @@ func (store AssistantWorkspaceStore) cleanupNpmArtifacts() error {
 }
 
 func assistantNpmRootDirectory(store AssistantWorkspaceStore) (*os.File, error) {
-	root, err := (AssistantStateStore(store)).root()
+	root, err := store.state().root()
 	if err != nil {
 		return nil, err
 	}

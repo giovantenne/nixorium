@@ -216,12 +216,16 @@ type AssistantSavePlan struct {
 	ChangedHosts   []string `json:"changedHosts"`
 	// CoreOverrideFiles lists added or changed files that mention a NixOS
 	// option override (see AssistantCoreOverrideFiles); it is only a warning.
-	CoreOverrideFiles []string              `json:"coreOverrideFiles"`
-	Evaluation        AssistantEvaluation   `json:"evaluation"`
-	Diff              string                `json:"diff"`
-	ReviewToken       string                `json:"reviewToken"`
-	ExpiresAt         time.Time             `json:"expiresAt"`
-	Proposal          TemplateResetProposal `json:"-"`
+	CoreOverrideFiles []string            `json:"coreOverrideFiles"`
+	Evaluation        AssistantEvaluation `json:"evaluation"`
+	// EvaluationReused reports that Evaluation is the receipt of the check
+	// Assistant ran at EvaluationVerifiedAt on exactly the same inputs.
+	EvaluationReused     bool                  `json:"evaluationReused"`
+	EvaluationVerifiedAt time.Time             `json:"evaluationVerifiedAt,omitzero"`
+	Diff                 string                `json:"diff"`
+	ReviewToken          string                `json:"reviewToken"`
+	ExpiresAt            time.Time             `json:"expiresAt"`
+	Proposal             TemplateResetProposal `json:"-"`
 }
 
 var assistantCoreOverride = regexp.MustCompile(`\bmk(?:Force|Override)\b`)
