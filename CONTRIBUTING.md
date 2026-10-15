@@ -69,6 +69,11 @@ For example, when clarifying a TUI hint:
    git diff --check
    ```
 
+   The gate also runs ShellCheck on every shell script and errcheck on the Go
+   code. Fix what they report; the
+   [validation guide](docs/development-validation.md#shell-and-error-handling-lint)
+   says when a targeted `# shellcheck disable` or `_ = call()` is justified.
+
 Generated TUI screens come from real presentation fixtures. Edit narrative
 outside the markers and use:
 

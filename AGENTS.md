@@ -82,6 +82,7 @@ scripts/
   create-home-template.sh  # Builds clean home directory template
   validate.sh              # Tiered upstream validation entry point
   security-check.sh        # Pinned staticcheck and govulncheck entry point
+  lint.sh                  # Pinned ShellCheck and errcheck entry point
 assets/
   empty-*                  # Neutral fallbacks for optional deployment assets
 templates/site/            # Private deployment repository template
@@ -110,7 +111,8 @@ Use the smallest gate appropriate to the change:
 # Edit-test loop: cached Go tests; accepts package paths and go test flags
 ./scripts/test-go.sh
 
-# Reproducible gate: syntax, shell regressions, guidance, schemas, Go package
+# Reproducible gate: syntax, shell regressions, ShellCheck, errcheck, guidance,
+# schemas, Go package
 ./scripts/validate.sh --quick
 
 # Add full mkLab evaluation for Nix API or host-composition changes
@@ -120,11 +122,24 @@ Use the smallest gate appropriate to the change:
 nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell
 go test ./...
 
+# ShellCheck and errcheck alone, with the pinned tools (the quick gate runs them)
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix lint-shell --command ./scripts/lint.sh
+
 # Dedicated Go security and static analysis with the locked toolchain
 nix --extra-experimental-features 'nix-command flakes' \
   develop --file tests/source-checks.nix security-shell \
   --command ./scripts/security-check.sh
 ```
+
+The quick gate runs ShellCheck (warnings and errors) over every `*.sh` file and
+errcheck over the non-test Go code. Fix a finding; do not disable a check
+globally. Where a ShellCheck finding is a false positive or the fix would
+change what an installer does, put `# shellcheck disable=SCxxxx # reason` above
+that command. Where dropping a Go error is the decision, write `_ = call()`.
+`.errcheck-exclude` lists only calls whose error never matters (closing a
+handle that was only read, `os.Remove`, `fmt.Fprint*`); a write, lock or commit
+must be checked. See [development validation](docs/development-validation.md).
 
 Use the affected management or client-installer VM only when changing its
 integration boundary. Reserve `--full` for cross-cutting system-build changes
