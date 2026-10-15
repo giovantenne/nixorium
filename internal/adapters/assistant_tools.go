@@ -24,6 +24,14 @@ func assistantToolFailure(err error) string {
 	if errors.Is(err, errAssistantPathCollision) {
 		return assistantToolResult(map[string]any{"ok": false, "error": "invalid_arguments", "message": err.Error()})
 	}
+	var settings *domain.AssistantSettingsError
+	if errors.As(err, &settings) {
+		message := settings.Error()
+		if settings.Code == domain.AssistantSettingsReadOnly {
+			message += ". Only these settings can be changed: " + strings.Join(domain.AssistantWritableSettings(), ", ") + ". Keep every other value as you read it."
+		}
+		return assistantToolResult(map[string]any{"ok": false, "error": settings.Code, "message": message})
+	}
 	code := "invalid_arguments"
 	switch {
 	case errors.Is(err, fs.ErrPermission):

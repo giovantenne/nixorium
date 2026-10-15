@@ -184,7 +184,15 @@ func TestAssistantToolsRejectTraversalProtectedFilesAndSymlinks(t *testing.T) {
 			t.Fatal(path)
 		}
 	}
-	for _, path := range []string{"lab-settings.json", "lab-credentials.json", "modules/lab-credentials.json", "flake.lock", "AGENTS.md", "CLAUDE.md", ".gitignore", ".gitattributes", ".gitmodules", "keys/public", ".env.private"} {
+	// The root lab-settings.json takes the settings route for writes (see
+	// assistant_settings_test.go); a copy elsewhere and every deletion stay protected.
+	if assistantFileCall(t, w, "delete_file", map[string]any{"path": "lab-settings.json"})["error"] != "protected_path" {
+		t.Fatal("settings deleted")
+	}
+	if assistantFileCall(t, w, "write_file", map[string]any{"path": "lab-settings.json", "content": "changed"})["error"] != "settings_invalid" {
+		t.Fatal("settings overwritten")
+	}
+	for _, path := range []string{"modules/lab-settings.json", "lab-credentials.json", "modules/lab-credentials.json", "flake.lock", "AGENTS.md", "CLAUDE.md", ".gitignore", ".gitattributes", ".gitmodules", "keys/public", ".env.private"} {
 		for _, name := range []string{"write_file", "delete_file"} {
 			args := map[string]any{"path": path}
 			if name == "write_file" {

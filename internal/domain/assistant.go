@@ -221,6 +221,10 @@ type AssistantSavePlan struct {
 	// option override (see AssistantCoreOverrideFiles); it is only a warning.
 	CoreOverrideFiles []string            `json:"coreOverrideFiles"`
 	Evaluation        AssistantEvaluation `json:"evaluation"`
+	// SettingsImpacts says what a proposed change of lab-settings.json means
+	// once saved, as a native settings review words it; see
+	// SettingsReviewLines. It is empty when the settings file is unchanged.
+	SettingsImpacts []SettingImpact `json:"settingsImpacts"`
 	// EvaluationReused reports that Evaluation is the receipt of the check
 	// Assistant ran at EvaluationVerifiedAt on exactly the same inputs.
 	EvaluationReused     bool                  `json:"evaluationReused"`
