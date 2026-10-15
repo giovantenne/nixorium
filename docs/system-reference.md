@@ -231,6 +231,42 @@ removed disappears at its next start. The guided change (Maintenance → Change
 network addressing, `nixorium network migrate`) writes and removes the record;
 see ADR 0028 and the administrator guide.
 
+## Time
+
+The controller keeps the laboratory's time and the client computers take it
+from it, so a computer with a drained clock battery shows the right time
+although it has no Internet of its own (certificates, file dates and logs stay
+correct). `modules/time.nix`, imported by `modules/common.nix`, declares it.
+
+- **Controller.** It runs `chrony`, which replaces `systemd-timesyncd` there.
+  The upstream is the default NixOS Internet pools; the controller needs
+  outbound UDP 123 to them. It answers only the laboratory network
+  (`allow <networkBase>/<networkPrefixLength>`), listens on the controller's
+  laboratory address, and `modules/firewall.nix` opens UDP 123 on the
+  laboratory interface only. When the pools are unreachable it keeps serving
+  its own clock at stratum 10, starting five minutes after boot so that a
+  clock that may still be wrong is not served while the upstream is being
+  reached.
+- **Clients.** They keep `systemd-timesyncd`, with the controller's laboratory
+  address as the only server (`services.timesyncd.servers` and
+  `networking.timeServers`) and no fallback, so no Internet pool is listed and
+  a client never waits for hosts it cannot reach. A client that has Internet
+  after a user signs in still takes the time from the controller. Clients open
+  no port. The defaults are `lib.mkDefault`, so a site module may name another
+  server.
+- **Controller-only mode** has no laboratory network: nothing is served and
+  the controller keeps the NixOS defaults (`systemd-timesyncd` with the
+  Internet pools).
+- **During a change of laboratory network** the controller serves both
+  networks (chrony binds one address only, so it is not bound to the
+  laboratory address meanwhile) and clients list the new controller address
+  first and the previous one second, like the cache.
+
+The change reaches a client at its next update and the controller when the
+controller is applied; until then a computer keeps its previous clock
+configuration. `nixorium doctor` still reports an unsynchronized controller
+clock.
+
 ## USB/SSH client installation boundary
 
 The supported remote-install environment is the official NixOS 26.05 Minimal

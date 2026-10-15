@@ -26,7 +26,8 @@ in
         allowedTCPPorts = lib.optionals isController [
           22 labSettings.cachePort labSettings.pxeHttpPort
         ];
-        allowedUDPPorts = lib.optionals isController [ 5353 67 69 4011 ];
+        # 123: time for the laboratory (chrony, modules/time.nix).
+        allowedUDPPorts = lib.optionals isController [ 5353 67 69 4011 123 ];
       };
     };
     extraInputRules = lib.optionalString isClient clientRules.allow;

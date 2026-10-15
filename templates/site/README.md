@@ -202,7 +202,10 @@ one-time adoption for older deployments, independent packages and recovery.
 ### Requirements for installing clients
 
 - **Network.** The controller and the clients share the lab network, and the
-  controller needs Internet for preparation and updates. For
+  controller needs Internet for preparation and updates. It also gives the
+  clients the correct time (UDP 123, laboratory network only), taken from
+  Internet time servers that the school firewall must let it reach, so a
+  computer needs no Internet of its own to show the right time. For
   [network boot](#install-computers-with-pxe), the clients need UEFI network
   boot and the controller must be allowed to run ProxyDHCP beside the
   institutional DHCP server, which stays authoritative; Wi-Fi may not support

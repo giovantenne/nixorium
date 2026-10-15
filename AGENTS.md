@@ -61,9 +61,10 @@ cmd/nixorium-demo/         # Developer-only deterministic website demo exporter
 internal/                  # Domain, application, adapter, and presentation layers
 modules/
   common.nix               # Composition point and shared system defaults
-  firewall.nix             # Interface-scoped SSH, cache, and PXE policy
+  firewall.nix             # Interface-scoped SSH, cache, PXE, and time policy
   desktop.nix              # Core GNOME session, locale and regional policy
   power.nix                # Idle and controller sleep policy
+  time.nix                 # Controller serves time (chrony); clients use only the controller
   nix-ld.nix               # nix-ld loader and common libraries for downloaded Linux binaries
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
@@ -743,8 +744,16 @@ that release's notes, so a release is not finished until the site follows it.
   all-interface SSH/Avahi openings, and uses nftables. Client TCP 22
   admits only the static controller IPv4 address on the lab interface, with
   a guard before connection tracking preventing IPv6/old-connection bypass.
-  Controller services stay interface-scoped; only it opens Harmonia/PXE.
+  Controller services stay interface-scoped; only it opens Harmonia/PXE and
+  UDP 123 for time. Clients open no port.
   Preserve independently owned runtime tables on firewall reload.
+- `modules/time.nix` runs chrony on a laboratory-mode controller (`allow` for
+  the laboratory network only, `local stratum 10`, UDP 123 only on the
+  laboratory interface) and gives every client `systemd-timesyncd` with the
+  controller's laboratory address as its only server and no fallback pool;
+  both controller addresses are used during a change of laboratory network.
+  Controller-only mode keeps the NixOS defaults. Never list an Internet pool
+  on a client: it has none of its own.
 - The classroom view (`lab.classroomView`, on unless set to false) adds
   only a client user-session agent on a private Unix socket. The controller
   reaches it solely through its existing SSH access with the fixed
@@ -861,7 +870,7 @@ that release's notes, so a release is not finished until the site follows it.
 - GitHub CI disables import-from-derivation: evaluation must never read a derivation output.
 - The `nixorium-staff` group (declared in `modules/users.nix`) lets `admin` and the teacher read the student's home snapshots.
 - `modules/common.nix` is only the composition point for core desktop, firewall,
-  power, SSH and nix-ld modules. Packages, shell preferences, development tools,
+  time, power, SSH and nix-ld modules. Packages, shell preferences, development tools,
   screensaver behavior, and application policy belong in the deployment.
   The one exception, by owner decision, is base software:
   `internal/domain/base-software.json` (Chromium, Ghostty, Git, the

@@ -5,6 +5,7 @@
     ./nix-ld.nix
     ./firewall.nix
     ./client-internet.nix
+    ./time.nix
     ./power.nix
     ./ssh.nix
   ];
