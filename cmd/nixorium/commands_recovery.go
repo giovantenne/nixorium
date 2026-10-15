@@ -66,8 +66,20 @@ func deploymentRecoveryCommand(ctx context.Context, manager deploymentRecoverer,
 	return 0
 }
 
+// templateResetRecoverer is the reviewed recovery of an interrupted template
+// reset or Assistant save (adapters.TemplateReset).
+type templateResetRecoverer interface {
+	PlanTemplateResetRecovery(context.Context, string) domain.TemplateResetRecoveryPlan
+	ApplyTemplateResetRecovery(context.Context, domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult
+}
+
 func runTemplateResetRecoveryCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
-	reset := adapters.TemplateReset{}
+	return templateResetRecoveryCommand(ctx, adapters.TemplateReset{}, repository, options, os.Stdin, presentation.IsInteractive(os.Stdin), operationRecordMessage, stdout, stderr)
+}
+
+// templateResetRecoveryCommand asks yes/no for the cases that change no file
+// and the typed RESTORE for a mixed checkout (ADR 0026).
+func templateResetRecoveryCommand(ctx context.Context, reset templateResetRecoverer, repository string, options options, input io.Reader, interactive bool, record func(string, any) string, stdout, stderr io.Writer) int {
 	plan := reset.PlanTemplateResetRecovery(ctx, repository)
 	if options.subcommand == "recover-plan" || plan.State != "ready" {
 		if options.json {
@@ -85,23 +97,33 @@ func runTemplateResetRecoveryCommand(ctx context.Context, repository string, opt
 		return 1
 	}
 	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
+		if !interactive {
 			fmt.Fprintln(stderr, "template-reset recover apply requires an interactive terminal or --yes.")
 			return 2
 		}
 		presentation.TemplateResetRecoveryPlanText(stderr, plan)
-		approved, err := presentation.ConfirmWord(os.Stdin, stderr, plan.Confirmation)
-		if err != nil || !approved {
-			fmt.Fprintln(stderr, "Confirmation did not match; nothing was changed.")
-			return 1
+		var approved bool
+		var err error
+		if word := plan.TypedConfirmation(); word != "" {
+			approved, err = presentation.ConfirmWord(input, stderr, word)
+			if err != nil || !approved {
+				fmt.Fprintln(stderr, "Confirmation did not match; nothing was changed.")
+				return 1
+			}
+		} else {
+			approved, err = presentation.ConfirmYesNo(input, stderr, presentation.TemplateResetRecoveryQuestion(plan))
+			if err != nil || !approved {
+				fmt.Fprintln(stderr, "Nothing was changed.")
+				return 1
+			}
 		}
 	}
 	result := reset.ApplyTemplateResetRecovery(ctx, plan)
-	result.Message = operationRecordMessage(result.Message, result)
+	result.Message = record(result.Message, result)
 	if options.json {
 		_ = presentation.JSON(stdout, result)
 	} else {
-		presentation.TemplateResetRecoveryResultText(stdout, result)
+		presentation.TemplateResetRecoveryResultText(stdout, plan, result)
 	}
 	if result.HasErrors() {
 		return 1

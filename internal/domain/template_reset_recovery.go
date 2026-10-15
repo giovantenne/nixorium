@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -16,7 +17,9 @@ const (
 )
 
 // ResetRecoveryConfirmation finishes the reset; RestoreConfirmation returns to
-// the configuration from before the reset.
+// the configuration from before the reset. The plan keeps both in its JSON
+// for compatibility, but only RESTORE is typed: the other cases change no
+// file and are confirmed with Enter or a yes/no answer (ADR 0026).
 const (
 	ResetRecoveryConfirmation = "RECOVERED"
 	ResetRestoreConfirmation  = "RESTORE"
@@ -43,6 +46,22 @@ type TemplateResetRecoveryPlan struct {
 
 func (p TemplateResetRecoveryPlan) HasErrors() bool {
 	return p.State == "blocked" || len(p.Issues) > 0
+}
+
+// TypedConfirmation is the word the operator must type, or "" when Enter
+// (or yes/no on the command line) confirms. Only restoring a mixed checkout
+// replaces files, so only it keeps RESTORE.
+func (p TemplateResetRecoveryPlan) TypedConfirmation() string {
+	if p.Case == ResetRecoveryRestore {
+		return ResetRestoreConfirmation
+	}
+	return ""
+}
+
+// AssistantSave reports a marker left by an interrupted native Assistant
+// save, which the same recovery resolves.
+func (p TemplateResetRecoveryPlan) AssistantSave() bool {
+	return strings.HasPrefix(p.BackupRef, "refs/nixorium/assistant-backups/")
 }
 
 type TemplateResetRecoveryResult struct {

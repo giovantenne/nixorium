@@ -171,42 +171,19 @@ func DeploymentRecoveryResultText(w io.Writer, result domain.DeploymentRecoveryR
 // reviewed. It changes nothing on any computer, so a yes/no answer is
 // proportionate (ADR 0026).
 func ConfirmDeploymentRecovery(input io.Reader, output io.Writer) (bool, error) {
-	fmt.Fprint(output, "Mark this update as reviewed? [y/N] ")
+	return ConfirmYesNo(input, output, "Mark this update as reviewed?")
+}
+
+// ConfirmYesNo asks a question for a recovery that changes nothing that
+// cannot be taken back; only "y" or "yes" approves it.
+func ConfirmYesNo(input io.Reader, output io.Writer, question string) (bool, error) {
+	fmt.Fprint(output, question+" [y/N] ")
 	line, err := bufio.NewReader(input).ReadString('\n')
 	if err != nil && len(line) == 0 {
 		return false, err
 	}
 	answer := strings.ToLower(strings.TrimSpace(line))
 	return answer == "y" || answer == "yes", nil
-}
-
-func TemplateResetRecoveryPlanText(w io.Writer, plan domain.TemplateResetRecoveryPlan) {
-	fmt.Fprintf(w, "Interrupted template reset: %s\n%s\n", plan.State, plan.Message)
-	if plan.Original != "" {
-		fmt.Fprintf(w, "Before the reset: %s\nReset commit:     %s\nCurrent HEAD:     %s\nBackup:           %s\n", plan.Original, plan.Candidate, plan.Head, plan.BackupRef)
-	}
-	if len(plan.Changed) > 0 {
-		fmt.Fprintf(w, "Files that differ from before the reset (%d):\n", len(plan.Changed))
-		for _, name := range plan.Changed[:min(len(plan.Changed), 30)] {
-			fmt.Fprintf(w, "  %s\n", name)
-		}
-		if len(plan.Changed) > 30 {
-			fmt.Fprintf(w, "  … and %d more\n", len(plan.Changed)-30)
-		}
-	}
-	for _, issue := range plan.Issues {
-		fmt.Fprintf(w, "  %s: %s\n", issue.Field, issue.Message)
-	}
-	if plan.ReviewToken != "" {
-		fmt.Fprintf(w, "Review token: %s\n", plan.ReviewToken)
-	}
-}
-
-func TemplateResetRecoveryResultText(w io.Writer, result domain.TemplateResetRecoveryResult) {
-	fmt.Fprintln(w, result.Message)
-	if result.Revision != "" {
-		fmt.Fprintf(w, "Revision: %s\n", result.Revision)
-	}
 }
 
 // ConfirmWord asks for an exact, case-sensitive confirmation word.

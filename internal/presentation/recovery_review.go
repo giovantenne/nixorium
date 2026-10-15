@@ -9,10 +9,10 @@ import (
 )
 
 // recoveryReview guides one reviewed recovery: an interrupted client update
-// or an interrupted template reset. The client update review changes nothing
-// on any computer and only archives its record, so Enter confirms it once
-// every computer was checked (ADR 0026); the template reset review still
-// asks for its typed word.
+// or an interrupted template reset. Both say what Nixorium found, what
+// confirming does, and how to confirm. A recovery that changes nothing on any
+// computer and no file (the update review, finishing or clearing a reset) is
+// confirmed with Enter (ADR 0026); restoring a mixed checkout keeps RESTORE.
 type recoveryReview struct {
 	kind         string // "deploy" or "reset"
 	acknowledge  bool
@@ -118,7 +118,7 @@ func (review recoveryReview) ready() (bool, string) {
 	if review.kind == "deploy" {
 		return review.deployPlan.State == "ready" && !review.deployPlan.HasErrors(), review.deployPlan.Confirmation
 	}
-	return review.resetPlan.State == "ready" && !review.resetPlan.HasErrors(), review.resetPlan.Confirmation
+	return review.resetPlan.State == "ready" && !review.resetPlan.HasErrors(), review.resetPlan.TypedConfirmation()
 }
 
 func (model dashboardModel) leaveRecoveryReview() (tea.Model, tea.Cmd) {
@@ -153,10 +153,22 @@ func (model dashboardModel) updateRecoveryReview(key tea.KeyPressMsg) (tea.Model
 	if review.kind == "deploy" {
 		return model.updateDeploymentRecoveryReview(key)
 	}
+	return model.updateResetRecoveryReview(key)
+}
+
+// updateResetRecoveryReview: r checks again, Enter confirms (after RESTORE
+// for a mixed checkout), Esc goes back without changing anything.
+func (model dashboardModel) updateResetRecoveryReview(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	review := &model.recoveryReview
 	ready, word := review.ready()
+	typing := ready && word != ""
 	switch key.String() {
 	case "esc":
 		return model.leaveRecoveryReview()
+	case "left":
+		if !typing {
+			return model.leaveRecoveryReview()
+		}
 	case "r":
 		if review.confirmation == "" {
 			return model.planRecoveryReview()
@@ -168,7 +180,7 @@ func (model dashboardModel) updateRecoveryReview(key tea.KeyPressMsg) (tea.Model
 			review.confirmation = string(value[:len(value)-1])
 		}
 	case "enter":
-		if !ready {
+		if !ready || model.actions.ApplyResetRecovery == nil {
 			return model, nil
 		}
 		if review.confirmation != word {
@@ -177,11 +189,12 @@ func (model dashboardModel) updateRecoveryReview(key tea.KeyPressMsg) (tea.Model
 			return model, nil
 		}
 		review.confirmation = ""
+		model.message = ""
 		plan, action := review.resetPlan, model.actions.ApplyResetRecovery
-		model.busy = "Resolving the interrupted template reset"
+		model.busy = "Resolving the interrupted " + resetRecoveryNoun(plan)
 		return model, func() tea.Msg { return recoveryResultMsg{reset: action(plan)} }
 	default:
-		if ready && key.Text != "" && key.Text != " " {
+		if typing && key.Text != "" && key.Text != " " && len(review.confirmation) < 64 {
 			review.confirmation += key.Text
 		}
 	}
@@ -223,7 +236,7 @@ func (model dashboardModel) recoveryReviewView() string {
 	review := model.recoveryReview
 	title := "Review the interrupted update"
 	if review.kind == "reset" {
-		title = "Recover the interrupted template reset"
+		title = "Finish or undo the " + resetRecoveryNoun(review.resetPlan)
 	}
 	shell := tuiShell{path: []string{"Recovery", title}}
 	if model.busy != "" {
@@ -234,26 +247,21 @@ func (model dashboardModel) recoveryReviewView() string {
 	if review.kind == "deploy" {
 		return model.deploymentRecoveryReviewView(shell, title)
 	}
-	var text strings.Builder
-	if review.done {
-		TemplateResetRecoveryResultText(&text, review.resetResult)
-	} else {
-		TemplateResetRecoveryPlanText(&text, review.resetPlan)
-	}
 	lines := []string{tuiTitle(title, model.isDark), ""}
-	for _, line := range strings.Split(strings.TrimRight(text.String(), "\n"), "\n") {
-		if !strings.HasPrefix(line, "Review token:") {
-			lines = append(lines, line)
-		}
-	}
 	ready, word := review.ready()
 	switch {
 	case review.done:
+		lines = append(lines, templateResetRecoveryResultLines(review.resetResult, resetRecoveryNoun(review.resetPlan), model.isDark)...)
 		shell.actions = []tuiAction{{key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
-	case ready:
-		lines = append(lines, "", tuiSection("Type "+word+" to continue:", model.isDark), "> "+review.confirmation+"_")
+	case ready && word != "":
+		lines = append(lines, templateResetRecoveryLines(review.resetPlan, model.isDark)...)
+		shell.fixedBody = templateResetRecoveryAction(review.resetPlan) + "\n" + tuiSection("Type "+word+" to continue:", model.isDark) + "\n> " + review.confirmation + "_"
 		shell.actions = []tuiAction{{key: "Enter", label: "Confirm"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+	case ready:
+		lines = append(lines, templateResetRecoveryLines(review.resetPlan, model.isDark)...)
+		shell.actions = []tuiAction{{key: "Enter", label: templateResetRecoveryEnterLabel(review.resetPlan)}, {key: "r", label: "Check again"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	default:
+		lines = append(lines, templateResetRecoveryLines(review.resetPlan, model.isDark)...)
 		shell.actions = []tuiAction{{key: "r", label: "Check again"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	}
 	shell.body = strings.Join(lines, "\n")

@@ -367,6 +367,10 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "r check every computer again   c continue without the computers that do not answer (c again includes them)",
 				"Enter marks the update as reviewed once every computer was checked   d technical details of the failure   Esc back",
 				"Marking it as reviewed changes nothing on the computers: it archives the record and unblocks other operations. Then update the computers again.")
+		} else {
+			lines = append(lines, "r check the repository again   Enter confirm   Esc back without changing anything",
+				"When the reset had finished, only the branch move is missing, or nothing was replaced, Enter confirms: no file changes and the marker is archived.",
+				"When files from before and after the reset are mixed, type RESTORE: the current files are saved under a recovery reference and the previous configuration comes back; untracked and ignored files are not removed.")
 		}
 	case dashboardServices:
 		lines = append(lines, "c review cache restart   r refresh   l logs after result")
@@ -600,6 +604,10 @@ func (model dashboardModel) textEntry() bool {
 	}
 	if model.screen == dashboardSetupKeys && model.setupKeyImporting {
 		return true
+	}
+	if model.screen == dashboardRecoveryReview && model.recoveryReview.kind == "reset" && !model.recoveryReview.done {
+		ready, word := model.recoveryReview.ready()
+		return ready && word != ""
 	}
 	switch model.screen {
 	case dashboardSettings:

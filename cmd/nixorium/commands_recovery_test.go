@@ -69,3 +69,57 @@ func TestDeployRecoverApplyAsksYesOrNo(t *testing.T) {
 		t.Fatalf("--yes: code %d, archived %d, stderr %s", code, source.archived, stderr)
 	}
 }
+
+type cliResetRecoverer struct {
+	plan    domain.TemplateResetRecoveryPlan
+	applied int
+}
+
+func (r *cliResetRecoverer) PlanTemplateResetRecovery(context.Context, string) domain.TemplateResetRecoveryPlan {
+	return r.plan
+}
+
+func (r *cliResetRecoverer) ApplyTemplateResetRecovery(_ context.Context, plan domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult {
+	r.applied++
+	return domain.TemplateResetRecoveryResult{State: "completed", Case: plan.Case, Revision: plan.Candidate, Archive: "/srv/lab/.git/nixorium-recovered/template-reset-x.json"}
+}
+
+func TestTemplateResetRecoverApplyAsksYesOrNoUnlessFilesAreRestored(t *testing.T) {
+	record := func(message string, _ any) string { return message }
+	run := func(reset *cliResetRecoverer, answer string, yes, interactive bool) (int, string, string) {
+		var stdout, stderr bytes.Buffer
+		opts := options{subcommand: "recover-apply", expect: reset.plan.ReviewToken, yes: yes}
+		code := templateResetRecoveryCommand(context.Background(), reset, "/srv/lab", opts, strings.NewReader(answer), interactive, record, &stdout, &stderr)
+		return code, stdout.String(), stderr.String()
+	}
+	plan := func(kind string) domain.TemplateResetRecoveryPlan {
+		return domain.TemplateResetRecoveryPlan{State: "ready", Case: kind, Confirmation: "RECOVERED", ReviewToken: "sha256:x",
+			Original: strings.Repeat("a", 40), Candidate: strings.Repeat("b", 40), Head: strings.Repeat("a", 40), BackupRef: "refs/nixorium/template-backups/x"}
+	}
+
+	reset := &cliResetRecoverer{plan: plan(domain.ResetRecoveryCompleteBranch)}
+	code, _, stderr := run(reset, "\n", false, true)
+	if code != 1 || reset.applied != 0 || !strings.Contains(stderr, "Only the branch move is missing") ||
+		!strings.Contains(stderr, "Move the branch to the reset commit and clear the marker? [y/N]") || strings.Contains(stderr, "Type ") {
+		t.Fatalf("empty answer: code %d, applied %d, stderr:\n%s", code, reset.applied, stderr)
+	}
+	code, stdout, _ := run(reset, "yes\n", false, true)
+	if code != 0 || reset.applied != 1 || !strings.Contains(stdout, "The reset is finished. Other operations are unblocked.") {
+		t.Fatalf("yes: code %d, applied %d, stdout:\n%s", code, reset.applied, stdout)
+	}
+	if code, _, _ := run(&cliResetRecoverer{plan: plan(domain.ResetRecoveryNotStarted)}, "", false, false); code != 2 {
+		t.Fatalf("non-interactive without --yes: code %d", code)
+	}
+
+	restore := plan(domain.ResetRecoveryRestore)
+	restore.Confirmation, restore.Changed = "RESTORE", []string{"lab-settings.json"}
+	reset = &cliResetRecoverer{plan: restore}
+	code, _, stderr = run(reset, "y\n", false, true)
+	if code != 1 || reset.applied != 0 || !strings.Contains(stderr, "Type RESTORE to continue") || strings.Contains(stderr, "[y/N]") ||
+		!strings.Contains(stderr, "untracked and ignored files are not removed") {
+		t.Fatalf("restore accepted y: code %d, applied %d, stderr:\n%s", code, reset.applied, stderr)
+	}
+	if code, _, _ := run(reset, "RESTORE\n", false, true); code != 0 || reset.applied != 1 {
+		t.Fatalf("RESTORE: code %d, applied %d", code, reset.applied)
+	}
+}
