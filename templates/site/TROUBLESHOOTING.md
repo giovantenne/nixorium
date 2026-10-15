@@ -663,6 +663,30 @@ the current content is first saved under
 commit. Untracked files, new files and private keys are never touched. Never add `secret-key`, `admin-ssh`,
 or plaintext credentials.
 
+## The last saved change caused trouble
+
+To go back to the configuration saved before your last change, review and
+apply the undo, then apply to the controller and update the computers as usual:
+
+```sh
+nixorium git undo plan
+nixorium git undo apply --expect REVIEW_TOKEN
+```
+
+The undo is saved as one new change; the undone change stays in the history,
+no computer changes and nothing is pushed. Unsaved changes stop it with
+`GIT-DIRTY` (review and save or discard them first). It also refuses a first
+saved version, a merge, a change that is already an undo, a change that
+recorded keys or the recovery file (see
+[Keys are missing or inconsistent](#keys-are-missing-or-inconsistent)), a
+change of the laboratory network (use **Maintenance → Change network
+addressing**) and files that cannot go back safely; each refusal names what to
+do instead. A change that updated Nixorium or the package base is recovered as
+described in [An upstream update failed](#an-upstream-update-failed) and in
+UPDATES.md, "Recovery and long-term autonomy". A computer that already runs
+the changed configuration returns only when you update it; a computer that
+cannot start can be taken back from its own boot menu.
+
 ## Configuration is invalid
 
 When `lab-settings.json` no longer validates, for example after an update

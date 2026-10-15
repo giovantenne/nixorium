@@ -199,7 +199,9 @@ save requires inspection/recovery before another update. If a saved update
 cannot run, restore the previous desired configuration through a reviewed Git
 change and activate the known-good system; use a previous boot generation when
 the controller cannot start. Keep data migrations and `stateVersion` outside
-this automatic recovery promise.
+this automatic recovery promise. `nixorium git undo` goes back from any other
+last saved change (settings, software, workspace) but refuses a change that
+updated Nixorium or the package base.
 
 A laboratory can select and validate a newer NixOS base without an upstream
 Nixorium release. If NixOS removes an option or a patch no longer applies, that

@@ -505,6 +505,18 @@ that release's notes, so a release is not finished until the site follows it.
   and exact confirmation. Preserve secret/content-transform checks, atomic
   compare-and-update of HEAD, path-only index reconciliation, unrelated index/
   worktree state, disabled hooks/signing, and the no-remote/no-push boundary.
+- `nixorium git undo plan`/`apply` reverts the last saved change as a new saved
+  change (`internal/app/git_undo.go`). Keep its refusals: unsaved changes
+  (`GIT-DIRTY`), detached HEAD or an unfinished Git operation, a first version,
+  merge or earlier undo, any change to `flake.nix`/`flake.lock` (updates own
+  their recovery; name `UPDATES.md`), keys and the recovery file, private
+  paths, links, submodules, Git attribute rules, a change of the laboratory
+  network (guided change only), a managed file whose earlier version is not
+  valid, and files that cannot go back safely. Reuse the commit boundary:
+  fixed Git commands, content-bound token, typed `UNDO`, compare-and-update of
+  HEAD, two-tree `read-tree` for the files, no hook, signing, remote or push.
+  It never applies to the controller or computers; its review names those
+  steps. The TUI does not offer it yet.
 - Upstream update planning must preserve the configured source identity, accept
   only the exact `master` branch or an explicit SemVer tag, generate the
   candidate lock outside the checkout,

@@ -965,6 +965,39 @@ and oversized content, then binds apply to the reviewed token and confirmation.
 Unselected worktree/index changes remain untouched. Hooks, signing, remotes,
 and push are never invoked.
 
+### Undo the last saved change
+
+When the change you saved last (settings, software, the student workspace)
+causes trouble, go back to the configuration saved before it, then apply and
+update as usual. From the administrator's terminal:
+
+```sh
+nix run .#nixorium -- git undo plan
+nix run .#nixorium -- git undo apply --expect REVIEW_TOKEN
+```
+
+The review shows the description, date and files of the change that will be
+undone, what the undo does to those files, and the steps that follow. Applying
+it (confirm with `UNDO`) saves one new change named `Undo: <description of the
+undone change>` and puts the files back; the undone change stays in the history
+and nothing is pushed. No computer changes yet: run **Apply to controller**, then
+**Update computers**, so the controller and the student computers return too. Save
+or discard other unsaved changes first; the review stops with the same
+unsaved-changes step as any other operation.
+
+Only the last change can be undone, once, and only an ordinary saved change.
+Nixorium refuses, and says what to do instead, when the last saved change is
+the first saved version, a merge, or already an undo (make the change again
+from its usual screen); when it updated Nixorium or the package base (follow
+[UPDATES.md](UPDATES.md), "Recovery and long-term autonomy"); when it recorded
+public keys or the encrypted recovery file (see
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#keys-are-missing-or-inconsistent));
+when it belongs to a change of the laboratory network (use **Maintenance →
+Change network addressing**); when it holds links, private files or Git
+attribute rules; or when the files cannot go back safely, for example because
+an ignored file of the same name would be overwritten. A Git operation left
+unfinished, or a repository that is not on a branch, also stops it.
+
 ### Apply to the controller
 
 ```sh
