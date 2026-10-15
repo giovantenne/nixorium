@@ -18,6 +18,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   first version, a merge, an earlier undo, an update of Nixorium or of the
   package base (see the update recovery), recorded keys, a change of the
   laboratory network and files that cannot go back safely.
+- Assistant can now change the browser homepage, the time zone, the locale, the
+  keyboard layout and the Git identities in a proposal; everything else in the
+  settings stays in the menu. The change is reviewed and saved like any other
+  proposal, with the same checks and the same "what happens next" lines as a
+  change made in Maintenance → Change settings.
 - Programs downloaded outside Nix now run on the controller and every client:
   Nixorium enables nix-ld with the common libraries (zlib, libstdc++, glib,
   OpenSSL, ICU and the X11/GTK set that Electron and Java GUI programs need).

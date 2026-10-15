@@ -185,7 +185,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			core = nil
 		}
 	}
-	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1"}}
+	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1", "settings_v1"}}
 	if discovery, ok := runner.Store.(interface {
 		HomeFilesSupported(context.Context, domain.AssistantConversation) bool
 	}); ok && discovery.HomeFilesSupported(ctx, conversation) {

@@ -234,7 +234,7 @@ func (store AssistantWorkspaceStore) Open(id string) (*AssistantWorkspace, error
 			return nil, errors.New("invalid Assistant modes")
 		}
 		for path := range workspace.modes {
-			if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || domain.AssistantReadOnlyPath(path) {
+			if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || (domain.AssistantReadOnlyPath(path) && !domain.AssistantSettingsPath(path)) {
 				return nil, errors.New("invalid Assistant mode path")
 			}
 		}
@@ -307,6 +307,12 @@ func (workspace *AssistantWorkspace) raw(path string) ([]byte, error) {
 	} else if !errors.Is(err, unix.ENOENT) {
 		return nil, fs.ErrPermission
 	}
+	return workspace.baseBlob(path)
+}
+
+// baseBlob reads a file as the conversation's base commit holds it, ignoring
+// the overlay.
+func (workspace *AssistantWorkspace) baseBlob(path string) ([]byte, error) {
 	base, ok := workspace.base[path]
 	if !ok {
 		return nil, fs.ErrNotExist
@@ -352,16 +358,48 @@ func (workspace *AssistantWorkspace) Read(path string) ([]byte, error) {
 		return nil, errors.New("not_text")
 	}
 	if filepath.Base(path) == "lab-settings.json" {
-		var settings any
-		if json.Unmarshal(data, &settings) != nil {
-			return nil, errors.New("not_text")
-		}
-		data, err = json.MarshalIndent(redactAssistantSettings(settings), "", "  ")
+		data, err = assistantSettingsText(data)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return []byte(domain.RedactForModel(string(data))), nil
+}
+
+// assistantSettingsText renders lab-settings.json with its sensitive fields
+// withheld, before the redaction every file passes through.
+func assistantSettingsText(data []byte) ([]byte, error) {
+	var settings any
+	if json.Unmarshal(data, &settings) != nil {
+		return nil, errors.New("not_text")
+	}
+	return json.MarshalIndent(redactAssistantSettings(settings), "", "  ")
+}
+
+// assistantSettingsView is the text of lab-settings.json exactly as the read
+// tool shows it to the model.
+func assistantSettingsView(data []byte) ([]byte, error) {
+	text, err := assistantSettingsText(data)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(domain.RedactForModel(string(text))), nil
+}
+
+// mergeSettings turns the model's whole-file write of lab-settings.json into
+// the file the candidate may hold; see domain.MergeAssistantSettings. It
+// changes nothing, so a refusal leaves the candidate as it was.
+func (workspace *AssistantWorkspace) mergeSettings(content string) (string, error) {
+	base, err := workspace.baseBlob(domain.AssistantSettingsFile)
+	if err != nil {
+		return "", err
+	}
+	view, err := assistantSettingsView(base)
+	if err != nil {
+		return "", &domain.AssistantSettingsError{Code: domain.AssistantSettingsInvalid, Detail: "the saved settings are not valid JSON; repair them in Maintenance → Change settings first"}
+	}
+	merged, err := domain.MergeAssistantSettings(base, view, []byte(content))
+	return string(merged), err
 }
 
 type AssistantFileEntry struct {
@@ -453,8 +491,18 @@ func (workspace *AssistantWorkspace) saveDeleted() error {
 	return assistantWriteState(workspace.root, "deleted.json", data)
 }
 func (workspace *AssistantWorkspace) Write(path, content string, executable bool) error {
-	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || domain.AssistantReadOnlyPath(path) {
+	settings := domain.AssistantSettingsPath(path)
+	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || (domain.AssistantReadOnlyPath(path) && !settings) {
 		return fs.ErrPermission
+	}
+	if settings {
+		// Only the writable settings can change, whatever the model wrote;
+		// the file keeps its mode from the base commit.
+		merged, err := workspace.mergeSettings(content)
+		if err != nil {
+			return err
+		}
+		content, executable = merged, workspace.base[path].mode == "100755"
 	}
 	for protected := range workspace.deniedPaths {
 		if strings.HasPrefix(protected, "home-files/imports/") && strings.HasPrefix(protected, path+"/") {

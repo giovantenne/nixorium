@@ -31,7 +31,7 @@ func PlanAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conve
 	return planAssistantSave(ctx, store, conversationID, runBoundedNix)
 }
 func planAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conversationID string, run assistantNixRunner) domain.AssistantSavePlan {
-	plan := domain.AssistantSavePlan{State: "blocked", ConversationID: conversationID, Added: []string{}, Changed: []string{}, Removed: []string{}, ChangedHosts: []string{}}
+	plan := domain.AssistantSavePlan{State: "blocked", ConversationID: conversationID, Added: []string{}, Changed: []string{}, Removed: []string{}, ChangedHosts: []string{}, SettingsImpacts: []domain.SettingImpact{}}
 	fail := func(message string) domain.AssistantSavePlan {
 		plan.State = "blocked"
 		plan.Message = message
@@ -68,6 +68,25 @@ func planAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conve
 	}
 	changes := assistantSaveChanges(proposal.Original, proposal.Candidate)
 	for _, change := range changes {
+		if domain.AssistantSettingsPath(change.Path) && change.Action == "replace" && proposal.Original[change.Path].Mode == proposal.Candidate[change.Path].Mode {
+			// The settings file is the one protected path a proposal may
+			// change, and only the way a native settings save may: the same
+			// transition rules, and the same impacts shown in the review.
+			review, err := domain.ReviewAssistantSettings(proposal.Original[change.Path].Data, proposal.Candidate[change.Path].Data)
+			if err != nil {
+				var refusal *domain.AssistantSettingsError
+				if errors.As(err, &refusal) {
+					return fail(refusal.ReviewMessage())
+				}
+				return fail(err.Error())
+			}
+			plan.SettingsImpacts = review.Impacts
+			if plan.SettingsImpacts == nil {
+				plan.SettingsImpacts = []domain.SettingImpact{}
+			}
+			plan.Changed = append(plan.Changed, change.Path)
+			continue
+		}
 		if !domain.ValidAssistantPath(change.Path) || domain.AssistantHiddenPath(change.Path) || domain.AssistantReadOnlyPath(change.Path) {
 			return fail("The proposal changes a protected path. Return to the chat and discard it.")
 		}
