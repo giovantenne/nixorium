@@ -324,8 +324,7 @@ func (m SettingsManager) ControllerAddresses(ctx context.Context, settings domai
 	if len(observation.Devices) == 0 {
 		return domain.ControllerAddresses{Choices: []domain.DHCPAddressChoice{}, Detail: observation.Detail}
 	}
-	labAddress, _ := domain.ControllerStaticAddress(settings.Lab)
-	return domain.ControllerAddresses{Choices: domain.ControllerDHCPCandidates(observation, labAddress), Detected: true, Detail: observation.Detail}
+	return domain.ControllerAddresses{Choices: domain.ControllerDHCPCandidates(observation, settings.Lab), Detected: true, Detail: observation.Detail}
 }
 
 // networkPreflight checks the devices a reviewed change would use. It runs
@@ -344,8 +343,7 @@ func (m SettingsManager) networkPreflight(ctx context.Context, base, candidate d
 			preflight.Controller = &check
 		}
 		if checkDHCP && len(observation.Devices) > 0 {
-			labAddress, _ := domain.ControllerStaticAddress(candidate.Lab)
-			check := domain.CheckDHCPAddress(candidate.Lab.MasterDHCPIP, domain.ControllerDHCPCandidates(observation, labAddress))
+			check := domain.CheckDHCPAddress(candidate.Lab.MasterDHCPIP, domain.ControllerDHCPCandidates(observation, candidate.Lab))
 			preflight.DHCPAddress = &check
 		}
 	}

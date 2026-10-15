@@ -150,13 +150,14 @@ func TestCheckClientInterfaceAndSaveRefusal(t *testing.T) {
 
 func TestControllerDHCPCandidatesAndCheck(t *testing.T) {
 	observation := controllerDevices()
-	observation.Devices = append(observation.Devices, NetworkDevice{Name: "enp0s9", Kind: NetworkDeviceWired, Addresses: []NetworkAddress{{Address: "169.254.3.4", Dynamic: true}, {Address: "172.16.0.5"}}})
-	choices := ControllerDHCPCandidates(observation, "10.0.0.99")
+	observation.Devices = append(observation.Devices, NetworkDevice{Name: "enp0s9", Kind: NetworkDeviceWired, Addresses: []NetworkAddress{{Address: "169.254.3.4", Dynamic: true}, {Address: "172.16.0.5"}, {Address: "10.0.0.7", Dynamic: true}}})
+	lab := validSettings().Lab
+	choices := ControllerDHCPCandidates(observation, lab)
 	if len(choices) != 1 || choices[0] != (DHCPAddressChoice{Address: "192.168.0.198", Device: "enp0s3"}) {
 		t.Fatalf("choices = %+v", choices)
 	}
 	observation.Lifetimes = false
-	if choices := ControllerDHCPCandidates(observation, "10.0.0.99"); len(choices) != 2 {
+	if choices := ControllerDHCPCandidates(observation, lab); len(choices) != 2 {
 		t.Fatalf("choices without lifetimes = %+v", choices)
 	}
 	if check := CheckDHCPAddress("192.168.0.198", choices); !check.Found || check.Message != "" {

@@ -335,16 +335,21 @@ func (preflight *NetworkPreflight) SaveRefusal() string {
 }
 
 // ControllerDHCPCandidates lists the controller's current addresses that can
-// be its DHCP address: IPv4, not link-local, not the laboratory address, and
-// dynamic. Without lifetime information (dynamic unknown) every remaining
-// address is offered.
-func ControllerDHCPCandidates(observation NetworkObservation, labAddress string) []DHCPAddressChoice {
+// be its DHCP address: IPv4, not link-local, outside the static laboratory
+// network, and dynamic. Without lifetime information (dynamic unknown) every
+// remaining address is offered.
+func ControllerDHCPCandidates(observation NetworkObservation, lab LabSettings) []DHCPAddressChoice {
+	labAddress, _ := ControllerStaticAddress(lab)
+	labPrefix, prefixErr := netip.ParsePrefix(fmt.Sprintf("%s/%d", lab.NetworkBase, lab.NetworkPrefix))
 	choices := []DHCPAddressChoice{}
 	seen := map[string]bool{}
 	for _, device := range observation.Devices {
 		for _, address := range device.Addresses {
 			parsed, err := netip.ParseAddr(address.Address)
 			if err != nil || !parsed.Is4() || parsed.IsLinkLocalUnicast() || parsed.IsLoopback() || address.Address == labAddress || seen[address.Address] {
+				continue
+			}
+			if prefixErr == nil && labPrefix.Contains(parsed) {
 				continue
 			}
 			if observation.Lifetimes && !address.Dynamic {
