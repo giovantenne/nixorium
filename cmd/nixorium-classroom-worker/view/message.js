@@ -245,9 +245,12 @@ const classroomTools = (() => {
     return { results };
   }
 
+  const unavailableNotes = { off: 'Switched off or not reachable.', stopped: 'Monitoring stopped on this PC.' };
+
   // Every computer's line lists the steps. A computer counts as done when
-  // each step was; off when none of them could reach it; failed when a step
-  // failed; skipped otherwise (nobody signed in, for example).
+  // each step was; off when none of them could reach it; stopped when its
+  // monitoring stopped for each; failed when a step failed; skipped
+  // otherwise (nobody signed in, for example).
   function summarize(run, results) {
     return names(run).map((name) => {
       const items = run.parts.filter((part) => part.computers.includes(name)).map((part) => {
@@ -261,6 +264,7 @@ const classroomTools = (() => {
         switch (row.outcome) {
           case 'done': return { outcome: 'done', text: step.did[run.phase] };
           case 'off': return { outcome: 'off', text: step.label + ': switched off or not reachable' };
+          case 'stopped': return { outcome: 'stopped', text: step.label + ': monitoring stopped on this PC' };
           case 'skipped': return { outcome: 'skipped', text: step.label + ': ' + row.note };
           default: return { outcome: 'failed', text: step.label + ' failed: ' + row.note };
         }
@@ -269,8 +273,9 @@ const classroomTools = (() => {
       let outcome = 'skipped';
       if (outcomes.every((item) => item === 'done')) outcome = 'done';
       else if (outcomes.every((item) => item === 'off')) outcome = 'off';
+      else if (outcomes.every((item) => item === 'stopped')) outcome = 'stopped';
       else if (outcomes.includes('failed')) outcome = 'failed';
-      return { name, outcome, skip: outcome !== 'done', note: outcome === 'off' ? 'Switched off or not reachable.' : items.map((item) => item.text).join(' · '), items };
+      return { name, outcome, skip: outcome !== 'done', note: unavailableNotes[outcome] || items.map((item) => item.text).join(' · '), items };
     });
   }
 

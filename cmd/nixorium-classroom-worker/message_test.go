@@ -34,8 +34,8 @@ func (session noteSession) HideMessage() error {
 	return nil
 }
 
-// noteLab has pc01 that shows messages, pc02 switched off and pc03 with an
-// agent that predates them.
+// noteLab has pc01 that shows messages, pc02 switched off, pc03 with an
+// agent that predates them and pc04 whose agent stopped.
 type noteLab struct {
 	mutex    sync.Mutex
 	calls    []string
@@ -43,7 +43,9 @@ type noteLab struct {
 }
 
 func (*noteLab) LabMeta(ctx context.Context, repository string) (domain.LabMeta, error) {
-	return deskLab{}.LabMeta(ctx, repository)
+	meta, err := deskLab{}.LabMeta(ctx, repository)
+	meta.Clients.Hosts = append(meta.Clients.Hosts, domain.HostMeta{Name: "pc04", IP: "10.0.0.4"})
+	return meta, err
 }
 
 func (lab *noteLab) Connect(_ context.Context, host domain.HostMeta) (classroomview.Session, error) {
@@ -55,6 +57,8 @@ func (lab *noteLab) Connect(_ context.Context, host domain.HostMeta) (classroomv
 		return noteSession{lab: lab}, nil
 	case "pc03":
 		return screenSession{}, nil
+	case "pc04":
+		return nil, classroomview.AgentError{Code: classroomview.CodeNoAgent}
 	}
 	return nil, classroomview.ErrUnreachable
 }
@@ -139,6 +143,29 @@ func TestPageShowsAMessageAfterAReviewThatQuotesIt(t *testing.T) {
 	// One review, one use.
 	if again := applyResult(t, server, host, cookie, review.ID); again.State != "expired" || len(lab.calls) != 1 {
 		t.Fatalf("second apply = %+v", again)
+	}
+}
+
+func TestPageCountsAStoppedAgentLikeTheOtherUnavailableComputers(t *testing.T) {
+	server, lab, host, cookie := noteServer(t)
+	review := planReview(t, server, host, cookie, `{"action":"message","computers":["pc01","pc04"],"message":{"text":"Wait"}}`)
+	if !review.Ready || review.Confirm != "Send the message to 1 computer" || len(review.Rows) != 2 {
+		t.Fatalf("review = %+v", review)
+	}
+	if row := review.Rows[1]; !row.Skip || row.Name != "pc04" || row.Note != app.ClassroomNoAgentDetail {
+		t.Fatalf("pc04 = %+v", row)
+	}
+	result := applyResult(t, server, host, cookie, review.ID)
+	if row := result.Rows[1]; row.Outcome != outcomeStopped || row.Note != app.ClassroomNoAgentDetail || !row.Skip {
+		t.Fatalf("pc04 result = %+v", row)
+	}
+	if len(lab.calls) != 1 {
+		t.Fatalf("calls = %q", lab.calls)
+	}
+	// Alone, it leaves nothing to send.
+	alone := planReview(t, server, host, cookie, `{"action":"message","computers":["pc04"],"message":{"text":"Wait"}}`)
+	if alone.Ready || alone.ID != "" {
+		t.Fatalf("a stopped agent alone = %+v", alone)
 	}
 }
 

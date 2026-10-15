@@ -126,6 +126,27 @@ const listed = (...entries) => entries.map(([name, steps]) => ({ name, state: 'v
     assert(!s.tools.inExam('pc01') && !s.tools.inExam('pc03'));
   }
 
+  // A computer whose monitoring stopped is counted like the other unavailable
+  // ones: all steps stopped is "stopped", a mix with a step that worked is skipped.
+  {
+    const s = page({
+      plan: (body) => review('id-' + body.action, body.action, okRows('pc01', 'pc02')),
+      apply: (body) => ({ state: 'partial', rows: [
+        { name: 'pc01', outcome: body.id === 'id-internet-block' ? 'done' : 'stopped', skip: body.id !== 'id-internet-block', note: 'Monitoring stopped on this PC.' },
+        { name: 'pc02', outcome: 'stopped', skip: true, note: 'Monitoring stopped on this PC.' }] }),
+    });
+    s.tools.exam(['pc01', 'pc02']);
+    await s.get('exam-review').fire('click');
+    await settle();
+    await s.get('action-confirm').fire('click');
+    const byName = Object.fromEntries(s.results[0][1].rows.map((row) => [row.name, row]));
+    assert.strictEqual(byName.pc01.outcome, 'skipped');
+    assert.strictEqual(byName.pc01.note, 'Internet blocked · Screen: monitoring stopped on this PC · Message: monitoring stopped on this PC');
+    assert.strictEqual(byName.pc02.outcome, 'stopped');
+    assert.strictEqual(byName.pc02.note, 'Monitoring stopped on this PC.');
+    assert.strictEqual(s.results[0][1].state, 'partial');
+  }
+
   // Nothing chosen, or a bad message, stays in the dialog.
   {
     const s = page({ plan: () => assert.fail('no review'), apply: () => assert.fail('no apply') });

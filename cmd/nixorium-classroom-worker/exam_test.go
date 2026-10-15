@@ -229,6 +229,12 @@ func TestWorkerEndsExamStepsItSeesEnd(t *testing.T) {
 	if got := steps(); got != "internet,lock,message" {
 		t.Fatalf("a computer behind its own lock screen = %q", got)
 	}
+	// A computer whose monitoring stopped still has its session, and so its
+	// steps; the teacher can end them when it answers again.
+	*state = app.ClassroomNoAgent
+	if got := steps(); got != "internet,lock,message" {
+		t.Fatalf("monitoring stopped = %q", got)
+	}
 	// Nobody signed in ends the lock and the message; the Internet block
 	// stays until the computer restarts.
 	*state = app.ClassroomNoSession

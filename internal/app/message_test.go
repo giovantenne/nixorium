@@ -193,6 +193,40 @@ func TestMessageOutcomesSayWhatWentWrong(t *testing.T) {
 	}
 }
 
+func TestMessageSaysWhenMonitoringStoppedOnAComputer(t *testing.T) {
+	// At the review, the computer's agent does not answer: it is listed with
+	// the words of the lock and skipped.
+	source := messageLab()
+	source.away["pc02"] = classroomview.AgentError{Code: classroomview.CodeNoAgent}
+	manager := NewMessageManager(source)
+	plan := manager.Plan(context.Background(), "/srv/lab", "pc01,pc02", domain.MessageShow, domain.MessageContent{Text: "Wait"})
+	if plan.HasErrors() || plan.Targets[1].Eligible || plan.Targets[1].Detail != ClassroomNoAgentDetail {
+		t.Fatalf("plan = %+v", plan)
+	}
+	report := manager.Apply(context.Background(), plan, plan.ReviewToken)
+	if got := report.Targets[1]; got.State != domain.MessageNotSent || !strings.Contains(got.Detail, "Unavailable in the reviewed plan") {
+		t.Fatalf("pc02 = %+v", got)
+	}
+	// Between the review and the apply the agent stopped answering: the
+	// computer is not sent anything and says why with the same words.
+	source = messageLab()
+	manager = NewMessageManager(source)
+	plan = manager.Plan(context.Background(), "/srv/lab", "pc01", domain.MessageShow, domain.MessageContent{Text: "Wait"})
+	source.away["pc01"] = classroomview.AgentError{Code: classroomview.CodeNoAgent}
+	report = manager.Apply(context.Background(), plan, plan.ReviewToken)
+	if got := report.Targets[0]; got.State != domain.MessageNotSent || got.Detail != ClassroomNoAgentDetail {
+		t.Fatalf("pc01 = %+v", got)
+	}
+	// An agent that answers hello and then loses its relay mid-message.
+	source = messageLab()
+	source.errors["pc01"] = classroomview.AgentError{Code: classroomview.CodeNoAgent}
+	manager = NewMessageManager(source)
+	plan = manager.Plan(context.Background(), "/srv/lab", "pc01", domain.MessageShow, domain.MessageContent{Text: "Wait"})
+	if report = manager.Apply(context.Background(), plan, plan.ReviewToken); report.Targets[0].State != domain.MessageNotSent || report.Targets[0].Detail != ClassroomNoAgentDetail {
+		t.Fatalf("pc01 = %+v", report.Targets[0])
+	}
+}
+
 func TestMessageDurationWording(t *testing.T) {
 	for content, want := range map[domain.MessageContent]string{
 		{Text: "x"}:                    "A student can close it after 10 seconds.",

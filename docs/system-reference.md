@@ -595,7 +595,9 @@ it stays: until the student closes it (**Close** appears after 10 seconds),
 not locked lets the student close it). The review shows the text and the
 computers, one button such as "Send the message to 12 computers" confirms,
 and the notice counts them, such as "Message: 12 shown · 1 switched off or not
-reachable". Like the lock it takes no administrative operation lock, and its
+reachable"; computers that are off, have nobody signed in or show "Monitoring
+stopped on this PC" are listed and skipped, like for the lock. Like the lock it
+takes no administrative operation lock, and its
 review token binds the text and the duration. The agent answers `message.show`
 (`text`, and `seconds` or `untilUnlock`; checked again against the same
 limits, 600 seconds at most) with `message.shown`, and `message.hide` with
