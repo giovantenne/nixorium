@@ -141,8 +141,8 @@ let
 
   # A change of laboratory network in progress (managed by the guided change).
   # The same host numbers keep their previous addresses on the previous
-  # network: the controller carries both, clients trust both controller
-  # addresses. Without clients the record is ignored and reported.
+  # network: the controller and every client carry both, clients trust both
+  # controller addresses. Without clients the record is ignored and reported.
   networkTransitionRecord = config.networkTransition;
   networkTransitionIgnored = networkTransitionRecord != null && pcCount == 0;
   networkTransition =
@@ -151,6 +151,10 @@ let
       base = networkTransitionRecord.previousBase;
       prefixLength = networkTransitionRecord.previousPrefixLength;
       masterIp = previousMasterIp;
+      # Each client's previous address, by host name.
+      hostIps = builtins.listToAttrs (lib.zipListsWith
+        (n: ip: { name = "pc${padNumber n}"; value = ip; })
+        clientNumbers previousClientIps);
     };
   mkPreviousHostIp = number:
     ipv4FromInt (ipv4ToInt networkTransitionRecord.previousBase + number);

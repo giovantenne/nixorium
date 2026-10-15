@@ -394,19 +394,24 @@ assert transitionLab.labMeta.network.transition == {
   }) 20;
 };
 assert (builtins.head transitionLab.labMeta.clients.hosts).ip == "10.1.0.1";
-assert transitionLab.nixosConfigurations.pc01._module.specialArgs.labSettings.networkTransition
+assert removeAttrs transitionLab.nixosConfigurations.pc01._module.specialArgs.labSettings.networkTransition [ "hostIps" ]
   == { base = "10.0.0.0"; prefixLength = 24; masterIp = "10.0.0.99"; };
-# Clients take only the new address, accept SSH from both controller
-# addresses and try the new controller cache first.
+assert transitionLab.nixosConfigurations.pc01._module.specialArgs.labSettings.networkTransition.hostIps.pc20 == "10.0.0.20";
+# Clients take the new address and keep the previous one, accept SSH from
+# both controller addresses and try the new controller cache first; the
+# running card takes the changed profile at once.
 assert transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "10.1.0.1/24";
-assert !(transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4 ? address2);
+assert transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address2 == "10.0.0.1/24";
+assert lib.hasInfix "nmcli device reapply" transitionClient.systemd.services.NetworkManager-ensure-profiles.postStart;
+assert !(lib.hasInfix "nmcli device reapply" movedLab.nixosConfigurations.pc01.config.systemd.services.NetworkManager-ensure-profiles.postStart);
+assert !(movedLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4 ? address2);
 assert transitionClient.networking.firewall.extraInputRules
   == "ip saddr 10.1.0.99 tcp dport 22 accept\nip saddr 10.0.0.99 tcp dport 22 accept\n";
 assert transitionClient.networking.nftables.tables.nixorium-client-access.content
   == "chain input {\n  type filter hook input priority -10; policy accept;\n  iifname \"lo\" accept\n  ip saddr 10.1.0.99 tcp dport 22 accept\n  ip saddr 10.0.0.99 tcp dport 22 accept\n  tcp dport 22 drop\n  udp dport 5353 drop\n}\n";
 assert labHttpSubstituters transitionClient == [ "http://10.1.0.99:5000" "http://10.0.0.99:5000" ];
 assert plainAddresses transitionNamedLab.nixosConfigurations.pc01.config.networking.interfaces.enp2s0.ipv4.addresses
-  == [ { address = "10.1.0.1"; prefixLength = 24; } ];
+  == [ { address = "10.1.0.1"; prefixLength = 24; } { address = "10.0.0.1"; prefixLength = 24; } ];
 assert transitionNamedLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules
   == "iifname \"enp2s0\" ip saddr 10.1.0.99 tcp dport 22 accept\niifname \"enp2s0\" ip saddr 10.0.0.99 tcp dport 22 accept\n";
 # The classroom Internet block keeps both laboratory networks reachable.
