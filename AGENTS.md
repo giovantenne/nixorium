@@ -172,6 +172,14 @@ nightly on `master` and on demand, so failures surface before a tag; ordinary
 pushes do not run it. Each job has a 240-minute limit; failure or timeout of
 any shard must block publication.
 
+After the GitHub Release is published, update the website in the same session:
+in `nixorium-website`, regenerate the product pin on the tagged commit
+(`NIXORIUM_PRODUCT_ROOT=… NIXORIUM_PRODUCT_REV=<tag commit> npm run
+demos:generate`), review the technician guide against the new changelog, build,
+and push `master` (production) and `master:staging`. The site shows the pinned
+version in its footer and on `/docs/`, linked to that release's notes, so a
+release is not finished until the site follows it.
+
 ## Architecture Notes
 
 - Public controller bootstrap must resolve the selected branch/tag once to a

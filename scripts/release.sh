@@ -70,3 +70,4 @@ git tag --annotate "${TAG}" --message "Nixorium ${TAG}"
 git push origin "${TAG}"
 
 echo "Pushed ${TAG}. GitHub Actions will publish the release only after full validation succeeds."
+echo "When the release is published, update the website pin (nixorium-website: npm run demos:generate on ${TAG}, review the technician guide, push master and master:staging)."
