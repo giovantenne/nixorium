@@ -983,7 +983,10 @@ undone, what the undo does to those files, and the steps that follow. Applying
 it (confirm by typing `UNDO`) saves one new change named `Undo: <description of the
 undone change>` and puts the files back; the undone change stays in the history
 and nothing is pushed. No computer changes yet: run **Apply to controller**, then
-**Update computers**, so the controller and the student computers return too. Save
+**Update computers**, so the controller and the student computers return too. In
+the dashboard, Enter on the result opens the ordinary Apply to controller review
+(and Update computers once the controller runs the saved configuration), as after
+a settings save; Esc returns to Maintenance. Save
 or discard other unsaved changes first; the review stops with the same
 unsaved-changes step as any other operation.
 

@@ -12,9 +12,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   back from the last saved change (settings, software, student workspace):
   the review shows its description, date and files, and applying it (typed
   `UNDO`) saves one new "Undo: ..." change and puts the files back. In the
-  dashboard press `u` on **Maintenance → Review Git changes**. Nothing is
-  pushed and no computer changes; apply to the controller and update the
-  computers as usual. It refuses, and names the next step, unsaved changes, a
+  dashboard press `u` on **Maintenance → Review Git changes**; Enter on the
+  result opens Apply to controller. Nothing is pushed and no computer changes;
+  apply to the controller and update the computers as usual. It refuses, and names the next step, unsaved changes, a
   first version, a merge, an earlier undo, an update of Nixorium or of the
   package base (see the update recovery), recorded keys, a change of the
   laboratory network and files that cannot go back safely.

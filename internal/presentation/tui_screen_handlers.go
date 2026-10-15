@@ -1012,6 +1012,12 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 	switch model.screen {
 	case dashboardGitReview:
 		if model.maintenance.gitCommitResult.Operation != "" || model.maintenance.gitUndoResult.Operation != "" {
+			// A saved undo continues like a settings save: Enter opens the
+			// ordinary Apply to controller review (or Update computers once the
+			// controller runs the saved revision); Esc returns to Maintenance.
+			if key.String() == "enter" && model.maintenance.gitUndoResult.Operation != "" && hasAction(model.saveFollowupActions(""), "Enter") {
+				return model.continueSavedConfiguration()
+			}
 			switch key.String() {
 			case "enter", "esc", "left":
 				if model.maintenance.gitFromHomeFiles {

@@ -395,7 +395,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardLogs, dashboardLogDetail:
 		lines = append(lines, "Enter open log   r refresh list   ↑/↓/pg scroll detail")
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview, dashboardGitUndoReview:
-		lines = append(lines, "c select commit paths   x discard changes   u undo the last saved change   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "COMMIT creates a local commit; DISCARD restores files after saving their content; UNDO saves a new change that puts the files of the last saved change back. Nothing is pushed and no computer changes.", "After an undo, apply to the controller and then update the computers.")
+		lines = append(lines, "c select commit paths   x discard changes   u undo the last saved change   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "COMMIT creates a local commit; DISCARD restores files after saving their content; UNDO saves a new change that puts the files of the last saved change back. Nothing is pushed and no computer changes.", "After an undo, Enter on the result opens Apply to controller; then update the computers.")
 	case dashboardUpdate, dashboardUpdateReview:
 		lines = append(lines, "During validation: l expands or collapses current check details in place.")
 		if model.updates.packageBase {

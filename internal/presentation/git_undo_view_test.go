@@ -34,7 +34,13 @@ func undoActions(t *testing.T, plan domain.GitUndoPlanReport, applied *int) Dash
 	review := domain.GitReviewReport{Operation: "git-review", State: "clean"}
 	return DashboardActions{
 		LoadGitReview: func(context.Context) domain.GitReviewReport { return review },
-		PlanGitUndo:   func(context.Context) domain.GitUndoPlanReport { return plan },
+		PlanController: func(context.Context) domain.ControllerRebuildPlanReport {
+			return domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "ready", Controller: "pc99", Revision: strings.Repeat("d", 40), Confirmation: "REBUILD"}
+		},
+		ApplyController: func(controller domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			return domain.ControllerRebuildExecutionReport{State: "completed", Applied: true, Verified: true, Revision: controller.Revision}
+		},
+		PlanGitUndo: func(context.Context) domain.GitUndoPlanReport { return plan },
 		ApplyGitUndo: func(reviewed domain.GitUndoPlanReport) domain.GitUndoReport {
 			*applied++
 			if reviewed.ReviewToken != plan.ReviewToken {
@@ -131,9 +137,73 @@ func TestDashboardUndoesTheLastSavedChangeAfterReviewAndTypedWord(t *testing.T) 
 	if model.controllerObservation != controllerOverviewPending {
 		t.Fatal("the Overview was not told that a new saved version waits for the controller")
 	}
-	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !strings.Contains(view, "Enter") || !strings.Contains(view, "Apply to this controller") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Maintenance") {
+		t.Fatalf("the result does not offer the controller review and the way back:\n%s", view)
+	}
+	// Esc returns to Maintenance without starting anything.
+	if back, command := pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEscape}); command != nil || back.screen != dashboardAdministration {
+		t.Fatalf("Esc did not return to Maintenance: screen = %d", back.screen)
+	}
+}
+
+func TestUndoResultContinuesToTheOrdinaryControllerReview(t *testing.T) {
+	applied := 0
+	model := openGitReviewFor(t, undoActions(t, undoTestPlan(), &applied), 120, 40)
+	model, command := pressUndoKey(t, model, tea.KeyPressMsg{Text: "u"})
+	updated, _ := model.Update(command())
+	model = updated.(dashboardModel)
+	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Text: "UNDO"})
+	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+
+	// Enter reviews the saved revision for this controller; the undo result
+	// stays behind it.
+	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if command == nil || model.busy == "" || !model.controller.fromSave || model.controller.saveOrigin != dashboardGitReview {
+		t.Fatalf("the controller review did not start: busy %q, fromSave %t", model.busy, model.controller.fromSave)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	if model.screen != dashboardControllerReview || !strings.Contains(view, "Apply the saved configuration to this controller?") || !strings.Contains(view, "Press Enter to build, activate, and verify this controller.") {
+		t.Fatalf("the ordinary Apply to controller review did not open (screen %d):\n%s", model.screen, view)
+	}
+	if applied != 1 {
+		t.Fatalf("the undo ran %d times", applied)
+	}
+	// Esc leaves the review untouched and returns to the undo result, whose
+	// numbered next steps are still there; Esc again returns to Maintenance.
+	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if command != nil || model.screen != dashboardGitReview || model.controller.fromSave || model.maintenance.gitUndoResult.Operation != "git-undo" {
+		t.Fatalf("Esc did not return to the undo result: screen %d", model.screen)
+	}
+	if view := model.View().Content; !strings.Contains(view, "1. Apply to controller") || !strings.Contains(view, "2. Update computers") {
+		t.Fatalf("the next steps were lost:\n%s", view)
+	}
+	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if model.screen != dashboardAdministration {
-		t.Fatalf("the result did not return to Maintenance: screen = %d", model.screen)
+		t.Fatalf("Esc did not return to Maintenance: screen = %d", model.screen)
+	}
+}
+
+func TestUndoResultEnterReturnsWhenThereIsNothingToChainTo(t *testing.T) {
+	applied := 0
+	actions := undoActions(t, undoTestPlan(), &applied)
+	actions.PlanController, actions.ApplyController = nil, nil
+	model := openGitReviewFor(t, actions, 120, 40)
+	model, command := pressUndoKey(t, model, tea.KeyPressMsg{Text: "u"})
+	updated, _ := model.Update(command())
+	model = updated.(dashboardModel)
+	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Text: "UNDO"})
+	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if view := model.View().Content; strings.Contains(view, "Apply to this controller") {
+		t.Fatalf("a controller review is offered without its callbacks:\n%s", view)
+	}
+	if model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter}); command != nil || model.screen != dashboardAdministration {
+		t.Fatalf("Enter did not return to Maintenance: screen = %d", model.screen)
 	}
 }
 
@@ -268,7 +338,7 @@ func TestGitReviewHelpMentionsTheUndo(t *testing.T) {
 	model := openGitReviewFor(t, undoActions(t, undoTestPlan(), &applied), 160, 50)
 	model.helpOpen = true
 	view := model.View().Content
-	for _, expected := range []string{"u undo the last saved change", "UNDO saves a new change", "apply to the controller and then update the computers"} {
+	for _, expected := range []string{"u undo the last saved change", "UNDO saves a new change", "Enter on the result opens Apply to controller; then update the computers"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("help lacks %q:\n%s", expected, view)
 		}

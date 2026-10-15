@@ -176,6 +176,13 @@ func (model dashboardModel) gitUndoResultView(path []string, backLabel string) s
 	if model.setupMode {
 		returnLabel = "Setup"
 	}
+	actions := []tuiAction{{key: "Enter", label: returnLabel}, {key: "r", label: "Refresh review"}, {key: "F1", label: "Help"}}
+	if success {
+		if followup := model.saveFollowupActions(returnLabel); hasAction(followup, "Enter") {
+			// Enter continues to the controller; Esc is the way back.
+			actions = insertBeforeHelp(followup, tuiAction{key: "r", label: "Refresh review"})
+		}
+	}
 	notices := []tuiNotice{}
 	if model.message != "" {
 		kind := tuiStatusAttention
@@ -187,7 +194,7 @@ func (model dashboardModel) gitUndoResultView(path []string, backLabel string) s
 	if !success {
 		notices = append(notices, gitUndoRefusalNotices(result.Issues)...)
 	}
-	return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: returnLabel}, {key: "r", label: "Refresh review"}, {key: "F1", label: "Help"}}})
+	return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
 // startGitUndoReview asks for the review of undoing the last saved change.

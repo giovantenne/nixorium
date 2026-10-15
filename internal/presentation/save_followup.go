@@ -63,6 +63,11 @@ func (model dashboardModel) saveFollowupState() (saved bool, revision string) {
 	case dashboardNetworkChange:
 		r := model.networkChange.result
 		return !r.HasErrors() && !r.RecoveryRequired && r.State == "saved", r.Revision
+	case dashboardGitReview:
+		// Only the undo of the last saved change chains to the controller; a
+		// reviewed commit or discard keeps its own Enter.
+		r := model.maintenance.gitUndoResult
+		return r.Operation != "" && r.State == "completed" && r.Committed && !r.HasErrors(), r.Revision
 	}
 	return false, ""
 }
