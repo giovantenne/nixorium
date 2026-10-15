@@ -221,6 +221,7 @@ let
   controllerTCP = controllerFirewall.interfaces.enp0s3.allowedTCPPorts;
   controllerUDP = controllerFirewall.interfaces.enp0s3.allowedUDPPorts;
   allInterfaceTCP = firewall: lib.concatMap (iface: iface.allowedTCPPorts) (lib.attrValues firewall.interfaces);
+  allInterfaceUDP = firewall: lib.concatMap (iface: iface.allowedUDPPorts) (lib.attrValues firewall.interfaces);
   clientTCP = allInterfaceTCP clientFirewall;
   nativeClient = plainLab.nixosConfigurations.pc01.config;
   nativeClientTCP = allInterfaceTCP plainLab.nixosConfigurations.pc01.config.networking.firewall;
@@ -379,7 +380,7 @@ assert plainAddresses transitionController.networking.interfaces.enp0s3.ipv4.add
   { address = "10.0.0.99"; prefixLength = 24; }
 ];
 assert builtins.all (port: builtins.elem port transitionController.networking.firewall.interfaces.enp0s3.allowedTCPPorts) [ 22 5000 8080 ];
-assert builtins.all (port: builtins.elem port transitionController.networking.firewall.interfaces.enp0s3.allowedUDPPorts) [ 67 69 4011 ];
+assert builtins.all (port: builtins.elem port transitionController.networking.firewall.interfaces.enp0s3.allowedUDPPorts) [ 67 69 4011 123 ];
 assert transitionController.services.harmonia.cache.settings.bind == "[::]:5000";
 assert transitionLab.labMeta.controller.staticIp == "10.1.0.99";
 assert transitionLab.labMeta.network.base == "10.1.0.0";
@@ -434,6 +435,44 @@ assert builtins.elem
   "lab.networkTransition is ignored because no client computers are configured; remove it from lab-settings.json"
   ignoredTransitionLab.nixosConfigurations.pc99.config.warnings;
 assert !(builtins.any (lib.hasInfix "networkTransition") controllerOnly.warnings);
+# Time (modules/time.nix). The controller runs chrony, serves the laboratory
+# network only and listens on its laboratory address; UDP 123 is open on the
+# laboratory interface only (a client opens no port: it is a client). Every
+# client takes the time from the controller alone, with no Internet pool even
+# as a fallback; controller-only mode keeps the NixOS defaults.
+assert subnetLab.nixosConfigurations.pc99.config.services.chrony.enable;
+assert !subnetLab.nixosConfigurations.pc99.config.services.timesyncd.enable;
+assert subnetLab.nixosConfigurations.pc99.config.services.chrony.extraConfig
+  == "allow 10.23.4.128/25\nlocal stratum 10 waitunsynced 300\nbindaddress 10.23.4.227\n";
+assert builtins.elem 123 controllerUDP;
+assert !(builtins.elem 123 (allInterfaceUDP subnetLab.nixosConfigurations.pc01.config.networking.firewall));
+assert subnetLab.nixosConfigurations.pc99.config.services.chrony.servers
+  == subnetLab.nixosConfigurations.pc99.config.networking.timeServers;
+assert builtins.length subnetLab.nixosConfigurations.pc99.config.services.chrony.servers > 0;
+assert !subnetLab.nixosConfigurations.pc01.config.services.chrony.enable;
+assert subnetLab.nixosConfigurations.pc01.config.services.timesyncd.enable;
+assert subnetLab.nixosConfigurations.pc01.config.services.timesyncd.servers == [ "10.23.4.227" ];
+assert subnetLab.nixosConfigurations.pc01.config.services.timesyncd.fallbackServers == [ ];
+assert subnetLab.nixosConfigurations.pc01.config.networking.timeServers == [ "10.23.4.227" ];
+assert subnetLab.nixosConfigurations.pc01.config.environment.etc."systemd/timesyncd.conf".text
+  == "[Time]\nNTP=10.23.4.227\nFallbackNTP=\n";
+assert roleInterfaceLab.nixosConfigurations.pc01.config.services.timesyncd.servers == [ "10.0.0.99" ];
+assert roleInterfaceLab.nixosConfigurations.pc01.config.services.timesyncd.fallbackServers == [ ];
+assert lib.hasInfix "allow 10.0.0.0/24\n" roleInterfaceLab.nixosConfigurations.pc99.config.services.chrony.extraConfig;
+assert !controllerOnly.services.chrony.enable;
+assert controllerOnly.services.timesyncd.enable;
+assert controllerOnly.services.timesyncd.servers == null;
+assert controllerOnly.services.timesyncd.fallbackServers == controllerOnly.networking.timeServers;
+assert builtins.length controllerOnly.networking.timeServers > 0;
+# During a change of laboratory network the controller serves both networks
+# and clients list the new controller address first and the previous second.
+assert transitionController.services.chrony.extraConfig
+  == "allow 10.1.0.0/24\nallow 10.0.0.0/24\nlocal stratum 10 waitunsynced 300\n";
+assert transitionClient.services.timesyncd.servers == [ "10.1.0.99" "10.0.0.99" ];
+assert transitionClient.services.timesyncd.fallbackServers == [ ];
+assert movedLab.nixosConfigurations.pc99.config.services.chrony.extraConfig
+  == "allow 10.1.0.0/24\nlocal stratum 10 waitunsynced 300\nbindaddress 10.1.0.99\n";
+assert movedLab.nixosConfigurations.pc01.config.services.timesyncd.servers == [ "10.1.0.99" ];
 # Temporary Internet block rules: name-based only for explicit names.
 assert builtins.length (lib.splitString "oifname" (import ../lib/client-internet-rules.nix { interface = null; networkCidr = "10.0.0.0/24"; })) == 2;
 assert lib.hasInfix "oifname \"enp2s0\" ip daddr 10.0.0.0/24 accept" (import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; });
@@ -597,8 +636,8 @@ assert controllerFirewall.allowedTCPPorts == [];
 assert controllerFirewall.allowedUDPPorts == [];
 assert builtins.all (port: builtins.elem port controllerTCP) [ 22 5000 8080 ];
 assert builtins.length controllerTCP == 3;
-assert builtins.all (port: builtins.elem port controllerUDP) [ 67 69 4011 5353 ];
-assert builtins.length controllerUDP == 4;
+assert builtins.all (port: builtins.elem port controllerUDP) [ 67 69 4011 5353 123 ];
+assert builtins.length controllerUDP == 5;
 assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-prepare-pxe");
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-restart-cache");
@@ -608,6 +647,8 @@ assert clientFirewall.enable;
 assert clientFirewall.allowedTCPPorts == [];
 assert clientFirewall.allowedUDPPorts == [];
 assert clientTCP == [];
+assert allInterfaceUDP clientFirewall == [];
+assert allInterfaceUDP roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall == [];
 assert !(clientFirewall.interfaces ? enp0s3);
 assert nativeClientTCP == [];
 assert !(controllerOnly.systemd.services ? nixorium-internet-block);
