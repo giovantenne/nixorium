@@ -93,6 +93,13 @@ func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, 
 		return domain.UpdateInputSnapshot{}, errors.New("flake.lock nixorium revision is missing")
 	}
 	snapshot.CurrentRev = node.Locked.Rev
+	if mismatches, err := flakeLockOriginalMismatches(flake, lock); err == nil {
+		for _, mismatch := range mismatches {
+			if strings.HasPrefix(mismatch, "nixorium:") {
+				snapshot.PinOutdated = mismatch
+			}
+		}
+	}
 	return snapshot, nil
 }
 
@@ -213,38 +220,82 @@ func (Local) PrepareUpdateWithProgress(ctx context.Context, repository, target s
 		return domain.UpdateProposal{}, err
 	}
 	targetURL := "github:" + snapshot.SourcePrefix + "/" + target
-	lockFile, err := os.CreateTemp("", "nixorium-update-lock-*.json")
+	// The framework update owns only nixorium. A package-base pin that already
+	// disagrees with flake.nix would be relocked here; refuse instead.
+	mismatches, err := flakeLockOriginalMismatches(snapshot.FlakeContent, snapshot.LockContent)
 	if err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("create candidate lock path: %w", err)
+		return domain.UpdateProposal{}, err
 	}
-	lockPath := lockFile.Name()
-	if err := lockFile.Close(); err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("close candidate lock path: %w", err)
+	for _, mismatch := range mismatches {
+		if strings.HasPrefix(mismatch, "nixpkgs:") {
+			return domain.UpdateProposal{}, fmt.Errorf("flake.lock does not match flake.nix (%s); in the deployment folder run `nix flake lock`, save flake.lock in Maintenance → Review Git changes, then update again", mismatch)
+		}
 	}
-	if err := os.Remove(lockPath); err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("initialize candidate lock path: %w", err)
-	}
-	defer os.Remove(lockPath)
-	flake, err := deploymentFlakeReference(ctx, repository)
+	current, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseLock, "Resolving the selected release and generating its candidate lock", 0, 0)
-	if _, err := runBoundedNix(ctx, 256*1024, "flake", "lock", flake, "--override-input", "nixorium", targetURL, "--output-lock-file", lockPath); err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("generate candidate flake.lock: %w", err)
-	}
-	proposedLock, _, err := readRegularFileNoFollowLimit(lockPath, 4*1024*1024)
+	proposedLock, err := lockUpdateCandidate(ctx, repository, proposedFlake, "nixorium", targetURL)
 	if err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("read candidate flake.lock: %w", err)
+		return domain.UpdateProposal{}, err
 	}
 	if err := preserveDeploymentInputNode(snapshot.LockContent, proposedLock, "nixpkgs"); err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("validate candidate package-base pin: %w", err)
 	}
-	common := []string{"--override-input", "nixorium", targetURL, "--reference-lock-file", lockPath, "--no-write-lock-file"}
-	return validateUpdateCandidate(ctx, flake, common, snapshot, proposedFlake, proposedLock, progress, false)
+	return validateUpdateCandidate(ctx, repository, current, snapshot, proposedFlake, proposedLock, progress, false)
 }
 
-func validateUpdateCandidate(ctx context.Context, flake string, common []string, snapshot domain.UpdateInputSnapshot, proposedFlake, proposedLock []byte, progress func(domain.UpdatePlanProgress), packageBase bool) (domain.UpdateProposal, error) {
+// lockUpdateCandidate locks the proposed flake.nix against the current
+// flake.lock. Only the named input is resolved again (the override fetches
+// targetURL even when the reference is a moving branch); Nix keeps every
+// other node. Because the proposed flake.nix already declares targetURL, the
+// recorded "original" matches the file that will be saved.
+func lockUpdateCandidate(ctx context.Context, repository string, proposedFlake []byte, input, targetURL string, extra ...string) ([]byte, error) {
+	source, err := candidateFlakeSource(ctx, repository, map[string][]byte{"flake.nix": proposedFlake})
+	if err != nil {
+		return nil, err
+	}
+	directory, err := os.MkdirTemp("", "nixorium-update-lock-*")
+	if err != nil {
+		return nil, fmt.Errorf("create candidate lock path: %w", err)
+	}
+	defer os.RemoveAll(directory)
+	lockPath := filepath.Join(directory, "flake.lock")
+	arguments := append([]string{"flake", "lock", source, "--override-input", input, targetURL}, extra...)
+	arguments = append(arguments, "--output-lock-file", lockPath)
+	if _, err := runBoundedNix(ctx, 256*1024, arguments...); err != nil {
+		return nil, fmt.Errorf("generate candidate flake.lock: %w", err)
+	}
+	lock, _, err := readRegularFileNoFollowLimit(lockPath, 4*1024*1024)
+	if err != nil {
+		return nil, fmt.Errorf("read candidate flake.lock: %w", err)
+	}
+	return lock, nil
+}
+
+// candidateLockMismatch is the refusal when a candidate flake.lock would
+// not be accepted by Nix as-is next to the proposed flake.nix.
+const candidateLockMismatch = "flake.lock does not match flake.nix in the candidate; the update was refused and nothing was changed"
+
+// validateUpdateCandidate evaluates and builds exactly the proposed pair of
+// files. The candidate is an immutable copy with the proposed flake.nix and
+// flake.lock, used with --no-update-lock-file and never with
+// --no-write-lock-file (which would let Nix silently relock in memory): a
+// pair that Nix would want to change is refused before anything else.
+func validateUpdateCandidate(ctx context.Context, repository, currentFlake string, snapshot domain.UpdateInputSnapshot, proposedFlake, proposedLock []byte, progress func(domain.UpdatePlanProgress), packageBase bool) (domain.UpdateProposal, error) {
+	if mismatches, err := flakeLockOriginalMismatches(proposedFlake, proposedLock); err != nil || len(mismatches) > 0 {
+		return domain.UpdateProposal{}, fmt.Errorf("%s: %s", candidateLockMismatch, strings.Join(mismatches, "; "))
+	}
+	flake, err := candidateFlakeSource(ctx, repository, map[string][]byte{"flake.nix": proposedFlake, "flake.lock": proposedLock})
+	if err != nil {
+		return domain.UpdateProposal{}, err
+	}
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Checking that the candidate flake.lock matches flake.nix", 0, 0)
+	if _, err := runBoundedNix(ctx, 64*1024, "flake", "lock", "--no-update-lock-file", flake); err != nil {
+		return domain.UpdateProposal{}, fmt.Errorf("%s: %w", candidateLockMismatch, err)
+	}
+	common := []string{"--no-update-lock-file"}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Evaluating candidate laboratory metadata", 0, 0)
 	metaOutput, err := runBoundedNix(ctx, 1024*1024, append([]string{"eval", flake + "#labMeta", "--json"}, common...)...)
 	if err != nil {
@@ -268,7 +319,7 @@ func validateUpdateCandidate(ctx context.Context, flake string, common []string,
 		return domain.UpdateProposal{}, err
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Comparing pinned student workspace dependencies", 0, 0)
-	workspace, err := inspectWorkspaceUpdate(ctx, flake, common)
+	workspace, err := inspectWorkspaceUpdate(ctx, currentFlake, flake, common)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}

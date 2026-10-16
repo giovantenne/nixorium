@@ -1991,6 +1991,9 @@ func (model dashboardModel) updateView() string {
 		"A confirmed update activates this controller; client distribution remains separate.",
 	)
 	notices := []tuiNotice{}
+	if model.updates.check.PinOutdated != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The saved Nixorium version is recorded inconsistently. Select the current version (or a newer one) to repair it before updating the computers."})
+	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
@@ -2086,7 +2089,8 @@ func updateCheckFailureSummary(report domain.UpdateCheckReport) (string, string)
 }
 
 func updateReleaseAlreadyCurrent(report domain.UpdateCheckReport, release domain.UpdateRelease) bool {
-	if release.Tag != report.CurrentRef {
+	// An outdated saved record is repaired by planning the same version again.
+	if release.Tag != report.CurrentRef || report.PinOutdated != "" {
 		return false
 	}
 	if release.Channel != domain.UpdateChannelMoving {
@@ -2098,6 +2102,9 @@ func updateReleaseAlreadyCurrent(report domain.UpdateCheckReport, release domain
 func updateReleaseStatus(report domain.UpdateCheckReport, release domain.UpdateRelease) string {
 	if release.Tag != report.CurrentRef {
 		return ""
+	}
+	if report.PinOutdated != "" {
+		return "  Current · select to repair"
 	}
 	if release.Channel != domain.UpdateChannelMoving {
 		return "  Current"

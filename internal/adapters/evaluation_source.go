@@ -60,25 +60,6 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 			return "", errors.New("cannot materialize the reviewed deployment source; retry after checking pinned inputs")
 		}
 	}
-	public, _, err := readRecoveryFile(filepath.Join(metadata.Path, settingsFileName), 1024*1024)
-	if err != nil {
-		return "", fmt.Errorf("read tracked settings from %s: %w", metadata.Path, err)
-	}
-	settings, issues := domain.DecodeLabSettings(public)
-	if len(issues) != 0 {
-		return "", domain.Blocked("SETTINGS-INVALID", errors.New("deployment settings are invalid; repair them in Change settings"))
-	}
-	if settings.Lab.CredentialsVersion != credentials.Version {
-		return "", errors.New("account credentials do not match this configuration; set all passwords again or restore its complete backup")
-	}
-	if settings.Lab.AdminPassword != "" || settings.Lab.TeacherPassword != "" || settings.Lab.StudentPassword != "" {
-		return "", errors.New("refusing password hashes in tracked settings")
-	}
-	settings.Lab.AdminPassword, settings.Lab.TeacherPassword, settings.Lab.StudentPassword = credentials.Admin, credentials.Teacher, credentials.Student
-	injected, err := domain.MarshalLabSettings(settings)
-	if err != nil {
-		return "", err
-	}
 	stage, err := os.MkdirTemp("", "nixorium-evaluation-*")
 	if err != nil {
 		return "", err
@@ -87,7 +68,7 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	if err := copyEvaluationSource(metadata.Path, stage); err != nil {
 		return "", fmt.Errorf("copy tracked source: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(stage, settingsFileName), injected, 0600); err != nil {
+	if err := injectEvaluationAccounts(stage, metadata.Path, credentials); err != nil {
 		return "", err
 	}
 	sourceRevision := metadata.Revision
@@ -109,6 +90,31 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 		return "", errors.New("Nix returned an invalid prepared source path")
 	}
 	return "path:" + storePath, nil
+}
+
+// injectEvaluationAccounts reads the tracked settings from source and writes
+// them, with the account hashes of the private credentials file, into stage.
+func injectEvaluationAccounts(stage, source string, credentials domain.LabCredentials) error {
+	public, _, err := readRecoveryFile(filepath.Join(source, settingsFileName), 1024*1024)
+	if err != nil {
+		return fmt.Errorf("read tracked settings from %s: %w", source, err)
+	}
+	settings, issues := domain.DecodeLabSettings(public)
+	if len(issues) != 0 {
+		return domain.Blocked("SETTINGS-INVALID", errors.New("deployment settings are invalid; repair them in Change settings"))
+	}
+	if settings.Lab.CredentialsVersion != credentials.Version {
+		return errors.New("account credentials do not match this configuration; set all passwords again or restore its complete backup")
+	}
+	if settings.Lab.AdminPassword != "" || settings.Lab.TeacherPassword != "" || settings.Lab.StudentPassword != "" {
+		return errors.New("refusing password hashes in tracked settings")
+	}
+	settings.Lab.AdminPassword, settings.Lab.TeacherPassword, settings.Lab.StudentPassword = credentials.Admin, credentials.Teacher, credentials.Student
+	injected, err := domain.MarshalLabSettings(settings)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(stage, settingsFileName), injected, 0600)
 }
 
 func copyEvaluationSource(source, target string) error {

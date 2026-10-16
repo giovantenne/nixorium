@@ -23,21 +23,24 @@ type UpdateRelease struct {
 }
 
 type UpdateCheckReport struct {
-	SchemaVersion  int               `json:"schemaVersion"`
-	Operation      string            `json:"operation"`
-	GeneratedAt    time.Time         `json:"generatedAt"`
-	State          string            `json:"state"`
-	Repository     string            `json:"repository"`
-	Upstream       string            `json:"upstream,omitempty"`
-	CurrentRef     string            `json:"currentRef,omitempty"`
-	CurrentRev     string            `json:"currentRevision,omitempty"`
-	CurrentChannel UpdateChannel     `json:"currentChannel,omitempty"`
-	VersionFloor   string            `json:"versionFloor,omitempty"`
-	Development    []UpdateRelease   `json:"development"`
-	Stable         []UpdateRelease   `json:"stable"`
-	Prerelease     []UpdateRelease   `json:"prerelease"`
-	Truncated      bool              `json:"truncated"`
-	Issues         []ValidationIssue `json:"issues"`
+	SchemaVersion  int           `json:"schemaVersion"`
+	Operation      string        `json:"operation"`
+	GeneratedAt    time.Time     `json:"generatedAt"`
+	State          string        `json:"state"`
+	Repository     string        `json:"repository"`
+	Upstream       string        `json:"upstream,omitempty"`
+	CurrentRef     string        `json:"currentRef,omitempty"`
+	CurrentRev     string        `json:"currentRevision,omitempty"`
+	CurrentChannel UpdateChannel `json:"currentChannel,omitempty"`
+	VersionFloor   string        `json:"versionFloor,omitempty"`
+	// PinOutdated describes a flake.lock whose recorded nixorium reference no
+	// longer matches flake.nix. Planning the configured target again repairs it.
+	PinOutdated string            `json:"pinOutdated,omitempty"`
+	Development []UpdateRelease   `json:"development"`
+	Stable      []UpdateRelease   `json:"stable"`
+	Prerelease  []UpdateRelease   `json:"prerelease"`
+	Truncated   bool              `json:"truncated"`
+	Issues      []ValidationIssue `json:"issues"`
 }
 
 func (r UpdateCheckReport) HasErrors() bool {
@@ -49,6 +52,9 @@ type UpdateInputSnapshot struct {
 	SourcePrefix string
 	CurrentRef   string
 	CurrentRev   string
+	// PinOutdated is set when flake.lock records another nixorium reference
+	// than flake.nix declares (an update saved by Nixorium 3.8.0 or older).
+	PinOutdated  string
 	FlakeContent []byte
 	LockContent  []byte
 	HasLock      bool

@@ -82,6 +82,7 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 	report.Upstream = "github:" + snapshot.SourcePrefix
 	report.CurrentRef = snapshot.CurrentRef
 	report.CurrentRev = snapshot.CurrentRev
+	report.PinOutdated = snapshot.PinOutdated
 	baseline, baselineErr := parseUpdateRelease(snapshot.CurrentRef)
 	if baselineErr == nil {
 		report.CurrentChannel = baseline.Channel()
@@ -207,7 +208,7 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 		report.CurrentChannel = current.Channel()
 		if report.TargetChannel != domain.UpdateChannelMoving {
 			comparison := compareUpdateReleases(targetRelease, current)
-			if comparison == 0 {
+			if comparison == 0 && snapshot.PinOutdated == "" {
 				report = updatePlanIssue(report, "target", "target release is already configured")
 			} else if comparison < 0 {
 				report.Downgrade = true
