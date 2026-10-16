@@ -8,8 +8,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The classroom view toolbar is simpler: **Send/Collect files** holds **Send a
+  folder…**, **Send a file…** and **Collect from desktop**, and the
+  **Refresh** button is gone, since the page refreshes by itself.
 - On the Overview, **Maintenance** now opens with `m` and **Assistant** with
   `a`; the letters were swapped so each matches its name.
+
+### Removed
+
+- **Exam mode** is removed from the classroom view. Use **Internet → Block
+  Internet**, **Lock** and **Message** one by one.
 
 ## [3.8.0] - 2026-10-16
 

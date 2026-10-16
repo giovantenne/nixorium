@@ -427,8 +427,7 @@ or not reachable** instead of its last picture; other pictures that are no
 longer live (nobody signed in, for example) are dimmed. The page asks for the
 cards every two seconds and keeps asking when the controller does not answer,
 giving up on a request after 15 seconds; after two failed requests in a row
-the summary says **Reconnecting…**. **Refresh** asks at once, closes the
-notice of the last action and draws every card again.
+the summary says **Reconnecting…**.
 
 A computer that answers over SSH with someone signed in, but whose agent does
 not answer (the socket is missing, or the agent is frozen and gives no answer
@@ -436,7 +435,7 @@ to the relay's own hello within 3 seconds), shows a warning sign over its
 dimmed last picture and **Monitoring stopped on this PC**. The login screen does not count as someone signed in
 (only a session of class `user` does), so a computer waiting at it says
 **Nobody is signed in**. The same words explain the computer wherever an
-action skips it (Lock, Send files, Share screen, Collect from desktop and
+action skips it (Lock, Send/Collect files, Share screen, Collect from desktop and
 Save screenshot), and a result notice counts such computers apart, as
 "monitoring stopped on this PC". The agent restarts by itself: its user unit
 is `Restart=always` with a one-second delay and no start limit, and both
@@ -572,8 +571,12 @@ lock is a classroom aid, not a security boundary. Locking also works from
 not take the administrative operation lock, since it changes no system
 state.
 
-**Send files** sends a file, or a folder with its name and contents, chosen
-by whoever uses the controller. The classroom service runs as `admin` and cannot read that
+The page's **Send/Collect files** menu (toolbar) holds **Send a folder…**,
+**Send a file…** and **Collect from desktop**, in this order, and so does a
+computer's **Actions** menu.
+
+Sending a file, or a folder with its name and contents, is chosen by whoever
+uses the controller. The classroom service runs as `admin` and cannot read that
 user's home, so Nixorium starts the page's browser through a small helper
 running as the user; while the classroom browser is open, the helper waits
 on the classroom socket. When the page asks, the service gives that user's
@@ -617,8 +620,8 @@ the helper downloads the picture once through the browser instead
 minutes. Only the save's own user (the socket's kernel peer credentials) may
 list, read or end a save, and the service itself never writes into a home.
 
-**Collect from desktop** (beside Send files in the toolbar, and in a
-computer's Actions menu) is the reverse of Send files. The review lists each
+**Collect from desktop** (in **Send/Collect files** in the toolbar, and in a
+computer's Actions menu) is the reverse of sending files. The review lists each
 selected computer's desktop; a computer whose agent predates collecting is
 left out and named. After the one confirmation, the service reads at most
 four computers at a time with `collect.list` (the regular files and folders
@@ -689,33 +692,6 @@ keyboard nor mouse: the student keeps both, unless the computer is locked or
 shows the teacher's screen, and then Close is not offered. A computer has one
 message at a time (a new one replaces the previous); it belongs to the
 session, not to the controller's connection, and logging out clears it.
-
-**Exam mode** (toolbar, selected computers) opens a dialog with three check
-boxes, all on: block Internet, lock the screens now (until you unlock them),
-and show a message (default "Exam in progress. Wait for the teacher.",
-editable; it stays until the screens are unlocked). After one combined review
-and one button such as "Start exam mode on 12 computers", the page applies
-three existing reviewed actions in this order: Internet block, lock, message.
-Each keeps its own review that applies once, and each computer's result lists
-the three steps. The page composes the chain and the computers keep no exam
-state. The classroom service remembers, in memory only, which steps it applied
-for exam mode on each computer and since when: the page tags each step of the
-chain, and a step counts once the computer confirmed it. The service sends
-that with the list of computers (`exam`), so a page opened later, and another
-user's page, show the same: the cards say "Exam mode" and the button reads
-**End exam mode**. The service also drops what it can see end: nobody signed in
-ends the lock and the message, an Internet state that reads as allowed again
-ends that step, and a restart or shutdown from the page ends all of them. A
-review lasts at most five minutes, so close to its end the page makes the
-reviews again before it starts, and asks again when the computers that qualify
-changed: an expired review never leaves exam mode half started. **End exam
-mode** (the same button, when a selected computer is in exam mode) reverses the
-steps that are in effect, in this order: remove the message, unlock, allow
-Internet. Then it opens the usual **Collect from desktop** review for the same
-computers; nothing is collected unless the teacher confirms it. Restarting the
-classroom service (`nixorium-classroom.service`) forgets exam mode while the
-computers stay locked and blocked: then use **Remove message**, **Unlock** and
-**Allow Internet**.
 
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a

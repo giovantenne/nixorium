@@ -268,11 +268,8 @@ view page, **Save screenshot** keeps a picture of its screen in
 `pc03-2026-10-15-10.30.12.jpg`; a page not opened from Nixorium downloads the
 picture through the browser instead. **Message** shows a short text over the
 screens of the selected computers, until the students close it, for 30 seconds
-or 2 minutes, or until you unlock them. **Exam mode** blocks Internet, locks the
-screens and shows a message on the selected computers with one confirmation;
-**End exam mode** undoes it and offers **Collect from desktop**; a reopened page,
-or another teacher's, shows the same. Restarting the classroom service forgets
-exam mode: then use **Remove message**, **Unlock** and **Allow Internet**.
+or 2 minutes, or until you unlock them. For an exam, use **Internet → Block
+Internet**, **Lock** and **Message** one by one.
 Update the student computers and have the students sign in again first: a
 computer that is not updated is listed as unable to show messages yet.
 
@@ -307,8 +304,8 @@ with its name and contents: hidden files and links are left out, at most 2000
 items and 500 MB are sent, the copies belong to the student and are never
 executable, and a name already on a student's desktop is kept as
 "name (2)". A restart empties the student's home, as usual. In the classroom
-view page, **Send files** offers **A file…** and **A folder…**, which open
-the system file chooser in your home folder.
+view page, **Send/Collect files** offers **Send a folder…** and **Send a file…**,
+which open the system file chooser in your home folder.
 From a terminal, as the teacher or the administrator: `nixorium send plan
 --file <file-or-folder> --on @lab`, then `nixorium send apply --file
 <file-or-folder> --on @lab --expect` with the review token; it needs only the
@@ -321,7 +318,7 @@ and mouse blocked, until **Stop sharing** or until you close the page.
 ## Collect files
 
 With the classroom view, **Collect from desktop** in the classroom view page
-(beside **Send files**, and in a computer's **Actions** menu) copies the files
+(in **Send/Collect files**, and in a computer's **Actions** menu) copies the files
 on the desktops of the selected students' computers into your home folder,
 in `Nixorium/Collected/<date and time>/<computer>/`, after a review. Hidden
 files and links are left out and nothing changes on the students' computers.

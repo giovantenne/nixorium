@@ -107,7 +107,6 @@ function updateSelection() {
   // A menu with data-always keeps opening without a selection: it holds an
   // entry about the whole classroom (Power: Schedule…).
   for (const menu of document.querySelectorAll('.toolbar .actions-menu')) menu.classList.toggle('disabled', chosen.size === 0 && !menu.hasAttribute('data-always'));
-  classroomTools.updateExamButton();
 }
 
 selectAll.addEventListener('change', () => {
@@ -164,24 +163,15 @@ function screenAge(computer) {
   return seconds < 60 ? '' : 'No change for ' + Math.round(seconds / 60) + ' min';
 }
 
-// Refresh asks for a clean redraw: cards of computers no longer listed go,
-// and every card's labels are drawn again.
-let redraw = false;
-
 function render(computers) {
   let viewing = 0;
-  classroomTools.read(computers);
-  if (redraw) {
-    redraw = false;
-    const listed = new Set(computers.map((computer) => computer.name));
-    for (const [name, entry] of cards) {
-      if (listed.has(name)) {
-        entry.badgeText = null;
-      } else {
-        entry.item.remove();
-        cards.delete(name);
-        chosen.delete(name);
-      }
+  // Cards of computers no longer listed go.
+  const listed = new Set(computers.map((computer) => computer.name));
+  for (const [name, entry] of cards) {
+    if (!listed.has(name)) {
+      entry.item.remove();
+      cards.delete(name);
+      chosen.delete(name);
     }
   }
   for (const computer of computers) {
@@ -208,7 +198,6 @@ function render(computers) {
     if (computer.showing) labels.push('Sharing your screen');
     // The teacher's lock is known only while the screen answers.
     if (computer.locked && (computer.state === 'viewing' || computer.state === 'locked')) labels.push('Locked');
-    if (classroomTools.inExam(computer.name)) labels.push('Exam mode');
     if (computer.internet === 'blocked') labels.push('Internet off');
     if (computer.power) labels.push(computer.power);
     if (labels.join('|') !== entry.badgeText) {
@@ -610,7 +599,6 @@ function startAction(action, computers) {
   else if (action === 'show-screen' && casting) stopCasting();
   else if (action === 'show-screen') showMyScreen(computers);
   else if (action === 'message') classroomTools.message(computers);
-  else if (action === 'exam') classroomTools.exam(computers);
   else runAction(action, computers);
 }
 
@@ -857,7 +845,7 @@ let failures = 0;
 
 async function refresh() {
   clearTimeout(refreshTimer);
-  // A forced refresh replaces a request still waiting.
+  // A new request replaces one still waiting.
   if (refreshing) refreshing.abort();
   const request = new AbortController();
   refreshing = request;
@@ -889,15 +877,6 @@ async function refresh() {
   refreshing = null;
   refreshTimer = setTimeout(refresh, 2000);
 }
-
-// Refresh asks again at once and draws every card anew, without the
-// notice of the last action.
-document.getElementById('refresh').addEventListener('click', () => {
-  hideToast();
-  redraw = true;
-  summary.textContent = 'Refreshing…';
-  refresh();
-});
 
 if (screenMode) showScreen(screenName);
 refresh();

@@ -55,10 +55,7 @@ type pendingAction struct {
 	power     *domain.ShutdownPlanReport
 	wake      *domain.WakePlan
 	message   *domain.MessagePlan
-	// exam and examStep tag an action applied as a step of exam mode.
-	exam     string
-	examStep string
-	expires  time.Time
+	expires   time.Time
 }
 
 type actionPlanRequest struct {
@@ -68,8 +65,6 @@ type actionPlanRequest struct {
 	Transfer string `json:"transfer,omitempty"`
 	// Message is the text and duration of the message action.
 	Message *domain.MessageContent `json:"message,omitempty"`
-	// Exam marks the action as a step of exam mode, "start" or "end".
-	Exam string `json:"exam,omitempty"`
 }
 
 type actionApplyRequest struct {
@@ -93,8 +88,7 @@ type actionReview struct {
 	Rows     []actionRow `json:"rows"`
 	Warnings []string    `json:"warnings,omitempty"`
 	Confirm  string      `json:"confirm,omitempty"`
-	// Expires is when the review ends, in Unix milliseconds: exam mode
-	// chains several reviews and checks the time left before it starts.
+	// Expires is when the review ends, in Unix milliseconds.
 	Expires int64 `json:"expires,omitempty"`
 }
 
@@ -165,14 +159,6 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 	if server.actions == nil || !validActionComputers(body.Computers) {
 		http.Error(writer, "Invalid request.", http.StatusBadRequest)
 		return
-	}
-	step := ""
-	if body.Exam != "" {
-		var known bool
-		if step, known = examStepOf(body.Exam, body.Action); !known {
-			http.Error(writer, "Invalid request.", http.StatusBadRequest)
-			return
-		}
 	}
 	ctx, cancel := context.WithTimeout(request.Context(), 2*time.Minute)
 	defer cancel()
@@ -254,7 +240,6 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			http.Error(writer, "The action could not start.", http.StatusInternalServerError)
 			return
 		}
-		pending.exam, pending.examStep = body.Exam, step
 		server.mutex.Lock()
 		server.pruneActionsLocked()
 		server.pending[id] = pending
@@ -535,7 +520,6 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		for _, target := range report.Targets {
 			result.Rows = append(result.Rows, resultRow(target.Name, target.State == "accepted", outcomeText(target.State, target.Detail), planned[target.Name]))
 			if target.State == "accepted" {
-				server.exams.forget(target.Name)
 				server.setLabel(target.Name, func(labels *computerLabels) {
 					labels.power, labels.powerExpiry = label, server.now().Add(powerLabelTime)
 					labels.powerRestart, labels.powerAway = pending.power.Action == domain.ClientRestart, false
@@ -548,9 +532,6 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		result = server.applyWake(ctx, *pending.wake)
 	default:
 		result.State, result.Message = "failed", "Unknown action."
-	}
-	if pending.exam != "" {
-		server.exams.record(pending.exam, pending.examStep, result.Rows, server.now())
 	}
 	writePageJSON(writer, result)
 }

@@ -794,7 +794,7 @@ that release's notes, so a release is not finished until the site follows it.
   nothing behind. The classroom worker prepares files in its private
   temporary folder under position-based names only, hashes each file, and
   binds the share review to paths, sizes and digests rather than to the
-  transfer identifier. The page never uploads files: its Send files asks
+  transfer identifier. The page never uploads files: its Send/Collect files menu asks
   the service, which hands a file or folder choice to the desktop helper of
   the page's own
   user (the browser launcher, running as that user, long-polling
@@ -840,16 +840,7 @@ that release's notes, so a release is not finished until the site follows it.
   keyboard nor mouse, and it is not tied to the controller's connection.
   The review keeps the controller's own sentences free of the text, which the
   page prints itself; its token binds the text and the duration, and it takes
-  no operation lock. Exam mode is a page-side chain of the existing Internet,
-  lock and message reviews (message.js): each review still applies once, and
-  the page makes the reviews again when one is about to expire so an expired
-  review cannot leave an exam half started; ending reverses the steps in order
-  and only offers the collect review. The computers keep no exam state. The
-  worker keeps, in memory only (`examBook`), which steps it applied for exam
-  mode per computer and since when, from the exam tag of a plan and the done
-  rows of its apply (never from what a page claims), shares it between pages
-  through `/api/computers`, and drops what it sees end (no session, Internet
-  allowed again, restart or shutdown); a restart of the worker forgets it.
+  no operation lock.
   Switch on (Wake-on-LAN, `wake-plan`/`wake-apply`, `nixorium wake`) takes
   no review token or operation lock, validates names like every classroom
   operation and never targets the controller. Hardware addresses come only

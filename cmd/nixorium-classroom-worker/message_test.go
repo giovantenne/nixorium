@@ -235,7 +235,7 @@ func TestMessageOperationsNeedTheClassroomViewAndTheFixedDeployment(t *testing.T
 	}
 }
 
-func TestPageOffersMessageAndExamMode(t *testing.T) {
+func TestPageOffersMessage(t *testing.T) {
 	page, err := viewAssets.ReadFile("view/index.html")
 	if err != nil {
 		t.Fatal(err)
@@ -243,9 +243,8 @@ func TestPageOffersMessageAndExamMode(t *testing.T) {
 	html := string(page)
 	for _, want := range []string{
 		`<script src="/message.js" defer></script>`,
-		`data-action="message"`, `data-action="message-hide"`, `data-action="exam"`,
-		`id="message-dialog"`, `id="exam-dialog"`, `maxlength="300"`,
-		`>Exam mode</button>`, `>Send a message…</button>`,
+		`data-action="message"`, `data-action="message-hide"`,
+		`id="message-dialog"`, `maxlength="300"`, `>Send a message…</button>`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("index.html lacks %s", want)
@@ -257,28 +256,46 @@ func TestPageOffersMessageAndExamMode(t *testing.T) {
 	if !found || !closed || !strings.Contains(block, `data-action="message"`) || !strings.Contains(block, `data-action="message-hide"`) {
 		t.Fatal("a computer's Actions menu has no message buttons")
 	}
-	// Exam mode is for the selected computers only: no Actions menu entry.
-	if strings.Contains(block, `data-action="exam"`) {
-		t.Fatal("exam mode is in a computer's Actions menu")
-	}
-	script, err := viewAssets.ReadFile("view/message.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{
-		// Start in this order, and end the other way round.
-		"const startOrder = ['internet', 'lock', 'message'];", "const endOrder = ['message', 'lock', 'internet'];",
-		"'Start exam mode on '", "'End exam mode on '", "Exam in progress. Wait for the teacher.",
-		// Ending offers the usual collect review; nothing is collected without it.
-		"runAction('collect', offer)",
-	} {
-		if !strings.Contains(string(script), want) {
-			t.Errorf("message.js lacks %s", want)
-		}
-	}
 	server, _, host, cookie := noteServer(t)
 	served := viewRequest(server, "/message.js", host, cookie)
 	if served.Code != http.StatusOK || !strings.HasPrefix(served.Header().Get("Content-Type"), "text/javascript") || !strings.Contains(served.Body.String(), "classroomTools") {
 		t.Fatalf("/message.js = %d %q", served.Code, served.Header())
+	}
+}
+
+func TestToolbarSendCollectMenu(t *testing.T) {
+	page, err := viewAssets.ReadFile("view/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(page)
+	_, rest, found := strings.Cut(html, "<summary>Send/Collect files</summary>")
+	menu, _, closed := strings.Cut(rest, "</details>")
+	if !found || !closed {
+		t.Fatal("the toolbar has no Send/Collect files menu")
+	}
+	last := -1
+	for _, want := range []string{`>Send a folder…</button>`, `>Send a file…</button>`, `data-action="collect"`, `>Collect from desktop</button>`} {
+		at := strings.Index(menu, want)
+		if at <= last {
+			t.Fatalf("Send/Collect files menu lacks %s in order: %s", want, menu)
+		}
+		last = at
+	}
+	toolbar, _, _ := strings.Cut(html, "</header>")
+	for _, gone := range []string{">Send files<", `id="refresh"`, ">Refresh<", "Exam mode", `data-action="exam"`} {
+		if strings.Contains(toolbar, gone) {
+			t.Errorf("the toolbar still has %s", gone)
+		}
+	}
+	if strings.Count(toolbar, `data-action="collect"`) != 1 {
+		t.Error("Collect from desktop is expected only in the Send/Collect files menu")
+	}
+	// A computer's Actions menu keeps the three together, in the same order.
+	_, rest, found = strings.Cut(html, `class="actions-menu viewer-actions"`)
+	block, _, _ := strings.Cut(rest, "</details>")
+	folder, file, collect := strings.Index(block, "Send a folder…"), strings.Index(block, "Send a file…"), strings.Index(block, "Collect from desktop")
+	if !found || folder < 0 || file < folder || collect < file || strings.Contains(block[folder:collect], "data-action=\"wake\"") {
+		t.Error("a computer's Actions menu lacks Send a folder…, Send a file…, Collect from desktop in order")
 	}
 }

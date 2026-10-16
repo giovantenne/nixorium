@@ -45,14 +45,13 @@
         <button type="button" data-action="message-hide" title="Take the message off the screens of the selected computers">Remove message</button>
       </div>
     </details>
-    <button type="button" data-action="exam" title="Block Internet, lock the screens and show a message on the selected computers, with one confirmation">Exam mode</button>
     <button type="button" data-action="show-screen" title="Share your screen, a window or a tab on the selected computers, with their keyboard and mouse blocked">Share screen</button>
-    <button type="button" data-action="collect" title="Copy the files on the desktops of the selected computers into Nixorium/Collected in your home folder">Collect from desktop</button>
-    <details class="actions-menu send-menu" title="Copy a file or a folder to the desktops of the selected computers">
-      <summary>Send files</summary>
+    <details class="actions-menu send-menu" title="Copy a file or a folder to the desktops of the selected computers, or copy their desktop files to you">
+      <summary>Send/Collect files</summary>
       <div class="menu">
-        <button type="button" data-action="send-file">A file…</button>
-        <button type="button" data-action="send-folder">A folder…</button>
+        <button type="button" data-action="send-folder">Send a folder…</button>
+        <button type="button" data-action="send-file">Send a file…</button>
+        <button type="button" data-action="collect" title="Copy the files on the desktops of the selected computers into Nixorium/Collected in your home folder">Collect from desktop</button>
       </div>
     </details>
     <details class="actions-menu power-menu" data-always>
@@ -65,7 +64,6 @@
         <button type="button" id="schedule-open" title="Switch the computers on and off at set times on set weekdays">Schedule…</button>
       </div>
     </details>
-    <button type="button" id="refresh" title="Ask every computer for its state again now">Refresh</button>
   </div>
 </header>
 <main>
@@ -87,9 +85,9 @@
         <button type="button" data-action="message">Send a message…</button>
         <button type="button" data-action="message-hide">Remove message</button>
         <button type="button" data-action="show-screen">Share screen</button>
-        <button type="button" data-action="collect">Collect from desktop</button>
-        <button type="button" data-action="send-file">Send a file…</button>
         <button type="button" data-action="send-folder">Send a folder…</button>
+        <button type="button" data-action="send-file">Send a file…</button>
+        <button type="button" data-action="collect">Collect from desktop</button>
         <button type="button" data-action="wake" title="Send a Wake-on-LAN packet to this computer">Switch on</button>
         <button type="button" data-action="restart">Restart</button>
         <button type="button" data-action="shutdown">Shut down</button>
@@ -162,19 +160,6 @@
   <div class="dialog-buttons">
     <button type="button" id="message-cancel">Cancel</button>
     <button type="button" id="message-review" class="primary">Review</button>
-  </div>
-</dialog>
-<dialog id="exam-dialog" class="tool-dialog" aria-labelledby="exam-title">
-  <h2 id="exam-title">Exam mode</h2>
-  <p>Prepare the selected computers for an exam. You see the computers before anything happens.</p>
-  <label class="check"><input type="checkbox" id="exam-internet" checked> Block Internet</label>
-  <label class="check"><input type="checkbox" id="exam-lock" checked> Lock the screens now (until you unlock them)</label>
-  <label class="check"><input type="checkbox" id="exam-message" checked> Show a message</label>
-  <textarea id="exam-text" rows="3" maxlength="300" aria-label="Message"></textarea>
-  <p id="exam-problem" class="problem" hidden></p>
-  <div class="dialog-buttons">
-    <button type="button" id="exam-cancel">Cancel</button>
-    <button type="button" id="exam-review" class="primary">Review</button>
   </div>
 </dialog>
 <div id="toast" class="toast" role="status" title="Click to close" hidden>

@@ -112,12 +112,11 @@ body.screen-mode #viewer-panel { display: flex; flex-direction: column; height: 
 #viewer-panel:fullscreen .viewer-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 1; background: var(--card); box-shadow: 0 2px 12px rgb(0 0 0 / 0.5); transform: translateY(-100%); transition: transform 0.15s ease-out; }
 #viewer-panel:fullscreen.show-bar .viewer-bar { transform: none; }
 #viewer-image.control:focus { outline: 3px solid var(--warning); }
-/* Message and exam mode: dialogs that ask first, before the usual review. */
+/* Message: dialog that ask first, before the usual review. */
 .tool-dialog { width: min(34rem, 92vw); padding: 1.2rem 1.4rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
 .tool-dialog::backdrop { background: rgb(0 0 0 / 0.55); }
 .tool-dialog h2 { margin: 0 0 0.6rem; font-size: 1.15rem; }
 .tool-dialog label { display: block; margin: 0.7rem 0 0.25rem; }
-.tool-dialog label.check { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0; }
 .tool-dialog textarea, .tool-dialog select { display: block; width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background); color: inherit; font: inherit; }
 .tool-dialog textarea { resize: vertical; }
 .tool-dialog .count { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.85rem; text-align: right; }
