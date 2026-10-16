@@ -98,7 +98,7 @@
               wait("Enter acknowledges")
               send("\r")
               wait("Assistant")
-              send("m")
+              send("a")
               # First access opens the chat itself: no gate, no service call.
               wait("Not activated")
               wait("Try asking, for example:")
