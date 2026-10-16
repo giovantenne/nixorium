@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -95,14 +96,59 @@ exit `+exit+"\n")
 	}
 }
 
+// deadlineAfterStart is a parent context whose deadline passes only once the
+// fake Colmena has started. A phase timeout counts from before the apply
+// evidence is written and synced; on a loaded builder those syncs can outlast
+// a short timeout, and then the apply correctly never starts and leaves no
+// evidence. Expiring the deadline after dispatch keeps the test on the path
+// it proves: a running phase hits its deadline.
+type deadlineAfterStart struct {
+	context.Context
+	done chan struct{}
+	at   atomic.Int64
+}
+
+func (c *deadlineAfterStart) Done() <-chan struct{} { return c.done }
+
+func (c *deadlineAfterStart) Err() error {
+	select {
+	case <-c.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
+	}
+}
+
+func expireAfterStart(t *testing.T, marker string) *deadlineAfterStart {
+	t.Helper()
+	ctx := &deadlineAfterStart{Context: context.Background(), done: make(chan struct{})}
+	go func() {
+		defer close(ctx.done)
+		defer func() { ctx.at.Store(time.Now().UnixNano()) }()
+		for limit := time.Now().Add(30 * time.Second); time.Now().Before(limit); time.Sleep(10 * time.Millisecond) {
+			if _, err := os.Lstat(marker); err == nil {
+				return
+			}
+		}
+	}()
+	return ctx
+}
+
 func TestDeploymentProcessTimeoutBoundsLocalChildrenAndRetainsApplyEvidence(t *testing.T) {
 	for _, phase := range []domain.DeploymentPhase{domain.DeploymentPhaseBuild, domain.DeploymentPhaseApply} {
 		t.Run(string(phase), func(t *testing.T) {
-			plan, directory := deploymentProcessFixture(t, "sleep 30 &\nwait\n")
-			started := time.Now()
-			err := runDeploymentPhase(context.Background(), plan, phase, io.Discard, directory, false, 100*time.Millisecond)
-			if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > 5*time.Second {
-				t.Fatalf("unbounded phase: %v (%s)", err, time.Since(started))
+			plan, directory := deploymentProcessFixture(t, "touch \"$NIXORIUM_TEST_STARTED\"\nsleep 30 &\nwait\n")
+			marker := filepath.Join(t.TempDir(), "started")
+			t.Setenv("NIXORIUM_TEST_STARTED", marker)
+			ctx := expireAfterStart(t, marker)
+			err := runDeploymentPhase(ctx, plan, phase, io.Discard, directory, false, time.Hour)
+			returned := time.Now()
+			if _, statErr := os.Lstat(marker); statErr != nil {
+				t.Fatalf("phase never started its child: %v (%v)", err, statErr)
+			}
+			bound := returned.Sub(time.Unix(0, ctx.at.Load()))
+			if !errors.Is(err, context.DeadlineExceeded) || bound > 5*time.Second {
+				t.Fatalf("unbounded phase: %v (%s after the deadline)", err, bound)
 			}
 			_, statErr := os.Lstat(filepath.Join(directory, deploymentPendingName))
 			if (statErr == nil) != (phase == domain.DeploymentPhaseApply) {
