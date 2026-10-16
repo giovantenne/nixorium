@@ -328,6 +328,9 @@ func (i *Inspector) addLocalFindings(ctx context.Context, repository string, rep
 			add(domain.Finding{ID: "RECOVERY-" + strings.ToUpper(condition.Kind), Level: level, Summary: condition.Title, Evidence: condition.Detail, Remediation: remediation})
 		}
 	}
+	if issue, found := flakePinIssue(i.source, repository); found {
+		add(domain.Finding{ID: "PIN-OUTDATED", Level: domain.LevelError, Summary: "flake.lock does not match flake.nix; updating the computers will fail", Evidence: issue.Message, Remediation: "Select the configured version again in Maintenance → Update Nixorium (`nixorium update plan --target <configured version>`), or run `nix flake lock` in the deployment folder and save flake.lock in Maintenance → Review Git changes"})
+	}
 	if clock, ok := i.source.(clockSource); ok {
 		if synchronized, err := clock.ClockSynchronized(); err == nil && !synchronized {
 			add(domain.Finding{ID: "TIME-SYNC", Level: domain.LevelWarning, Summary: "The controller clock is not synchronized", Remediation: "Check network time (`timedatectl`); review expiry and update checks depend on a correct clock."})

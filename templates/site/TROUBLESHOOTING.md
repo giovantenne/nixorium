@@ -85,6 +85,7 @@ and JSON issues carry a `next` object with the same code and texts; the JSON
 | `UPDATES-QUEUED` | Some computers will update when they are switched on | Nothing to do (Computers → Queued updates shows them; review again those marked as changed) |
 | `BACKUP-DUE` | A backup of this laboratory is due | Back up the lab ([Backups and restoration](#backups-and-restoration)) |
 | `EVAL-FAILED` | The configuration has an error | Open Diagnostics and fix the first reported error (`nixorium doctor`; do not retry other operations) |
+| `PIN-OUTDATED` | The saved Nixorium version is recorded inconsistently | Repeat the update for the configured Nixorium version ([Updating the computers fails with a read-only flake.lock](#updating-the-computers-fails-with-a-read-only-flakelock)) |
 
 ## The controller DHCP lease changed
 
@@ -766,6 +767,56 @@ and active closure; `/run/current-system` equality alone is not success.
 Do not create or edit the receipt under `/var/lib/nixorium/controller/`.
 The privileged action invalidates stale evidence before retrying and recreates
 it only after complete activation.
+
+## Updating the computers fails with a read-only flake.lock
+
+**Symptom.** **Update computers** (or `nixorium deploy apply`) stops before
+any computer changes, with a log ending like:
+
+```text
+error: opening file "/nix/store/…-source/flake.lock": Read-only file system
+colmena build: exit status 1
+```
+
+Releases after 3.8.0 stop earlier with `PIN-OUTDATED` and the message
+`flake.lock does not match flake.nix (nixorium: flake.nix declares
+github:…/vB but flake.lock records github:…/vA)`. `nixorium doctor` reports
+the same finding.
+
+**Cause.** **Update Nixorium** in 3.8.0 and earlier saved the new release in
+`flake.nix` and locked the right commit in `flake.lock`, but recorded the
+release that was configured *before* the update as the lock's reference. Nix
+then wants to rewrite `flake.lock`. Applying the controller still works, but
+the computers are built from a read-only copy of the configuration, where the
+file cannot be rewritten. Every laboratory that updated Nixorium from the menu
+is affected; nothing on the computers changed.
+
+**Fix.** With a Nixorium release newer than 3.8.0 running on the controller:
+
+1. Open **Maintenance → Update Nixorium**. The list says the saved version is
+   recorded inconsistently; select the configured version (marked
+   "Current · select to repair") or a newer release.
+2. Review and confirm as for any update. The review shows only the
+   `flake.lock` reference changing for the configured version. Nixorium saves
+   the files and applies the controller.
+3. Run **Update computers** again.
+
+In a terminal the same repair is `nixorium update plan --target <configured
+version>`, then `nixorium update apply --target <configured version> --expect
+<review-token> --yes`, saving
+the two files in **Maintenance → Review Git changes** (`nixorium git review`)
+and applying the controller.
+
+Manual alternative (needs Internet access): in the deployment folder run
+`nix flake lock`, check with `git diff flake.lock` that only the `original`
+reference changed (the locked revision stays the same for a release tag), then
+save `flake.lock` in **Maintenance → Review Git changes** and apply the
+controller. The same command repairs a `nixpkgs` reference that disagrees with
+`flake.nix` after a manual edit.
+
+If the controller still runs 3.8.0, update Nixorium first: that update leaves
+the same inconsistency once more, and the newer release then repairs it as
+above.
 
 ## An upstream update failed
 

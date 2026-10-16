@@ -41,8 +41,12 @@ most the newest 20 stable and 20 prerelease SemVer tags. An explicit target can
 proceed directly and lets Nix resolve that exact branch or release.
 
 During planning, generate the candidate lock outside the checkout with Nix's
-`--output-lock-file`. Evaluate and build against that candidate using an exact
-input override, `--reference-lock-file`, and `--no-write-lock-file`. Require
+`--output-lock-file`, locking a private copy that already contains the proposed
+`flake.nix` so the recorded `original` reference matches it. Evaluate and build
+against an immutable copy of the proposed `flake.nix` and `flake.lock` with
+`--no-update-lock-file`, after `nix flake lock --no-update-lock-file` accepts
+that pair. (Amended after 3.8.0: the original override against the current
+`flake.nix` recorded the old reference and broke client deployment.) Require
 deployment metadata/readiness evaluation and no-link builds of one client, the
 controller, netboot ramdisk, PXE firmware, and installer bundle before emitting
 a ready plan. Bound the rendered source/lock patch and bind HEAD, target,

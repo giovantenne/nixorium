@@ -19,6 +19,25 @@ The project follows [Semantic Versioning](https://semver.org/).
 - **Exam mode** is removed from the classroom view. Use **Internet → Block
   Internet**, **Lock** and **Message** one by one.
 
+### Fixed
+
+- **Update computers** no longer fails after **Update Nixorium**. Until 3.8.0,
+  updating Nixorium from the menu saved the new release correctly but left the
+  previous release recorded inside `flake.lock`. Applying the controller still
+  worked, but updating the student computers then stopped before changing any
+  computer, with `flake.lock: Read-only file system` and
+  `colmena build: exit status 1`. Every laboratory that updated Nixorium from
+  the menu is affected. Updates now record the selected release correctly and
+  refuse any candidate whose two files disagree. To repair a laboratory, run
+  this release on the controller (updating from 3.8.0 leaves the problem once
+  more), then open **Maintenance → Update Nixorium**, select the configured
+  version, now marked "Current · select to repair", and confirm. Until then
+  **Update computers** and `nixorium doctor` say so with the code
+  `PIN-OUTDATED` instead of the build error. See "Updating the computers fails
+  with a read-only flake.lock" in the troubleshooting guide. The same defect
+  made every change of NixOS channel in **Update system and packages** fail
+  its own check; that works now too.
+
 ## [3.8.0] - 2026-10-16
 
 ### Added

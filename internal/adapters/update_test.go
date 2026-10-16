@@ -10,6 +10,20 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// fakeCandidateStoreCases lets a fake nix import candidate sources: each
+// staged directory is kept under $NIXORIUM_TEST_STAGES/<n> when set, and the
+// candidate lock check fails when NIXORIUM_TEST_LOCK_CHECK=stale.
+const fakeCandidateStoreCases = `  *" store add-path "*)
+    for last; do :; done
+    count=0
+    if [ -n "${NIXORIUM_TEST_STAGES:-}" ]; then
+      count=$(ls "$NIXORIUM_TEST_STAGES" | wc -l)
+      cp -R "$last" "$NIXORIUM_TEST_STAGES/$count"
+    fi
+    printf '/nix/store/%032d-source\n' "$count" ;;
+  *" flake lock --no-update-lock-file "*)
+    if [ "${NIXORIUM_TEST_LOCK_CHECK:-}" = stale ]; then echo "error: flake 'path:/nix/store/x-source' requires lock file changes but they're not allowed due to '--no-update-lock-file'" >&2; exit 1; fi ;;`
+
 func TestInspectUpdateInputAndRenderTarget(t *testing.T) {
 	repository := t.TempDir()
 	write := func(name, content string) {
@@ -204,6 +218,7 @@ func TestPrepareUpdateUsesExternalCandidateLockAndRepresentativeBuilds(t *testin
 set -eu
 printf '%s\n' "$*" >> "$NIXORIUM_TEST_NIX_LOG"
 case " $* " in
+` + fakeCandidateStoreCases + `
   *" flake lock "*)
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --output-lock-file ]; then
@@ -231,6 +246,8 @@ esac
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("NIXORIUM_TEST_NIX_LOG", logPath)
+	stages := t.TempDir()
+	t.Setenv("NIXORIUM_TEST_STAGES", stages)
 	progress := []domain.UpdatePlanProgress{}
 	proposal, err := (Local{}).PrepareUpdateWithProgress(context.Background(), repository, "v1.1.0", func(item domain.UpdatePlanProgress) {
 		progress = append(progress, item)
@@ -246,18 +263,30 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 7 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 5 || strings.Count(string(log), "--no-write-lock-file") != 6 {
+	// Two candidate sources, the candidate lock, the lock check, two
+	// evaluations, two workspace reads, the validator and one grouped build.
+	if len(lines) != 10 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 0 || strings.Count(string(log), "--no-write-lock-file") != 1 || strings.Count(string(log), "store add-path") != 2 {
 		t.Fatalf("unexpected Nix invocations (%d):\n%s", len(lines), log)
 	}
+	if !strings.HasPrefix(lines[1], "--extra-experimental-features nix-command flakes flake lock path:/nix/store/") || !strings.Contains(lines[1], "--override-input nixorium github:owner/project/v1.1.0") || !strings.Contains(lines[3], "flake lock --no-update-lock-file path:/nix/store/") {
+		t.Fatalf("candidate lock was not computed and checked from the proposed source:\n%s", log)
+	}
 	for _, output := range []string{"nixosConfigurations.pc01.config.system.build.toplevel", "nixosConfigurations.pc99.config.system.build.toplevel", "nixosConfigurations.netboot.config.system.build.netbootRamdisk", "pxeFirmware", "installerBundle"} {
-		if !strings.Contains(lines[6], "#"+output) {
-			t.Fatalf("required output %s missing from grouped build: %s", output, lines[6])
+		if !strings.Contains(lines[9], "#"+output) {
+			t.Fatalf("required output %s missing from grouped build: %s", output, lines[9])
 		}
+	}
+	// The lock was computed from the proposed flake.nix with the current lock,
+	// and validation used the proposed pair.
+	lockSource := readGitReviewFile(t, filepath.Join(stages, "0"), "flake.nix")
+	candidateLock := readGitReviewFile(t, filepath.Join(stages, "1"), "flake.lock")
+	if !strings.Contains(lockSource, "github:owner/project/v1.1.0") || readGitReviewFile(t, filepath.Join(stages, "0"), "flake.lock") != readGitReviewFile(t, repository, "flake.lock") || candidateLock != string(proposal.LockContent) {
+		t.Fatalf("candidate sources: flake.nix=%q lock=%q", lockSource, candidateLock)
 	}
 	if strings.Contains(string(log), repository+"/secret-key") {
 		t.Fatalf("private path entered Nix arguments:\n%s", log)
 	}
-	if len(progress) != 6 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Phase != domain.UpdatePlanPhaseEvaluate || progress[2].Detail != "Evaluating candidate deployment readiness" || progress[3].Detail != "Comparing pinned student workspace dependencies" || progress[4].Phase != domain.UpdatePlanPhaseBuild || progress[4].Current != 0 || progress[4].Total != 5 || progress[5].Phase != domain.UpdatePlanPhaseReview {
+	if len(progress) != 7 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Detail != "Checking that the candidate flake.lock matches flake.nix" || progress[2].Phase != domain.UpdatePlanPhaseEvaluate || progress[3].Detail != "Evaluating candidate deployment readiness" || progress[4].Detail != "Comparing pinned student workspace dependencies" || progress[5].Phase != domain.UpdatePlanPhaseBuild || progress[5].Current != 0 || progress[5].Total != 5 || progress[6].Phase != domain.UpdatePlanPhaseReview {
 		t.Fatalf("candidate progress = %+v", progress)
 	}
 }
@@ -278,6 +307,7 @@ func TestPrepareUpdateBuildsOnlyControllerForControllerMode(t *testing.T) {
 set -eu
 printf '%s\n' "$*" >> "$NIXORIUM_TEST_NIX_LOG"
 case " $* " in
+` + fakeCandidateStoreCases + `
   *" flake lock "*)
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --output-lock-file ]; then
@@ -317,7 +347,7 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 7 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
+	if len(lines) != 10 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
 		t.Fatalf("unexpected controller-only Nix invocations (%d):\n%s", len(lines), log)
 	}
 	for _, excluded := range []string{"nixosConfigurations.pc01", "nixosConfigurations.netboot", "#pxeFirmware", "#installerBundle"} {

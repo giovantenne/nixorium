@@ -278,6 +278,10 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 		return deploymentIssue(report, "repository", fmt.Sprintf("resolve path: %v", err))
 	}
 	report.Repository = root
+	if issue, found := flakePinIssue(m.source, root); found {
+		report.Issues = append(report.Issues, issue)
+		return report
+	}
 	meta, err := m.source.LabMeta(ctx, root)
 	if err != nil {
 		report.Issues = append(report.Issues, domain.EvaluationIssue("configuration", "labMeta", err))
@@ -344,6 +348,30 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 		report.State = "ready"
 	}
 	return report
+}
+
+// flakePinConsistencySource is implemented by sources that can compare
+// flake.lock with flake.nix without Nix or network access.
+type flakePinConsistencySource interface {
+	FlakeLockConsistency(string) error
+}
+
+// flakePinIssue refuses early when flake.lock no longer matches flake.nix.
+// The client build uses an immutable copy of the deployment, where Nix cannot
+// rewrite the lock and would fail with a read-only file system error.
+func flakePinIssue(source any, repository string) (domain.ValidationIssue, bool) {
+	checker, ok := source.(flakePinConsistencySource)
+	if !ok {
+		return domain.ValidationIssue{}, false
+	}
+	err := checker.FlakeLockConsistency(repository)
+	if err == nil {
+		return domain.ValidationIssue{}, false
+	}
+	if code, typed := domain.BlockedCodeOf(err); typed {
+		return domain.BlockedIssue("pin", code, err.Error()), true
+	}
+	return domain.ValidationIssue{Field: "pin", Message: err.Error()}, true
 }
 
 // PlanReachable creates a new review for an explicit subset. It neither edits

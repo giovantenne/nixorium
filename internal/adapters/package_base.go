@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 
@@ -163,28 +162,22 @@ func (p PackageBase) PrepareUpdateWithProgress(ctx context.Context, repo, target
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
-	flake, err := deploymentFlakeReference(ctx, repo)
+	mismatches, err := flakeLockOriginalMismatches(s.FlakeContent, s.LockContent)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
-	file, err := os.CreateTemp("", "nixorium-base-lock-*.json")
+	if len(mismatches) > 0 {
+		return domain.UpdateProposal{}, fmt.Errorf("flake.lock does not match flake.nix (%s); repair it in Maintenance → Update Nixorium by selecting the configured version again, then update the system base", strings.Join(mismatches, "; "))
+	}
+	current, err := deploymentFlakeReference(ctx, repo)
 	if err != nil {
-		return domain.UpdateProposal{}, err
-	}
-	path := file.Name()
-	defer os.Remove(path)
-	if err := file.Close(); err != nil {
-		return domain.UpdateProposal{}, err
-	}
-	if err := os.Remove(path); err != nil {
 		return domain.UpdateProposal{}, err
 	}
 	url := "github:NixOS/nixpkgs/" + target
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseLock, "Resolving the system/package base candidate", 0, 0)
-	if _, err := runBoundedNix(ctx, 256*1024, "flake", "lock", flake, "--override-input", "nixpkgs", url, "--update-input", "nixpkgs", "--output-lock-file", path); err != nil {
-		return domain.UpdateProposal{}, err
-	}
-	lock, _, err := readRegularFileNoFollowLimit(path, 4*1024*1024)
+	// Lock the proposed flake.nix so the recorded original is the selected
+	// channel; --update-input refreshes the same channel to its newest revision.
+	lock, err := lockUpdateCandidate(ctx, repo, proposed, "nixpkgs", url, "--update-input", "nixpkgs")
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
@@ -200,8 +193,7 @@ func (p PackageBase) PrepareUpdateWithProgress(ctx context.Context, repo, target
 	if target == s.CurrentRef && s.CurrentRev == candidate.CurrentRev {
 		return domain.UpdateProposal{}, errors.New("the selected system/package base is already at this revision; no update is available")
 	}
-	common := []string{"--override-input", "nixpkgs", url, "--reference-lock-file", path, "--no-write-lock-file"}
-	proposal, err := validateUpdateCandidate(ctx, flake, common, s, proposed, lock, progress, true)
+	proposal, err := validateUpdateCandidate(ctx, repo, current, s, proposed, lock, progress, true)
 	if err != nil {
 		return proposal, err
 	}

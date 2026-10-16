@@ -155,6 +155,13 @@ var nextSteps = map[string]NextStep{
 		Action: "Open Diagnostics and fix the first reported error",
 		TUI:    "Maintenance → Diagnostics", Command: "nixorium doctor", Stop: true,
 	},
+	"PIN-OUTDATED": {
+		Code:   "PIN-OUTDATED",
+		Title:  "The saved Nixorium version is recorded inconsistently",
+		Why:    "The student computers are built from a fixed copy of the saved configuration, which cannot correct this record by itself.",
+		Action: "Repeat the update for the configured Nixorium version",
+		TUI:    "Maintenance → Update Nixorium", Command: "nixorium update check",
+	},
 }
 
 // NextStepByCode returns a catalog entry.
@@ -292,6 +299,8 @@ func NextStepFor(message string) (NextStep, bool) {
 		code = "CLIENT-UNCONFIRMED"
 	case has("disk space may be too low", "low nix store disk space"):
 		code = "DISK-LOW"
+	case has("flake.lock does not match flake.nix", "requires lock file changes", `flake.lock": read-only file system`):
+		code = "PIN-OUTDATED"
 	case has("nix evaluation rejected", "evaluate labmeta"):
 		code = "EVAL-FAILED"
 	default:

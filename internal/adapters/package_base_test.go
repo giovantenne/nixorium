@@ -46,6 +46,7 @@ func TestPreparePackageBaseValidatesCandidatesAndNeverWritesDeployment(t *testin
 set -eu
 printf '%s\n' "$*" >> "$NIXORIUM_TEST_BASE_LOG"
 case " $* " in
+` + fakeCandidateStoreCases + `
   *" flake lock "*)
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --output-lock-file ]; then cp "$NIXORIUM_TEST_BASE_CANDIDATE" "$2"; exit 0; fi

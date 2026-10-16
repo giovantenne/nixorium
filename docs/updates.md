@@ -130,7 +130,10 @@ If a moving channel advanced since review, apply refuses the changed proposal;
 create a fresh plan and review it. The TUI keeps its exact candidate in memory.
 Both paths bind before/after bytes, HEAD and policy; changed files or HEAD
 invalidate the review. Candidate lock files are temporary and never written
-over the deployment during planning.
+over the deployment during planning. The candidate `flake.lock` is computed from the
+proposed `flake.nix` and refused unless Nix accepts the pair unchanged; if an
+update saved by Nixorium 3.8.0 or older left them out of step (`PIN-OUTDATED`),
+plan the configured release again to repair them before updating the computers.
 
 ## Validation and remaining gates
 

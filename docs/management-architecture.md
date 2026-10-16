@@ -1082,13 +1082,24 @@ site template. New templates use the canonical fully qualified assignment, so
 the compatibility path can update those deployments without requiring a
 manual bootstrap edit.
 
-The plan renders candidate `flake.nix` bytes in memory and asks Nix to write a
-candidate lock outside the checkout with `flake lock --override-input nixorium
-... --output-lock-file ...`. It validates that other top-level inputs remain
-owned by the deployment while allowing the selected upstream's transitive lock
-closure to change. All subsequent evaluation and builds use the explicit
-override plus `--reference-lock-file` and `--no-write-lock-file`; they never
-write the deployment lock during review.
+The plan renders candidate `flake.nix` bytes in memory, stages a private
+immutable copy of the committed deployment with that proposed `flake.nix` and
+the current `flake.lock`, and asks Nix to write a candidate lock outside the
+checkout with `flake lock <copy> --override-input nixorium ...
+--output-lock-file ...`. Nix records each input's `original` reference from
+the `flake.nix` it locks, so locking the proposed file keeps the saved pair
+consistent (3.8.0 and earlier locked the current file, which left the old
+reference as `original`; Colmena then failed on the read-only store copy). It
+validates that other top-level inputs remain owned by the deployment while
+allowing the selected upstream's transitive lock closure to change. A second
+immutable copy holds the proposed `flake.nix` and `flake.lock`; `nix flake lock
+--no-update-lock-file` on it must succeed before anything is evaluated, and all
+evaluation and builds use that copy with `--no-update-lock-file` (never
+`--no-write-lock-file`, which would let Nix relock in memory). Review never
+writes the deployment lock. When an existing `flake.lock` records another
+`nixorium` reference than `flake.nix`, the update check reports it, the
+configured release can be planned again to repair the pair, and `deploy plan`
+and `doctor` report `PIN-OUTDATED` instead of reaching Colmena.
 
 Before a plan becomes ready, evaluate `labMeta` and `deploymentStatus`, then
 build one configured client, the controller, netboot ramdisk, PXE firmware, and

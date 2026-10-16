@@ -56,12 +56,12 @@ func workspaceUpdateNixString(value string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, "${", `\${`, "\n", `\n`, "\r", `\r`, "\t", `\t`).Replace(value) + `"`
 }
 
-func inspectWorkspaceUpdate(ctx context.Context, flake string, common []string) (*domain.WorkspaceUpdateImpact, error) {
-	current, err := readUpdateWorkspace(ctx, flake, nil)
+func inspectWorkspaceUpdate(ctx context.Context, currentFlake, candidateFlake string, common []string) (*domain.WorkspaceUpdateImpact, error) {
+	current, err := readUpdateWorkspace(ctx, currentFlake, nil)
 	if err != nil {
 		return nil, err
 	}
-	proposed, err := readUpdateWorkspace(ctx, flake, common)
+	proposed, err := readUpdateWorkspace(ctx, candidateFlake, common)
 	if err != nil {
 		return nil, err
 	}

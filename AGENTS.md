@@ -544,7 +544,9 @@ that release's notes, so a release is not finished until the site follows it.
   review through `continueSavedConfiguration`, like a settings save.
 - Upstream update planning must preserve the configured source identity, accept
   only the exact `master` branch or an explicit SemVer tag, generate the
-  candidate lock outside the checkout,
+  candidate lock outside the checkout from the proposed `flake.nix` (Nix
+  records `original` from the file it locks), refuse a pair that
+  `nix flake lock --no-update-lock-file` would change,
   and validate representative outputs against that exact lock. Explicit
   controller mode requires zero clients, explicit controller readiness, and a
   candidate controller build; it must not require or build client/PXE outputs.
