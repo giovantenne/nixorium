@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- On the Overview, **Maintenance** now opens with `m` and **Assistant** with
+  `a`; the letters were swapped so each matches its name.
+
 ## [3.8.0] - 2026-10-16
 
 ### Added

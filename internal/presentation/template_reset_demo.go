@@ -32,7 +32,7 @@ func renderTemplateResetDemo(revision string, width, height int) DemoScenario {
 	}
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1000)
-	r.key(demoText("a"))
+	r.key(demoText("m"))
 	load := r.key(demoText("t"))
 	r.capture("Load the locked upstream template", 1000)
 	r.command(load)

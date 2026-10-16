@@ -415,7 +415,7 @@ Overview
   [c] Computers     inventory, update computers, Internet access, power
   [n] Installation  network boot (PXE) or USB over SSH
   [w] Software      configured choices and pinned package search
-  [a] Maintenance   settings, updates, logs, diagnostics, backup;
+  [m] Maintenance   settings, updates, logs, diagnostics, backup;
                     advanced: free disk space, controller apply, services,
                     Git review, deployment template reset
 ```

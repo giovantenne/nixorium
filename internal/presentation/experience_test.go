@@ -636,7 +636,7 @@ func TestUpdateProgressExplainsSystemChecksInOperatorLanguage(t *testing.T) {
 
 func TestAdministrationBackAndDiagnosticsUseTypedCallback(t *testing.T) {
 	m := experienceFixture(2)
-	m = press(m, "a")
+	m = press(m, "m")
 	m.actions.LoadDoctor = func(ctx context.Context) (domain.DoctorReport, error) {
 		return domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}}, nil
 	}

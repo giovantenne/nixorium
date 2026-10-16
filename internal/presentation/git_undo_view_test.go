@@ -21,7 +21,7 @@ func undoTestPlan() domain.GitUndoPlanReport {
 func openGitReviewFor(t *testing.T, actions DashboardActions, width, height int) dashboardModel {
 	t.Helper()
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions, width: width, height: height}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "g"})
 	model = updated.(dashboardModel)

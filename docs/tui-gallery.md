@@ -41,7 +41,7 @@ reads saved configuration and local service/Git state; inventory, client probes 
 readiness checks run when the selected task needs them. Deferred checks never
 imply that installation or deployment is ready.
 
-The controller offers Assistant (`m`) unless `lab.assistant` is explicitly false.
+The controller offers Assistant (`a`) unless `lab.assistant` is explicitly false.
 Its account activation, subscription and consent
 checks precede content sharing. Ctrl+R reviews candidate changes and their Nix
 evaluation; SAVE records a local commit with a backup. Controller application
@@ -199,7 +199,7 @@ Choose an area with the arrows or its letter.
 › [c] Computers
   [n] Installation
   [w] Software
-  [a] Maintenance
+  [m] Maintenance
 
 Inventory, updating computers, Internet access and power
 
@@ -221,8 +221,8 @@ Choose an area with the arrows or its letter.
 › [c] Computers
   [n] Installation
   [w] Software
-  [a] Maintenance
-  [m] Assistant
+  [m] Maintenance
+  [a] Assistant
 
 Inventory, updating computers, Internet access and power
 
@@ -240,8 +240,8 @@ Choose an area with the arrows or its letter.
 › [c] Computers
   [n] Installation
   [w] Software
-  [a] Maintenance
-  [m] Assistant
+  [m] Maintenance
+  [a] Assistant
 
 Inventory, updating computers, Internet access and power
 
@@ -1563,8 +1563,8 @@ Items in yellow need your attention; press their number to open them.
 › [c] Computers
   [n] Installation
   [w] Software
-  [a] Maintenance
-  [m] Assistant
+  [m] Maintenance
+  [a] Assistant
 
 Inventory, updating computers, Internet access and power
 

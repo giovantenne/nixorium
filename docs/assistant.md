@@ -22,7 +22,7 @@ deployment's existing `lab-settings.json`, preserving the other settings:
 Review and commit the configuration change, then use the ordinary controller
 application review. Once that controller configuration is active, the menu
 entry is removed. Set it to `true` and apply the controller to enable it again.
-When enabled, **Assistant** is the fifth administrator menu entry (`m`);
+When enabled, **Assistant** is the fifth administrator menu entry (`a`);
 it is absent on clients and from the teacher's classroom dashboard.
 Menu availability does not activate an account, accept consent or send requests.
 

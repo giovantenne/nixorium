@@ -26,10 +26,10 @@ var dashboardTasks = []dashboardTask{
 	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, updating computers, Internet access and power"},
 	{id: "installation", shortcut: "n", title: "Installation", description: "Configure the lab and install computers by PXE or the official USB ISO over SSH"},
 	{id: "software", shortcut: "w", title: "Software", description: "Manage configured software or find packages to add"},
-	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
+	{id: "admin", shortcut: "m", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
 }
 
-var assistantTask = dashboardTask{id: "assistant", shortcut: "m", title: "Assistant", description: "Describe a lab customization; review the proposal before saving"}
+var assistantTask = dashboardTask{id: "assistant", shortcut: "a", title: "Assistant", description: "Describe a lab customization; review the proposal before saving"}
 
 func (model dashboardModel) homeAreas() []dashboardTask {
 	tasks := append([]dashboardTask(nil), dashboardTasks...)

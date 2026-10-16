@@ -253,9 +253,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 		}
 		switch action {
-		case "m":
-			return model.openAssistant()
 		case "a":
+			return model.openAssistant()
+		case "m":
 			model.screen = dashboardAdministration
 		case "c":
 			return model.openComputersArea()

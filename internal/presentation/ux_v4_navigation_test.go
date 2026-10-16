@@ -149,7 +149,7 @@ func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 	model.actions.CheckUpdate = func(ctx context.Context) domain.UpdateCheckReport {
 		return domain.UpdateCheckReport{Operation: "update-check", State: "current", CurrentRef: "v2.0.0"}
 	}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
@@ -163,7 +163,7 @@ func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 	model.busy = ""
 	model.settings.result = domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
 	model.actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return domain.LabSettingsFile{}, nil }
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Text: "e"})
 	model = updated.(dashboardModel)

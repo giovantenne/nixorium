@@ -18,7 +18,7 @@ func TestClientTasksRequireInventoryOnlyWhenOpened(t *testing.T) {
 			m.report.Meta = domain.LabMeta{}
 			calls := 0
 			m.actions.LoadInventory = func(context.Context) (domain.StatusReport, error) { calls++; return observed, nil }
-			m = press(m, "a")
+			m = press(m, "m")
 			m = press(m, "esc")
 			m = press(m, "c")
 			if calls != 0 || m.busy != "" {

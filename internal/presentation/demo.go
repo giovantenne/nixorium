@@ -190,7 +190,7 @@ func renderSupportDemo(revision string, width, height int) DemoScenario {
 	}
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1000)
-	r.pressAndCapture(demoText("a"), "Open Maintenance", 800)
+	r.pressAndCapture(demoText("m"), "Open Maintenance", 800)
 	r.command(r.key(demoText("i")))
 	r.capture("Open diagnostic observations", 1000)
 	r.key(demoText("e"))

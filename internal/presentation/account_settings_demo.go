@@ -15,7 +15,7 @@ func RenderAccountSettingsDemo(revision string, width, height int) DemoScenario 
 	actions.LoadSettings = func(context.Context) (domain.LabSettingsFile, error) { return demoSettings(), nil }
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1000)
-	r.pressAndCapture(demoText("a"), "Open Maintenance", 1600)
+	r.pressAndCapture(demoText("m"), "Open Maintenance", 1600)
 	load := r.key(demoText("e"))
 	r.command(load)
 	r.capture("Settings categories", 1600)

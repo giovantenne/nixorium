@@ -1133,7 +1133,7 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 		},
 	}
 	model := dashboardModel{actions: actions}
-	updated, command := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	if command != nil || model.screen != dashboardAdministration {
 		t.Fatalf("maintenance did not open: screen=%d", model.screen)
@@ -1285,7 +1285,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	if strings.Contains(model.View().Content, "Update Nixorium") || !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("home omits navigable task menu:\n%s", model.View().Content)
 	}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
@@ -1493,7 +1493,7 @@ func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
 			}
 		}},
 	}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
@@ -1585,7 +1585,7 @@ func TestNixoriumUpdateInputFailureIsNotPresentedAsNetworkFailure(t *testing.T) 
 			}
 		}},
 	}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
@@ -1682,7 +1682,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	if !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("home omits settings task:\n%s", model.View().Content)
 	}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "e"})
 	model = updated.(dashboardModel)
@@ -1762,7 +1762,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "s"})
 	model = updated.(dashboardModel)
@@ -1823,7 +1823,7 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
 	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "l"})
 	model = updated.(dashboardModel)
@@ -1866,7 +1866,7 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
 	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "g"})
 	model = updated.(dashboardModel)
@@ -1923,7 +1923,7 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "g"})
 	model = updated.(dashboardModel)

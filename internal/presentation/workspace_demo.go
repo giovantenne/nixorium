@@ -68,7 +68,7 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 	}
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1000)
-	r.key(demoText("a"))
+	r.key(demoText("m"))
 	r.command(r.key(demoText("e")))
 	load := r.key(demoText("w"))
 	r.capture("Resolve the saved student profile and pinned catalog", 1000)
