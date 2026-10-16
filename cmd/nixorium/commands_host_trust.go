@@ -56,7 +56,8 @@ func runHostTrustCommand(ctx context.Context, repository string, options options
 		}
 		return 0
 	}
-	if plan.ReviewToken != options.expect {
+	plan, matched := manager.Reviewed(plan, options.expect)
+	if !matched {
 		fmt.Fprintln(stderr, "Host-key review changed; create a fresh plan.")
 		return 1
 	}

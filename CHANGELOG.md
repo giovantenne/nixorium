@@ -9,6 +9,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - **Computers → Queued updates** opens again; selecting it did nothing.
+- Trusting a reinstalled computer's new SSH key no longer fails with "review
+  changed" when the review was made just before the clock passed a
+  five-minute mark. A host-key review now stays valid for four to five
+  minutes, from the command line and from the computer's details.
 
 ## [3.8.2] - 2026-10-16
 

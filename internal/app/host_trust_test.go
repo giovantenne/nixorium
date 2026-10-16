@@ -223,3 +223,48 @@ func TestHostTrustRejectsRepositoryChangesDuringInspection(t *testing.T) {
 		}
 	}
 }
+
+// The CLI rebuilds the review at apply time. A review confirmed just before a
+// grid line must still match the rebuilt one, for as long as it is valid.
+func TestHostTrustReviewSurvivesExpiryGridUntilItExpires(t *testing.T) {
+	created := time.Date(2026, 10, 16, 15, 39, 59, 900_000_000, time.UTC)
+	for _, delay := range []time.Duration{0, 200 * time.Millisecond, 2 * time.Second, time.Minute, 3 * time.Minute, 4 * time.Minute} {
+		t.Run(delay.String(), func(t *testing.T) {
+			f := hostTrustFixture()
+			m := hostTrustTestManager(f)
+			now := created
+			m.now = func() time.Time { return now }
+			p := m.Plan(context.Background(), "/deployment", "pc01")
+			if p.HasErrors() || p.ExpiresAt.Sub(created) < 4*time.Minute {
+				t.Fatalf("review too short: %+v", p)
+			}
+			now = created.Add(delay)
+			rebuilt, matched := m.Reviewed(m.Plan(context.Background(), "/deployment", "pc01"), p.ReviewToken)
+			if !matched || rebuilt.ReviewToken != p.ReviewToken || !rebuilt.ExpiresAt.Equal(p.ExpiresAt) {
+				t.Fatalf("CLI could not rebuild a valid review after %s: %+v", delay, rebuilt)
+			}
+			if r := m.Apply(context.Background(), rebuilt, p.ReviewToken); r.HasErrors() || f.writes != 1 {
+				t.Fatalf("CLI apply after %s: %+v writes=%d", delay, r, f.writes)
+			}
+			f.writes = 0
+			if r := m.Apply(context.Background(), p, p.ReviewToken); r.HasErrors() || f.writes != 1 {
+				t.Fatalf("dashboard apply after %s: %+v writes=%d", delay, r, f.writes)
+			}
+		})
+	}
+	t.Run("expired", func(t *testing.T) {
+		f := hostTrustFixture()
+		m := hostTrustTestManager(f)
+		now := created
+		m.now = func() time.Time { return now }
+		p := m.Plan(context.Background(), "/deployment", "pc01")
+		now = p.ExpiresAt
+		if _, matched := m.Reviewed(m.Plan(context.Background(), "/deployment", "pc01"), p.ReviewToken); matched {
+			t.Fatal("expired review matched a rebuilt one")
+		}
+		p.ExpiresAt = now.Add(time.Hour)
+		if r := m.Apply(context.Background(), p, p.ReviewToken); !r.HasErrors() || f.writes != 0 {
+			t.Fatalf("expired review applied: %+v", r)
+		}
+	})
+}
