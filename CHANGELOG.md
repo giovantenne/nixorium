@@ -6,6 +6,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.8.2] - 2026-10-16
+
+### Fixed
+
+- 3.8.1 was tagged but never published: its release checks found an
+  automated test still pressing the old letter for **Assistant** after the
+  Overview letters were swapped. 3.8.2 is 3.8.1 with that test corrected;
+  update straight from 3.8.0 to 3.8.2. The changes listed under 3.8.1 arrive
+  with this release.
+
 ## [3.8.1] - 2026-10-16
 
 ### Changed
@@ -2258,7 +2268,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.8.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.8.2...HEAD
+[3.8.2]: https://github.com/giovantenne/nixorium/compare/v3.8.1...v3.8.2
 [3.8.1]: https://github.com/giovantenne/nixorium/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/giovantenne/nixorium/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/giovantenne/nixorium/compare/v3.6.1...v3.7.0
