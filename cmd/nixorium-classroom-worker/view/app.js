@@ -489,7 +489,7 @@ async function saveScreenshot(name) {
 }
 
 // A computer's window offers a screenshot only of a live screen, and
-// Collect from desktop only with someone signed in.
+// Collect from students' desktops only with someone signed in.
 function updateSaveButtons(computers) {
   if (!selected) return;
   const computer = computers.find((item) => item.name === selected);

@@ -304,7 +304,7 @@ with its name and contents: hidden files and links are left out, at most 2000
 items and 500 MB are sent, the copies belong to the student and are never
 executable, and a name already on a student's desktop is kept as
 "name (2)". A restart empties the student's home, as usual. In the classroom
-view page, **Send/Collect files** offers **Send a folder…** and **Send a file…**,
+view page, **Share files** offers **Send a folder…** and **Send a file…**,
 which open the system file chooser in your home folder.
 From a terminal, as the teacher or the administrator: `nixorium send plan
 --file <file-or-folder> --on @lab`, then `nixorium send apply --file
@@ -317,8 +317,8 @@ and mouse blocked, until **Stop sharing** or until you close the page.
 
 ## Collect files
 
-With the classroom view, **Collect from desktop** in the classroom view page
-(in **Send/Collect files**, and in a computer's **Actions** menu) copies the files
+With the classroom view, **Collect from students' desktops** in the classroom view page
+(in **Share files**, and in a computer's **Actions** menu) copies the files
 on the desktops of the selected students' computers into your home folder,
 in `Nixorium/Collected/<date and time>/<computer>/`, after a review. Hidden
 files and links are left out and nothing changes on the students' computers.

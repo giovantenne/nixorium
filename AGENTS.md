@@ -796,7 +796,7 @@ that release's notes, so a release is not finished until the site follows it.
   nothing behind. The classroom worker prepares files in its private
   temporary folder under position-based names only, hashes each file, and
   binds the share review to paths, sizes and digests rather than to the
-  transfer identifier. The page never uploads files: its Send/Collect files menu asks
+  transfer identifier. The page never uploads files: its Share files menu asks
   the service, which hands a file or folder choice to the desktop helper of
   the page's own
   user (the browser launcher, running as that user, long-polling

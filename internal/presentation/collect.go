@@ -10,7 +10,7 @@ import (
 )
 
 func CollectPlanText(w io.Writer, p domain.CollectPlan) {
-	fmt.Fprintf(w, "Collect from desktop (%s)\n%s\n", p.State, p.Message)
+	fmt.Fprintf(w, "Collect from students' desktops (%s)\n%s\n", p.State, p.Message)
 	for _, t := range p.Targets {
 		outcome := t.Detail
 		if !t.Eligible {

@@ -10,7 +10,7 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-// Collect from desktop: the page reviews the selected computers through
+// Collect from students' desktops: the page reviews the selected computers through
 // the worker's own collect plan, and after the confirmation the worker
 // copies their desktops into its private temporary folder and the desktop
 // helper of the page's user saves them as

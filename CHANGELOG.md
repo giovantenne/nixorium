@@ -8,8 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- The classroom view toolbar is simpler: **Send/Collect files** holds **Send a
-  folder…**, **Send a file…** and **Collect from desktop**, and the
+- In the classroom view, **Send/Collect files** is now **Share files**, and its
+  **Collect from desktop** is now **Collect from students' desktops**.
+- The classroom view toolbar is simpler: **Share files** holds **Send a
+  folder…**, **Send a file…** and **Collect from students' desktops**, and the
   **Refresh** button is gone, since the page refreshes by itself.
 - On the Overview, **Maintenance** now opens with `m` and **Assistant** with
   `a`; the letters were swapped so each matches its name.
@@ -68,7 +70,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   live: a computer that is off, idle behind its own screen lock or without
   anyone signed in has no picture to save. When the page was not opened from
   Nixorium, the browser downloads the picture instead.
-- **Collect from desktop** copies the files on the desktops of the selected
+- **Collect from students' desktops** copies the files on the desktops of the selected
   students' computers into your home folder, in
   `Nixorium/Collected/<date and time>/<computer>/`, after the usual review
   with one confirmation button. It sits beside **Send files** in the classroom
@@ -102,7 +104,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   each step optional and each computer's result listing the three steps. The
   same button reads **End exam mode** on computers it was started on from the
   open page: it removes the message, unlocks the screens, allows Internet
-  again, and then offers **Collect from desktop** for the same computers
+  again, and then offers **Collect from students' desktops** for the same computers
   (nothing is collected unless you confirm). The classroom service remembers
   which computers are in exam mode, so a reopened page, or another user's,
   shows the same; the computers keep no exam state, and restarting the
@@ -201,7 +203,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   again by itself a second later, however many times. While it is down, the
   computer's card says "Monitoring stopped on this PC" instead of just
   dimming, and the same words explain why Lock, Send files, Share screen,
-  Collect from desktop and Save screenshot skipped that computer; the result
+  Collect from students' desktops and Save screenshot skipped that computer; the result
   notice counts it apart. A computer waiting at the login screen still says
   "Nobody is signed in". A classroom view that is frozen rather than stopped
   is reported the same way, and a frozen one no longer keeps its connection

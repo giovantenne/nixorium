@@ -14,7 +14,7 @@ import (
 	"github.com/giovantenne/nixorium/internal/presentation"
 )
 
-// Collect from desktop: the files on the desktops of the selected
+// Collect from students' desktops: the files on the desktops of the selected
 // students' computers are copied, through the classroom service, into a
 // folder of whoever runs Nixorium (teacher or administrator), as that
 // user: <folder>/<YYYY-MM-DD HH.MM>/<computer>/…, where the folder is

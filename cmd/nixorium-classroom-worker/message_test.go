@@ -269,16 +269,16 @@ func TestToolbarSendCollectMenu(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := string(page)
-	_, rest, found := strings.Cut(html, "<summary>Send/Collect files</summary>")
+	_, rest, found := strings.Cut(html, "<summary>Share files</summary>")
 	menu, _, closed := strings.Cut(rest, "</details>")
 	if !found || !closed {
-		t.Fatal("the toolbar has no Send/Collect files menu")
+		t.Fatal("the toolbar has no Share files menu")
 	}
 	last := -1
-	for _, want := range []string{`>Send a folder…</button>`, `>Send a file…</button>`, `data-action="collect"`, `>Collect from desktop</button>`} {
+	for _, want := range []string{`>Send a folder…</button>`, `>Send a file…</button>`, `data-action="collect"`, `>Collect from students' desktops</button>`} {
 		at := strings.Index(menu, want)
 		if at <= last {
-			t.Fatalf("Send/Collect files menu lacks %s in order: %s", want, menu)
+			t.Fatalf("Share files menu lacks %s in order: %s", want, menu)
 		}
 		last = at
 	}
@@ -289,13 +289,13 @@ func TestToolbarSendCollectMenu(t *testing.T) {
 		}
 	}
 	if strings.Count(toolbar, `data-action="collect"`) != 1 {
-		t.Error("Collect from desktop is expected only in the Send/Collect files menu")
+		t.Error("Collect from students' desktops is expected only in the Share files menu")
 	}
 	// A computer's Actions menu keeps the three together, in the same order.
 	_, rest, found = strings.Cut(html, `class="actions-menu viewer-actions"`)
 	block, _, _ := strings.Cut(rest, "</details>")
-	folder, file, collect := strings.Index(block, "Send a folder…"), strings.Index(block, "Send a file…"), strings.Index(block, "Collect from desktop")
+	folder, file, collect := strings.Index(block, "Send a folder…"), strings.Index(block, "Send a file…"), strings.Index(block, "Collect from students' desktops")
 	if !found || folder < 0 || file < folder || collect < file || strings.Contains(block[folder:collect], "data-action=\"wake\"") {
-		t.Error("a computer's Actions menu lacks Send a folder…, Send a file…, Collect from desktop in order")
+		t.Error("a computer's Actions menu lacks Send a folder…, Send a file…, Collect from students' desktops in order")
 	}
 }

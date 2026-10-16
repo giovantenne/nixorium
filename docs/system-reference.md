@@ -435,7 +435,7 @@ to the relay's own hello within 3 seconds), shows a warning sign over its
 dimmed last picture and **Monitoring stopped on this PC**. The login screen does not count as someone signed in
 (only a session of class `user` does), so a computer waiting at it says
 **Nobody is signed in**. The same words explain the computer wherever an
-action skips it (Lock, Send/Collect files, Share screen, Collect from desktop and
+action skips it (Lock, Share files, Share screen, Collect from students' desktops and
 Save screenshot), and a result notice counts such computers apart, as
 "monitoring stopped on this PC". The agent restarts by itself: its user unit
 is `Restart=always` with a one-second delay and no start limit, and both
@@ -571,8 +571,8 @@ lock is a classroom aid, not a security boundary. Locking also works from
 not take the administrative operation lock, since it changes no system
 state.
 
-The page's **Send/Collect files** menu (toolbar) holds **Send a folder…**,
-**Send a file…** and **Collect from desktop**, in this order, and so does a
+The page's **Share files** menu (toolbar) holds **Send a folder…**,
+**Send a file…** and **Collect from students' desktops**, in this order, and so does a
 computer's **Actions** menu.
 
 Sending a file, or a folder with its name and contents, is chosen by whoever
@@ -620,7 +620,7 @@ the helper downloads the picture once through the browser instead
 minutes. Only the save's own user (the socket's kernel peer credentials) may
 list, read or end a save, and the service itself never writes into a home.
 
-**Collect from desktop** (in **Send/Collect files** in the toolbar, and in a
+**Collect from students' desktops** (in **Share files** in the toolbar, and in a
 computer's Actions menu) is the reverse of sending files. The review lists each
 selected computer's desktop; a computer whose agent predates collecting is
 left out and named. After the one confirmation, the service reads at most
