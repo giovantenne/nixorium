@@ -315,6 +315,12 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "h", "x", "i", "l", "s":
 			model.areaReturn = dashboardComputersArea
 			return model.openComputerTask(action)
+		case "u":
+			if model.actions.ClassroomMode {
+				return model, nil
+			}
+			model.areaReturn = dashboardComputersArea
+			return model.openComputerTask(action)
 		case "v":
 			return model.openComputerTask(action)
 		}

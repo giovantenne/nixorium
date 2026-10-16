@@ -113,3 +113,109 @@ func TestQueuedUpdatesScreenListsAndRemoves(t *testing.T) {
 		t.Fatalf("removed %v", removed)
 	}
 }
+
+func queuedEntryModel() dashboardModel {
+	actions := DashboardActions{
+		LoadDeferredUpdates: func(context.Context) domain.DeferredUpdateStatus {
+			return domain.DeferredUpdateStatus{State: "ready"}
+		},
+	}
+	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	model.width, model.height = 100, 30
+	model.screen = dashboardComputersArea
+	return model
+}
+
+func TestComputersAreaEnterOpensQueuedUpdates(t *testing.T) {
+	model := queuedEntryModel()
+	for index, task := range model.availableComputerTasks() {
+		if task.id == "queued" {
+			model.computers.areaCursor = index
+		}
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardDeferredUpdates || command == nil || model.areaReturn != dashboardComputersArea {
+		t.Fatalf("Enter did not open Queued updates: screen=%d command=%v", model.screen, command != nil)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if updated.(dashboardModel).screen != dashboardComputersArea {
+		t.Fatalf("Esc did not return to Computers: screen=%d", updated.(dashboardModel).screen)
+	}
+}
+
+func TestComputersAreaShortcutOpensQueuedUpdates(t *testing.T) {
+	model := queuedEntryModel()
+	updated, command := model.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardDeferredUpdates || command == nil {
+		t.Fatalf("u did not open Queued updates: screen=%d command=%v", model.screen, command != nil)
+	}
+}
+
+func TestComputersAreaIgnoresQueuedShortcutInClassroomMode(t *testing.T) {
+	model := queuedEntryModel()
+	model.actions.ClassroomMode = true
+	updated, command := model.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
+	if updated.(dashboardModel).screen != dashboardComputersArea || command != nil {
+		t.Fatal("u must stay ignored in classroom mode")
+	}
+}
+
+// Every entry an area lists must do something: its shortcut and Enter must
+// leave the area or start a read.
+func TestEveryListedAreaTaskIsHandled(t *testing.T) {
+	noop := func(context.Context) domain.DeferredUpdateStatus { return domain.DeferredUpdateStatus{} }
+	base := func() dashboardModel {
+		model := experienceFixture(2)
+		model.actions.LoadDeferredUpdates = noop
+		model.actions.PlanLock = func(context.Context, string, domain.LockAction) domain.LockPlan { return domain.LockPlan{} }
+		model.actions.PlanShare = func(context.Context, string, string) domain.SharePlan { return domain.SharePlan{} }
+		model.actions.OpenClassroomView = func(context.Context) (string, error) { return "", nil }
+		model.actions.LoadRemoteInstall = func(context.Context) (domain.RemoteInstallResponse, error) {
+			return domain.RemoteInstallResponse{}, nil
+		}
+		model.actions.LoadTemplateReset = func(context.Context) domain.TemplateResetCatalog { return domain.TemplateResetCatalog{} }
+		model.actions.PlanTemplateReset = func(context.Context, string, func(string)) domain.TemplateResetPlan {
+			return domain.TemplateResetPlan{}
+		}
+		model.actions.ApplyTemplateReset = func(domain.TemplateResetPlan) domain.TemplateResetResult {
+			return domain.TemplateResetResult{}
+		}
+		model.actions.Telemetry = func(context.Context, string) (domain.TelemetryReport, error) {
+			return domain.TelemetryReport{}, nil
+		}
+		model.width, model.height = 120, 40
+		return model
+	}
+	areas := []struct {
+		name   string
+		screen dashboardScreen
+		tasks  func(dashboardModel) []dashboardTask
+	}{
+		{"home", dashboardHome, func(m dashboardModel) []dashboardTask { return m.homeAreas() }},
+		{"computers", dashboardComputersArea, func(m dashboardModel) []dashboardTask { return m.availableComputerTasks() }},
+		{"installation", dashboardInstallationArea, func(dashboardModel) []dashboardTask { return installationAreaTasks }},
+		{"maintenance", dashboardAdministration, func(dashboardModel) []dashboardTask { return administrationTasks }},
+	}
+	for _, area := range areas {
+		for index, task := range area.tasks(base()) {
+			for _, viaEnter := range []bool{false, true} {
+				model := base()
+				model.screen = area.screen
+				model.homeMenu.list.Select(index)
+				model.computers.areaCursor = index
+				model.installationAreaCursor = index
+				model.adminCursor = index
+				key := tea.KeyPressMsg{Code: []rune(task.shortcut)[0], Text: task.shortcut}
+				if viaEnter {
+					key = tea.KeyPressMsg{Code: tea.KeyEnter}
+				}
+				updated, command := model.Update(key)
+				if updated.(dashboardModel).screen == area.screen && command == nil {
+					t.Errorf("%s: entry %q (%s, enter=%v) does nothing", area.name, task.title, task.shortcut, viaEnter)
+				}
+			}
+		}
+	}
+}

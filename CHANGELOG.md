@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Computers → Queued updates** opens again; selecting it did nothing.
+
 ## [3.8.2] - 2026-10-16
 
 ### Fixed
