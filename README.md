@@ -16,7 +16,10 @@ applications locally and returns to a clean desktop at every boot.
 [Releases](https://github.com/giovantenne/nixorium/releases)
 
 
-https://github.com/user-attachments/assets/3dfc054b-4f10-40a4-b26a-1c317d0d7fcf
+
+
+https://github.com/user-attachments/assets/956a1608-c1f2-446b-867d-5e9605bc8900
+
 
 
 
