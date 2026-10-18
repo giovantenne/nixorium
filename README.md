@@ -280,4 +280,5 @@ change the license or grant privileged access to releases or decisions.
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE). The Nixorium name and logo are
+covered by the [trademark policy](TRADEMARKS.md).
