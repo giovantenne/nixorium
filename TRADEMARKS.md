@@ -28,7 +28,8 @@ respective owners.
   such as "X for Nixorium" or "works with Nixorium".
 - Use the unmodified logo to link to [nixorium.org](https://nixorium.org) or
   to the GitHub project.
-- Modify Nixorium privately, inside your own school or organization.
+- Keep calling a modified copy "Nixorium" while you use it only inside your
+  own school or organization.
 
 ## You need written permission for this
 
@@ -67,7 +68,7 @@ Write to [hello@nixorium.org](mailto:hello@nixorium.org) to ask for permission
 or to ask a question. Please say what you plan to do and where the name will
 appear.
 
-This policy may change. The version in the main branch of the repository is
-the current one.
+This policy may change. The version on the `master` branch of the
+repository is the current one.
 
 This document is not legal advice and does not replace applicable law.
