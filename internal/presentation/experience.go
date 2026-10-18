@@ -426,6 +426,7 @@ func (model dashboardModel) helpView() string {
 	default:
 		lines = append(lines, "Follow the contextual controls and review before applying.", "Text fields keep their normal typing keys; F1 opens help.")
 	}
+	lines = append(lines, "", tuiMuted("Questions or feedback: hello@nixorium.org · nixorium.org", model.isDark))
 	return strings.Join(append(lines, "", "Esc / ? / F1 close help"), "\n")
 }
 

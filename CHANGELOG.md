@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A [trademark policy](TRADEMARKS.md) says how the Nixorium name and logo can
+  be used: freely to talk about and share Nixorium, with permission for forks,
+  services and products that carry the name.
+- The keyboard help (F1 or `?`) now shows the address for questions and
+  feedback, hello@nixorium.org.
+
 ### Fixed
 
 - **Computers → Queued updates** opens again; selecting it did nothing.

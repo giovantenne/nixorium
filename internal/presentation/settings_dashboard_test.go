@@ -347,3 +347,13 @@ func TestSettingsAccountsHelpNamesBothEntries(t *testing.T) {
 		t.Fatalf("Settings help still lists the removed p shortcut:\n%s", help)
 	}
 }
+
+func TestHelpShowsContactAddressOnEveryScreen(t *testing.T) {
+	for _, screen := range []dashboardScreen{dashboardHome, dashboardSettings, dashboardHosts} {
+		model := dashboardModel{width: 100, height: 30, screen: screen}
+		help := demoANSI.ReplaceAllString(model.helpView(), "")
+		if strings.Count(help, "hello@nixorium.org") != 1 || !strings.Contains(help, "Esc / ? / F1 close help") {
+			t.Fatalf("help for screen %d should show the contact address once:\n%s", screen, help)
+		}
+	}
+}
