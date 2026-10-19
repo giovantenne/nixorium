@@ -1021,9 +1021,10 @@ in
       };
     };
 
-    # Client updates queued for computers that were off: each pass updates,
-    # one at a time and under the operation gate, those that answer again
-    # (nixorium deploy queue run). Without a queue nothing starts.
+    # Client updates queued for computers that were off: each pass updates
+    # those that answer again together, with one ordinary update under the
+    # operation gate (nixorium deploy queue run). Without a queue nothing
+    # starts.
     systemd.services.nixorium-deferred-updates = {
       description = "Apply queued Nixorium client updates to computers that are back";
       after = [ "network-online.target" ];
@@ -1037,7 +1038,8 @@ in
         Group = "users";
         SupplementaryGroups = [ "nixorium-operations" ];
         UMask = "0077";
-        TimeoutStartSec = "3h";
+        # One build (at most 6 h) and one apply (at most 2 h) per pass.
+        TimeoutStartSec = "9h";
         Environment = [
           "XDG_CACHE_HOME=/var/cache/nixorium/admin"
           "XDG_STATE_HOME=/home/admin/.local/state"

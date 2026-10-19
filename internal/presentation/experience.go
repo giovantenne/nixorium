@@ -300,7 +300,7 @@ func (model dashboardModel) helpView() string {
 			"During the change Enter opens the next step; f finishes when every computer is on the new network; u undoes the change, which is possible until it is finished.",
 			"After finishing, prepare network installation again before installing a computer by PXE.")
 	case dashboardDeferredUpdates:
-		lines = append(lines, "These computers were off when an update was reviewed. Every minute the controller tries those that answer, one at a time, with the same build, check and record as Update computers.", "A computer marked as changed is not updated: the configuration moved on after queueing. Review the update again.", "x removes the selected computer, X removes all; they keep their current system. r refreshes.")
+		lines = append(lines, "These computers were off when an update was reviewed. Every minute the controller updates those that answer, together, with the same build, check and record as Update computers.", "A computer marked as changed is not updated: the configuration moved on after queueing. Review the update again.", "x removes the selected computer, X removes all; they keep their current system. r refreshes.")
 	case dashboardLock:
 		lines = append(lines, "Space select clients; a select all; Tab choose lock or unlock; Enter review, then Enter applies.", "A locked screen shows \"Eyes on the teacher\" and ignores keyboard and mouse; logging out or restarting unlocks it.", "Computers that are off or have nobody signed in are listed and skipped.")
 	case dashboardInternet:

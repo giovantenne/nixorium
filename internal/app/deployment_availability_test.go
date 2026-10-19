@@ -101,12 +101,12 @@ func TestDeploymentResultClassificationPreservesEvidence(t *testing.T) {
 		recovery                                      bool
 	}{
 		{name: "updated", headline: "Deployment completed and verified", outcome: "Updated"},
-		{name: "not reached", offline: true, headline: "Some computers were not reached", outcome: "Not reached"},
+		{name: "not reached", offline: true, headline: "Some computers were not reached", outcome: "Not updated"},
 		{name: "failed update", applyErr: errors.New("confirmed batch failure"), oldRevision: true, headline: "An update failed", outcome: "Update failed"},
 		{name: "unknown authentication", changedKey: true, headline: "Deployment needs attention", outcome: "Not verified"},
 		{name: "recording failed", recordError: true, headline: "Deployment needs attention", outcome: "Updated"},
 		{name: "uncertain activation", applyErr: &domain.DeploymentUnconfirmedError{Err: errors.New("disconnected")}, headline: "Deployment requires recovery", outcome: "Not verified", recovery: true},
-		{name: "uncertain and offline", applyErr: &domain.DeploymentUnconfirmedError{Err: errors.New("disconnected")}, offline: true, headline: "Deployment requires recovery — some computers were not reached", outcome: "Not reached", recovery: true},
+		{name: "uncertain and offline", applyErr: &domain.DeploymentUnconfirmedError{Err: errors.New("disconnected")}, offline: true, headline: "Deployment requires recovery — some computers were not reached", outcome: "Not updated", recovery: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			source := readyDeploymentSource()

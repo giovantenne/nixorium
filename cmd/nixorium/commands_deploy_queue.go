@@ -14,13 +14,13 @@ import (
 
 // Client updates that wait for their computers: the review queues computers
 // that are off; nixorium-deferred-updates.timer runs "deploy queue run",
-// which updates each of them, one at a time, once it answers again.
+// which updates those that answer again together, with one ordinary update.
 
 func newDeferredUpdateManager() *app.DeferredUpdateManager {
 	local := adapters.Local{}
 	deployments := app.NewDeploymentManager(local)
-	return app.NewDeferredUpdateManager(adapters.ManagedDeferredUpdates(), local, func(ctx context.Context, repository, host, revision string) (domain.DeploymentExecutionReport, bool) {
-		return executeDeploymentOperationGated(ctx, deployments, repository, host, revision, io.Discard, nil)
+	return app.NewDeferredUpdateManager(adapters.ManagedDeferredUpdates(), local, func(ctx context.Context, repository string, hosts []string, revision string) (domain.DeploymentExecutionReport, bool) {
+		return executeDeploymentOperationGated(ctx, deployments, repository, strings.Join(hosts, ","), revision, io.Discard, nil)
 	})
 }
 
@@ -92,5 +92,18 @@ func applyDeploymentQueued(ctx context.Context, manager *app.DeploymentManager, 
 	}
 	report := executeDeploymentOperationWithProgress(ctx, manager, repository, strings.Join(reachable, ","), plan.Revision, io.Discard, observe)
 	report.Queued = unreachable
+	// Computers that stopped answering after the build follow the same
+	// reviewed choice as those that were already off.
+	if len(report.Skipped) > 0 {
+		if err := newDeferredUpdateManager().Queue(plan, report.Skipped); err != nil {
+			report.Issues = append(report.Issues, domain.ValidationIssue{Field: "queue", Message: "the computers that stopped answering could not be queued: " + err.Error()})
+			return report
+		}
+		report.Queued = append(report.Queued, report.Skipped...)
+		if report.State == "partial" && !report.RecoveryRequired && len(report.Issues) == 0 && report.Verification.Verified == report.Verification.Attempted {
+			report.State = "completed"
+			report.Message = fmt.Sprintf("%d computer(s) updated and verified; %s stopped answering after the build and update when they answer again", report.Verification.Verified, strings.Join(report.Skipped, ", "))
+		}
+	}
 	return report
 }

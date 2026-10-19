@@ -21,10 +21,27 @@ func (report DeploymentExecutionReport) ResultSummary() DeploymentResultSummary 
 		verified[target.Name] = target
 	}
 	notReached, updateFailed := false, false
+	skipped := map[string]bool{}
+	for _, name := range report.Skipped {
+		skipped[name] = true
+	}
+	queued := map[string]bool{}
+	for _, name := range report.Queued {
+		queued[name] = true
+	}
 	for _, target := range report.Targets {
+		if queued[target.Name] {
+			continue
+		}
 		observation := verified[target.Name]
 		result := DeploymentComputerResult{Name: target.Name, Outcome: "Not verified", Guidance: "Inspect authenticated computer state and the private log before a fresh review."}
 		switch {
+		case skipped[target.Name] && report.BuildCompleted:
+			result.Outcome = "Not updated"
+			result.Guidance = "It stopped answering after the build, so nothing was started on it. Switch it on and update it again."
+			notReached = true
+			summary.Computers = append(summary.Computers, result)
+			continue
 		case !report.BuildCompleted || report.Phase == DeploymentPhasePreflight:
 			result.Outcome = "Not updated"
 			result.Guidance = "No update was started. Resolve the build or preflight issue first."

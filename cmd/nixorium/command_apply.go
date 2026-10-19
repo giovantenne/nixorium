@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
@@ -176,21 +177,25 @@ func executeDeploymentOperationWithProgress(ctx context.Context, manager *app.De
 func executeDeploymentOperationGated(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer, observe func(domain.DeploymentProgress)) (domain.DeploymentExecutionReport, bool) {
 	operation, err := adapters.OpenDeploymentOperation()
 	if err != nil {
+		// Nothing was attempted: report from the inputs, without evaluating
+		// or probing the laboratory again (the queue runner asks every minute).
 		var busy *adapters.OperationBusyError
-		plan := manager.Plan(ctx, repository, requested)
+		root, rootErr := filepath.Abs(repository)
+		if rootErr != nil {
+			root = repository
+		}
 		return domain.DeploymentExecutionReport{
-			SchemaVersion:   domain.SchemaVersion,
-			Operation:       "deploy-apply",
-			State:           "failed",
-			Repository:      plan.Repository,
-			Requested:       plan.Requested,
-			Revision:        plan.Revision,
-			ColmenaSelector: plan.ColmenaSelector,
-			Targets:         plan.Targets,
-			Phase:           domain.DeploymentPhasePreflight,
-			RetrySafe:       true,
-			Message:         "prepare deployment operation: " + err.Error(),
-			Issues:          plan.Issues,
+			SchemaVersion: domain.SchemaVersion,
+			Operation:     "deploy-apply",
+			State:         "failed",
+			Repository:    root,
+			Requested:     requested,
+			Revision:      expectedRevision,
+			Targets:       []domain.DeploymentTarget{},
+			Phase:         domain.DeploymentPhasePreflight,
+			RetrySafe:     true,
+			Message:       "prepare deployment operation: " + err.Error(),
+			Issues:        []domain.ValidationIssue{{Field: "operation", Message: err.Error()}},
 		}, errors.As(err, &busy)
 	}
 	progress := io.MultiWriter(stream, operation.Writer())
@@ -201,7 +206,40 @@ func executeDeploymentOperationGated(ctx context.Context, manager *app.Deploymen
 		report.Message = fmt.Sprintf("%s; finalize durable log: %v", report.Message, closeErr)
 	}
 	report.Message = operationRecordMessage(report.Message, report)
+	forgetQueuedUpdates(report)
 	return report, false
+}
+
+// forgetQueuedUpdates removes queue entries of computers this update just
+// verified: they run the current revision, so an older queued update for
+// them is obsolete. A refused queue change is harmless: the next pass finds
+// them current and removes them without updating them again.
+func forgetQueuedUpdates(report domain.DeploymentExecutionReport) {
+	if report.RecoveryRequired || !report.ApplyCompleted {
+		return
+	}
+	verified := []string{}
+	for _, target := range report.Verification.Targets {
+		if target.State == "verified" {
+			verified = append(verified, target.Name)
+		}
+	}
+	if len(verified) == 0 {
+		return
+	}
+	status, err := adapters.ManagedDeferredUpdates().Read()
+	if err != nil {
+		return
+	}
+	queued := []string{}
+	for _, name := range verified {
+		if _, found := status.Find(name); found {
+			queued = append(queued, name)
+		}
+	}
+	if len(queued) > 0 {
+		_, _ = newDeferredUpdateManager().Cancel(queued)
+	}
 }
 
 func runGitCommitApply(ctx context.Context, manager *app.GitCommitManager, repository string, stdout, stderr io.Writer, paths, expectedToken string, assumeYes, jsonOutput bool) int {

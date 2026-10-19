@@ -392,12 +392,22 @@ that release's notes, so a release is not finished until the site follows it.
   bounded inventory probe; an open SSH port is not authenticated identity or
   proof of power state. A reachable-only choice creates a fresh explicit-target
   plan and confirmation, never edits or silently shrinks an approved execution.
+  The one exception happens at apply time: a computer that no longer answers
+  after the build is left out of the apply, named in `Skipped`, reported as
+  not updated and never written into the pending record; it is queued only
+  when the review chose queueing. Nothing is ever added to an approved set.
 - Queued client updates (`internal/app/deferred_updates.go`) hold only reviewed
   computers at the reviewed revision in the coordination directory, changed
-  under the operation gate. The controller timer applies one computer at a time
-  through the ordinary deploy, verify and record path, never holds the gate
-  while waiting, backs off failures, and never applies a stale entry (the
-  repository moved on). Queueing is a visible review choice, never implicit.
+  under the operation gate. Each timer pass first checks the gate and the
+  pending record without taking them (a busy or blocked controller is not a
+  failure of the waiting computers), skips computers already at the queued
+  revision, then updates all answering current entries of that revision
+  together through the ordinary deploy, verify and record path. It never holds
+  the gate while waiting, backs off failures per computer, and never applies a
+  stale entry (the repository moved on). A verified Update computers removes
+  the queue entries of the computers it updated. Queueing is a visible review
+  choice, never implicit; Update computers preselects computers whose queued
+  update became stale, and the administrator can change that selection.
 - Every client update that replaces the running system writes
   `/run/nixorium/update-notice.json` during activation; the classroom extension
   notifies the user and offers GNOME's restart dialog when kernel, initrd,

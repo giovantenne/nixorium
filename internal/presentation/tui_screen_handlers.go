@@ -68,6 +68,7 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.message = ""
 		model.deployment.chosen = map[string]bool{}
 		model.deployment.cursor = 0
+		return model, model.loadWaitingSelection()
 	case "h":
 		model.computers.hostDetail = false
 		model.computers.hostTechnical = false

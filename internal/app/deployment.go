@@ -91,10 +91,25 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		return deploymentExecutionIssue(report, "review", "run deploy plan again and review the new revision and targets")
 	}
 
+	// A computer switched off during the build is left out of the apply and
+	// reported: nothing is started on it, so it never becomes pending work
+	// that blocks the laboratory. Computers that still answer are updated.
+	applyTargets, skipped := answeringDeploymentTargets(verified)
+	report.Skipped = skipped
+	if len(applyTargets) == 0 {
+		report.State = "failed"
+		report.Phase = domain.DeploymentPhasePreflight
+		report.Message = "no selected computer answered after the build; nothing was applied"
+		return report
+	}
+	if len(skipped) > 0 {
+		fmt.Fprintf(output, "\nNot answering after the build, left unchanged: %s\n", strings.Join(skipped, ", "))
+	}
+
 	report.Phase = domain.DeploymentPhaseApply
 	emitDeploymentProgress(observe, domain.DeploymentProgress{
 		Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4,
-		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(report.Targets)),
+		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(applyTargets)),
 	})
 	timing.begin("\n==> Applying the built configurations with Colmena")
 	// Apply over the addresses that answered just now: during a change of
@@ -102,6 +117,10 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 	// previous address.
 	applyPlan := plan
 	applyPlan.Availability = verified.Availability
+	if len(skipped) > 0 {
+		applyPlan.Targets = applyTargets
+		applyPlan.ColmenaSelector = strings.Join(deploymentTargetNames(applyTargets), ",")
+	}
 	applyErr := m.runPhase(ctx, applyPlan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4}, output, observe)
 	timing.end("Applying")
 	var unconfirmed *domain.DeploymentUnconfirmedError
@@ -112,11 +131,11 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 	}
 	emitDeploymentProgress(observe, domain.DeploymentProgress{
 		Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
-		TargetTotal: len(report.Targets), Activity: "Verifying authenticated client state",
+		TargetTotal: len(applyTargets), Activity: "Verifying authenticated client state",
 	})
 	timing.begin("\n==> Verifying selected computers through authenticated host state")
 	// Local cancellation must not skip the separately time-bounded observations.
-	recordErr := m.verifySuccessfulDeployments(context.WithoutCancel(ctx), &report, output, observe)
+	recordErr := m.verifySuccessfulDeployments(context.WithoutCancel(ctx), &report, applyTargets, output, observe)
 	timing.end("Verifying")
 	if applyErr != nil {
 		report.State = "failed"
@@ -140,6 +159,12 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		report.State = "partial"
 		report.Phase = domain.DeploymentPhaseVerify
 		report.Message = fmt.Sprintf("apply completed, but authenticated reconciliation verified only %d/%d targets; inspect host state and retry from a fresh plan", report.Verification.Verified, report.Verification.Attempted)
+		return report
+	}
+	if len(report.Skipped) > 0 {
+		report.State = "partial"
+		report.Phase = domain.DeploymentPhaseComplete
+		report.Message = fmt.Sprintf("%d computer(s) updated and verified; %s stopped answering after the build and kept their current system", report.Verification.Verified, strings.Join(report.Skipped, ", "))
 		return report
 	}
 	report.Phase = domain.DeploymentPhaseComplete
@@ -184,17 +209,17 @@ func (t *deploymentTiming) total(started time.Time) {
 	fmt.Fprintf(t.output, "\nTotal time: %s\n", t.now().UTC().Sub(started).Round(time.Second))
 }
 
-func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, report *domain.DeploymentExecutionReport, output io.Writer, observe func(domain.DeploymentProgress)) error {
+func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, report *domain.DeploymentExecutionReport, targets []domain.DeploymentTarget, output io.Writer, observe func(domain.DeploymentProgress)) error {
 	report.Verification = domain.DeploymentVerificationSummary{
-		Attempted: len(report.Targets),
-		Targets:   make([]domain.DeploymentTargetVerification, 0, len(report.Targets)),
+		Attempted: len(targets),
+		Targets:   make([]domain.DeploymentTargetVerification, 0, len(targets)),
 	}
-	hosts := targetHosts(report.Targets)
+	hosts := targetHosts(targets)
 	observed := m.source.CurrentSystems(ctx, hosts, deploymentVerificationTimeout)
 	availability := m.source.SSHStatus(ctx, hosts, sshProbeTimeout)
 	updates := map[string]domain.LastSuccessfulDeployment{}
 	verifiedAt := m.now().UTC()
-	for index, target := range report.Targets {
+	for index, target := range targets {
 		probe, found := observed[target.Name]
 		verification := domain.DeploymentTargetVerification{
 			Reachability:     availability[target.Name].Reachability,
@@ -236,8 +261,8 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 		fmt.Fprintln(output)
 		emitDeploymentProgress(observe, domain.DeploymentProgress{
 			Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
-			TargetCurrent: index + 1, TargetTotal: len(report.Targets),
-			Activity: fmt.Sprintf("Checked authenticated state for %d/%d computer(s)", index+1, len(report.Targets)),
+			TargetCurrent: index + 1, TargetTotal: len(targets),
+			Activity: fmt.Sprintf("Checked authenticated state for %d/%d computer(s)", index+1, len(targets)),
 		})
 	}
 	if report.RecoveryRequired {
@@ -511,4 +536,28 @@ func targetHosts(targets []domain.DeploymentTarget) []domain.HostMeta {
 func deploymentIssue(report domain.DeploymentPlanReport, field, message string) domain.DeploymentPlanReport {
 	report.Issues = append(report.Issues, domain.ValidationIssue{Field: field, Message: message})
 	return report
+}
+
+// answeringDeploymentTargets splits a revalidated plan's computers into those
+// whose SSH port answered just before the apply and those that did not.
+func answeringDeploymentTargets(plan domain.DeploymentPlanReport) ([]domain.DeploymentTarget, []string) {
+	answering := reachableDeploymentNames(plan)
+	targets := []domain.DeploymentTarget{}
+	skipped := []string{}
+	for _, target := range plan.Targets {
+		if slices.Contains(answering, target.Name) {
+			targets = append(targets, target)
+		} else {
+			skipped = append(skipped, target.Name)
+		}
+	}
+	return targets, skipped
+}
+
+func deploymentTargetNames(targets []domain.DeploymentTarget) []string {
+	names := make([]string, 0, len(targets))
+	for _, target := range targets {
+		names = append(names, target.Name)
+	}
+	return names
 }

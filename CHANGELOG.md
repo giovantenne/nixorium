@@ -19,6 +19,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 - The log of **Update computers** shows when each step started and how long it
   took, with the total time at the end, so it is clear where an update spends
   its time.
+- Computers waiting for a queued update are updated together when they come
+  back, instead of one after the other, and a computer already up to date
+  leaves the queue without a second update. While another operation is
+  running the queue waits for the next minute instead of counting a failure.
+- **Update computers** selects the computers whose queued update is out of
+  date, so the new review includes them; the selection can still be changed.
 
 ### Fixed
 
@@ -29,6 +35,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   still on their previous address.
 - Preparing the review of **Update computers** no longer stops with "Loading
   took too long" right after Nixorium was updated.
+- A computer switched off while **Update computers** was building is left
+  unchanged and reported as not updated (or queued, if the review chose
+  that), instead of ending the whole update as interrupted and blocking every
+  other operation until a recovery review.
 - **Computers → Queued updates** opens again; selecting it did nothing.
 - Trusting a reinstalled computer's new SSH key no longer fails with "review
   changed" when the review was made just before the clock passed a

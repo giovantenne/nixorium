@@ -511,6 +511,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.deferred = deferredModel{status: message.status, loaded: true}
 		return model, nil
+	case deploymentWaitingSelectionMsg:
+		return model.applyWaitingSelection(message.status), nil
 	case dashboardDeploymentUSBMsg:
 		return model.handleDeploymentUSBMessage(message)
 	case dashboardDeploymentPlanMsg:

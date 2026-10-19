@@ -91,6 +91,9 @@ type DeploymentExecutionReport struct {
 	// Queued names reviewed computers that were off: they get this revision
 	// when they answer again (deferred updates).
 	Queued []string `json:"queued,omitempty"`
+	// Skipped names reviewed computers that stopped answering after the
+	// build. Nothing was started on them, so they are never pending.
+	Skipped []string `json:"skipped,omitempty"`
 }
 
 type LastSuccessfulDeployment struct {

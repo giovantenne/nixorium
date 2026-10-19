@@ -885,12 +885,18 @@ for deliberate automation and never removes the revision check.
 
 When some selected computers do not answer, the review offers to update them
 when they are switched on (on by default; **F3** turns it off). The others are
-updated now; the controller then checks every minute and updates each waiting
-computer, one at a time, as soon as it answers, with the same build, check and
-record. **Computers → Queued updates** lists them and removes entries. An entry
-is never applied once the configuration changed after queueing: review the
-update again. From a terminal: `deploy apply ... --queue-unreachable`,
-`deploy queue status`, `deploy queue cancel --on pc02` (or `@all`).
+updated now. A computer that is switched off while the update is being built
+is left as it is and reported as not updated; with the same choice on, it is
+queued too. It never blocks the other computers.
+
+The controller checks every minute and updates the waiting computers that
+answer, all together, with the same build, check and record. While another
+operation is running it simply waits for the next minute. **Computers →
+Queued updates** lists them and removes entries. An entry is never applied
+once the configuration changed after queueing; the next **Update computers**
+selects those computers for you, so the new review includes them. From a
+terminal: `deploy apply ... --queue-unreachable`, `deploy queue status`,
+`deploy queue cancel --on pc02` (or `@all`).
 
 After any update the person at the computer sees a GNOME notification that it
 was updated. Without a restart the notification says the update is in place,

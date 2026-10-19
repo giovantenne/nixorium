@@ -23,6 +23,7 @@ type fakeDeploymentSource struct {
 	revisionErr error
 	runErrors   map[domain.DeploymentPhase]error
 	runPhases   []domain.DeploymentPhase
+	selectors   []string
 	afterBuild  func()
 	addresses   []string
 	addressErr  error
@@ -92,6 +93,7 @@ func (f *fakeDeploymentSource) InterfaceAddresses(string) ([]string, error) {
 
 func (f *fakeDeploymentSource) RunDeploymentPhase(_ context.Context, plan domain.DeploymentPlanReport, phase domain.DeploymentPhase, output io.Writer) error {
 	f.runPhases = append(f.runPhases, phase)
+	f.selectors = append(f.selectors, plan.ColmenaSelector)
 	if plan.ColmenaSelector == "" {
 		return errors.New("empty selector")
 	}
@@ -354,5 +356,33 @@ func TestDeploymentLogTimesFailedBuildWithoutApply(t *testing.T) {
 		if strings.Contains(log.String(), unwanted) {
 			t.Errorf("log mentions %q after a failed build:\n%s", unwanted, log.String())
 		}
+	}
+}
+
+func TestDeploymentLeavesOutComputersThatStopAnsweringAfterTheBuild(t *testing.T) {
+	source := readyDeploymentSource()
+	answer := domain.SSHProbe{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable}
+	source.ssh = map[string]domain.SSHProbe{"pc01": answer, "pc02": answer}
+	source.afterBuild = func() {
+		source.ssh = map[string]domain.SSHProbe{"pc01": answer, "pc02": {Reachability: domain.ReachabilityUnreachable}}
+	}
+	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01,pc02", source.revision, "", io.Discard)
+	if len(source.selectors) != 2 || source.selectors[0] != "pc01,pc02" || source.selectors[1] != "pc01" {
+		t.Fatalf("selectors = %v, want the build for both and the apply for pc01 only", source.selectors)
+	}
+	if report.RecoveryRequired || report.State != "partial" || len(report.Skipped) != 1 || report.Skipped[0] != "pc02" {
+		t.Fatalf("report = %+v", report)
+	}
+	if report.Verification.Attempted != 1 || report.Verification.Verified != 1 {
+		t.Fatalf("verification = %+v", report.Verification)
+	}
+
+	// Nobody answers after the build: nothing is applied.
+	source = readyDeploymentSource()
+	source.ssh = map[string]domain.SSHProbe{"pc01": answer}
+	source.afterBuild = func() { source.ssh = map[string]domain.SSHProbe{} }
+	report = NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
+	if len(source.runPhases) != 1 || report.State != "failed" || report.ApplyCompleted || report.RecoveryRequired {
+		t.Fatalf("phases %v, report %+v", source.runPhases, report)
 	}
 }
