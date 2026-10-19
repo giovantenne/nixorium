@@ -64,6 +64,10 @@ type PendingDeployment struct {
 	Targets       []DeploymentTarget `json:"targets"`
 	StartedAt     time.Time          `json:"startedAt"`
 	ControllerPID int                `json:"controllerPid"`
+	// ControllerPIDStart is the start time of that process (field 22 of
+	// /proc/PID/stat). With the PID it tells the recorder from an unrelated
+	// process that reused the number after a reboot. Older records lack it.
+	ControllerPIDStart string `json:"controllerPidStart,omitempty"`
 }
 
 // Recovery condition kinds.

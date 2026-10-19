@@ -20,7 +20,7 @@ type cliRecoverySource struct {
 func (s *cliRecoverySource) PendingDeployment() (domain.PendingDeployment, bool, error) {
 	return s.pending, s.present, nil
 }
-func (s *cliRecoverySource) ProcessRunning(int) bool { return false }
+func (s *cliRecoverySource) ProcessRunning(int, string) bool { return false }
 func (s *cliRecoverySource) ObserveDeploymentActivity(_ context.Context, hosts []domain.HostMeta, _ time.Duration) map[string]domain.DeploymentActivity {
 	result := map[string]domain.DeploymentActivity{}
 	for _, host := range hosts {

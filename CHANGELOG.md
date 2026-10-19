@@ -16,6 +16,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Reviewing an interrupted update of the student computers no longer waits
+  forever for a program that only reused the number of the one that started
+  the update.
+- During a change of laboratory network, that review also checks computers
+  still on their previous address.
 - **Computers → Queued updates** opens again; selecting it did nothing.
 - Trusting a reinstalled computer's new SSH key no longer fails with "review
   changed" when the review was made just before the clock passed a

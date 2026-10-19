@@ -141,7 +141,11 @@ func operationBusy(lock *os.File) *OperationBusyError {
 // processStartTime returns field 22 of /proc/PID/stat, which identifies a
 // process together with its PID.
 func processStartTime(pid int) (string, error) {
-	content, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	return processStartTimeAt("/proc", pid)
+}
+
+func processStartTimeAt(procRoot string, pid int) (string, error) {
+	content, err := os.ReadFile(filepath.Join(procRoot, strconv.Itoa(pid), "stat"))
 	if err != nil {
 		return "", err
 	}

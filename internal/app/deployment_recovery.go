@@ -17,7 +17,7 @@ const deploymentActivityTimeout = 8 * time.Second
 // its record once the operator has reviewed every computer.
 type DeploymentRecoverySource interface {
 	PendingDeployment() (domain.PendingDeployment, bool, error)
-	ProcessRunning(int) bool
+	ProcessRunning(pid int, start string) bool
 	ObserveDeploymentActivity(context.Context, []domain.HostMeta, time.Duration) map[string]domain.DeploymentActivity
 	ArchivePendingDeployment(domain.PendingDeployment) (string, error)
 }
@@ -52,8 +52,8 @@ func (m *DeploymentRecoveryManager) ForProcess(pid int) *DeploymentRecoveryManag
 	return m
 }
 
-func (m *DeploymentRecoveryManager) recorderRunning(pid int) bool {
-	if pid <= 0 || !m.source.ProcessRunning(pid) {
+func (m *DeploymentRecoveryManager) recorderRunning(pid int, start string) bool {
+	if pid <= 0 || !m.source.ProcessRunning(pid, start) {
 		return false
 	}
 	if pid != m.ownPID {
@@ -92,12 +92,12 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 		return plan
 	}
 	plan.Pending = pending
-	if m.recorderRunning(pending.ControllerPID) {
+	if m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart) {
 		return issue("process", fmt.Sprintf("the Nixorium process that started the update (PID %d) is still running; wait for it to finish or close it first", pending.ControllerPID))
 	}
 	hosts := make([]domain.HostMeta, 0, len(pending.Targets))
 	for _, target := range pending.Targets {
-		hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP})
+		hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP, PreviousIP: target.PreviousIP})
 	}
 	activity := m.source.ObserveDeploymentActivity(ctx, hosts, deploymentActivityTimeout)
 	activating := 0
@@ -152,13 +152,17 @@ func (m *DeploymentRecoveryManager) Apply(ctx context.Context, plan domain.Deplo
 	if !present || err != nil || !samePendingDeployment(pending, plan.Pending) {
 		return refuse("record", "the interrupted update record changed after review; create a fresh review")
 	}
-	if m.recorderRunning(pending.ControllerPID) {
+	if m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart) {
 		return refuse("process", "the Nixorium process that started the update is running again; create a fresh review")
+	}
+	previous := map[string]string{}
+	for _, target := range pending.Targets {
+		previous[target.Name] = target.PreviousIP
 	}
 	recheck := []domain.HostMeta{}
 	for _, target := range plan.Targets {
 		if target.State != domain.RecoveryTargetUnreachable {
-			recheck = append(recheck, domain.HostMeta{Name: target.Name, IP: target.IP})
+			recheck = append(recheck, domain.HostMeta{Name: target.Name, IP: target.IP, PreviousIP: previous[target.Name]})
 		}
 	}
 	activity := m.source.ObserveDeploymentActivity(ctx, recheck, deploymentActivityTimeout)

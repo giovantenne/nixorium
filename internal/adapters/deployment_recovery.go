@@ -22,9 +22,20 @@ import (
 // and revision, queued systemd jobs, and any running activation.
 const deploymentActivityCommand = "nixorium-host-state 2>/dev/null; echo '--- jobs'; systemctl list-jobs --no-legend --no-pager 2>/dev/null; echo '--- activation'; pgrep -c -f '[s]witch-to-configuration' 2>/dev/null; true"
 
-// ProcessRunning reports whether a PID still belongs to a Nixorium process.
-func (Local) ProcessRunning(pid int) bool {
-	content, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
+// ProcessRunning reports whether the process that wrote the pending record
+// still runs. With a recorded start time the PID must still have that start
+// time, so a number reused after a reboot is not mistaken for the recorder.
+// Without one (older records) the PID must belong to a Nixorium process.
+func (Local) ProcessRunning(pid int, start string) bool {
+	return processRunningAt("/proc", pid, start)
+}
+
+func processRunningAt(procRoot string, pid int, start string) bool {
+	if start != "" {
+		current, err := processStartTimeAt(procRoot, pid)
+		return err == nil && current == start
+	}
+	content, err := os.ReadFile(filepath.Join(procRoot, strconv.Itoa(pid), "cmdline"))
 	if err != nil {
 		return false
 	}

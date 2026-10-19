@@ -32,14 +32,18 @@ func createDeploymentPending(directory *os.File, plan domain.DeploymentPlanRepor
 	if !filepath.IsAbs(plan.Repository) || !validGitRevision(plan.Revision) || len(plan.Targets) == 0 || plan.ColmenaSelector == "" {
 		return nil, errors.New("deployment pending identity is invalid")
 	}
+	// The start time binds the record to this process; without it the record
+	// is still written, and the review falls back to the PID alone.
+	start, _ := processStartTime(os.Getpid())
 	content, err := json.Marshal(struct {
-		SchemaVersion int                       `json:"schemaVersion"`
-		Repository    string                    `json:"repository"`
-		Revision      string                    `json:"revision"`
-		Targets       []domain.DeploymentTarget `json:"targets"`
-		StartedAt     time.Time                 `json:"startedAt"`
-		ControllerPID int                       `json:"controllerPid"`
-	}{1, plan.Repository, plan.Revision, plan.Targets, time.Now().UTC(), os.Getpid()})
+		SchemaVersion      int                       `json:"schemaVersion"`
+		Repository         string                    `json:"repository"`
+		Revision           string                    `json:"revision"`
+		Targets            []domain.DeploymentTarget `json:"targets"`
+		StartedAt          time.Time                 `json:"startedAt"`
+		ControllerPID      int                       `json:"controllerPid"`
+		ControllerPIDStart string                    `json:"controllerPidStart,omitempty"`
+	}{1, plan.Repository, plan.Revision, plan.Targets, time.Now().UTC(), os.Getpid(), start})
 	if err != nil {
 		return nil, err
 	}
