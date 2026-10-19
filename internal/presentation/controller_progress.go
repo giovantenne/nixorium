@@ -28,9 +28,12 @@ func (model dashboardModel) controllerProgressView(path []string) string {
 	lines := []string{tuiTitle("Controller configuration", model.isDark), "", model.busyView()}
 	lines = append(lines, model.operationProgressView(model.controller.progress, "Current progress")...)
 	if model.controller.progressUnavailable {
+		// Without readable progress the journal is the only view of the job:
+		// it is shown at once, not behind the details key.
 		lines = append(lines, tuiStatus("Managed progress could not be refreshed; the operation may still be running.", tuiStatusAttention, model.isDark))
+		lines = append(lines, "  journalctl -u 'nixorium-apply-controller*' -f")
 	}
-	if model.progressDetails && model.controllerDetailsAvailable() {
+	if model.progressDetails && model.controllerDetailsAvailable() && !model.controller.progressUnavailable {
 		lines = append(lines, "", tuiMuted("These are managed phases, not the build log. Full output is in the controller service journal.", model.isDark))
 		lines = append(lines, "  journalctl -u 'nixorium-apply-controller*' -f")
 	}
@@ -55,10 +58,10 @@ func operationDetailsAvailable(operation domain.OperationProgress) bool {
 	return len(operation.Recent) > 1
 }
 
-// controllerDetailsAvailable also keeps the toggle when the managed progress
-// could not be refreshed, because the expanded view names the service journal.
+// controllerDetailsAvailable reports earlier managed activities. When the
+// progress cannot be refreshed the compact view already names the journal.
 func (model dashboardModel) controllerDetailsAvailable() bool {
-	return operationDetailsAvailable(model.controller.progress) || model.controller.progressUnavailable
+	return operationDetailsAvailable(model.controller.progress)
 }
 
 // deploymentDetailsAvailable reports captured command output or authored

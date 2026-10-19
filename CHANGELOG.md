@@ -23,8 +23,6 @@ The project follows [Semantic Versioning](https://semver.org/).
   whose result is truly unknown still needs a review, and that review closes
   itself as soon as the computer reports how its update ended. The log shows
   each computer's progress and its activation messages.
-### Changed
-
 - The `l` key for progress details appears only when there are details to
   show, instead of on every progress screen.
 

@@ -127,14 +127,11 @@ func TestProgressDetailsAppearWhenProgressArrivesAndRenderCompactWhenItVanishes(
 	}
 }
 
-func TestControllerProgressDetailsStayWhenProgressCannotBeRefreshed(t *testing.T) {
+func TestControllerJournalIsShownAtOnceWhenProgressCannotBeRefreshed(t *testing.T) {
 	model := progressDetailsCases()[2].empty
 	model.controller.progressUnavailable = true
-	if !strings.Contains(model.View().Content, "Progress details") {
-		t.Fatalf("the journal pointer became unreachable:\n%s", model.View().Content)
-	}
-	updated, _ := model.Update(keyPress("l"))
-	if view := updated.(dashboardModel).View().Content; !strings.Contains(view, "journalctl") {
-		t.Fatalf("l did not show the service journal:\n%s", view)
+	view := model.View().Content
+	if !strings.Contains(view, "journalctl") || strings.Contains(view, "Progress details") {
+		t.Fatalf("the journal must be visible without the details key:\n%s", view)
 	}
 }
