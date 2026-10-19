@@ -31,6 +31,29 @@ at activation. The deployment engine and both installers write the record
 before the shared system runs, and never overwrite a record that names another
 computer. The flake has no `colmena` output.
 
+## Deployment migrations
+
+Files copied from the site template belong to the deployment, so later releases
+cannot simply overwrite them. `lib/deployment-migrations.nix` (exported as
+`lib.deploymentMigrations`, ADR 0034) lists exact text replacements: `id`
+(date-prefixed), `file`, `description`, `from`, `to`. During Update Nixorium the
+installed controller evaluates the target release's list, applies each entry to
+a staged copy of the committed deployment, and builds the candidate with the
+result. An entry is `applied` (`from` found exactly once), `done` (`to` already
+there) or `manual` (the administrator changed the file; the review shows the
+Replace/With text). Applied and done ids go to the deployment's tracked
+`nixorium-migrations.json`, so each runs once. Saving writes the migrated files
+first, only if each is unchanged since the review, and commits them with the
+update. The review token binds them.
+
+Rules for the developer: add an entry in the same change as the template change;
+copy `from` from the previous template text in Git history, one entry for each
+released form that differs; never edit or remove a released entry; never name
+protected files (`flake.nix`, `flake.lock`, credentials, keys, hidden paths, the
+record file); test it with `internal/adapters/deployment_migrations_test.go` as
+the model. The mechanism runs only on a controller whose release already has it,
+so an update from an older release still needs a changelog note.
+
 `deploymentStatus` reports whether placeholders, missing public keys, or
 public default passwords remain. Keep the standalone example evaluable even
 when it is intentionally not deployment-ready.

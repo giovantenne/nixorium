@@ -56,6 +56,17 @@ with the same module graph. Evaluation tests cover inventory, host-name, and
 address generation. Build an additional client only when affected host-specific
 modules make it materially different.
 
+## Carry template changes to existing deployments
+
+A deployment owns the files copied from `templates/site/`. When a template
+change must reach existing deployments, add an entry to
+`lib/deployment-migrations.nix` in the same change, with an exact `from` taken
+from the previous template text, a `to` equal to the new text and a one-sentence
+description. Never edit or remove a released entry. Follow the "Deployment
+migrations" section of `AGENTS.md` and the migration paragraph in
+[references/architecture.md](references/architecture.md); a release is not ready
+until the list covers every such template change since the previous tag.
+
 ## Keep distribution coherent
 
 Public API changes must update the template, both READMEs, `AGENTS.md`, and

@@ -1249,3 +1249,4 @@ The following decisions are recorded separately:
 - [ADR-0024: encrypted controller backups](adr/0024-encrypted-controller-backups.md)
 - [ADR-0026: proportionate confirmation for recovery](adr/0026-proportionate-confirmation-for-recovery.md)
 - [ADR-0033: one system per class of identical client computers](adr/0033-client-classes.md)
+- [ADR-0034: deployment migrations](adr/0034-deployment-migrations.md)

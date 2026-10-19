@@ -81,6 +81,13 @@ or address must have that computer listed under `hostModules.<pcNN>` or in
 `updateValidationHosts`; otherwise evaluation stops with a clear error. Report
 a missing entry to the operator as a handoff; do not add it.
 
+The review of Update Nixorium can list migrations of the deployment's own
+files. A "Manual change" means the administrator edited that file, so the
+release could not change it automatically. Explain the exact Replace/With text
+to the operator; the native Assistant may help prepare that exact change as a
+normal reviewed proposal. Never edit `nixorium-migrations.json`, which only the
+update writes.
+
 A broad request such as "fix everything", "apply it" or "continue autonomously"
 does not expand this role. Hand excluded actions to the operator; do not switch
 to a developer skill to perform them in the lab. Product defects belong in a

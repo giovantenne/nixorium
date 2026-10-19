@@ -51,6 +51,7 @@ lib/
   eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
   eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
   eval-workspace-profile.nix # Internal student preference JSON validator
+  deployment-migrations.nix # Changes a release makes to a deployment's files (ADR 0034)
   mk-lab.nix               # Host, class, netboot, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
@@ -177,6 +178,41 @@ examples using the real argument parser, relative instruction links, and skill
 discovery/distribution. They do not prove that prose describes runtime effects:
 review CLI versus TUI behavior and existing workflow tests explicitly.
 
+## Deployment migrations
+
+A deployment owns the files copied from `templates/site/`, so a change there
+does not reach existing deployments by itself. Update Nixorium applies the
+exact changes listed in `lib/deployment-migrations.nix` to the deployment,
+shows them in the review and saves them with the update (ADR 0034; each entry
+is applied once and recorded in the deployment's `nixorium-migrations.json`).
+Whenever a change to `templates/site/**`, or to anything else a deployment
+owns, must reach existing deployments, add an entry in the same change:
+
+- `id` starts with the year and month: `2026-10-short-slug`. `file` is the
+  path inside the deployment. `description` is one sentence an administrator
+  understands.
+- `from` is the exact text of the previous template. Copy it from the file's
+  Git history (`git log -p -- templates/site/<file>`), not from memory. Every
+  released form of the text that differs needs its own entry; a form with no
+  entry becomes a "Manual change" in the review, so say so in the changelog.
+  `to` is exactly the new template text.
+- Prefer whole-line replacements that end with a newline, so `from` is unlikely
+  to match inside a longer line, and keep each text short.
+- Never edit or remove a released entry: its id is already recorded in
+  deployments, and deployments that skip releases still need it. To correct a
+  mistake, add a new entry.
+- Never name a protected file (`flake.nix`, `flake.lock`, credentials, keys,
+  hidden paths) or the record file. Limits: 64 migrations, 64 KiB per text,
+  1 MiB per file. Only replacement of one exact text exists; a new kind (add a
+  file, rename) needs a change to the mechanism and its ADR first.
+- Test it as in `internal/adapters/deployment_migrations_test.go`: the old text
+  is replaced once and recorded, an edited file becomes a manual change, and
+  the template's own mkLab and template checks still pass with the new text.
+- Mention the change in `CHANGELOG.md`, and review the administrator update
+  guide (`docs/updates.md`, with its template copy) if what the review shows
+  changes. A migration reaches a controller only once it runs a release that has
+  the mechanism, so an update from an older release still needs a manual note.
+
 ## Releases
 
 Releases follow Semantic Versioning. `VERSION`, the release tag (`v<version>`),
@@ -190,6 +226,10 @@ the GitHub Release from the matching changelog section. The same workflow runs
 nightly on `master` and on demand, so failures surface before a tag; ordinary
 pushes do not run it. Each job has a 240-minute limit; failure or timeout of
 any shard must block publication.
+
+Before the release commit, check that every change to `templates/site/**` made
+since the previous tag that existing deployments need has its entry in
+`lib/deployment-migrations.nix`.
 
 Before tagging, the website branch `release/<version>` of `nixorium-website`
 must exist, be built against the commit to release and be green on `staging`.
