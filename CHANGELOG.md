@@ -16,6 +16,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Reviews and updates prepare the configuration for evaluation once instead
+  of several times, which shortens every update a little.
 - Blocking Internet, switching computers off or restarting them, and the
   scheduled shut-down no longer wait while the administrator updates
   computers. Only the computers being updated, or whose last update was

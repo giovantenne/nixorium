@@ -2,6 +2,8 @@ package adapters
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -30,7 +33,7 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return "", err
 	}
-	credentials, _, err := readCredentials(repository)
+	credentials, credentialsData, err := readCredentials(repository)
 	if errors.Is(err, os.ErrNotExist) {
 		return reference, nil
 	}
@@ -48,6 +51,23 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	}
 	if json.Unmarshal([]byte(output), &metadata) != nil || !domain.ValidStorePath(metadata.Path) || (revision != "" && metadata.Revision != revision) {
 		return "", errors.New("Nix returned an invalid deployment source")
+	}
+	sourceRevision := metadata.Revision
+	if sourceRevision == "" {
+		sourceRevision = metadata.DirtyRevision
+	}
+	// metadata.Path is content-addressed, so the same key always produces the
+	// same prepared source. Only the copy, injection and import are skipped;
+	// the metadata call above still detects every tracked change.
+	digest := sha256.Sum256(credentialsData)
+	key := evaluationSourceKey{
+		metadataPath:   metadata.Path,
+		revision:       revision,
+		credentials:    hex.EncodeToString(digest[:]),
+		sourceRevision: sourceRevision,
+	}
+	if storePath, ok := preparedEvaluationSources.lookup(key); ok {
+		return "path:" + storePath, nil
 	}
 	// Newer Nix versions can return a lazy source path from metadata without
 	// materializing it. Archive the pinned source before reading its files.
@@ -71,10 +91,6 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	if err := injectEvaluationAccounts(stage, metadata.Path, credentials); err != nil {
 		return "", err
 	}
-	sourceRevision := metadata.Revision
-	if sourceRevision == "" {
-		sourceRevision = metadata.DirtyRevision
-	}
 	if sourceRevision != "" {
 		data, _ := json.Marshal(sourceRevision)
 		if err := os.WriteFile(filepath.Join(stage, ".nixorium-source-revision.json"), data, 0600); err != nil {
@@ -89,7 +105,75 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	if !domain.ValidStorePath(storePath) {
 		return "", errors.New("Nix returned an invalid prepared source path")
 	}
+	preparedEvaluationSources.store(key, storePath)
 	return "path:" + storePath, nil
+}
+
+// evaluationSourceCacheLimit bounds how many prepared sources one process
+// remembers; a review, an update and their phases use the latest one or two.
+const evaluationSourceCacheLimit = 8
+
+// evaluationSourceKey identifies one prepared source. The credentials are
+// represented only by the SHA-256 of the file, never by their content.
+type evaluationSourceKey struct {
+	metadataPath   string
+	revision       string
+	credentials    string
+	sourceRevision string
+}
+
+type evaluationSourceEntry struct {
+	key       evaluationSourceKey
+	storePath string
+}
+
+// evaluationSourceCache remembers, for this process only, the store path made
+// from a key. It is never written to disk. An entry is reused only while its
+// store path still exists, so garbage collection falls back to recomputing.
+type evaluationSourceCache struct {
+	mu      sync.Mutex
+	limit   int
+	entries []evaluationSourceEntry // oldest first
+	exists  func(string) bool
+}
+
+var preparedEvaluationSources = &evaluationSourceCache{
+	limit: evaluationSourceCacheLimit,
+	exists: func(path string) bool {
+		_, err := os.Stat(path)
+		return err == nil
+	},
+}
+
+func (c *evaluationSourceCache) lookup(key evaluationSourceKey) (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for index, entry := range c.entries {
+		if entry.key != key {
+			continue
+		}
+		if !c.exists(entry.storePath) {
+			c.entries = append(c.entries[:index], c.entries[index+1:]...)
+			return "", false
+		}
+		return entry.storePath, true
+	}
+	return "", false
+}
+
+func (c *evaluationSourceCache) store(key evaluationSourceKey, storePath string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for index, entry := range c.entries {
+		if entry.key == key {
+			c.entries = append(c.entries[:index], c.entries[index+1:]...)
+			break
+		}
+	}
+	c.entries = append(c.entries, evaluationSourceEntry{key, storePath})
+	if extra := len(c.entries) - c.limit; extra > 0 {
+		c.entries = append([]evaluationSourceEntry(nil), c.entries[extra:]...)
+	}
 }
 
 // injectEvaluationAccounts reads the tracked settings from source and writes
