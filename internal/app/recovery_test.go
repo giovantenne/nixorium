@@ -75,6 +75,9 @@ func TestRecoveryReportsEveryPersistentBlocker(t *testing.T) {
 	if len(pending.Affects) != 2 || pending.Since == nil || !strings.Contains(pending.Detail, "pc01, pc02") {
 		t.Fatalf("pending = %+v", pending)
 	}
+	if want := "Update of pc01, pc02 started " + started.Local().Format("2006-01-02 15:04") + "; how it ended is unknown."; pending.Detail != want {
+		t.Fatalf("pending detail = %q, want %q", pending.Detail, want)
+	}
 	busy, _ := report.Condition(domain.RecoveryOperationBusy)
 	if busy.Title != "Another Nixorium operation is still running" || !strings.Contains(busy.Detail, "Update computers, started by admin") {
 		t.Fatalf("busy = %+v", busy)

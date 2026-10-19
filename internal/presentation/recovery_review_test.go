@@ -288,7 +288,7 @@ func TestUpdateResultAfterActivationPastInterruptedUpdateKeepsItsReview(t *testi
 	revision := "0123456789abcdef0123456789abcdef01234567"
 	started := time.Date(2026, 10, 15, 15, 4, 0, 0, time.Local)
 	held := domain.RecoveryReport{Conditions: []domain.BlockingCondition{
-		{Kind: domain.RecoveryDeploymentPending, Title: situationTitle("DEPLOY-PENDING"), Detail: "Update of 2026-10-15 15:04 to pc01; how it ended is unknown.", Since: &started},
+		{Kind: domain.RecoveryDeploymentPending, Title: situationTitle("DEPLOY-PENDING"), Detail: "Update of pc01 started 2026-10-15 15:04; how it ended is unknown.", Since: &started},
 	}}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: fixture.actions(), width: 160, height: 44, screen: dashboardUpdate,
 		updates: updateModel{applying: true, result: domain.UpdateApplyReport{Operation: "update-save", State: "saved", Updated: true, Revision: revision, Target: "v3.7.0"}}}

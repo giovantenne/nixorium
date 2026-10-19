@@ -91,7 +91,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 			for _, target := range pending.Targets {
 				affects = append(affects, target.Name)
 			}
-			detail = fmt.Sprintf("Update of %s to %s; how it ended is unknown.", started.Local().Format("2006-01-02 15:04"), computerList(affects))
+			detail = fmt.Sprintf("Update of %s started %s; how it ended is unknown.", computerList(affects), started.Local().Format("2006-01-02 15:04"))
 		}
 		add(domain.RecoveryDeploymentPending, "DEPLOY-PENDING", detail, "Every other maintenance operation, and classroom controls on the computers it names. Update Nixorium and Apply to controller stay available.", since, affects)
 	}
