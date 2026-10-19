@@ -21,11 +21,11 @@ func (outdatedPinInspectorSource) FlakeLockConsistency(string) error { return er
 
 func TestDeploymentPlanRefusesAnOutdatedPinBeforeBuilding(t *testing.T) {
 	source := outdatedPinDeploymentSource{readyDeploymentSource()}
-	report := NewDeploymentManager(source).Plan(context.Background(), "/deployment", "@lab")
+	report := newTestDeploymentManager(source).Plan(context.Background(), "/deployment", "@lab")
 	if report.State != "blocked" || len(report.Issues) != 1 || report.Issues[0].Next == nil || report.Issues[0].Next.Code != "PIN-OUTDATED" || !strings.Contains(report.Issues[0].Message, "v3.3.1") {
 		t.Fatalf("plan = %+v", report)
 	}
-	execution := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "@lab", "0123456789abcdef", "", nil)
+	execution := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "@lab", "0123456789abcdef", "", nil)
 	if !execution.HasErrors() || len(source.runPhases) != 0 {
 		t.Fatalf("outdated pin reached Colmena: %+v phases=%v", execution, source.runPhases)
 	}

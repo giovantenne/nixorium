@@ -28,6 +28,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The check after an update now tries up to three times, a few seconds apart,
+  before reporting a computer as unverified, because a computer that has just
+  switched to its new system can take a moment to answer. When the answer is
+  still unexpected, the report says what the computer replied.
 - In the classroom view the **Power** menu opens towards the left, so it
   stays readable when the window is maximised.
 - While an update of the student computers is still running, the Overview

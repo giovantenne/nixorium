@@ -115,6 +115,55 @@ func TestGitStatePreservesPorcelainPaths(t *testing.T) {
 	}
 }
 
+// writeFakeSSH puts an ssh command that runs script in front of the real one.
+func writeFakeSSH(t *testing.T, script string) {
+	t.Helper()
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "ssh"), []byte("#!/bin/sh\n"+script+"\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestCurrentSystemProbeParsesOnlyStandardOutput(t *testing.T) {
+	system := "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system"
+	revision := strings.Repeat("a", 40)
+	writeFakeSSH(t, "echo 'Warning: noise on stderr' >&2\nprintf '%s\\n%s\\n' '"+system+"' '"+revision+"'")
+	probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil)
+	if probe.SystemPath != system || probe.Revision != revision || probe.Detail != "" {
+		t.Fatalf("probe = %+v", probe)
+	}
+}
+
+func TestCurrentSystemProbeKeepsWhatAnInvalidAnswerSaid(t *testing.T) {
+	const prefix = "authenticated system observation returned invalid state"
+	for _, test := range []struct {
+		name, script, detail string
+	}{
+		{"silent", "exit 0", prefix},
+		{"stdout", "printf 'line one\\nline\\ttwo\\001\\n'", prefix + ` (stdout: "line one\nline\ttwo\x01")`},
+		{"both", "echo out; echo err >&2", prefix + ` (stdout: "out"; stderr: "err")`},
+		{"stderr only", "echo 'Connection reset' >&2", prefix + ` (stderr: "Connection reset")`},
+		{"long", "head -c 1000 /dev/zero | tr '\\0' x", prefix + ` (stdout: "` + strings.Repeat("x", 160) + `")`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			writeFakeSSH(t, test.script)
+			probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil)
+			if probe.Revision != "" || probe.SystemPath != "" || probe.Detail != test.detail {
+				t.Fatalf("probe = %+v, want detail %q", probe, test.detail)
+			}
+		})
+	}
+}
+
+func TestCurrentSystemProbeFailureDetailComesFromStandardError(t *testing.T) {
+	writeFakeSSH(t, "echo 'partial output'\necho '@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@' >&2\nexit 255")
+	probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil)
+	if probe.HostKeyCondition != domain.HostKeyChanged || !strings.HasPrefix(probe.Detail, "authenticated system observation failed: @@@ WARNING") {
+		t.Fatalf("probe = %+v", probe)
+	}
+}
+
 func TestCurrentSystemSSHCommandIsFixedAndNonInteractive(t *testing.T) {
 	arguments := sshCurrentSystemArguments(domain.HostMeta{Name: "pc01", IP: "192.0.2.1"}, 2500*time.Millisecond)
 	joined := strings.Join(arguments, " ")

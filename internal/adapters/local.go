@@ -366,22 +366,57 @@ func probeCurrentSystemArguments(ctx context.Context, timeout time.Duration, arg
 	probeContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	command := exec.CommandContext(probeContext, "ssh", arguments...)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		detail := strings.TrimSpace(string(output))
+	var stdout, stderr bytes.Buffer
+	command.Stdout, command.Stderr = &stdout, &stderr
+	if err := command.Run(); err != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if detail == "" {
+			detail = strings.TrimSpace(stdout.String())
+		}
 		if detail == "" {
 			detail = err.Error()
 		}
 		if len(detail) > 512 {
 			detail = detail[:512]
 		}
-		return domain.HostSystemProbe{HostKeyCondition: sshHostKeyCondition(string(output)), Detail: "authenticated system observation failed: " + detail}
+		return domain.HostSystemProbe{HostKeyCondition: sshHostKeyCondition(stderr.String() + stdout.String()), Detail: "authenticated system observation failed: " + detail}
 	}
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
 	if len(lines) != 2 || !validSystemPath(lines[0]) || !validGitRevision(lines[1]) {
-		return domain.HostSystemProbe{Detail: "authenticated system observation returned invalid state"}
+		return domain.HostSystemProbe{Detail: invalidSystemObservationDetail(stdout.String(), stderr.String())}
 	}
 	return domain.HostSystemProbe{SystemPath: lines[0], Revision: lines[1]}
+}
+
+// invalidSystemObservationDetail says what a computer answered when the answer
+// was not a system path and a revision, so the next occurrence can be
+// diagnosed. Only a short printable excerpt of each stream is kept.
+func invalidSystemObservationDetail(stdout, stderr string) string {
+	detail := "authenticated system observation returned invalid state"
+	var streams []string
+	for _, stream := range []struct{ name, text string }{{"stdout", stdout}, {"stderr", stderr}} {
+		if excerpt := observationExcerpt(stream.text); excerpt != "" {
+			streams = append(streams, stream.name+": "+excerpt)
+		}
+	}
+	if len(streams) == 0 {
+		return detail
+	}
+	return detail + " (" + strings.Join(streams, "; ") + ")"
+}
+
+// observationExcerpt keeps the first 160 bytes of text. Quoting shows newlines
+// as \n and replaces every other non-printable character with an escape, so
+// the excerpt is always plain printable text.
+func observationExcerpt(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	if len(text) > 160 {
+		text = strings.ToValidUTF8(text[:160], "")
+	}
+	return strconv.Quote(text)
 }
 
 func sshHostKeyCondition(output string) domain.HostKeyCondition {

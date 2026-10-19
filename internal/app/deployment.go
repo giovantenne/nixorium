@@ -27,6 +27,13 @@ type DeploymentSource interface {
 
 const deploymentVerificationTimeout = 3 * time.Second
 
+// A computer that has just activated its system may need a few seconds before
+// it answers the host-state check, so a missing answer is asked for again.
+const (
+	deploymentVerificationAttempts  = 3
+	deploymentVerificationRetryWait = 5 * time.Second
+)
+
 func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, expectedRevision, logPath string, progress io.Writer) domain.DeploymentExecutionReport {
 	return m.ExecuteWithProgress(ctx, repository, requested, expectedRevision, logPath, progress, nil)
 }
@@ -216,6 +223,18 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 	}
 	hosts := targetHosts(targets)
 	observed := m.source.CurrentSystems(ctx, hosts, deploymentVerificationTimeout)
+	if observed == nil {
+		observed = map[string]domain.HostSystemProbe{}
+	}
+	for attempt := 1; attempt < deploymentVerificationAttempts; attempt++ {
+		pending := hostsWithoutState(hosts, observed)
+		if len(pending) == 0 || m.sleep(ctx, deploymentVerificationRetryWait) != nil {
+			break
+		}
+		for name, probe := range m.source.CurrentSystems(ctx, pending, deploymentVerificationTimeout) {
+			observed[name] = probe
+		}
+	}
 	availability := m.source.SSHStatus(ctx, hosts, sshProbeTimeout)
 	updates := map[string]domain.LastSuccessfulDeployment{}
 	verifiedAt := m.now().UTC()
@@ -325,10 +344,40 @@ func sameDeploymentTargets(left, right []domain.DeploymentTarget) bool {
 type DeploymentManager struct {
 	source DeploymentSource
 	now    func() time.Time
+	sleep  func(context.Context, time.Duration) error
 }
 
 func NewDeploymentManager(source DeploymentSource) *DeploymentManager {
-	return &DeploymentManager{source: source, now: time.Now}
+	return &DeploymentManager{source: source, now: time.Now, sleep: sleepContext}
+}
+
+// sleepContext waits for the duration, or returns the context's error as soon
+// as the context ends.
+func sleepContext(ctx context.Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+// hostsWithoutState are the hosts whose check returned no result or no system
+// state, except those whose SSH host key changed: asking again cannot fix that.
+func hostsWithoutState(hosts []domain.HostMeta, observed map[string]domain.HostSystemProbe) []domain.HostMeta {
+	var pending []domain.HostMeta
+	for _, host := range hosts {
+		probe, found := observed[host.Name]
+		if probe.HostKeyCondition == domain.HostKeyChanged {
+			continue
+		}
+		if !found || probe.Revision == "" || probe.SystemPath == "" {
+			pending = append(pending, host)
+		}
+	}
+	return pending
 }
 
 func (m *DeploymentManager) Plan(ctx context.Context, repository, requested string) domain.DeploymentPlanReport {

@@ -73,7 +73,7 @@ func transitionDeploymentSource() *fakeDeploymentSource {
 
 func TestDeploymentReachesComputersOnEitherNetwork(t *testing.T) {
 	source := transitionDeploymentSource()
-	manager := NewDeploymentManager(source)
+	manager := newTestDeploymentManager(source)
 	plan := manager.Plan(context.Background(), "/deployment", "@lab")
 	if plan.HasErrors() || plan.ReachableRequested != "pc01,pc02" {
 		t.Fatalf("plan = %+v", plan)

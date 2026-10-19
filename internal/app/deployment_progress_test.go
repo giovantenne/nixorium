@@ -37,7 +37,7 @@ func TestDeploymentCancelledAfterClientUpdateNeverClaimsCompletionOrSafeRetry(t 
 	observedOutput := false
 	watchdog := time.AfterFunc(5*time.Second, cancel)
 	defer watchdog.Stop()
-	report := NewDeploymentManager(source).ExecuteWithProgress(ctx, "/deployment", "pc01", source.revision, "", io.Discard, func(progress domain.DeploymentProgress) {
+	report := newTestDeploymentManager(source).ExecuteWithProgress(ctx, "/deployment", "pc01", source.revision, "", io.Discard, func(progress domain.DeploymentProgress) {
 		if progress.Phase == domain.DeploymentPhaseApply && len(progress.Output) > 0 {
 			observedOutput = true
 			cancel()
