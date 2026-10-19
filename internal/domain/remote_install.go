@@ -503,8 +503,13 @@ func ValidateRemoteMachineFacts(facts RemoteMachineFacts) error {
 			return errors.New("remote machine disk inventory contains duplicate paths")
 		}
 		diskPaths[disk.Path] = true
-		if err := validateRemoteDisk(disk); err != nil {
+		// A small extra disk (card reader, second USB stick, the live
+		// medium) is listed as excluded, not a reason to refuse the computer.
+		if err := validateRemoteDiskIdentity(disk); err != nil {
 			return err
+		}
+		if disk.Eligible && disk.SizeBytes < remoteDiskMinimumBytes {
+			return errors.New("remote disk is below the minimum capacity")
 		}
 		if disk.Eligible != (len(disk.ExclusionReasons) == 0) {
 			return errors.New("remote disk eligibility disagrees with exclusion reasons")
@@ -716,12 +721,23 @@ func ValidateRemoteInstallCache(cache RemoteInstallCache) error {
 	return validateRemoteCache(cache)
 }
 
+// remoteDiskMinimumBytes matches MINIMUM_DISK_BYTES of the live installer.
+const remoteDiskMinimumBytes = 8 * 1024 * 1024 * 1024
+
+// validateRemoteDisk checks a disk selected for installation.
 func validateRemoteDisk(disk RemoteDisk) error {
+	if err := validateRemoteDiskIdentity(disk); err != nil {
+		return err
+	}
+	if disk.SizeBytes < remoteDiskMinimumBytes {
+		return errors.New("remote disk is below the minimum capacity")
+	}
+	return nil
+}
+
+func validateRemoteDiskIdentity(disk RemoteDisk) error {
 	if !remoteDevicePattern.MatchString(disk.Path) || !remoteKNamePattern.MatchString(disk.KName) || disk.Path != "/dev/"+disk.KName || !remoteMajorMinorPattern.MatchString(disk.MajorMinor) {
 		return errors.New("remote disk device identity is invalid")
-	}
-	if disk.SizeBytes < 8*1024*1024*1024 {
-		return errors.New("remote disk is below the minimum capacity")
 	}
 	for _, value := range []string{disk.Serial, disk.WWN, disk.Model, disk.Transport, disk.DiskSeq} {
 		if len(value) > 256 || strings.ContainsAny(value, "\x00\r\n") {

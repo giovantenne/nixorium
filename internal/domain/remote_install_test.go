@@ -157,6 +157,21 @@ func TestDecodeRemoteMachineFactsLimitsAndSupport(t *testing.T) {
 	if _, err := DecodeRemoteMachineFacts(data); err != nil {
 		t.Fatal(err)
 	}
+	// A small excluded disk is listed, not a reason to refuse the computer.
+	facts.Disks = append(facts.Disks, RemoteDisk{
+		Path: "/dev/sdb", KName: "sdb", MajorMinor: "8:16", SizeBytes: 0,
+		Model: "card reader", Transport: "usb", DiskSeq: "2", ExclusionReasons: []string{"removable", "too-small"},
+	})
+	data, _ = json.Marshal(facts)
+	if _, err := DecodeRemoteMachineFacts(data); err != nil {
+		t.Fatal("small excluded disk refused the inventory:", err)
+	}
+	facts.Disks[1].Eligible, facts.Disks[1].ExclusionReasons = true, nil
+	data, _ = json.Marshal(facts)
+	if _, err := DecodeRemoteMachineFacts(data); err == nil {
+		t.Fatal("small eligible disk accepted")
+	}
+	facts.Disks = facts.Disks[:1]
 	facts.VariantID = "server"
 	data, _ = json.Marshal(facts)
 	if _, err := DecodeRemoteMachineFacts(data); err == nil {
