@@ -22,3 +22,21 @@ func TestClientNumberAndSharedSystem(t *testing.T) {
 		}
 	}
 }
+
+func TestDeploymentConfigurationsCountsOneSystemPerSharedClass(t *testing.T) {
+	targets := []DeploymentTarget{
+		{Name: "pc01", Class: "shared-1"}, {Name: "pc02", Class: "shared-1"},
+		{Name: "pc03", Class: "pc03"}, {Name: "pc04"}, {Name: "pc05", Class: "shared-2"},
+	}
+	if got := DeploymentConfigurations(targets); got != 4 {
+		t.Fatalf("configurations = %d, want 4", got)
+	}
+	if ClientSystemName("pc01", "shared-1") != "nixorium-client-shared-1" || ClientSystemName("pc03", "pc03") != "pc03" || ClientSystemName("pc04", "") != "pc04" {
+		t.Fatal("system names")
+	}
+	for _, class := range []string{"shared-", "shared-x", "pc02", "other"} {
+		if ValidClientClass("pc01", class) {
+			t.Fatalf("class %q accepted for pc01", class)
+		}
+	}
+}

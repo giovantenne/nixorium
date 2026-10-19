@@ -64,14 +64,17 @@ func TestReadyDeploymentPlanShowsRevisionBoundNextCommand(t *testing.T) {
 		State:           "ready",
 		Revision:        "0123456789abcdef",
 		ColmenaSelector: "@lab",
-		Targets:         []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}},
+		Targets:         []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1", Class: "shared-1"}, {Name: "pc02", IP: "10.0.0.2", Class: "shared-1"}},
 	}
 	output := &bytes.Buffer{}
 	DeploymentPlanText(output, report)
+	if !strings.Contains(output.String(), "Builds:          1 configuration for 2 computers\n") {
+		t.Fatalf("ready plan does not count configurations:\n%s", output.String())
+	}
 	if !strings.Contains(output.String(), "nixorium deploy apply --on @lab --expect 0123456789abcdef") {
 		t.Fatalf("ready plan does not show exact next command:\n%s", output.String())
 	}
-	if !strings.Contains(output.String(), "build each selected computer's system once, then copy and activate it on the computer") || strings.Contains(strings.ToLower(output.String()), "colmena") {
+	if !strings.Contains(output.String(), "build each configuration once (identical computers share one), then copy and activate it on each computer") || strings.Contains(strings.ToLower(output.String()), "colmena") {
 		t.Fatalf("ready plan does not describe the update engine in plain words:\n%s", output.String())
 	}
 }

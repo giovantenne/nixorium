@@ -32,6 +32,16 @@ func (target DeploymentTarget) SharedSystem() bool {
 	return target.Class != "" && target.Class != target.Name
 }
 
+// DeploymentConfigurations counts the systems an update builds: one per
+// shared class and one per computer with its own system (ADR 0033).
+func DeploymentConfigurations(targets []DeploymentTarget) int {
+	seen := map[string]bool{}
+	for _, target := range targets {
+		seen[ClientSystemName(target.Name, target.Class)] = true
+	}
+	return len(seen)
+}
+
 // ClientSystemName is the name inside a client's system store path: its own
 // name, or `nixorium-client-<class>` when it shares its class's system
 // (ADR 0033). An empty class is a per-host system.

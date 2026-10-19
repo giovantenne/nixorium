@@ -389,6 +389,12 @@ func HostsText(writer io.Writer, report domain.HostsReport) {
 	}
 }
 
+// deploymentConfigurationsLabel says how many systems an update builds:
+// computers of a class share one (ADR 0033).
+func deploymentConfigurationsLabel(targets []domain.DeploymentTarget) string {
+	return fmt.Sprintf("%s for %s", countNoun(domain.DeploymentConfigurations(targets), "configuration"), countNoun(len(targets), "computer"))
+}
+
 func DeploymentPlanText(writer io.Writer, report domain.DeploymentPlanReport) {
 	fmt.Fprintf(writer, "Deployment plan: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Repository:      %s\n", report.Repository)
@@ -400,10 +406,11 @@ func DeploymentPlanText(writer io.Writer, report domain.DeploymentPlanReport) {
 		for _, target := range report.Targets {
 			fmt.Fprintf(writer, "  %-10s %s  %s\n", target.Name, target.IP, deploymentAvailabilityLabel(report, target.Name, target.IP))
 		}
+		fmt.Fprintf(writer, "Builds:          %s\n", deploymentConfigurationsLabel(report.Targets))
 		if report.ReachableRequested != "" {
 			fmt.Fprintf(writer, "Reachable only:  create a new review with nixorium deploy plan --on %s\n", report.ReachableRequested)
 		}
-		fmt.Fprintln(writer, "Plan:            build each selected computer's system once, then copy and activate it on the computer")
+		fmt.Fprintln(writer, "Plan:            build each configuration once (identical computers share one), then copy and activate it on each computer")
 		fmt.Fprintln(writer, "Availability:    brief SSH-port check, not authenticated identity or proof of power state")
 		if report.State == "ready" && report.Revision != "" {
 			fmt.Fprintf(writer, "Next:            nixorium deploy apply --on %s --expect %s\n", report.ColmenaSelector, report.Revision)

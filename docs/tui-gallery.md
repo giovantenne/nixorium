@@ -678,6 +678,7 @@ Nixorium  /  Computers  /  Update computers
 Update these computers?
 
 Affects  pc01,pc02,pc03,pc04,pc05 · 5 computers
+Builds   5 configurations for 5 computers
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
@@ -736,6 +737,7 @@ Nixorium  /  Computers  /  Update computers
 Update these computers?
 
 Affects  pc01,pc02 · 2 computers
+Builds   2 configurations for 2 computers
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
@@ -760,6 +762,7 @@ Nixorium  /  Computers  /  Update computers
 Update these computers?
 
 Affects  pc01 · 1 computer
+Builds   1 configuration for 1 computer
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
