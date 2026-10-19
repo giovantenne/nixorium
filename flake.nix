@@ -117,6 +117,10 @@
       clientNetworkUpgradeVmTest = pkgs.testers.runNixOSTest (import ./tests/client-network-upgrade-vm.nix {
         networkingModule = ./modules/networking.nix;
       });
+      classNetworkVmTest = pkgs.testers.runNixOSTest (import ./tests/class-network-vm.nix {
+        networkingModule = ./modules/networking.nix;
+        identityModule = ./modules/identity.nix;
+      });
       networkTransitionVmTest = pkgs.testers.runNixOSTest (import ./tests/network-transition-vm.nix {
         transitionLab = mkLab {
           deploymentSelf = self;
@@ -286,6 +290,7 @@
         client-installer-vm = clientInstallerVmTest;
         remote-client-installer-vm = remoteClientInstallerVmTest;
         client-network-upgrade-vm = clientNetworkUpgradeVmTest;
+        class-network-vm = classNetworkVmTest;
         network-transition-vm = networkTransitionVmTest;
         network-migration-vm = networkMigrationVmTest;
         management-vm = managementVmTest;
