@@ -222,6 +222,7 @@ let
     (upstreamRoot + "/modules/common.nix")
     (upstreamRoot + "/modules/users.nix")
     (upstreamRoot + "/modules/networking.nix")
+    (upstreamRoot + "/modules/identity.nix")
     (upstreamRoot + "/modules/cache.nix")
     (upstreamRoot + "/modules/filesystems.nix")
     (upstreamRoot + "/modules/home-reset.nix")

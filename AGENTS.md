@@ -70,6 +70,7 @@ modules/
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
   networking.nix           # Hostname + static IP with shared iface name
+  identity.nix             # Client identity record (/var/lib/nixorium/identity.json)
   management.nix           # Controller-only management command installation
   pxe.nix                  # Transactional PXE address state and boot recovery
   users.nix                # User accounts (admin + teacher + student, nixorium-staff group)

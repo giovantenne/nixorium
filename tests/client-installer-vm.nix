@@ -168,6 +168,8 @@ in
     target.wait_for_unit("multi-user.target")
     target.succeed("test \"$(systemctl show virtualbox.service --property=LoadState --value)\" = not-found")
     target.succeed("test \"$(hostname)\" = pc01")
+    # The installed system records its own number for later releases.
+    target.succeed("grep -F '\"number\":1' /var/lib/nixorium/identity.json; grep -Fx 'NIXORIUM_HOST_NUMBER=1' /run/nixorium/identity.env")
     # The only NIC is called eno7: neither the fallback name nor a configured
     # one. The lab address and DHCP still land on it, matched by type.
     target.succeed("test -d /sys/class/net/eno7; test ! -e /sys/class/net/enp0s3")
