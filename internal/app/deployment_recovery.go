@@ -92,17 +92,27 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 		return plan
 	}
 	plan.Pending = pending
-	if m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart) {
+	if !pending.ApplyReturned && m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart) {
 		return issue("process", fmt.Sprintf("the Nixorium process that started the update (PID %d) is still running; wait for it to finish or close it first", pending.ControllerPID))
 	}
+	// A computer the engine never started needs no observation; one whose
+	// activation finished has its result in the record.
 	hosts := make([]domain.HostMeta, 0, len(pending.Targets))
+	probe := []domain.HostMeta{}
 	for _, target := range pending.Targets {
-		hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP, PreviousIP: target.PreviousIP})
+		host := domain.HostMeta{Name: target.Name, IP: target.IP, PreviousIP: target.PreviousIP}
+		hosts = append(hosts, host)
+		if pending.ActivationOf(target.Name).State == domain.ActivationStarted {
+			probe = append(probe, host)
+		}
 	}
-	activity := m.source.ObserveDeploymentActivity(ctx, hosts, deploymentActivityTimeout)
+	activity := m.source.ObserveDeploymentActivity(ctx, probe, deploymentActivityTimeout)
 	activating := 0
+	known := len(pending.Activations) > 0
 	for _, host := range hosts {
-		plan.Targets = append(plan.Targets, recoveryTarget(host, activity[host.Name], pending.Revision))
+		target, confirmed := engineRecoveryTarget(host, pending.ActivationOf(host.Name), activity[host.Name], pending.Revision)
+		known = known && confirmed
+		plan.Targets = append(plan.Targets, target)
 		switch plan.Targets[len(plan.Targets)-1].State {
 		case domain.RecoveryTargetActivating:
 			activating++
@@ -124,10 +134,53 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 		return issue("unreachable", plan.Message)
 	}
 	plan.State = "ready"
+	plan.Automatic = known && plan.Unreachable == 0
 	plan.ExpiresAt = m.now().UTC().Truncate(deploymentRecoveryWindow).Add(deploymentRecoveryWindow)
 	plan.ReviewToken = domain.DeploymentRecoveryToken(plan)
 	plan.Message = "Every reachable computer has finished. Confirming archives the record and unblocks operations; the interrupted update is not declared successful."
+	if plan.Automatic {
+		plan.Message = "Every computer's update result is known. The record can be archived without asking; the interrupted update is not declared successful."
+	}
 	return plan
+}
+
+// AutoClose archives a pending record once the engine's own records say how
+// every computer ended (ADR 0031, decision D7): nothing is asked, nothing
+// changes on the computers. Any doubt leaves the record for a review.
+func (m *DeploymentRecoveryManager) AutoClose(ctx context.Context, repository string) (domain.DeploymentRecoveryResult, bool) {
+	plan := m.Plan(ctx, repository, false)
+	if plan.State != "ready" || !plan.Automatic {
+		return domain.DeploymentRecoveryResult{}, false
+	}
+	result := m.Apply(ctx, plan, plan.ReviewToken)
+	return result, result.State == "completed"
+}
+
+// engineRecoveryTarget classifies one computer using the engine's record
+// first. confirmed reports an outcome known without inference: never
+// started, finished in the record, or finished with this activation's own
+// result on the computer.
+func engineRecoveryTarget(host domain.HostMeta, activation domain.PendingActivation, activity domain.DeploymentActivity, reviewed string) (domain.DeploymentRecoveryTarget, bool) {
+	switch activation.State {
+	case domain.ActivationPlanned:
+		return domain.DeploymentRecoveryTarget{Name: host.Name, IP: host.IP, State: domain.RecoveryTargetNotStarted, Detail: "the update never started on it"}, true
+	case domain.ActivationFinished:
+		return finishedRecoveryTarget(host, activation.Result), true
+	}
+	if activation.ActivationID != "" && activity.Reachable && !activity.Activating &&
+		activity.LastActivationID == activation.ActivationID && activity.LastExitCode != nil {
+		target := finishedRecoveryTarget(host, domain.ActivationResult(*activity.LastExitCode))
+		target.Revision = activity.Revision
+		return target, true
+	}
+	return recoveryTarget(host, activity, reviewed), false
+}
+
+func finishedRecoveryTarget(host domain.HostMeta, result string) domain.DeploymentRecoveryTarget {
+	if domain.ActivationSwitched(result) {
+		return domain.DeploymentRecoveryTarget{Name: host.Name, IP: host.IP, State: domain.RecoveryTargetReviewed, Detail: "finished on the reviewed revision (" + result + ")"}
+	}
+	return domain.DeploymentRecoveryTarget{Name: host.Name, IP: host.IP, State: domain.RecoveryTargetOther, Detail: "finished, but the update failed on it; it will be updated by a new review"}
 }
 
 func (m *DeploymentRecoveryManager) Apply(ctx context.Context, plan domain.DeploymentRecoveryPlan, expectedToken string) domain.DeploymentRecoveryResult {
@@ -151,7 +204,7 @@ func (m *DeploymentRecoveryManager) Apply(ctx context.Context, plan domain.Deplo
 	if !present || err != nil || !samePendingDeployment(pending, plan.Pending) {
 		return refuse("record", "the interrupted update record changed after review; create a fresh review")
 	}
-	if m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart) {
+	if !pending.ApplyReturned && m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart) {
 		return refuse("process", "the Nixorium process that started the update is running again; create a fresh review")
 	}
 	previous := map[string]string{}

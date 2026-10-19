@@ -399,8 +399,10 @@ deploy only that machine:
 ```sh
 git add flake.nix modules/pc05.nix
 nix build .#nixosConfigurations.pc05.config.system.build.toplevel --no-link
-colmena apply --on pc05
 ```
+
+Then save the change and update that computer with **Computers → Update
+computers** (or `nixorium deploy plan --on pc05` and `nixorium deploy apply`).
 
 Additional backgrounds can be passed from `flake.nix`:
 
@@ -871,8 +873,8 @@ Apply repeats the preflight, asks `Continue? [y/N]` in the CLI (Enter on the rev
 activation, and streams output to a mode-0600 log. In the dashboard, the same
 foreground operation shows elapsed time, named stages and authenticated-computer
 verification counts. `l` expands the progress bar and up to five authored
-activities. Raw Colmena output remains in the private log instead of being rendered
-as terminal UI. Accidental quit stays disabled until the final report appears;
+activities. The build output, each computer's copy and its activation messages
+remain in the private log instead of being rendered as terminal UI. Accidental quit stays disabled until the final report appears;
 that compact result offers direct dashboard, log, and fresh-review actions.
 
 After every attempt, Nixorium authenticates selected hosts and records only

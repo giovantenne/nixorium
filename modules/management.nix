@@ -1029,8 +1029,13 @@ in
       description = "Apply queued Nixorium client updates to computers that are back";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
-      unitConfig.ConditionPathExists = "/var/lib/nixorium/coordination/deferred-updates.json";
-      path = [ pkgs.colmena pkgs.git pkgs.nix pkgs.openssh pkgs.util-linux ];
+      # It also runs while an interrupted client update waits, so that the
+      # record closes itself once every computer's result is known.
+      unitConfig.ConditionPathExists = [
+        "|/var/lib/nixorium/coordination/deferred-updates.json"
+        "|/var/lib/nixorium/coordination/deployment-pending.json"
+      ];
+      path = [ pkgs.git pkgs.nix pkgs.openssh pkgs.util-linux ];
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${nixoriumPackage}/bin/nixorium --repo ${lib.escapeShellArg cfg.deploymentPath} deploy queue run";

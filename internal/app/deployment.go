@@ -60,7 +60,7 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 	timing.heading("==> Reviewing the selected computers", startedAt)
 	timing.took("Reviewing", startedAt, reviewedAt)
 	defer func() { timing.total(startedAt) }()
-	timing.begin("==> Building selected configurations with Colmena")
+	timing.begin("==> Building the systems of the selected computers")
 	err := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4}, output, observe)
 	timing.end("Building")
 	if err != nil {
@@ -111,7 +111,7 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4,
 		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(applyTargets)),
 	})
-	timing.begin("\n==> Applying the built configurations with Colmena")
+	timing.begin("\n==> Copying and activating the built systems")
 	// Apply over the addresses that answered just now: during a change of
 	// laboratory network a computer not yet moved is reached on its
 	// previous address.

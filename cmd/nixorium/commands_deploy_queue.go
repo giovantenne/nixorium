@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
@@ -37,6 +38,11 @@ func runDeploymentQueueCommand(ctx context.Context, repository string, options o
 		fmt.Fprintf(stdout, "Removed %s; those computers keep their current system.\n", map[bool]string{true: "1 queued update", false: fmt.Sprintf("%d queued updates", removed)}[removed == 1])
 		return 0
 	case "queue-run":
+		// An interrupted update whose outcome is now known on every computer
+		// closes itself first (ADR 0031), so the queue can continue.
+		if closed, done := app.NewDeploymentRecoveryManager(adapters.Local{}).ForProcess(os.Getpid()).AutoClose(ctx, repository); done {
+			fmt.Fprintln(stdout, "Closed the interrupted update: every computer's result is known.", closed.Archive)
+		}
 		report := manager.Run(ctx, repository)
 		if options.json {
 			return commandOutputError(presentation.JSON(stdout, report), stderr)

@@ -68,6 +68,72 @@ type PendingDeployment struct {
 	// /proc/PID/stat). With the PID it tells the recorder from an unrelated
 	// process that reused the number after a reboot. Older records lack it.
 	ControllerPIDStart string `json:"controllerPidStart,omitempty"`
+	// Activations, written by the deployment engine, follow each computer
+	// from planned (nothing done on it yet) to started (its system profile
+	// may have changed) to finished (its activation result is known).
+	// Records of older versions have none: every target counts as started.
+	Activations []PendingActivation `json:"activations,omitempty"`
+	// ApplyReturned: the engine finished its apply and left the record only
+	// for computers whose result is unknown; the recorder process no longer
+	// acts on any computer, even if it is still open.
+	ApplyReturned bool `json:"applyReturned,omitempty"`
+}
+
+// Activation states of a computer in a pending client update.
+const (
+	ActivationPlanned  = "planned"
+	ActivationStarted  = "started"
+	ActivationFinished = "finished"
+)
+
+// Results of a finished activation (switch-to-configuration exit codes).
+const (
+	ActivationActivated      = "activated"
+	ActivationFailedUnits    = "activated-with-failed-units"
+	ActivationRebootRequired = "activated-reboot-required"
+	ActivationFailed         = "failed"
+	ActivationUnknown        = "unknown"
+)
+
+// PendingActivation is one computer's progress in a pending client update.
+type PendingActivation struct {
+	Name         string `json:"name"`
+	State        string `json:"state"`
+	ActivationID string `json:"activationId,omitempty"`
+	Result       string `json:"result,omitempty"`
+	ExitCode     *int   `json:"exitCode,omitempty"`
+}
+
+// ActivationOf returns the engine's progress for a computer. Records without
+// activations (older versions) report every target as started.
+func (record PendingDeployment) ActivationOf(name string) PendingActivation {
+	for _, activation := range record.Activations {
+		if activation.Name == name {
+			return activation
+		}
+	}
+	return PendingActivation{Name: name, State: ActivationStarted}
+}
+
+// ActivationResult maps the exit code of switch-to-configuration (or 200 when
+// the system profile could not be set) to a result.
+func ActivationResult(exitCode int) string {
+	switch exitCode {
+	case 0:
+		return ActivationActivated
+	case 4:
+		return ActivationFailedUnits
+	case 100:
+		return ActivationRebootRequired
+	default:
+		return ActivationFailed
+	}
+}
+
+// ActivationSwitched reports whether a result means the computer now runs the
+// new system.
+func ActivationSwitched(result string) bool {
+	return result == ActivationActivated || result == ActivationFailedUnits || result == ActivationRebootRequired
 }
 
 // Recovery condition kinds.

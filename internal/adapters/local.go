@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -86,85 +85,6 @@ func (Local) GitRevision(ctx context.Context, repository string) (string, error)
 
 func (Local) RunDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, phase domain.DeploymentPhase, output io.Writer) error {
 	return runDeploymentPhase(ctx, plan, phase, output, managedCoordinationDirectory, true, deploymentPhaseTimeout(phase))
-}
-
-func deploymentCommand(phase domain.DeploymentPhase, selector string) ([]string, error) {
-	if selector == "" {
-		return nil, errors.New("Colmena selector is empty")
-	}
-	switch phase {
-	case domain.DeploymentPhaseBuild:
-		return []string{"build", "--on", selector, "--verbose", "--color", "never"}, nil
-	case domain.DeploymentPhaseApply:
-		return []string{"apply", "switch", "--on", selector, "--verbose", "--color", "never"}, nil
-	default:
-		return nil, fmt.Errorf("unsupported deployment phase %q", phase)
-	}
-}
-
-// colmenaRedirects maps the laboratory address of each computer that, during
-// a change of laboratory network, answered only on its previous address to
-// that address. Colmena then reaches it there; SSH still checks the key
-// recorded for the address it connects to.
-func colmenaRedirects(plan domain.DeploymentPlanReport) map[string]string {
-	redirects := map[string]string{}
-	for _, target := range plan.Targets {
-		if target.PreviousIP == "" {
-			continue
-		}
-		for _, observed := range plan.Availability {
-			if observed.Name == target.Name && observed.IP == target.IP && observed.Network == domain.HostNetworkPrevious {
-				redirects[target.IP] = target.PreviousIP
-			}
-		}
-	}
-	return redirects
-}
-
-func colmenaSSHConfig(redirects map[string]string) (string, error) {
-	content := ""
-	addresses := make([]string, 0, len(redirects))
-	for address := range redirects {
-		addresses = append(addresses, address)
-	}
-	slices.Sort(addresses)
-	for _, address := range addresses {
-		if canonicalRemoteIPv4(address) == "" || canonicalRemoteIPv4(redirects[address]) == "" {
-			return "", fmt.Errorf("invalid laboratory address for %s", address)
-		}
-		content += "Host " + address + "\n  HostName " + redirects[address] + "\n"
-	}
-	return content + "Host *\n  BatchMode yes\n  PasswordAuthentication no\n  KbdInteractiveAuthentication no\n  StrictHostKeyChecking accept-new\n  ConnectTimeout 10\n  ConnectionAttempts 1\n  ServerAliveInterval 10\n  ServerAliveCountMax 3\n", nil
-}
-
-func configureColmenaSSH(command *exec.Cmd, redirects map[string]string) (func(), error) {
-	content, err := colmenaSSHConfig(redirects)
-	if err != nil {
-		return nil, err
-	}
-	config, err := os.CreateTemp("", "nixorium-colmena-ssh-*")
-	if err != nil {
-		return nil, err
-	}
-	path := config.Name()
-	cleanup := func() {
-		_ = os.Remove(path)
-	}
-	if _, err := io.WriteString(config, content); err != nil {
-		_ = config.Close()
-		cleanup()
-		return nil, err
-	}
-	if err := config.Close(); err != nil {
-		cleanup()
-		return nil, err
-	}
-	environment := command.Env
-	if environment == nil {
-		environment = os.Environ()
-	}
-	command.Env = environmentWithValue(environment, "SSH_CONFIG_FILE", path)
-	return cleanup, nil
 }
 
 func environmentWithValue(environment []string, name, value string) []string {

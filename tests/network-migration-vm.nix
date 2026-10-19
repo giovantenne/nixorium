@@ -4,10 +4,10 @@
 # The controller runs the management module; its deployment Flake is a small
 # fixture whose labMeta follows lab-settings.json and whose controller system
 # sets the controller's laboratory addresses from the saved settings when it
-# is activated. Colmena is replaced by a script that reaches the client
-# through the SSH configuration Nixorium writes (so a client on the previous
-# network is reached there) and activates the matching client
-# configuration: the mkLab networking and firewall modules for 10.0.0.0/24,
+# is activated. The deployment engine runs with a placeholder build and copy;
+# its real SSH commands reach the client at the address it chose (a client on
+# the previous network is reached there), where the activation command
+# switches to the matching client configuration: the mkLab networking and firewall modules for 10.0.0.0/24,
 # for the change to 10.1.0.0/24, and for 10.1.0.0/24 after it.
 #
 # Scenario 1: start, apply to the controller, update the client over its
@@ -74,26 +74,59 @@ let
       nixoriumPackage
     ];
   };
-  # Colmena stand-in: reaches the client exactly as Colmena would, through
-  # the SSH configuration Nixorium wrote, and activates the client
-  # configuration that matches the reviewed settings.
-  fakeColmena = pkgs.writeShellScriptBin "colmena" ''
+  # Deployment engine stand-ins. The build returns a placeholder system whose
+  # name says which client configuration matches the reviewed settings, and
+  # the copy only records its target. The engine's real SSH commands reach
+  # the client at the address it chose; there a forced command activates that
+  # configuration in place of the transient unit and writes the activation
+  # result, while every other command runs as sent.
+  fakeEngineNix = pkgs.writeShellScriptBin "nix" ''
     set -eu
-    printf '%s\n' "$*" >> /tmp/colmena.log
-    if [ "''${1:-}" != apply ]; then
-      exit 0
-    fi
-    cat "$SSH_CONFIG_FILE" >> /tmp/colmena-ssh-config.log
-    BASE="$(${pkgs.jq}/bin/jq -r .lab.networkBase lab-settings.json)"
-    PREVIOUS="$(${pkgs.jq}/bin/jq -r '.lab.networkTransition.previousBase // ""' lab-settings.json)"
-    VARIANT=base
-    if [ -n "$PREVIOUS" ]; then
-      VARIANT=transition
-    elif [ "$BASE" = 10.1.0.0 ]; then
-      VARIANT=finished
-    fi
-    REVISION="$(${pkgs.git}/bin/git rev-parse HEAD)"
-    exec ${pkgs.openssh}/bin/ssh -F "$SSH_CONFIG_FILE" "root@''${BASE%.0}.1" nixorium-test-activate "$VARIANT" "$REVISION"
+    case " $* " in
+      *" build "*"#nixosConfigurations."*)
+        DEPLOYMENT=/home/admin/nixorium-deployment
+        BASE="$(${pkgs.jq}/bin/jq -r .lab.networkBase "$DEPLOYMENT/lab-settings.json")"
+        PREVIOUS="$(${pkgs.jq}/bin/jq -r '.lab.networkTransition.previousBase // ""' "$DEPLOYMENT/lab-settings.json")"
+        VARIANT=base
+        if [ -n "$PREVIOUS" ]; then
+          VARIANT=transition
+        elif [ "$BASE" = 10.1.0.0 ]; then
+          VARIANT=finished
+        fi
+        REVISION="$(${pkgs.git}/bin/git -C "$DEPLOYMENT" rev-parse HEAD)"
+        printf '[{"drvPath":"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-x.drv","outputs":{"out":"/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-nixos-system-pc01-%s-%s"}}]\n' "$VARIANT" "$REVISION"
+        ;;
+      *) exec /run/current-system/sw/bin/nix "$@" ;;
+    esac
+  '';
+  fakeEngineCopy = pkgs.writeShellScriptBin "nix-copy-closure" ''
+    set -eu
+    printf '%s\n' "$*" >> /tmp/engine-copy.log
+  '';
+  clientEngineActivation = pkgs.writeShellScript "nixorium-test-engine-activation" ''
+    STATUS=0
+    /run/current-system/sw/bin/nixorium-test-activate "$1" "$2" || STATUS=$?
+    ${pkgs.coreutils}/bin/mkdir -p /var/lib/nixorium/activation
+    printf '{"activationId":"%s","systemPath":"%s","exitCode":%d}\n' "$3" "$4" "$STATUS" > /var/lib/nixorium/activation/last.json.tmp
+    ${pkgs.coreutils}/bin/mv -f /var/lib/nixorium/activation/last.json.tmp /var/lib/nixorium/activation/last.json
+  '';
+  clientEngineRemote = pkgs.writeShellScriptBin "nixorium-test-engine-remote" ''
+    set -eu
+    remote="''${SSH_ORIGINAL_COMMAND:-}"
+    case "$remote" in
+      *systemd-run*)
+        printf '%s\n' "''${SSH_CONNECTION:-}" >> /tmp/engine-activate.log
+        ID="$(printf '%s' "$remote" | ${pkgs.gnused}/bin/sed -n 's/.*NIXORIUM_ACTIVATION=\([0-9a-f]*\).*/\1/p')"
+        SYSTEM="$(printf '%s' "$remote" | ${pkgs.gnused}/bin/sed -n 's/.*NIXORIUM_SYSTEM=\([^ ]*\).*/\1/p')"
+        NAME="''${SYSTEM##*-nixos-system-pc01-}"
+        VARIANT="''${NAME%%-*}"
+        REVISION="''${NAME#*-}"
+        # Like the transient unit started with --no-block: the activation
+        # runs on its own and survives the connection.
+        ${pkgs.util-linux}/bin/setsid ${clientEngineActivation} "$VARIANT" "$REVISION" "$ID" "$SYSTEM" </dev/null >/dev/null 2>&1 &
+        ;;
+      *) exec ${pkgs.bash}/bin/bash -c "$remote" ;;
+    esac
   '';
   clientHostState = pkgs.writeShellScriptBin "nixorium-host-state" ''
     set -eu
@@ -229,7 +262,7 @@ in
       # of the laboratory.
       networking.networkmanager.unmanaged = [ "interface-name:eth0" ];
       services.openssh = { enable = true; settings.PermitRootLogin = "prohibit-password"; };
-      users.users.root.openssh.authorizedKeys.keys = [ keys.snakeOilPublicKey ];
+      users.users.root.openssh.authorizedKeys.keys = [ ''command="${clientEngineRemote}/bin/nixorium-test-engine-remote" ${keys.snakeOilPublicKey}'' ];
       environment.systemPackages = [ clientHostState clientActivate pkgs.iproute2 ];
       system.stateVersion = "26.05";
     };
@@ -262,7 +295,7 @@ in
     def update_computers():
       plan = cli("deploy plan --on @lab")
       assert plan["state"] == "ready", plan
-      result = json.loads(controller.succeed(admin("PATH=/tmp/fake-colmena-bin:$PATH nixorium deploy apply --repo ~/nixorium-deployment --on @lab --expect " + plan["revision"] + " --yes --json")))
+      result = json.loads(controller.succeed(admin("PATH=/tmp/fake-engine-bin:$PATH nixorium deploy apply --repo ~/nixorium-deployment --on @lab --expect " + plan["revision"] + " --yes --json")))
       assert result["state"] == "completed", result
       return plan, result
 
@@ -281,8 +314,8 @@ in
     client.wait_until_succeeds("ip -4 -o address show dev eth1 | grep -F ' 10.0.0.1/24 '", timeout=90)
 
     with subtest("a laboratory on 10.0.0.0/24 with one client"):
-      controller.succeed("install -d -o admin -g users -m 0700 /home/admin/nixorium-deployment /tmp/fake-colmena-bin")
-      controller.succeed("ln -s ${fakeColmena}/bin/colmena /tmp/fake-colmena-bin/colmena; chmod 0755 /tmp/fake-colmena-bin")
+      controller.succeed("install -d -o admin -g users -m 0700 /home/admin/nixorium-deployment /tmp/fake-engine-bin")
+      controller.succeed("ln -s ${fakeEngineNix}/bin/nix ${fakeEngineCopy}/bin/nix-copy-closure /tmp/fake-engine-bin/; chmod 0755 /tmp/fake-engine-bin")
       controller.succeed("install -o admin -g users -m 0600 /etc/nixorium-test/admin-key /home/admin/.ssh/id_ed25519")
       controller.succeed(admin(
         "set -eu; cd ~/nixorium-deployment; cp /etc/nixorium-test/flake.nix flake.nix; cp /etc/nixorium-test/.gitignore .gitignore; "
@@ -329,7 +362,8 @@ in
       # address, so the update reaches it there and moves it.
       plan, result = update_computers()
       assert plan["availability"][0]["network"] == "previous" and plan["targets"][0]["previousIp"] == "10.0.0.1", plan
-      controller.succeed("grep -Fx 'Host 10.1.0.1' /tmp/colmena-ssh-config.log; grep -Fx '  HostName 10.0.0.1' /tmp/colmena-ssh-config.log")
+      controller.succeed("grep -F 'root@10.0.0.1 ' /tmp/engine-copy.log")
+      client.succeed("tail -n 1 /tmp/engine-activate.log | cut -d ' ' -f 3 | grep -Fx 10.0.0.1")
       client.wait_until_succeeds("ip -4 -o address show dev eth1 | grep -F ' 10.1.0.1/24 '", timeout=60)
       assert client_addresses() == "10.0.0.1/24 10.1.0.1/24", client_addresses()
       controller.wait_until_succeeds(admin("nixorium network migrate status --repo ~/nixorium-deployment --json | jq -e '.computers[0].state == \"migrated\" and .computers[0].network == \"current\" and .canFinish'"), timeout=60)
@@ -337,7 +371,7 @@ in
       assert hosts["hosts"][0]["network"] == "current" and hosts["hosts"][0]["deployment"] == "current", hosts
 
     with subtest("start, apply to the controller and update the client over its previous address"):
-      controller.succeed("rm -f /tmp/colmena-ssh-config.log")
+      controller.succeed("rm -f /tmp/engine-copy.log"); client.succeed("rm -f /tmp/engine-activate.log")
       start_change()
 
     with subtest("undo returns the client and the controller to the previous network"):
@@ -364,7 +398,7 @@ in
       controller.wait_until_succeeds(admin("nixorium hosts --repo ~/nixorium-deployment --json | jq -e '.hosts[0].ssh == \"available\"'"), timeout=60)
 
     with subtest("start again and finish"):
-      controller.succeed("rm -f /tmp/colmena-ssh-config.log")
+      controller.succeed("rm -f /tmp/engine-copy.log"); client.succeed("rm -f /tmp/engine-activate.log")
       start_change()
       review, saved = migrate("finish")
       assert review["from"] == "10.0.0.0/24" and review["to"] == "10.1.0.0/24", review

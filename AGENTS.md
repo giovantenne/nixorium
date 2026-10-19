@@ -9,7 +9,7 @@ broaden that role through developer instructions. Discovery
 links for Codex, OpenCode, Claude Code, and Pi are versioned with the repository.
 
 Nixorium manages a multi-PC NixOS lab using Nix Flakes,
-Disko, and Colmena. A controller PC deploys to student workstations
+Disko, and its own deployment engine (ADR 0031). A controller PC deploys to student workstations
 over a LAN-only deployment network. Clients do not need internet for
 installation or system updates, but may have internet during user sessions.
 
@@ -254,7 +254,7 @@ that release's notes, so a release is not finished until the site follows it.
   type (a NetworkManager profile), its Internet-block and SSH nftables rules
   omit interface names, and installers skip the name check. Keep these paths
   consistent (ADR 0017).
-- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
+- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by the deployment engine and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
 - Clients substitute only from the controller's Harmonia cache: `modules/cache.nix`
   replaces the NixOS `cache.nixos.org` default on clients (override priority 90),
   so updates never contact the Internet. The controller keeps the public cache.
@@ -400,7 +400,7 @@ that release's notes, so a release is not finished until the site follows it.
   is never unattended. Both installers use `ERASE` and ask again after a
   mistyped answer; an empty confirmation cancels.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
-- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist fleet-wide pending evidence before apply. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new maintenance operations except controller activation (ADR 0027), makes classroom controls leave the computers it names alone (ADR 0030) and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
+- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with the fixed commands of ADR 0031 (one `nix build` of the systems, `nix-copy-closure --use-substitutes`, one SSH command starting the `nixorium-activate` transient unit, read-only polling), and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. The apply only uses store paths built for that revision in the same update. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist pending evidence before apply, with each computer marked started durably before its activation command. A record whose every computer is known from the engine's own evidence (never started, finished in the record, or this activation's `last.json` on the computer) closes itself (ADR 0031, D7); anything inferred, or older records, still need the reviewed recovery. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new maintenance operations except controller activation (ADR 0027), makes classroom controls leave the computers it names alone (ADR 0030) and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
 - Deployment availability is advisory: probe only selected identities with the
   bounded inventory probe; an open SSH port is not authenticated identity or
   proof of power state. A reachable-only choice creates a fresh explicit-target
@@ -629,9 +629,9 @@ that release's notes, so a release is not finished until the site follows it.
   on the new network with the saved configuration, and keeps undo possible
   until then (ADR 0028). During a change labMeta decoding copies each
   client's previous address into `HostMeta.PreviousIP`: every per-computer
-  probe tries the new address first, then the previous one, and Colmena
-  reaches a computer on the previous network through `HostName` entries in
-  its SSH configuration. Trusted host keys are copied from the previous to
+  probe tries the new address first, then the previous one, and the
+  deployment engine copies to and activates a computer at the address that
+  answered. Trusted host keys are copied from the previous to
   the new address in the managed known-hosts file before any contact there;
   never replace a different key or relax checking. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first

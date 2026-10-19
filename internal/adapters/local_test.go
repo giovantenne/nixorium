@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -113,76 +112,6 @@ func TestGitStatePreservesPorcelainPaths(t *testing.T) {
 				t.Fatalf("state = %+v, err = %v, want paths %q", state, err, test.paths)
 			}
 		})
-	}
-}
-
-func TestDeploymentCommandIsFixedAndUsesArgumentArray(t *testing.T) {
-	tests := []struct {
-		phase domain.DeploymentPhase
-		want  string
-	}{
-		{phase: domain.DeploymentPhaseBuild, want: "build --on pc01,pc02 --verbose --color never"},
-		{phase: domain.DeploymentPhaseApply, want: "apply switch --on pc01,pc02 --verbose --color never"},
-	}
-	for _, test := range tests {
-		arguments, err := deploymentCommand(test.phase, "pc01,pc02")
-		if err != nil || strings.Join(arguments, " ") != test.want {
-			t.Errorf("%s command = %q, %v", test.phase, strings.Join(arguments, " "), err)
-		}
-	}
-	if _, err := deploymentCommand(domain.DeploymentPhaseComplete, "pc01"); err == nil {
-		t.Fatal("unsupported deployment phase was accepted")
-	}
-	if _, err := deploymentCommand(domain.DeploymentPhaseBuild, ""); err == nil {
-		t.Fatal("empty deployment selector was accepted")
-	}
-}
-
-func TestConfigureColmenaSSHUsesPrivateSupportedConfig(t *testing.T) {
-	command := exec.Command("true")
-	command.Env = []string{"PATH=/bin", "SSH_CONFIG_FILE=/tmp/untrusted"}
-	cleanup, err := configureColmenaSSH(command, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := ""
-	pathEnvironmentPreserved := false
-	for _, entry := range command.Env {
-		if entry == "PATH=/bin" {
-			pathEnvironmentPreserved = true
-		}
-		if strings.HasPrefix(entry, "SSH_CONFIG_FILE=") {
-			if path != "" {
-				t.Fatalf("duplicate SSH_CONFIG_FILE entries: %q", command.Env)
-			}
-			path = strings.TrimPrefix(entry, "SSH_CONFIG_FILE=")
-		}
-	}
-	if path == "" || path == "/tmp/untrusted" {
-		t.Fatalf("SSH_CONFIG_FILE = %q", path)
-	}
-	if !pathEnvironmentPreserved {
-		t.Fatalf("existing command environment was not preserved: %q", command.Env)
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, expected := range []string{"Host *", "BatchMode yes", "PasswordAuthentication no", "StrictHostKeyChecking accept-new", "KbdInteractiveAuthentication no", "ConnectTimeout 10", "ConnectionAttempts 1", "ServerAliveInterval 10", "ServerAliveCountMax 3"} {
-		if !strings.Contains(string(content), expected) {
-			t.Fatalf("SSH config omits %q:\n%s", expected, content)
-		}
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatalf("SSH config mode = %v, want 0600", info.Mode().Perm())
-	}
-	cleanup()
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatalf("SSH config still exists after cleanup: %v", err)
 	}
 }
 

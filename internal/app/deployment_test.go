@@ -313,10 +313,10 @@ func TestDeploymentLogTimesEveryStep(t *testing.T) {
 	}
 	for _, want := range []string{
 		"==> Reviewing the selected computers (2026-10-19T08:00:01Z)\n    Reviewing took 1s\n",
-		"==> Building selected configurations with Colmena (2026-10-19T08:00:03Z)\n",
+		"==> Building the systems of the selected computers (2026-10-19T08:00:03Z)\n",
 		"    Building took 1s\n",
 		"\n==> Revalidating the reviewed revision and targets (2026-10-19T08:00:05Z)\n    Revalidating took 1s\n",
-		"\n==> Applying the built configurations with Colmena (2026-10-19T08:00:07Z)\n",
+		"\n==> Copying and activating the built systems (2026-10-19T08:00:07Z)\n",
 		"    Applying took 1s\n",
 		"\n==> Verifying selected computers through authenticated host state (2026-10-19T08:00:09Z)\n",
 		// The verification step also reads the clock once to stamp the record.
@@ -344,7 +344,7 @@ func TestDeploymentLogTimesFailedBuildWithoutApply(t *testing.T) {
 		t.Fatalf("report = %+v", report)
 	}
 	for _, want := range []string{
-		"==> Building selected configurations with Colmena (2026-10-19T08:00:03Z)\n",
+		"==> Building the systems of the selected computers (2026-10-19T08:00:03Z)\n",
 		"    Building took 1s\n",
 		"\nTotal time: 4s\n",
 	} {

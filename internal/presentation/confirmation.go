@@ -61,7 +61,7 @@ func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.Dep
 	fmt.Fprintln(output, "Update computers: review")
 	fmt.Fprintf(output, "Revision: %s\n", report.Revision)
 	fmt.Fprintf(output, "Targets: %s (%s)\n", report.ColmenaSelector, countNoun(len(report.Targets), "computer"))
-	fmt.Fprintln(output, "Action: build every selected configuration, then apply it with Colmena")
+	fmt.Fprintln(output, "Action: build every selected system, then copy and activate it on each computer")
 	fmt.Fprintln(output, "Impact: target services may restart; offline or failed targets will be reported")
 	fmt.Fprintln(output, "Retry: safe; Nixorium revalidates the revision and rebuilds before every apply")
 	return ConfirmYesNo(input, output, continuePrompt)

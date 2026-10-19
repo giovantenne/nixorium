@@ -69,7 +69,9 @@ in
         pkgs.shadow
         pkgs.systemd
         pkgs.util-linux
-        fakeColmena
+        fakeEngineNix
+        fakeEngineCopy
+        fakeEngineRemote
         fakeHostState
         nixoriumPackage
         internetHelper
@@ -101,21 +103,49 @@ in
       kernel bzImage init=/nix/store/test-init
       IPXE
     '';
-    fakeColmena = pkgs.writeShellScriptBin "nixorium-test-colmena" ''
+    # The deployment engine's external commands. Only the build of computer
+    # systems, the copy and the activation commands are simulated: every
+    # other nix and ssh call reaches the real program.
+    fakeEngineNix = pkgs.writeShellScriptBin "nixorium-test-engine-nix" ''
       set -eu
-      printf '%s\n' "$*" >> "''${NIXORIUM_TEST_COLMENA_INVOCATIONS}"
-      printf 'fake colmena: %s\n' "$*"
-      if [ "''${1:-}" = apply ]; then
-        test -n "''${SSH_CONFIG_FILE:-}"
-        test "$(stat -c %a "$SSH_CONFIG_FILE")" = 600
-        grep -Fx '  BatchMode yes' "$SSH_CONFIG_FILE"
-        grep -Fx '  PasswordAuthentication no' "$SSH_CONFIG_FILE"
-        grep -Fx '  StrictHostKeyChecking accept-new' "$SSH_CONFIG_FILE"
-        touch /tmp/nixorium-test-colmena-ssh-policy
-      fi
-      if [ "''${NIXORIUM_TEST_COLMENA_FAIL:-}" = "''${1:-}" ]; then
-        exit 42
-      fi
+      case " $* " in
+        *" build "*"#nixosConfigurations."*)
+          printf 'build %s\n' "$*" >> "''${NIXORIUM_TEST_ENGINE_INVOCATIONS}"
+          printf 'fake engine: build\n' >&2
+          if [ "''${NIXORIUM_TEST_ENGINE_FAIL:-}" = build ]; then exit 42; fi
+          printf '[{"drvPath":"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-x.drv","outputs":{"out":"/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-nixos-system-pc01-test"}}]\n'
+          ;;
+        *) exec /run/current-system/sw/bin/nix "$@" ;;
+      esac
+    '';
+    fakeEngineCopy = pkgs.writeShellScriptBin "nixorium-test-engine-copy" ''
+      set -eu
+      printf 'copy %s\n' "$*" >> "''${NIXORIUM_TEST_ENGINE_INVOCATIONS}"
+      printf 'NIX_SSHOPTS %s\n' "''${NIX_SSHOPTS:-}" >> /tmp/nixorium-test-engine-sshopts
+      printf 'fake engine: copy\n'
+    '';
+    # The computer side of the activation commands, as a forced SSH command
+    # for root: the start, observe and journal commands are simulated, every
+    # other command (host state, recovery probes) runs as sent.
+    fakeEngineRemote = pkgs.writeShellScriptBin "nixorium-test-engine-remote" ''
+      set -eu
+      remote="''${SSH_ORIGINAL_COMMAND:-}"
+      case "$remote" in
+        *systemd-run*)
+          printf 'activate\n' >> /tmp/nixorium-test-engine-activations
+          ${pkgs.jq}/bin/jq -e '.activations[0].state == "started"' /var/lib/nixorium/coordination/deployment-pending.json >/dev/null
+          printf '%s' "$remote" | ${pkgs.gnused}/bin/sed -n 's/.*NIXORIUM_ACTIVATION=\([0-9a-f]*\).*/\1/p' > /tmp/nixorium-test-engine-id
+          ;;
+        *"--- unit"*)
+          if [ -e /tmp/nixorium-test-engine-lose ]; then
+            printf '\n--- unit\ndead\n'
+          else
+            printf '{"activationId":"%s","exitCode":0}\n\n--- unit\nexited\n' "$(cat /tmp/nixorium-test-engine-id)"
+          fi
+          ;;
+        *"journalctl _SYSTEMD_INVOCATION_ID"*) printf 'fake engine: activation log\n' ;;
+        *) exec /run/current-system/sw/bin/bash -c "$remote" ;;
+      esac
     '';
     cleanGenerations = pkgs.writeShellApplication {
       name = "nixorium-clean-generations";
@@ -284,7 +314,7 @@ in
     # sources across reboot rather than losing the writable store's tmpfs.
     virtualisation.writableStoreUseTmpfs = internetOnly;
     virtualisation.memorySize = if internetOnly then 2048 else 1024;
-    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnused pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit cleanGenerations ];
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnused pkgs.jq pkgs.python3 pkgs.util-linux fakeEngineNix fakeEngineCopy fakeEngineRemote fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit cleanGenerations ];
     users.groups.nixorium-staff = {};
     system.activationScripts.createHomeTemplates = "";
     system.activationScripts.siteHomeProfile = {
@@ -646,7 +676,7 @@ in
     controller.succeed("for user in admin teacher; do uid=$(id -u $user); test \"$(stat -c %U:%G /home/$user/.config/Code/User/globalStorage)\" = $user:users; test \"$(stat -c %U:%G /home/$user/.vscode/extensions)\" = $user:users; test \"$(stat -c %U:%G:%a /run/user/$uid)\" = $user:users:700; su -s /bin/sh $user -c \"test -w /home/$user/.config/Code/User/globalStorage && test -w /home/$user/.vscode/extensions && test -w /run/user/$uid\"; done")
     controller.succeed("uid=$(id -u student); systemctl start user-runtime-dir@$uid.service; test \"$(stat -c %U:%G:%a /run/user/$uid)\" = student:users:700; su -s /bin/sh student -c \"test -w /run/user/$uid\"")
     controller.succeed("grep -Fx 'X-RestartIfChanged=false' /etc/systemd/system/nixorium-apply-controller.service; grep -Fx 'X-RestartIfChanged=false' /etc/systemd/system/nixorium-apply-controller@.service")
-    controller.succeed("mkdir /tmp/fake-colmena-bin; ln -s /run/current-system/sw/bin/nixorium-test-colmena /tmp/fake-colmena-bin/colmena")
+    controller.succeed("mkdir /tmp/fake-engine-bin; ln -s /run/current-system/sw/bin/nixorium-test-engine-nix /tmp/fake-engine-bin/nix; ln -s /run/current-system/sw/bin/nixorium-test-engine-copy /tmp/fake-engine-bin/nix-copy-closure; chmod 0755 /tmp/fake-engine-bin")
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
     controller.wait_until_fails("systemctl is-active --quiet nixorium-harmonia.service")
     controller.succeed("journalctl -u harmonia.service --no-pager | grep -F 'Failed to set up credentials'")
@@ -970,7 +1000,7 @@ in
     controller.fail("su - admin -c 'systemctl start nixorium-apply-controller.service'")
     controller.succeed("journalctl -u nixorium-apply-controller.service --no-pager | grep -F 'deployment worktree must be clean before controller apply'")
     controller.succeed("rm /home/admin/nixorium-deployment/dirty; test -z \"$(git -C /home/admin/nixorium-deployment status --porcelain=v1 --untracked-files=normal)\"")
-    controller.succeed("cp /home/admin/nixorium-deployment/admin-ssh /home/admin/.ssh/id_ed25519; chown admin:users /home/admin/.ssh/id_ed25519; chmod 0600 /home/admin/.ssh/id_ed25519; install -d -m 0700 /root/.ssh; cp /home/admin/nixorium-deployment/keys/admin-ssh.pub /root/.ssh/authorized_keys; chmod 0600 /root/.ssh/authorized_keys; systemctl reload sshd.service")
+    controller.succeed("cp /home/admin/nixorium-deployment/admin-ssh /home/admin/.ssh/id_ed25519; chown admin:users /home/admin/.ssh/id_ed25519; chmod 0600 /home/admin/.ssh/id_ed25519; install -d -m 0700 /root/.ssh; printf 'command=\"/run/current-system/sw/bin/nixorium-test-engine-remote\" %s\n' \"$(cat /home/admin/nixorium-deployment/keys/admin-ssh.pub)\" > /root/.ssh/authorized_keys; chmod 0600 /root/.ssh/authorized_keys; systemctl reload sshd.service")
     with subtest("reviewed single-client host trust keeps the administrator boundary"):
       controller.succeed("ip addr add 10.0.0.1/8 dev lab0; cp -a /home/admin/nixorium-deployment /home/admin/host-trust-deployment")
       trust_flake = controller.succeed("cat /home/admin/host-trust-deployment/flake.nix").replace("127.0.0.1", "10.0.0.1")
@@ -991,15 +1021,17 @@ in
       controller.succeed("su - admin -c 'set -eu; cp -a ~/nixorium-deployment /tmp/offline-plan-deployment; /run/current-system/sw/bin/sed -i s/127.0.0.1/192.0.2.250/g /tmp/offline-plan-deployment/flake.nix; git -C /tmp/offline-plan-deployment add flake.nix; git -C /tmp/offline-plan-deployment -c user.name=Test -c user.email=test@example.invalid commit -qm offline-fixture; nixorium deploy plan --repo /tmp/offline-plan-deployment --on pc01 --json' > /tmp/offline-plan.json")
       controller.succeed("jq -e '.state == \"ready\" and (.targets | length) == 1 and .targets[0].name == \"pc01\" and .availability[0].reachability == \"unreachable\" and (.reachableRequested // \"\") == \"\"' /tmp/offline-plan.json")
     controller.fail("nixorium deploy plan --repo /tmp/deployment --on pc02 --json")
-    controller.succeed("su - admin -c 'revision=$(git -C /home/admin/nixorium-deployment rev-parse HEAD); NIXORIUM_TEST_COLMENA_INVOCATIONS=/tmp/colmena-success PATH=/tmp/fake-colmena-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on pc01 --expect \"$revision\" --yes --json >/tmp/deploy-success.json 2>/tmp/deploy-success.progress' || { cat /tmp/deploy-success.json /tmp/deploy-success.progress; false; }")
+    controller.succeed("su - admin -c 'revision=$(git -C /home/admin/nixorium-deployment rev-parse HEAD); NIXORIUM_TEST_ENGINE_INVOCATIONS=/tmp/colmena-success PATH=/tmp/fake-engine-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on pc01 --expect \"$revision\" --yes --json >/tmp/deploy-success.json 2>/tmp/deploy-success.progress' || { cat /tmp/deploy-success.json /tmp/deploy-success.progress; false; }")
     controller.succeed("jq -e '.operation == \"deploy-apply\" and .state == \"completed\" and .phase == \"complete\" and .buildCompleted and .applyCompleted and .retrySafe and .colmenaSelector == \"pc01\" and .verification.attempted == 1 and .verification.verified == 1 and .verification.recorded == 1 and .verification.targets[0].name == \"pc01\" and .verification.targets[0].state == \"verified\" and (.logPath | startswith(\"/home/admin/.local/state/nixorium/operations/deploy-\"))' /tmp/deploy-success.json")
-    controller.succeed("source=$(su - admin -c 'nixorium config source --repo /home/admin/nixorium-deployment --revision $(git -C /home/admin/nixorium-deployment rev-parse HEAD)'); test \"$(head -n 1 /tmp/colmena-success)\" = \"build --on pc01 --verbose --color never --config $source\"; test \"$(tail -n 1 /tmp/colmena-success)\" = \"apply switch --on pc01 --verbose --color never --config $source\"; test \"$(wc -l </tmp/colmena-success)\" = 2; test -e /tmp/nixorium-test-colmena-ssh-policy")
-    controller.succeed("log=$(jq -r .logPath /tmp/deploy-success.json); test \"$(stat -c '%U:%G:%a' \"$log\")\" = admin:users:600; grep -F 'fake colmena: build' \"$log\"; grep -F 'Result: completed' \"$log\"; grep -F 'Verified targets: 1/1' \"$log\"; grep -F 'fake colmena: apply' /tmp/deploy-success.progress")
+    controller.succeed("source=$(su - admin -c 'nixorium config source --repo /home/admin/nixorium-deployment --revision $(git -C /home/admin/nixorium-deployment rev-parse HEAD)'); grep -F \"$source#nixosConfigurations.pc01.config.system.build.toplevel\" /tmp/colmena-success; grep -Fx 'copy --to root@127.0.0.1 --use-substitutes /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-nixos-system-pc01-test' /tmp/colmena-success; grep -Fx activate /tmp/nixorium-test-engine-activations; test \"$(wc -l </tmp/colmena-success)\" = 2; grep -F 'BatchMode=yes' /tmp/nixorium-test-engine-sshopts; grep -F 'StrictHostKeyChecking=accept-new' /tmp/nixorium-test-engine-sshopts; grep -F 'PasswordAuthentication=no' /tmp/nixorium-test-engine-sshopts; test ! -e /var/lib/nixorium/coordination/deployment-pending.json")
+    controller.succeed("log=$(jq -r .logPath /tmp/deploy-success.json); test \"$(stat -c '%U:%G:%a' \"$log\")\" = admin:users:600; grep -F 'fake engine: build' \"$log\"; grep -F '[pc01] fake engine: copy' \"$log\"; grep -F '[pc01]   fake engine: activation log' \"$log\"; grep -F 'Result: completed' \"$log\"; grep -F 'Verified targets: 1/1' \"$log\"; grep -F '[pc01] activation finished' /tmp/deploy-success.progress")
     controller.succeed("history=(/home/admin/.local/state/nixorium/deployments/*.json); test \"''${#history[@]}\" = 1; test \"$(stat -c '%U:%G:%a' \"''${history[0]}\")\" = admin:users:600; jq -e '.schemaVersion == 1 and .repository == \"/home/admin/nixorium-deployment\" and (.hosts | keys) == [\"pc01\"] and (.hosts.pc01.revision | length) == 40 and (.hosts.pc01.systemPath | startswith(\"/nix/store/\")) and (.hosts.pc01.verifiedAt | endswith(\"Z\"))' \"''${history[0]}\"")
     controller.succeed("su - admin -c 'nixorium hosts --repo /home/admin/nixorium-deployment --json' > /tmp/hosts-verified.json; jq -e '.hosts[0].lastSuccessfulDeploy.revision == .hosts[0].desiredRevision and (.hosts[0].lastSuccessfulDeploy.systemPath | startswith(\"/nix/store/\")) and (.hosts[0].lastSuccessfulDeploy.verifiedAt | endswith(\"Z\"))' /tmp/hosts-verified.json")
-    controller.succeed("su - admin -c 'revision=$(git -C /home/admin/nixorium-deployment rev-parse HEAD); NIXORIUM_TEST_COLMENA_INVOCATIONS=/tmp/colmena-failed NIXORIUM_TEST_COLMENA_FAIL=apply PATH=/tmp/fake-colmena-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on @lab --expect \"$revision\" --yes --json >/tmp/deploy-failed.json 2>/tmp/deploy-failed.progress' || test $? = 1")
+    controller.succeed("touch /tmp/nixorium-test-engine-lose")
+    controller.succeed("su - admin -c 'revision=$(git -C /home/admin/nixorium-deployment rev-parse HEAD); NIXORIUM_TEST_ENGINE_INVOCATIONS=/tmp/colmena-failed PATH=/tmp/fake-engine-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on @lab --expect \"$revision\" --yes --json >/tmp/deploy-failed.json 2>/tmp/deploy-failed.progress' || test $? = 1")
     controller.succeed("jq -e '.state == \"failed\" and .phase == \"apply\" and .buildCompleted and (.applyCompleted | not) and (.retrySafe | not) and .recoveryRequired and .verification.verified == 1 and .verification.recorded == 0' /tmp/deploy-failed.json")
-    controller.succeed("test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/deployment-pending.json)\" = admin:users:600; jq -e '.schemaVersion == 1 and (.revision | length) == 40 and .targets[0].name == \"pc01\"' /var/lib/nixorium/coordination/deployment-pending.json")
+    controller.succeed("rm /tmp/nixorium-test-engine-lose")
+    controller.succeed("test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/deployment-pending.json)\" = admin:users:600; jq -e '.schemaVersion == 1 and (.revision | length) == 40 and .targets[0].name == \"pc01\" and .activations[0].state == \"started\" and .activations[0].result == \"unknown\" and (.activations[0].activationId | length) == 32' /var/lib/nixorium/coordination/deployment-pending.json")
     controller.fail("su - admin -c 'revision=$(git -C ~/nixorium-deployment rev-parse HEAD); nixorium deploy apply --repo ~/nixorium-deployment --on pc01 --expect \"$revision\" --yes --json'")
     # The way to the fix is never blocked: controller activation changes only
     # the controller, so the record neither refuses it nor is cleared by it.
@@ -1008,12 +1040,12 @@ in
     controller.fail("systemctl start nixorium-prepare-pxe.service")
     controller.fail("systemctl start nixorium-pxe-network.service")
     controller.succeed("journalctl -u nixorium-pxe-network.service --no-pager | grep -F 'unfinished client deployment'")
-    # The fixture's failed Colmena did not dispatch a real activation. Explicitly
+    # The fixture's lost activation did not run anything. Explicitly
     # archive its reviewed evidence under the existing fleet lock before retry.
     controller.succeed("su - admin -c 'flock -n /var/lib/nixorium/coordination/operation.lock mv -T -- /var/lib/nixorium/coordination/deployment-pending.json /var/lib/nixorium/coordination/deployment-reviewed-test.json'; sync; systemctl reset-failed")
-    controller.succeed("su - admin -c 'revision=$(git -C /home/admin/nixorium-deployment rev-parse HEAD); NIXORIUM_TEST_COLMENA_INVOCATIONS=/tmp/colmena-retry PATH=/tmp/fake-colmena-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on @lab --expect \"$revision\" --yes --json >/tmp/deploy-retry.json 2>/tmp/deploy-retry.progress'")
+    controller.succeed("su - admin -c 'revision=$(git -C /home/admin/nixorium-deployment rev-parse HEAD); NIXORIUM_TEST_ENGINE_INVOCATIONS=/tmp/colmena-retry PATH=/tmp/fake-engine-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on @lab --expect \"$revision\" --yes --json >/tmp/deploy-retry.json 2>/tmp/deploy-retry.progress'")
     controller.succeed("jq -e '.state == \"completed\" and .buildCompleted and .applyCompleted and .verification.verified == 1 and .verification.recorded == 1' /tmp/deploy-retry.json; test \"$(wc -l </tmp/colmena-retry)\" = 2")
-    controller.succeed("su - admin -c 'NIXORIUM_TEST_COLMENA_INVOCATIONS=/tmp/colmena-stale PATH=/tmp/fake-colmena-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on pc01 --expect 0000000000000000000000000000000000000000 --yes --json >/tmp/deploy-stale.json' || test $? = 1")
+    controller.succeed("su - admin -c 'NIXORIUM_TEST_ENGINE_INVOCATIONS=/tmp/colmena-stale PATH=/tmp/fake-engine-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on pc01 --expect 0000000000000000000000000000000000000000 --yes --json >/tmp/deploy-stale.json' || test $? = 1")
     controller.succeed("jq -e '.state == \"blocked\" and .phase == \"preflight\" and any(.issues[]; .field == \"review\")' /tmp/deploy-stale.json; test ! -e /tmp/colmena-stale")
     controller.succeed("su - admin -c 'cd /tmp; nixorium logs --json' > /tmp/logs.json; jq -e '.operation == \"logs-list\" and .state == \"available\" and .limit == 50 and (.logs | length) >= 3 and all(.logs[]; .kind == \"deployment\" and .available and (.id | startswith(\"deploy-\"))) and any(.records[]; .operation == \"deploy-apply\" and .state == \"completed\" and .subject == \"@lab\") and any(.records[]; .operation == \"controller-apply\" and .state == \"completed\") and any(.records[]; .operation == \"service-restart\" and .state == \"completed\") and any(.records[]; .operation == \"pxe-start\" and .state == \"completed\")' /tmp/logs.json")
     controller.succeed("test \"$(stat -c '%U:%G:%a' /home/admin/.local/state/nixorium/operations/records.json)\" = admin:users:600; test \"$(stat -c '%a' /home/admin/.local/state/nixorium/operations)\" = 700")
@@ -1022,7 +1054,7 @@ in
     controller.succeed("su - admin -c 'nixorium logs show ../../etc/passwd --json' >/tmp/log-invalid.json || test $? = 1; jq -e '.state == \"blocked\" and any(.issues[]; .field == \"log\" and (.message | contains(\"ID is invalid\")))' /tmp/log-invalid.json")
     controller.succeed("su - admin -c 'printf unsafe > ~/.local/state/nixorium/operations/deploy-20990101T000000.000000000Z-1.log; chmod 0644 ~/.local/state/nixorium/operations/deploy-20990101T000000.000000000Z-1.log; nixorium logs --json' >/tmp/logs-unsafe.json || test $? = 1; jq -e '.state == \"partial\" and .logs[0].state == \"unavailable\" and (.issues[0].message | contains(\"0600\"))' /tmp/logs-unsafe.json; unlink /home/admin/.local/state/nixorium/operations/deploy-20990101T000000.000000000Z-1.log")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.operation == \"setup-status\" and .state == \"ready\" and (.currentStage | not) and (.stages | length) == 9 and (.stages[] | select(.id == \"prepare-artifacts\").state) == \"complete\"'")
-    controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"PXE-PREPARATION\" and .level == \"OK\") and any(.findings[]; .id == \"PXE-LIFECYCLE\" and .level == \"OK\") and any(.findings[]; .id == \"SERVICE-HARMONIA\" and .level == \"OK\") and any(.findings[]; .id == \"CACHE-HEALTH\" and .level == \"OK\") and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\") and any(.findings[]; .id == \"DISK-FREE\" and .level == \"WARNING\")'")
+    controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"PXE-PREPARATION\" and .level == \"OK\") and any(.findings[]; .id == \"PXE-LIFECYCLE\" and .level == \"OK\") and any(.findings[]; .id == \"SERVICE-HARMONIA\" and .level == \"OK\") and any(.findings[]; .id == \"CACHE-HEALTH\" and .level == \"OK\") and any(.findings[]; .id == \"COMMAND-NIX-COPY-CLOSURE\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\") and any(.findings[]; .id == \"DISK-FREE\" and .level == \"WARNING\")'")
     controller.succeed("systemctl start nixorium-pxe-network.service; test -e /var/lib/nixorium/pxe/session.json")
     controller.succeed("sync")
     controller.crash()

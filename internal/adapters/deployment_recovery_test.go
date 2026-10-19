@@ -140,11 +140,11 @@ func TestCreateDeploymentPendingRecordsTheProcessStartTime(t *testing.T) {
 	}
 	defer directory.Close()
 	plan := domain.DeploymentPlanReport{Repository: "/srv/lab", Revision: strings.Repeat("b", 40), ColmenaSelector: "@clients", Targets: []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}}}
-	file, err := createDeploymentPending(directory, plan)
+	record, err := createDeploymentPending(directory, plan, []domain.PendingActivation{{Name: "pc01", State: domain.ActivationPlanned}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
+	defer record.close()
 	read, present, err := pendingDeploymentAt(root)
 	if !present || err != nil {
 		t.Fatalf("read = %+v %v %v", read, present, err)
@@ -158,5 +158,17 @@ func TestCreateDeploymentPendingRecordsTheProcessStartTime(t *testing.T) {
 	}
 	if !(Local{}).ProcessRunning(read.ControllerPID, read.ControllerPIDStart) {
 		t.Fatal("the running recorder was not recognised")
+	}
+}
+
+func TestDeploymentActivityReadsTheActivationResult(t *testing.T) {
+	id := strings.Repeat("d", 32)
+	activity := parseDeploymentActivity("/nix/store/x\n" + strings.Repeat("a", 40) + "\n--- jobs\nNo jobs running.\n--- activation\n0\n--- result\n{\"activationId\":\"" + id + "\",\"exitCode\":0}\n")
+	if !activity.Reachable || activity.Activating || activity.LastActivationID != id || activity.LastExitCode == nil || *activity.LastExitCode != 0 {
+		t.Fatalf("activity = %+v", activity)
+	}
+	activity = parseDeploymentActivity("/nix/store/x\n" + strings.Repeat("a", 40) + "\n--- jobs\nNo jobs running.\n--- activation\n0\n--- result\n")
+	if activity.LastActivationID != "" || activity.LastExitCode != nil {
+		t.Fatalf("missing result = %+v", activity)
 	}
 }

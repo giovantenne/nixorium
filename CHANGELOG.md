@@ -18,6 +18,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Update computers** no longer uses Colmena. Nixorium builds each selected
+  computer's system once (instead of twice), copies it, and activates it in a
+  service on the computer that keeps running if the connection drops. A
+  computer that fails or is off no longer blocks the others: only a computer
+  whose result is truly unknown still needs a review, and that review closes
+  itself as soon as the computer reports how its update ended. The log shows
+  each computer's progress and its activation messages.
 - Reviews and updates prepare the configuration for evaluation once instead
   of several times, which shortens every update a little.
 - Blocking Internet, switching computers off or restarting them, and the
