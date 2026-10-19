@@ -459,7 +459,9 @@ Group modules declare common behavior within each class; this is a configuration
 contract, not automatic proof that arbitrary Nix code is equivalent. A private
 module that branches on `networking.hostName` must declare the
 exceptional hosts in `hostModules` or `updateValidationHosts`. Otherwise the
-representative cannot establish their individual behavior. Class/base results
+representative cannot establish their individual behavior. The same classes
+share one system (ADR 0033), where `hostName` and `hostIp` stop the evaluation
+with an error naming the hosts that need their own configuration. Class/base results
 are cached only within the conversation; the candidate is evaluated afresh.
 System derivations are evaluated in sequential batches of at most two
 representatives per Nix process, on both sides. This limits memory accumulation

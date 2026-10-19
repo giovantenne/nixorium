@@ -3,7 +3,7 @@
 ## Repository roles
 
 The public repository is a versioned framework. It exports `lib.mkLab`, a site
-template, standalone example hosts, Colmena outputs, netboot outputs, helper
+template, standalone example hosts, netboot outputs, helper
 apps, readiness metadata, and an offline installer bundle.
 
 A private deployment owns site configuration and consumes a pinned upstream
@@ -18,6 +18,18 @@ references must remain inside the upstream or deployment source trees.
 
 Generated host names and addresses come from the validated IPv4 network,
 prefix, client count, and host numbers. Reject unknown per-host modules so configuration typos cannot be ignored.
+
+Clients of the same class (module groups, managed software, interface; the
+controller, `hostModules` hosts and `updateValidationHosts` are classes of one)
+share one system, evaluated and built once (ADR 0033). A class of one keeps the
+per-host system and is named after its computer; a larger class is
+`shared-<n>` and `nixosConfigurations.pcNN` aliases it. A shared system must
+not evaluate a computer's name or address: `hostName` and `hostIp` throw, and
+`modules/identity.nix` and `modules/networking.nix` take both from the
+computer's identity record (`/var/lib/nixorium/identity.json`, number only)
+at activation. The deployment engine and both installers write the record
+before the shared system runs, and never overwrite a record that names another
+computer. The flake has no `colmena` output.
 
 `deploymentStatus` reports whether placeholders, missing public keys, or
 public default passwords remain. Keep the standalone example evaluable even

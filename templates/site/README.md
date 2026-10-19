@@ -368,7 +368,13 @@ Each group refers only to client PCs. Overlapping groups apply both sets of
 modules in group-name order. Group modules describe common behavior; keep
 individual exceptions in `hostModules` or declare `updateValidationHosts` when
 private modules branch by host name. Grouping preserves differences in managed
-software and network interfaces. An older pinned Nixorium must be updated before
+software and network interfaces. Computers that are identical in groups,
+software and interface share one system, which is built once; each keeps its
+name and address from a small identity record that the update or the installer
+writes. A module that uses `hostName` or `hostIp` needs its computer listed in
+`hostModules` or `updateValidationHosts`; otherwise evaluation stops with a clear
+error. If a computer reports "This computer has no Nixorium identity", see the
+troubleshooting guide. An older pinned Nixorium must be updated before
 using this new argument; do not add it to a pin that does not support it.
 
 <details>

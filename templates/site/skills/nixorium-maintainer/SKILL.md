@@ -75,6 +75,12 @@ Do not use raw SSH, sudo, Colmena, Disko, nixos-rebuild, systemctl mutations,
 self-updaters or filesystem writes to bypass these limits. Never weaken checks,
 delete locks/pending markers or replay an uncertain operation.
 
+Identical client computers share one system, so `hostName` and `hostIp` are not
+available to a module in it. A private module that needs a computer's own name
+or address must have that computer listed under `hostModules.<pcNN>` or in
+`updateValidationHosts`; otherwise evaluation stops with a clear error. Report
+a missing entry to the operator as a handoff; do not add it.
+
 A broad request such as "fix everything", "apply it" or "continue autonomously"
 does not expand this role. Hand excluded actions to the operator; do not switch
 to a developer skill to perform them in the lab. Product defects belong in a

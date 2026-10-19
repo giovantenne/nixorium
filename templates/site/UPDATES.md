@@ -169,8 +169,20 @@ deployment readiness, builds the controller and representative client variants
 (`nixoriumUpdateTargets`): distinct managed-software selections,
 interfaces and every explicit host module. Private modules branching on host
 identity must declare additional `updateValidationHosts = [ "pc03" ];` in
-their `mkLab` arguments; these hosts also enter offline validation. Identical
-client roles reuse a representative rather than rebuilding the entire fleet.
+their `mkLab` arguments, or list that computer under `hostModules`; these hosts
+also enter offline validation. Without it, evaluation stops with an error
+because a system shared by several computers has no `hostName` or `hostIp`.
+Identical client computers share one system (a class), so the update builds it
+once rather than once per computer. The plan and the review show, for example,
+"Builds  2 configurations for 20 computers".
+
+Before it switches a computer to a shared system, the update writes the
+computer's identity record (`/var/lib/nixorium/identity.json`, only its number)
+over SSH and checks the number again afterwards. A record that names another
+computer is never overwritten: that computer stays unchanged and the result says
+"identity record names another computer" (see
+[Troubleshooting](troubleshooting.md#the-update-says-identity-record-names-another-computer)).
+To go back, choose the previous generation in the computer's boot menu.
 The plan also builds netboot, PXE firmware and installer outputs
 when laboratory mode needs them. Controller-only mode builds no client/PXE
 system. `nixoriumOfflineCheck` compares the selected systems' derivation paths

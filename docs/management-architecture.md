@@ -9,8 +9,9 @@ execution plans are not specifications.
 
 Nixorium already has a sound declarative core:
 
-- `lib.mkLab` turns a typed site configuration into NixOS hosts, Colmena
-  metadata, netboot outputs, helper applications, and an offline installer.
+- `lib.mkLab` turns a typed site configuration into NixOS hosts (one system
+  per class of identical client computers, [ADR 0033](adr/0033-client-classes.md)),
+  netboot outputs, helper applications, and an offline installer.
 - `labMeta` is a versioned, non-secret operational interface. Shell helpers
   consume it through Nix evaluation instead of parsing Nix source.
 - `deploymentStatus` reports configuration blockers without making the
@@ -308,8 +309,13 @@ computer.
 execution boundary. It repeats the plan checks before execution and after the
 build, asks `Continue? [y/N]` (or takes the explicit
 automation-only `--yes`), and constructs fixed argument arrays that build each selected
-computer's system once with `nix build`, copy it with `nix-copy-closure`, and
-start its activation in a service on the computer. A per-administrator
+computer's system once with `nix build` (computers of one class share one
+system, so it is built once for the class), copy it with `nix-copy-closure`, and
+start its activation in a service on the computer. Before a computer is
+switched to a shared system, the engine writes its identity record
+(`/var/lib/nixorium/identity.json`, only its number) over SSH; a record that
+names another computer leaves the computer unchanged, and verification of a
+shared system requires the number the computer reports. A per-administrator
 non-blocking lock prevents overlapping Nixorium deploys. Output is streamed and
 duplicated to a no-follow, mode-0600 operation log under the XDG state
 directory. After every apply attempt, the application reuses the bounded
@@ -319,8 +325,8 @@ revision. Reports distinguish preflight, build, apply, verify, and complete
 phases. Apply success is partial until all targets are verified and recorded;
 an apply failure remains failed while still preserving independently verified
 hosts. Retrying is convergent: it requires a fresh valid review and rebuilds
-before applying again. The flake's `colmena` output is still generated, but
-Nixorium no longer uses it.
+before applying again. The flake has no `colmena` output; Nixorium builds and
+applies the systems itself (ADR 0031).
 
 `shutdown plan --on` and `restart plan --on` accept the same explicit client selector grammar as
 deployment but never permits the controller. It observes TCP reachability,
@@ -1242,3 +1248,4 @@ The following decisions are recorded separately:
 - [ADR-0023: reviewed recovery of interrupted operations](adr/0023-reviewed-recovery-of-interrupted-operations.md)
 - [ADR-0024: encrypted controller backups](adr/0024-encrypted-controller-backups.md)
 - [ADR-0026: proportionate confirmation for recovery](adr/0026-proportionate-confirmation-for-recovery.md)
+- [ADR-0033: one system per class of identical client computers](adr/0033-client-classes.md)

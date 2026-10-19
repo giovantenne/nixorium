@@ -99,9 +99,11 @@ controller activation. Annual quota exhaustion requires renewal or a manual
 agreement. Its availability does not expand this external agent's proposal-only
 authority. Do not drive
 its activation, consent, save or recovery confirmations. Host-specific private
-modules that branch on networking.hostName must declare their exceptional
-hosts in hostModules or updateValidationHosts for representative evaluation;
-identifying a missing declaration is a handoff, not permission to edit it.
+modules that branch on networking.hostName, or use hostName or hostIp, must have
+their exceptional hosts in hostModules or updateValidationHosts: identical
+client computers share one system, where those two arguments stop the
+evaluation with a clear error. Identifying a missing declaration is a handoff,
+not permission to edit it.
 `groupModules` associates common modules with existing clientGroups and preserves
 software/interface distinctions; membership alone does not prove arbitrary Nix
 code equivalent. This hook does not expand this external agent's authority.

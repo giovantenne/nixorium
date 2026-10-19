@@ -51,7 +51,7 @@ lib/
   eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
   eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
   eval-workspace-profile.nix # Internal student preference JSON validator
-  mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
+  mk-lab.nix               # Host, class, netboot, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
 pkgs/
@@ -241,7 +241,8 @@ that release's notes, so a release is not finished until the site follows it.
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `groupModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
-- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
+- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`, with the controller defined separately.
+- Clients of one class (`nixoriumHostClasses`: same module groups, managed software and interface; the controller, `hostModules` hosts and `updateValidationHosts` are classes of one) share one system (ADR 0033). A class of one keeps the per-host system and is named after its computer; a class with several members is `shared-<n>` (`classIdFor`), and `nixosConfigurations.pcNN` is an alias of it. `labSettings.clientIdentities` carries number, name, address and previous address of every client; `labMeta.clients.hosts[].class` and `labMeta.clients.classes` list the classes; modules receive `nixoriumClass`. In a shared system `hostName` and `hostIp` throw: a private module that needs them must be listed in `hostModules` or `updateValidationHosts`. A computer takes its name and laboratory address from `/var/lib/nixorium/identity.json` (`{"schemaVersion":1,"number":N}`, `modules/identity.nix`); the update and the installers write it, a record naming another computer is never overwritten, and the flake has no `colmena` output.
 - Hostname, static IP, and effective network interface are centralized in
   `lib/mk-lab.nix`. `ifaceName` is the compatibility fallback;
   `controllerIfaceName`, `clientIfaceName`, and `hostIfaceNames` resolve in
@@ -291,10 +292,9 @@ that release's notes, so a release is not finished until the site follows it.
   key revocation as unconfirmed. Consumed review tokens, any remote receipt,
   uncertain dispatch, and reboot evidence forbid this path; never reuse the
   old authorization or accept a replacement identity for recovery.
-- Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
-  Colmena receives them only as per-node `meta.nodeSpecialArgs`: its global
-  `meta.specialArgs` overrides node `_module.args`, so never put host-resolved
-  values (interface, address, software) there.
+- Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`, `nixoriumClass`) to modules that need them.
+  Never put host-resolved values (interface, address, software) in global
+  arguments; `specialArgsForHost` and `specialArgsForClass` resolve them per system.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - Guided software changes use `software catalog`, `software plan`, and
@@ -365,7 +365,7 @@ that release's notes, so a release is not finished until the site follows it.
   starts once local account credentials or laboratory private keys exist.
 - Inventory/package discovery must remain independent of host module evaluation.
   Keep workspace prerequisite guards on readiness, validators, configurations,
-  Colmena and individual app/package entries; Nix probes package namespaces even
+  and individual app/package entries; Nix probes package namespaces even
   when reading top-level metadata. Group a controller preflight into one fresh
   evaluation, never a cached authorization. Repeat live revision, activation
   receipt and system checks before/after apply. Update candidate builds share
@@ -1008,7 +1008,7 @@ Use only the arguments the module actually needs:
 | File names       | kebab-case       | `home-reset.nix`, `install-controller.sh`   |
 | Shell variables  | UPPER_SNAKE_CASE | `PC_NUMBER`, `TEMPLATE_DIR`                 |
 | NixOS options    | Standard dotted  | `services.openssh.enable`                   |
-| Helper functions | `mk` prefix      | `mkHost`, `mkColmenaHost`                   |
+| Helper functions | `mk` prefix      | `mkHost`, `mkLab`                           |
 
 ### Imports
 - Flake uses root-relative: `./modules/networking.nix`, `./modules/cache.nix`
@@ -1094,7 +1094,9 @@ set -euo pipefail
 ## Host Configuration
 
 Hostname + static IP are generated in `lib/mk-lab.nix` from the IPv4 network,
-CIDR prefix, and host offset. Interface resolution uses host, role, then shared
+CIDR prefix, and host offset. In a shared class system they are not evaluated
+into the system: they come from the computer's identity record at activation
+(ADR 0033). Interface resolution uses host, role, then shared
 fallback settings in `lib/mk-lab.nix`; `modules/networking.nix` applies the
 resolved interface.
 
