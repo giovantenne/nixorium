@@ -41,10 +41,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   installation, builds it once instead of once for every computer. Each
   computer keeps its own name and laboratory address from a small identity
   record, `/var/lib/nixorium/identity.json`, that the update or the installer
-  writes before the computer starts its new system. A computer without a
-  valid record shows "This computer has no Nixorium identity"; updating it from
-  the controller writes the record again, and an update never overwrites a
-  record that names another computer.
+  writes before the computer starts its new system. An update writes a
+  damaged record again and never overwrites a valid record that names
+  another computer. A computer without a valid record has no laboratory
+  address and shows "This computer has no Nixorium identity": the fix starts
+  at that computer (see the troubleshooting guide).
 - A private module that uses a computer's name or address (`hostName` or
   `hostIp`) now needs that computer listed in `hostModules` or
   `updateValidationHosts`; otherwise the evaluation stops with a message that
