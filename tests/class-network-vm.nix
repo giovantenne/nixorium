@@ -103,6 +103,7 @@ in
       show(a)
       assert a.succeed("hostname").strip() == "pc01"
       assert a.succeed("hostnamectl hostname").strip() == "pc01"
+      assert a.succeed("cat /etc/hostname").strip() == "pc01"
       a.succeed("getent hosts pc01")
       a.succeed("grep -Fx NIXORIUM_HOST_NUMBER=1 ${env}")
       a.succeed("systemctl is-active nixorium-identity.service")
@@ -125,6 +126,7 @@ in
       show(b)
       controller.wait_until_succeeds(ssh + "root@10.0.0.2 true", timeout=90)
       assert controller.succeed(ssh + "root@10.0.0.2 hostname").strip() == "pc02"
+      b.succeed("test ! -L /etc/hostname && grep -Fx pc02 /etc/hostname")
       b.wait_until_succeeds("nmcli -t -f NAME,DEVICE connection show --active | grep -Fx 'nixorium-lab:eth1'", timeout=60)
       b.fail("systemctl cat network-addresses-eth1.service")
       b.succeed("test -z \"$(systemctl --failed --no-legend)\"")

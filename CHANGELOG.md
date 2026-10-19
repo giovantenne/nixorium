@@ -62,6 +62,16 @@ The project follows [Semantic Versioning](https://semver.org/).
   be done. Update plans, the troubleshooting guide and the interrupted-update
   message also use plainer words and no longer mention the old deployment tool.
 
+### Upgrade notes
+
+- Deployments created before 3.9.0 have a `modules/workstation.nix` that
+  finds the controller by comparing `hostName`. Computers that share a
+  configuration have no single name, so that test now stops the evaluation
+  with a message that says what to do: replace the line
+  `isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);`
+  with `isController = args.isController or false;`, save, then update
+  Nixorium again.
+
 ## [3.9.0] - 2026-10-19
 
 ### Added

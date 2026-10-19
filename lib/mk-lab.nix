@@ -277,7 +277,7 @@ let
   specialArgsForClass = class:
     let
       members = builtins.concatStringsSep ", " class.members;
-      unknown = what: throw "${what} is not known in the configuration shared by ${members}; give the computer that needs it its own configuration with hostModules or updateValidationHosts";
+      unknown = what: throw "${what} is not known in the configuration shared by ${members}. A module that only tests whether it runs on the controller should use isController (in modules/workstation.nix of deployments created before 3.9.0, replace the hostName comparison with: isController = args.isController or false;); a module that needs the computer's own name or address needs its own configuration with hostModules or updateValidationHosts";
     in
     specialArgsForHost class.representative null // {
       hostName = unknown "hostName";

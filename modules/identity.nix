@@ -56,7 +56,10 @@ let
     else
       number=$recorded
       ${writeEnvironment}
-      # The running name; DHCP never changes it (modules/networking.nix).
+      # The computer's name, read by systemd at boot, and the running name;
+      # DHCP never changes it (modules/networking.nix).
+      ${coreutils}/rm -f /etc/hostname
+      printf '%s\n' "$name" > /etc/hostname
       printf '%s\n' "$name" > /proc/sys/kernel/hostname
     fi
   '';
@@ -64,7 +67,8 @@ in
 {
   config = lib.mkIf (laboratoryEnabled && !isController) {
     system.activationScripts.nixoriumIdentity = {
-      deps = [ "specialfs" ];
+      # After /etc is set up: a shared system writes /etc/hostname itself.
+      deps = [ "specialfs" "etc" ];
       text = if shared then sharedScript else perHost;
     };
     # The visible failure of a shared system without a valid record: no

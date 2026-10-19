@@ -38,7 +38,14 @@ let
   };
 in
 {
-  networking.hostName = if shared then "" else hostName;
+  # A shared system has no single name. Services that write the configured
+  # name into their own files (Apache's ServerName, for example) need a valid
+  # one, so the configuration carries a placeholder; the computer's real name
+  # is set at activation in /etc/hostname and the kernel (modules/identity.nix),
+  # and mDNS announces that real name.
+  networking.hostName = if shared then "nixorium-client" else hostName;
+  environment.etc.hostname.enable = lib.mkIf shared (lib.mkForce false);
+  services.avahi.hostName = lib.mkIf shared (lib.mkDefault "");
   system.name = lib.mkIf shared "nixorium-client-${nixoriumClass.id}";
   # Controller-only bootstrap uses NetworkManager, without a speculative lab IP.
   networking.interfaces = lib.mkIf (laboratoryEnabled && !profile) {

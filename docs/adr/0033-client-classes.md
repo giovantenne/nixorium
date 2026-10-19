@@ -43,7 +43,12 @@ from a small record on its own disk.
   computer its own configuration with `hostModules` or
   `updateValidationHosts`. A private module that needs a computer's name or
   address therefore stops the evaluation instead of silently using the
-  representative's.
+  representative's. `config.networking.hostName` is the placeholder
+  `nixorium-client`, because NixOS services such as Apache write the
+  configured name into their own files and fail on an empty one; the
+  computer's real name is written to `/etc/hostname` and the kernel at
+  activation, and mDNS announces the real name. (Found on the first live
+  migration: Apache refused `ServerName` with no argument.)
 - **Identity record.** `/var/lib/nixorium/identity.json` holds only
   `{"schemaVersion":1,"number":N}`. Name and addresses follow from the number
   and the inventory in the system, so a change of network changes no record.

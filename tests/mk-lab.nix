@@ -550,7 +550,9 @@ assert classesLab.labMeta.clients.classes == [
   { id = "pc03"; shared = false; members = [ "pc03" ]; }
 ];
 assert map (host: host.class) (lib.take 4 classesLab.labMeta.clients.hosts) == [ "shared-1" "shared-1" "pc03" "shared-1" ];
-assert classesLab.nixosConfigurations.pc01.config.networking.hostName == "";
+assert classesLab.nixosConfigurations.pc01.config.networking.hostName == "nixorium-client";
+assert !classesLab.nixosConfigurations.pc01.config.environment.etc.hostname.enable;
+assert classesLab.nixosConfigurations.pc01.config.services.avahi.hostName == "";
 assert classesLab.nixosConfigurations.pc01.config.networking.networkmanager.settings.main.hostname-mode == "none";
 assert classesLab.nixosConfigurations.pc01.config.systemd.services ? nixorium-identity;
 assert classesLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.dad-timeout == "3000";
