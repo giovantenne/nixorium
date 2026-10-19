@@ -14,6 +14,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 - The keyboard help (F1 or `?`) now shows the address for questions and
   feedback, hello@nixorium.org.
 
+### Changed
+
+- The log of **Update computers** shows when each step started and how long it
+  took, with the total time at the end, so it is clear where an update spends
+  its time.
+
 ### Fixed
 
 - Reviewing an interrupted update of the student computers no longer waits

@@ -289,3 +289,70 @@ func TestDeploymentExecuteReportsHistoryWriteFailureAfterSuccessfulApply(t *test
 		t.Fatalf("history failure report = %+v", report)
 	}
 }
+
+// steppingClock returns a clock that advances one second on every call, so the
+// log text depends only on how many times the manager reads the clock.
+func steppingClock() func() time.Time {
+	at := time.Date(2026, 10, 19, 8, 0, 0, 0, time.UTC)
+	return func() time.Time {
+		at = at.Add(time.Second)
+		return at
+	}
+}
+
+func TestDeploymentLogTimesEveryStep(t *testing.T) {
+	source := readyDeploymentSource()
+	manager := NewDeploymentManager(source)
+	manager.now = steppingClock()
+	log := &bytes.Buffer{}
+	report := manager.Execute(context.Background(), "/deployment", "pc01", source.revision, "", log)
+	if report.State != "completed" {
+		t.Fatalf("report = %+v", report)
+	}
+	for _, want := range []string{
+		"==> Reviewing the selected computers (2026-10-19T08:00:01Z)\n    Reviewing took 1s\n",
+		"==> Building selected configurations with Colmena (2026-10-19T08:00:03Z)\n",
+		"    Building took 1s\n",
+		"\n==> Revalidating the reviewed revision and targets (2026-10-19T08:00:05Z)\n    Revalidating took 1s\n",
+		"\n==> Applying the built configurations with Colmena (2026-10-19T08:00:07Z)\n",
+		"    Applying took 1s\n",
+		"\n==> Verifying selected computers through authenticated host state (2026-10-19T08:00:09Z)\n",
+		// The verification step also reads the clock once to stamp the record.
+		"    Verifying took 2s\n",
+		"\nTotal time: 11s\n",
+	} {
+		if !strings.Contains(log.String(), want) {
+			t.Errorf("log lacks %q:\n%s", want, log.String())
+		}
+	}
+	if !strings.HasSuffix(log.String(), "\nTotal time: 11s\n") {
+		t.Errorf("total is not the last line:\n%s", log.String())
+	}
+	t.Log("\n" + log.String())
+}
+
+func TestDeploymentLogTimesFailedBuildWithoutApply(t *testing.T) {
+	source := readyDeploymentSource()
+	source.runErrors = map[domain.DeploymentPhase]error{domain.DeploymentPhaseBuild: errors.New("fixture failure")}
+	manager := NewDeploymentManager(source)
+	manager.now = steppingClock()
+	log := &bytes.Buffer{}
+	report := manager.Execute(context.Background(), "/deployment", "pc01", source.revision, "", log)
+	if report.State != "failed" || report.BuildCompleted {
+		t.Fatalf("report = %+v", report)
+	}
+	for _, want := range []string{
+		"==> Building selected configurations with Colmena (2026-10-19T08:00:03Z)\n",
+		"    Building took 1s\n",
+		"\nTotal time: 4s\n",
+	} {
+		if !strings.Contains(log.String(), want) {
+			t.Errorf("log lacks %q:\n%s", want, log.String())
+		}
+	}
+	for _, unwanted := range []string{"Applying", "Revalidating", "Verifying"} {
+		if strings.Contains(log.String(), unwanted) {
+			t.Errorf("log mentions %q after a failed build:\n%s", unwanted, log.String())
+		}
+	}
+}

@@ -32,7 +32,9 @@ func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, 
 }
 
 func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository, requested, expectedRevision, logPath string, output io.Writer, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+	startedAt := m.now().UTC()
 	plan := m.Plan(ctx, repository, requested)
+	reviewedAt := m.now().UTC()
 	report := executionFromPlan(plan, logPath)
 	if plan.HasErrors() {
 		return report
@@ -54,8 +56,14 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Activity: fmt.Sprintf("Building configurations for %d selected computer(s)", len(report.Targets)),
 	})
 	fmt.Fprintf(output, "Deployment revision: %s\nTargets: %s\n\n", report.Revision, report.ColmenaSelector)
-	fmt.Fprintln(output, "==> Building selected configurations with Colmena")
-	if err := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4}, output, observe); err != nil {
+	timing := deploymentTiming{now: m.now, output: output}
+	timing.heading("==> Reviewing the selected computers", startedAt)
+	timing.took("Reviewing", startedAt, reviewedAt)
+	defer func() { timing.total(startedAt) }()
+	timing.begin("==> Building selected configurations with Colmena")
+	err := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4}, output, observe)
+	timing.end("Building")
+	if err != nil {
 		report.State = "failed"
 		report.Message = fmt.Sprintf("build failed before any deployment was started: %v", err)
 		return report
@@ -66,7 +74,9 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Activity: "Build completed; revalidating the reviewed revision and targets",
 	})
 
+	timing.begin("\n==> Revalidating the reviewed revision and targets")
 	verified := m.Plan(ctx, repository, requested)
+	timing.end("Revalidating")
 	if verified.HasErrors() {
 		report.State = "failed"
 		report.Phase = domain.DeploymentPhasePreflight
@@ -86,13 +96,14 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4,
 		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(report.Targets)),
 	})
-	fmt.Fprintln(output, "\n==> Applying the built configurations with Colmena")
+	timing.begin("\n==> Applying the built configurations with Colmena")
 	// Apply over the addresses that answered just now: during a change of
 	// laboratory network a computer not yet moved is reached on its
 	// previous address.
 	applyPlan := plan
 	applyPlan.Availability = verified.Availability
 	applyErr := m.runPhase(ctx, applyPlan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4}, output, observe)
+	timing.end("Applying")
 	var unconfirmed *domain.DeploymentUnconfirmedError
 	report.RecoveryRequired = errors.As(applyErr, &unconfirmed)
 	report.RetrySafe = !report.RecoveryRequired
@@ -103,9 +114,10 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
 		TargetTotal: len(report.Targets), Activity: "Verifying authenticated client state",
 	})
-	fmt.Fprintln(output, "\n==> Verifying selected computers through authenticated host state")
+	timing.begin("\n==> Verifying selected computers through authenticated host state")
 	// Local cancellation must not skip the separately time-bounded observations.
 	recordErr := m.verifySuccessfulDeployments(context.WithoutCancel(ctx), &report, output, observe)
+	timing.end("Verifying")
 	if applyErr != nil {
 		report.State = "failed"
 		report.Phase = domain.DeploymentPhaseApply
@@ -139,6 +151,37 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Activity: "Deployment completed and authenticated state was recorded",
 	})
 	return report
+}
+
+// deploymentTiming writes the start time of each step of a client update and
+// how long it took into the private deployment log, using the manager clock.
+type deploymentTiming struct {
+	now     func() time.Time
+	output  io.Writer
+	started time.Time
+}
+
+// begin writes a heading followed by the UTC start time.
+func (t *deploymentTiming) begin(heading string) {
+	t.started = t.now().UTC()
+	t.heading(heading, t.started)
+}
+
+// end writes how long the step started by begin took.
+func (t *deploymentTiming) end(phase string) {
+	t.took(phase, t.started, t.now().UTC())
+}
+
+func (t *deploymentTiming) heading(heading string, at time.Time) {
+	fmt.Fprintf(t.output, "%s (%s)\n", heading, at.Format(time.RFC3339))
+}
+
+func (t *deploymentTiming) took(phase string, started, ended time.Time) {
+	fmt.Fprintf(t.output, "    %s took %s\n", phase, ended.Sub(started).Round(time.Second))
+}
+
+func (t *deploymentTiming) total(started time.Time) {
+	fmt.Fprintf(t.output, "\nTotal time: %s\n", t.now().UTC().Sub(started).Round(time.Second))
 }
 
 func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, report *domain.DeploymentExecutionReport, output io.Writer, observe func(domain.DeploymentProgress)) error {
