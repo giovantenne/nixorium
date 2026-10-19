@@ -16,14 +16,11 @@ const (
 	ResetRecoveryRestore        = "restore"         // mixed state; restore the original files
 )
 
-// ResetRecoveryConfirmation finishes the reset; RestoreConfirmation returns to
-// the configuration from before the reset. The plan keeps both in its JSON
-// for compatibility, but only RESTORE is typed: the other cases change no
-// file and are confirmed with Enter or a yes/no answer (ADR 0026).
-const (
-	ResetRecoveryConfirmation = "RECOVERED"
-	ResetRestoreConfirmation  = "RESTORE"
-)
+// ResetRestoreConfirmation returns to the configuration from before the
+// reset. It is the only typed word of this recovery: the other cases change
+// no file and are confirmed with Enter or a yes/no answer (ADR 0026), so
+// their plans carry no confirmation word.
+const ResetRestoreConfirmation = "RESTORE"
 
 type TemplateResetRecoveryPlan struct {
 	SchemaVersion int               `json:"schemaVersion"`

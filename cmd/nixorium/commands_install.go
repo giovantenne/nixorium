@@ -194,14 +194,14 @@ func runInteractiveRemoteInstallAction(ctx context.Context, action, operationID 
 		return 1
 	}
 	presentation.RemoteInstallResponseText(terminal, status)
-	word := "REBOOT"
+	word, question := "", "Reboot this computer now?"
 	operation := domain.RemoteInstallRebootOperation
 	if action == "usb-close" {
 		operation = domain.RemoteInstallCloseOperation
 		fmt.Fprintln(terminal, presentation.RemoteInstallCloseExplanation(status))
 		// A record that never reached the disk closes with yes/no; after a
 		// possible disk change CLOSE is typed (ADR 0026).
-		word = ""
+		question = "Close this record?"
 		if presentation.RemoteInstallCloseNeedsWord(status) {
 			word = "CLOSE"
 		}
@@ -209,7 +209,7 @@ func runInteractiveRemoteInstallAction(ctx context.Context, action, operationID 
 	reader := bufio.NewReaderSize(terminal, 4096)
 	var approved bool
 	if word == "" {
-		approved, err = presentation.ConfirmYesNo(reader, terminal, "Close this record?")
+		approved, err = presentation.ConfirmYesNo(reader, terminal, question)
 	} else {
 		approved, err = confirmRemoteInstall(reader, terminal, word)
 	}

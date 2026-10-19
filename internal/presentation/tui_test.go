@@ -147,7 +147,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 			return domain.SoftwareChangePlanReport{
 				SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready",
 				Repository: "/deployment", ManagedFile: "lab-software.json", Request: request,
-				AffectedClients: catalog.Clients, ReviewToken: "sha256:abcdef0123456789", Confirmation: "SAVE",
+				AffectedClients: catalog.Clients, ReviewToken: "sha256:abcdef0123456789",
 			}
 		},
 		SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
@@ -660,7 +660,7 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 			},
 			PlanSoftware: func(ctx context.Context, candidate domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 				request = candidate
-				return domain.SoftwareChangePlanReport{State: "ready", Request: candidate, Confirmation: "SAVE"}
+				return domain.SoftwareChangePlanReport{State: "ready", Request: candidate}
 			},
 		},
 	}
@@ -772,7 +772,7 @@ func TestCompletedSetupOpensGenericNetworkInstallation(t *testing.T) {
 	}
 }
 
-func TestSetupRequiresExplicitConfirmationToLeavePXEActive(t *testing.T) {
+func TestSetupAsksForEnterToLeavePXEActive(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("active"), setupMode: true, screen: dashboardPXE}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
@@ -780,19 +780,19 @@ func TestSetupRequiresExplicitConfirmationToLeavePXEActive(t *testing.T) {
 		t.Fatalf("active PXE quit did not open consequence review:\n%s", model.View().Content)
 	}
 
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "leave pxe active"})
-	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command != nil || !strings.Contains(model.View().Content, "Confirmation did not match") {
-		t.Fatal("inexact leave confirmation quit the TUI")
+	if view := model.View().Content; !strings.Contains(view, "Enter closes Nixorium and leaves installation mode active") || strings.Contains(view, "Type LEAVE") {
+		t.Fatalf("leave review does not say what Enter does:\n%s", view)
 	}
-
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "LEAVE"})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardPXE {
+		t.Fatal("Esc did not keep Nixorium open")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
 	_, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if command == nil {
-		t.Fatal("exact leave confirmation did not quit")
+		t.Fatal("Enter on the leave review did not quit")
 	}
 }
 
@@ -939,7 +939,7 @@ func TestReinstallReviewsConsequencesBeforeLeavingPXEActive(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("active"), screen: dashboardPXE}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
-	if command != nil || model.screen != dashboardPXELeaveReview || !strings.Contains(model.View().Content, "Type LEAVE to continue") {
+	if command != nil || model.screen != dashboardPXELeaveReview || !strings.Contains(model.View().Content, "Enter closes Nixorium") {
 		t.Fatalf("reinstall quit bypassed the active-PXE review:\n%s", model.View().Content)
 	}
 }
@@ -1025,8 +1025,9 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 		t.Fatalf("planned = %q, screen = %d:\n%s", planned, model.screen, model.View().Content)
 	}
 
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "DEPLOY"})
-	model = updated.(dashboardModel)
+	if view := model.View().Content; !strings.Contains(view, "Enter updates these computers.") || strings.Contains(view, "Type DEPLOY") || !strings.Contains(view, "Update computers") {
+		t.Fatalf("the review does not say what Enter does:\n%s", view)
+	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || !model.deployment.applying || !strings.Contains(model.View().Content, "Closing is disabled") {
@@ -1424,7 +1425,7 @@ func TestDashboardRefusesOlderThanRunningVersionPlanOnMasterPins(t *testing.T) {
 func TestDashboardRefusesNixoriumDowngradeBeforeReview(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	updated, command := model.Update(dashboardUpdatePlanMsg{report: domain.UpdatePlanReport{
-		State: "ready", Target: "v3.1.1", Downgrade: true, Confirmation: "DOWNGRADE",
+		State: "ready", Target: "v3.1.1", Downgrade: true,
 	}})
 	model = updated.(dashboardModel)
 	if command != nil || model.screen != dashboardUpdate || !strings.Contains(model.message, "downgrades are not available") {
@@ -1773,17 +1774,15 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View().Content, "Type RESTART to continue") {
+	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View().Content, "Enter restarts the software cache") {
 		t.Fatalf("restart review missing:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "restart cache"})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command != nil || restarts != 0 || !strings.Contains(model.View().Content, "did not match") {
-		t.Fatalf("inexact restart was accepted: restarts=%d", restarts)
+	if command != nil || restarts != 0 || model.screen != dashboardServices {
+		t.Fatalf("cancelled restart changed something: restarts=%d screen=%d", restarts, model.screen)
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "RESTART"})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
@@ -1895,7 +1894,6 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 	revision := strings.Repeat("a", 40)
 	token := "sha256:" + strings.Repeat("b", 64)
-	confirmation := "COMMIT"
 	applied := 0
 	review := domain.GitReviewReport{
 		Operation: "git-review",
@@ -1912,7 +1910,7 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 			if paths != "lab-settings.json" {
 				t.Fatalf("planned paths = %q", paths)
 			}
-			return domain.GitCommitPlanReport{Operation: "git-commit-plan", State: "ready", Revision: revision, Paths: []string{"lab-settings.json"}, ReviewToken: token, CommitMessage: "chore: update laboratory settings", Confirmation: confirmation, Diff: domain.GitDiff{Content: "+settings\n"}}
+			return domain.GitCommitPlanReport{Operation: "git-commit-plan", State: "ready", Revision: revision, Paths: []string{"lab-settings.json"}, ReviewToken: token, CommitMessage: "chore: update laboratory settings", Diff: domain.GitDiff{Content: "+settings\n"}}
 		},
 		ApplyGitCommit: func(plan domain.GitCommitPlanReport) domain.GitCommitReport {
 			applied++
@@ -1940,11 +1938,9 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardGitCommitReview || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No hooks, signing actions, remote operations, or push") {
+	if model.screen != dashboardGitCommitReview || !strings.Contains(model.View().Content, "Enter saves these changes as one local commit.") || strings.Contains(model.View().Content, "Type COMMIT") || !strings.Contains(model.View().Content, "No hooks, signing actions, remote operations, or push") {
 		t.Fatalf("commit review missing:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "COMMIT"})
-	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
@@ -2038,7 +2034,7 @@ func TestSelectedDeploymentTargetsPreservesInventoryOrder(t *testing.T) {
 	}
 }
 
-func TestDashboardPXEStartRequiresExactTypedConfirmation(t *testing.T) {
+func TestDashboardPXEStartIsConfirmedWithEnter(t *testing.T) {
 	starts := 0
 	actions := DashboardActions{
 		Refresh: func(ctx context.Context) (domain.StatusReport, error) { return testDashboardReport("active"), nil },
@@ -2066,16 +2062,20 @@ func TestDashboardPXEStartRequiresExactTypedConfirmation(t *testing.T) {
 		t.Fatalf("start review not shown:\n%s", model.View().Content)
 	}
 
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "start pxe"})
-	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command != nil || starts != 0 || !strings.Contains(model.View().Content, "did not match") {
-		t.Fatalf("inexact confirmation started PXE: starts=%d", starts)
+	if view := model.View().Content; !strings.Contains(view, "Enter starts network installation mode.") || strings.Contains(view, "Type START") || !strings.Contains(view, "Start PXE") {
+		t.Fatalf("start review does not say what Enter does:\n%s", view)
 	}
-
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "START"})
+	// Esc cancels without touching the network.
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	model = updated.(dashboardModel)
+	if command != nil || starts != 0 || model.screen != dashboardPXE {
+		t.Fatalf("cancelled start changed something: starts=%d screen=%d", starts, model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "s"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
@@ -2085,23 +2085,21 @@ func TestDashboardPXEStartRequiresExactTypedConfirmation(t *testing.T) {
 	}
 }
 
-func TestDashboardPXEConfirmationRejectsLegacyMultiwordInput(t *testing.T) {
-	model := dashboardModel{screen: dashboardPXEStartReview}
-	for _, key := range []tea.KeyPressMsg{
-		{Text: "START"},
-		{Code: tea.KeySpace},
-		{Text: "PXE"},
-	} {
+func TestDashboardPXEStartReviewIgnoresTypedWords(t *testing.T) {
+	starts := 0
+	model := dashboardModel{screen: dashboardPXEStartReview, actions: DashboardActions{
+		StartPXE: func() domain.PXELifecycleReport { starts++; return domain.PXELifecycleReport{Message: "PXE active"} },
+	}}
+	for _, key := range []tea.KeyPressMsg{{Text: "START"}, {Code: tea.KeySpace}, {Text: "PXE"}} {
 		updated, _ := model.Update(key)
 		model = updated.(dashboardModel)
 	}
-	if model.confirmation != "START PXE" {
-		t.Fatalf("terminal confirmation = %q, want legacy phrase to remain unaccepted", model.confirmation)
+	if model.confirmation != "" || starts != 0 || model.screen != dashboardPXEStartReview {
+		t.Fatalf("typed text was kept or acted on: confirmation=%q starts=%d", model.confirmation, starts)
 	}
-	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command != nil || model.confirmation != "" || !strings.Contains(model.message, "did not match") {
-		t.Fatal("legacy multiword PXE confirmation was accepted")
+	_, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("Enter did not start the reviewed PXE mode")
 	}
 }
 

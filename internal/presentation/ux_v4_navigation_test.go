@@ -44,7 +44,7 @@ func TestActivePXEExitUsesOneGlobalReview(t *testing.T) {
 				t.Fatalf("exit bypassed active-PXE review: screen=%d", model.screen)
 			}
 			view := model.View().Content
-			if !strings.Contains(view, "Stop installation mode") || !strings.Contains(view, "Type LEAVE to continue") {
+			if !strings.Contains(view, "Stop installation mode") || !strings.Contains(view, "Enter closes Nixorium") {
 				t.Fatalf("exit choices are incomplete:\n%s", view)
 			}
 		})
@@ -55,12 +55,11 @@ func TestActivePXELeaveReviewCannotBeBypassedWithControlC(t *testing.T) {
 	model := experienceFixture(2)
 	model.report.PXE.Mode = "active"
 	model.screen = dashboardPXELeaveReview
-	model.confirmation = "LEAV"
 
 	updated, command := model.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	model = updated.(dashboardModel)
-	if command != nil || model.screen != dashboardPXELeaveReview || model.confirmation != "LEAV" {
-		t.Fatalf("control-c bypassed protected PXE exit: screen=%d confirmation=%q", model.screen, model.confirmation)
+	if command != nil || model.screen != dashboardPXELeaveReview {
+		t.Fatalf("control-c bypassed protected PXE exit: screen=%d", model.screen)
 	}
 }
 
@@ -121,7 +120,7 @@ func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 	model.software.catalog = testSoftwareCatalogReport()
 	model.software.cursor = 1
 	model.actions.PlanSoftware = func(ctx context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
-		return domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "REMOVE"}
+		return domain.SoftwareChangePlanReport{State: "ready", Request: request}
 	}
 
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -437,8 +436,8 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 	updated, _ = model.Update(planMessage)
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if model.screen != dashboardPXEStartReview || starts != 0 || !strings.Contains(view, "Temporarily remove 10.0.0.99/24") || !strings.Contains(view, "Type START to continue") || strings.Contains(view, "pilot") {
-		t.Fatalf("flow did not stop at the sole PXE confirmation: screen=%d starts=%d\n%s", model.screen, starts, view)
+	if model.screen != dashboardPXEStartReview || starts != 0 || !strings.Contains(view, "Temporarily remove 10.0.0.99/24") || !strings.Contains(view, "Enter starts network installation mode") || strings.Contains(view, "pilot") {
+		t.Fatalf("flow did not stop at the sole PXE review: screen=%d starts=%d\n%s", model.screen, starts, view)
 	}
 }
 

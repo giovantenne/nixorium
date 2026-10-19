@@ -13,7 +13,7 @@ import (
 // network. It shows the change in progress (or a form for a new one), reviews
 // each step in the recovery-review style (what was found, what happens,
 // confirm), saves it with Enter, and continues with the ordinary controller
-// and computer reviews, which keep their typed confirmations.
+// and computer reviews, which are confirmed with Enter as well.
 
 var networkChangeTask = dashboardTask{id: "network", shortcut: "n", title: "Change network addressing", description: "Move the computers and the controller to a new laboratory network, step by step", advanced: true}
 
@@ -237,7 +237,7 @@ func (model dashboardModel) networkChangeController() (tea.Model, tea.Cmd) {
 }
 
 // openNetworkChangeDeployment opens Update computers with every computer
-// selected; its review and DEPLOY confirmation stay unchanged.
+// selected; its review and Enter confirmation stay unchanged.
 func (model dashboardModel) openNetworkChangeDeployment() (tea.Model, tea.Cmd) {
 	if model.actions.LoadInventory == nil || model.actions.PlanDeployment == nil {
 		model.message = "Computer deployment is unavailable in this session."

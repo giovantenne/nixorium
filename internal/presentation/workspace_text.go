@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -83,16 +82,11 @@ func WorkspaceApplyText(writer io.Writer, report domain.WorkspaceApplyReport) {
 }
 
 func ConfirmWorkspace(input io.Reader, output io.Writer, report domain.WorkspacePlanReport) (bool, error) {
-	if report.HasErrors() || report.State != "ready" || report.Confirmation != "SAVE" {
+	if report.HasErrors() || report.State != "ready" {
 		return false, nil
 	}
 	WorkspacePlanText(output, report)
-	fmt.Fprint(output, "Type SAVE to write only workspace-profile.json: ")
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == "SAVE", nil
+	return ConfirmYesNo(input, output, "Write only workspace-profile.json?")
 }
 
 func workspaceProfileText(writer io.Writer, label string, profile domain.WorkspaceProfile) {

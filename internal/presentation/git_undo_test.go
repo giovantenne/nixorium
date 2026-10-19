@@ -18,9 +18,9 @@ func undoReadyPlan() domain.GitUndoPlanReport {
 			Files: []domain.GitUndoFile{{Path: "lab-software.json", Change: "modified"}, {Path: "modules/site.nix", Change: "added"}},
 		},
 		CommitMessage: "Undo: chore: update laboratory software\n\nThis reverts commit " + strings.Repeat("a", 40) + ".\n",
-		ReviewToken:   "sha256:token", Confirmation: "UNDO",
-		Diff:    domain.GitDiff{Scope: "undo-changes", Content: "-  \"packages\": [vlc]\n+  \"packages\": []"},
-		Impacts: domain.GitUndoImpacts(true),
+		ReviewToken:   "sha256:token",
+		Diff:          domain.GitDiff{Scope: "undo-changes", Content: "-  \"packages\": [vlc]\n+  \"packages\": []"},
+		Impacts:       domain.GitUndoImpacts(true),
 	}
 }
 
@@ -91,14 +91,14 @@ func TestGitUndoResultTextNamesTheFollowingSteps(t *testing.T) {
 	}
 }
 
-func TestGitUndoNeedsTheTypedWord(t *testing.T) {
-	for input, expected := range map[string]bool{"UNDO\n": true, "  UNDO  \n": true, "undo\n": false, "\n": false, "yes\n": false, "UNDO": true} {
+func TestGitUndoAsksYesNo(t *testing.T) {
+	for input, expected := range map[string]bool{"y\n": true, "yes\n": true, "  y  \n": true, "\n": false, "n\n": false, "UNDO\n": false} {
 		var output bytes.Buffer
 		approved, err := ConfirmGitUndo(strings.NewReader(input), &output, undoReadyPlan())
 		if err != nil || approved != expected {
 			t.Fatalf("input %q: approved = %t, err = %v", input, approved, err)
 		}
-		for _, line := range []string{"Last change: chore: update laboratory software (saved 2026-10-15 14:03)", "Files: lab-software.json, modules/site.nix", "Type UNDO to continue: "} {
+		for _, line := range []string{"Last change: chore: update laboratory software (saved 2026-10-15 14:03)", "Files: lab-software.json, modules/site.nix", "Continue? [y/N] "} {
 			if !strings.Contains(output.String(), line) {
 				t.Fatalf("confirmation lacks %q:\n%s", line, output.String())
 			}
@@ -106,7 +106,7 @@ func TestGitUndoNeedsTheTypedWord(t *testing.T) {
 	}
 	blocked := undoReadyPlan()
 	blocked.State = "blocked"
-	if approved, _ := ConfirmGitUndo(strings.NewReader("UNDO\n"), &bytes.Buffer{}, blocked); approved {
+	if approved, _ := ConfirmGitUndo(strings.NewReader("y\n"), &bytes.Buffer{}, blocked); approved {
 		t.Fatal("a blocked review was confirmed")
 	}
 }

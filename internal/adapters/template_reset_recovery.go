@@ -54,7 +54,6 @@ func (TemplateReset) PlanTemplateResetRecovery(ctx context.Context, repository s
 	}
 	plan.State = "ready"
 	plan.ExpiresAt = time.Now().UTC().Truncate(templateResetRecoveryWindow).Add(templateResetRecoveryWindow)
-	plan.Confirmation = domain.ResetRecoveryConfirmation
 	switch plan.Case {
 	case domain.ResetRecoveryFinished:
 		plan.Message = "The reset already completed; only its marker remains. Confirming clears the marker."

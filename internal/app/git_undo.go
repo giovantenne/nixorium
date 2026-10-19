@@ -121,7 +121,6 @@ func (m *GitUndoManager) plan(ctx context.Context, repository string) (domain.Gi
 	report.Diff = proposal.Diff
 	report.CommitMessage = gitUndoMessage(facts)
 	report.ReviewToken = gitUndoReviewToken(facts, proposal.TreeID, report.CommitMessage)
-	report.Confirmation = domain.GitUndoConfirmation
 	report.Impacts = domain.GitUndoImpacts(m.undoReachesClients(ctx, root, facts))
 	report.State = "ready"
 	return report, facts

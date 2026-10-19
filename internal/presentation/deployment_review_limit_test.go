@@ -23,7 +23,6 @@ func TestDeploymentReviewPlanUsesTheBuildReadLimit(t *testing.T) {
 	model = newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, actions, false)
 	model.screen = dashboardDeployReview
 	model.deployment.plan = plan
-	model.deployment.confirmation = "DEPLOY"
 	updated, command := model.Update(demoCode(tea.KeyF2))
 	if command == nil || updated.(dashboardModel).read.limit != dashboardBuildTimeout {
 		t.Fatalf("reachable-only plan limit is %v, want %v", updated.(dashboardModel).read.limit, dashboardBuildTimeout)

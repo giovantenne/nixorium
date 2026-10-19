@@ -146,7 +146,7 @@ func (model dashboardModel) gitUndoReviewWith(height int) string {
 	return model.renderShell(tuiShell{
 		path:      path,
 		body:      strings.Join(lines, "\n"),
-		fixedBody: tuiSection("Type "+plan.Confirmation+" to continue:", model.isDark) + "\n> " + model.confirmation + "_",
+		fixedBody: tuiSection("Enter saves a new change that puts these files back.", model.isDark),
 		notices:   notices,
 		actions:   []tuiAction{{key: "↑/↓/Pg", label: "Scroll"}, {key: "Enter", label: "Undo"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
 	})
@@ -244,19 +244,7 @@ func (model dashboardModel) updateGitUndoReviewKey(key tea.KeyPressMsg) (tea.Mod
 		if model.maintenance.gitScroll > maximum {
 			model.maintenance.gitScroll = maximum
 		}
-	case "backspace":
-		value := []rune(model.confirmation)
-		if len(value) > 0 {
-			model.confirmation = string(value[:len(value)-1])
-		}
-	case "space":
-		model.confirmation += " "
 	case "enter":
-		if model.confirmation != plan.Confirmation {
-			model.confirmation = ""
-			model.message = "Confirmation did not match; nothing was changed."
-			return model, nil
-		}
 		model.busy = "Revalidating and saving the undo of the last saved change"
 		model.confirmation = ""
 		model.message = ""
@@ -266,10 +254,6 @@ func (model dashboardModel) updateGitUndoReviewKey(key tea.KeyPressMsg) (tea.Mod
 			ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
 			defer cancel()
 			return dashboardGitUndoResultMsg{report: result, review: model.actions.LoadGitReview(ctx)}
-		}
-	default:
-		if key.Text != "" {
-			model.confirmation += key.Text
 		}
 	}
 	return model, nil

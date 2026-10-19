@@ -528,8 +528,8 @@ main() {
   echo
   echo "SUCCESS: ${SELECTED_HOST} is installed on ${SELECTED_DISK}."
   echo "Remove or deprioritize network boot so the machine starts from disk."
-  prompt_input "Type REBOOT to reboot now, or press Enter to remain in the installer: " REBOOT_CONFIRMATION || return 1
-  if [[ "$REBOOT_CONFIRMATION" == "REBOOT" ]]; then
+  prompt_input "Reboot now? [y/N] (Enter remains in the installer): " REBOOT_CONFIRMATION || return 1
+  if [[ "${REBOOT_CONFIRMATION,,}" == "y" || "${REBOOT_CONFIRMATION,,}" == "yes" ]]; then
     echo "Rebooting into ${SELECTED_HOST}..."
     reboot_system
   else

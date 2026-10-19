@@ -203,10 +203,8 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 		return softwarePlanIssue(report, "review", err.Error())
 	}
 	report.ReviewToken = domain.SoftwareReviewToken(report.BaseFingerprint, reviewData)
-	report.Confirmation = "SAVE"
 	action := "Add "
 	if !request.Present {
-		report.Confirmation = "REMOVE"
 		action = "Remove "
 	}
 	report.Message = action + item.Label + " in " + report.ManagedFile + "; no system has been built or changed."

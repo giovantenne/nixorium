@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"strings"
@@ -47,7 +46,6 @@ func GitUndoPlanText(writer io.Writer, report domain.GitUndoPlanReport) {
 			fmt.Fprintf(writer, "  - %s\n", impact.Detail)
 		}
 		fmt.Fprintf(writer, "Review token: %s\n", report.ReviewToken)
-		fmt.Fprintf(writer, "Confirmation: %s\n", report.Confirmation)
 	}
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "Blocked: %s\n", issue.Message)
@@ -76,7 +74,7 @@ func GitUndoResultText(writer io.Writer, report domain.GitUndoReport) {
 	}
 }
 
-// ConfirmGitUndo asks for the typed word after a summary of the reviewed undo.
+// ConfirmGitUndo asks a yes/no question after a summary of the reviewed undo.
 func ConfirmGitUndo(input io.Reader, output io.Writer, plan domain.GitUndoPlanReport) (bool, error) {
 	if plan.HasErrors() {
 		return false, nil
@@ -90,10 +88,5 @@ func ConfirmGitUndo(input io.Reader, output io.Writer, plan domain.GitUndoPlanRe
 	fmt.Fprintf(output, "Files: %s\n", strings.Join(paths, ", "))
 	fmt.Fprintf(output, "Action: save one new change, \"%s\", that puts these files back as they were before\n", plan.Title())
 	fmt.Fprintln(output, "Safety: the undone change stays in the history; no computer changes and nothing is pushed")
-	fmt.Fprintf(output, "Type %s to continue: ", plan.Confirmation)
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == plan.Confirmation, nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }

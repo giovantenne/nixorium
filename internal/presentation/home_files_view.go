@@ -123,7 +123,7 @@ func (model dashboardModel) homeFilesView() string {
 			start := min(m.scroll, max(0, len(wrapped)-capacity))
 			lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
 			lines = append(lines, fmt.Sprintf("Review lines %d–%d of %d", start+1, min(len(wrapped), start+capacity), len(wrapped)))
-			fixed = "Save and record the manifest and reviewed copies locally.\nType SAVE: " + m.confirmation + "_"
+			fixed = "Enter saves and records the manifest and reviewed copies locally."
 			label := "Save copies"
 			if m.plan.State == "unchanged" {
 				fixed = "Declarations unchanged; student homes were not checked."

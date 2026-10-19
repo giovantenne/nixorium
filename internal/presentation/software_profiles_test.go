@@ -272,7 +272,7 @@ func TestSoftwareDetailsChangeScopeAndControllerRemovalWarning(t *testing.T) {
 	var requests []domain.SoftwareChangeRequest
 	model.actions.PlanSoftware = func(_ context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 		requests = append(requests, request)
-		report := domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "SAVE", ManagedFile: "lab-software.json"}
+		report := domain.SoftwareChangePlanReport{State: "ready", Request: request, ManagedFile: "lab-software.json"}
 		if request.Scope.Kind == domain.SoftwareScopeShared {
 			report.AffectedController = "pc99"
 		}

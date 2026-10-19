@@ -14,7 +14,7 @@ func demoWorkspacePlan() domain.WorkspacePlanReport {
 	return domain.WorkspacePlanReport{
 		SchemaVersion: 1, Operation: "workspace-plan", State: "ready",
 		Repository: "/demo/lab", ManagedFile: domain.WorkspaceFileName,
-		Candidate: &candidate, ReviewToken: "sha256:synthetic-workspace", Confirmation: "SAVE",
+		Candidate: &candidate, ReviewToken: "sha256:synthetic-workspace",
 		Message: "Only the profile declaration will be saved. No commit, deployment or reset is included.",
 		Inspection: &domain.WorkspaceInspection{
 			Base:     &candidate,
@@ -84,7 +84,6 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 	r.key(demoCode(tea.KeyEnter))
 	r.command(r.key(demoText("v")))
 	r.capture("Review the declaration without activating a system", 2200)
-	r.typeAndCapture("SAVE", "Confirm the profile save and local record")
 	save := r.key(demoCode(tea.KeyEnter))
 	r.capture("Recheck before the atomic save", 900)
 	r.command(save)

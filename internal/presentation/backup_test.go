@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestGitBackupRequiresReviewAndConfirmationAndMasksSecrets(t *testing.T) {
+func TestGitBackupPushesOnEnterAfterReviewAndMasksSecrets(t *testing.T) {
 	calls := 0
 	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{PublishGitBackup: func(p domain.GitBackupPlan, pass []byte) domain.BackupReport {
 		calls++
@@ -31,14 +31,14 @@ func TestGitBackupRequiresReviewAndConfirmationAndMasksSecrets(t *testing.T) {
 	if strings.Contains(m.View().Content, "quiet passphrase!") {
 		t.Fatal("passphrase shown")
 	}
-	m.backup.repeat = append([]rune{}, m.backup.passphrase...)
-	m.backup.field = 2
+	m.backup.repeat = []rune("another passphrase")
+	m.backup.field = 1
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = next.(dashboardModel)
 	if cmd != nil || calls != 0 {
-		t.Fatal("push without confirmation")
+		t.Fatal("push with a passphrase that was not repeated")
 	}
-	m.backup.confirmation = "PUSH"
+	m.backup.repeat = append([]rune{}, m.backup.passphrase...)
 	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	m = next.(dashboardModel)
 	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

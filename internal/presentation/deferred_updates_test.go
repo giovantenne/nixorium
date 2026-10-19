@@ -46,10 +46,6 @@ func TestDeploymentReviewQueuesComputersThatAreOffByDefault(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyF3})
 	model = updated.(dashboardModel)
-	for _, character := range "DEPLOY" {
-		updated, _ = model.Update(tea.KeyPressMsg{Code: character, Text: string(character)})
-		model = updated.(dashboardModel)
-	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil {

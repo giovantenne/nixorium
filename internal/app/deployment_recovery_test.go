@@ -61,7 +61,7 @@ func TestDeploymentRecoveryRequiresFinishedOrAcknowledgedComputers(t *testing.T)
 		t.Fatalf("unreachable computer not acknowledged: %+v", plan)
 	}
 	plan = manager.Plan(context.Background(), "/srv/lab", true)
-	if plan.State != "ready" || plan.Confirmation != "RECOVERED" || plan.Targets[0].State != domain.RecoveryTargetReviewed || plan.Targets[1].State != domain.RecoveryTargetOther || plan.Targets[2].State != domain.RecoveryTargetUnreachable {
+	if plan.State != "ready" || plan.Confirmation != "" || plan.Targets[0].State != domain.RecoveryTargetReviewed || plan.Targets[1].State != domain.RecoveryTargetOther || plan.Targets[2].State != domain.RecoveryTargetUnreachable {
 		t.Fatalf("plan = %+v", plan)
 	}
 	if result := manager.Apply(context.Background(), plan, "sha256:wrong"); result.State != "blocked" || source.archived != 0 {

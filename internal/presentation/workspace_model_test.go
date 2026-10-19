@@ -200,18 +200,15 @@ func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) 
 	m.actions.ApplyGitCommit = nil
 	m, cmd := workspaceKey(m, demoText("v"))
 	m = workspaceComplete(t, m, cmd)
-	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
-	if cmd != nil || saves != 0 {
-		t.Fatal("save without typed confirmation")
+	if saves != 0 || !strings.Contains(m.View().Content, "Enter saves") {
+		t.Fatalf("the review does not say what Enter does:\n%s", m.View().Content)
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyF1))
-	m, _ = workspaceKey(m, demoText("SAVE"))
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 	if !m.helpOpen || cmd != nil || saves != 0 {
 		t.Fatal("help triggered a save")
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyEsc))
-	m, _ = workspaceKey(m, demoText("SAVE"))
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 	if cmd == nil || !m.workspace.saving {
 		t.Fatal("reviewed save did not start")
@@ -234,7 +231,7 @@ func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) 
 		t.Fatal("duplicate result replaced success")
 	}
 	for _, state := range []string{"unchanged", "invalid"} {
-		m.workspace.stage, m.workspace.plan.State, m.workspace.confirmation = workspaceReview, state, "SAVE"
+		m.workspace.stage, m.workspace.plan.State = workspaceReview, state
 		m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 		if cmd != nil || saves != 1 {
 			t.Fatalf("%s plan requested save", state)
@@ -302,7 +299,7 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					case "review":
 						w.plan = demoWorkspacePlan()
 						w.stage = workspaceReview
-						want = append(want, "Type SAVE:", "Save JSON", "no system apply or reset")
+						want = append(want, "Enter saves and records only the profile JSON", "Save JSON", "no system apply or reset")
 					case "loading":
 						m.busy = "Loading workspace metadata"
 						m.beginRead(dashboardReadTimeout)

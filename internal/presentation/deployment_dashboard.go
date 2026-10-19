@@ -93,28 +93,15 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 		case "esc":
 			model.confirmation = ""
 			return model, deploymentIntent{kind: deploymentCloseIntent, destination: dashboardDeploy, message: "Deployment cancelled; no build or apply was started."}
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
-			if model.confirmation != "DEPLOY" {
-				model.confirmation = ""
-				return model, deploymentIntent{message: "Confirmation did not match; no build or apply was started."}
-			}
+			// The review on screen is the confirmation; the application still
+			// rechecks its token, revision and computers before any apply.
 			model.applying = true
 			model.progress = domain.DeploymentProgress{}
 			model.recent = nil
 			model.started = time.Now()
 			model.confirmation = ""
 			return model, deploymentIntent{kind: deploymentApplyIntent}
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
-			}
 		}
 	}
 	return model, deploymentIntent{}

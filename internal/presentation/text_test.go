@@ -107,7 +107,7 @@ func TestControllerRebuildTextShowsReviewAndVerifiedResult(t *testing.T) {
 	planOutput := &bytes.Buffer{}
 	ControllerRebuildPlanText(planOutput, domain.ControllerRebuildPlanReport{
 		State: "ready", Repository: "/deployment", Controller: "pc99", Revision: revision,
-		CurrentDetail: "not active", Confirmation: "REBUILD", Issues: []domain.ValidationIssue{},
+		CurrentDetail: "not active", Issues: []domain.ValidationIssue{},
 	})
 	for _, expected := range []string{"READY", "pc99", revision, "controller apply --expect"} {
 		if !strings.Contains(planOutput.String(), expected) {
@@ -205,12 +205,11 @@ func TestGitCommitTextShowsPlanAndLocalResult(t *testing.T) {
 		Paths:         []string{"lab-settings.json"},
 		ReviewToken:   "sha256:review",
 		CommitMessage: "chore: update laboratory settings",
-		Confirmation:  "COMMIT",
 		Diff:          domain.GitDiff{Content: "+password: <redacted>\n"},
 	}
 	var output bytes.Buffer
 	GitCommitPlanText(&output, plan)
-	for _, expected := range []string{"commit plan: READY", "lab-settings.json", "sha256:review", "COMMIT", "No remote or push", "<redacted>"} {
+	for _, expected := range []string{"commit plan: READY", "lab-settings.json", "sha256:review", "No remote or push", "<redacted>"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("commit plan output omits %q:\n%s", expected, output.String())
 		}
@@ -229,9 +228,9 @@ func TestUpdateTextShowsValidatedPlanAndReviewableResult(t *testing.T) {
 		State: "ready", Repository: "/deployment", Revision: strings.Repeat("a", 40),
 		CurrentRef: "v2.0.0", CurrentRev: strings.Repeat("b", 40), CurrentChannel: domain.UpdateChannelStable,
 		Target: "v2.1.0-beta.1", TargetChannel: domain.UpdateChannelPrerelease,
-		ReviewToken: "sha256:review", Confirmation: "UPDATE",
-		Checks: []domain.UpdateCheck{{ID: "client", State: "passed", Message: "built"}},
-		Diff:   domain.GitDiff{Content: "+github:owner/repo/v2.1.0-beta.1\n"},
+		ReviewToken: "sha256:review",
+		Checks:      []domain.UpdateCheck{{ID: "client", State: "passed", Message: "built"}},
+		Diff:        domain.GitDiff{Content: "+github:owner/repo/v2.1.0-beta.1\n"},
 	}
 	var output bytes.Buffer
 	UpdatePlanText(&output, plan)
@@ -285,11 +284,11 @@ func TestSoftwareTextSeparatesDeclarationFromBuildAndDeployment(t *testing.T) {
 	plan := domain.SoftwareChangePlanReport{
 		State: "ready", ManagedFile: "lab-software.json",
 		Request:         domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "media"}},
-		AffectedClients: []string{"pc01", "pc02"}, ReviewToken: "sha256:review", Confirmation: "SAVE",
+		AffectedClients: []string{"pc01", "pc02"}, ReviewToken: "sha256:review",
 		Message: "no system has been built or changed",
 	}
 	SoftwareChangePlanText(&output, plan)
-	for _, expected := range []string{"Software proposal: READY", "vlc", "media", "pc01, pc02", "sha256:review", plan.Confirmation, "no system has been built or changed"} {
+	for _, expected := range []string{"Software proposal: READY", "vlc", "media", "pc01, pc02", "sha256:review", "no system has been built or changed"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("software plan omits %q:\n%s", expected, output.String())
 		}
@@ -321,11 +320,11 @@ func TestSoftwarePresetTextShowsDefaultsPreservedScopesAndReviewBoundary(t *test
 		SelectedPackages:   []domain.SoftwareCatalogItem{{ID: "firefox"}},
 		Existing:           []domain.SoftwareDeclaration{{Package: "firefox", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeController}}},
 		Additions:          []domain.SoftwareDeclaration{{Package: "libreoffice", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}}},
-		AffectedController: "controller", AffectedClients: []string{"pc01"}, ReviewToken: "sha256:preset", Confirmation: "ADD PROFILE",
+		AffectedController: "controller", AffectedClients: []string{"pc01"}, ReviewToken: "sha256:preset",
 		Message: "No system has been built or changed.",
 	}
 	SoftwarePresetPlanText(&output, plan)
-	for _, expected := range []string{"Software profile proposal: READY", "Essential (essential)", "Excluded:                 vlc", "scope preserved", "controller", "libreoffice", "pc01", "sha256:preset", "ADD PROFILE", "No system has been built or changed"} {
+	for _, expected := range []string{"Software profile proposal: READY", "Essential (essential)", "Excluded:                 vlc", "scope preserved", "controller", "libreoffice", "pc01", "sha256:preset", "No system has been built or changed"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("software profile plan omits %q:\n%s", expected, output.String())
 		}

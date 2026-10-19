@@ -17,8 +17,10 @@ import (
 // DemoGraphBundle holds navigable website demos. Each graph is explored from
 // the real dashboard model by pressing navigation keys against synthetic
 // actions; the website follows recorded edges instead of reimplementing the
-// TUI. Destructive steps stop at their typed confirmation because the
-// explorer never types confirmation words.
+// TUI. The steps that need a typed word (erasing a disk, resetting the
+// template, discarding changes) stop there because the explorer never types
+// confirmation words; the reviews that Enter confirms run against synthetic
+// actions only.
 type DemoGraphBundle struct {
 	SchemaVersion int         `json:"schemaVersion"`
 	SourceCommit  string      `json:"sourceCommit"`
@@ -186,7 +188,7 @@ func demoExplorePresetPlan(catalog domain.SoftwareCatalogReport, profiles domain
 	plan := domain.SoftwarePresetPlanReport{
 		SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-preset-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
 		Request: request, Preset: preset, SelectedPackages: []domain.SoftwareCatalogItem{}, Existing: []domain.SoftwareDeclaration{}, Additions: []domain.SoftwareDeclaration{},
-		AffectedController: "pc99", AffectedClients: catalog.Clients, ReviewToken: "sha256:demo-profile-review", Confirmation: "ADD PROFILE", Issues: []domain.ValidationIssue{},
+		AffectedController: "pc99", AffectedClients: catalog.Clients, ReviewToken: "sha256:demo-profile-review", Issues: []domain.ValidationIssue{},
 	}
 	for _, name := range preset.Packages {
 		if excluded[name] {
@@ -275,7 +277,7 @@ func demoExploreActions(revision string) DashboardActions {
 			if action == domain.ClientRestart {
 				confirmation = "RESTART"
 			}
-			plan := domain.ShutdownPlanReport{SchemaVersion: domain.SchemaVersion, Operation: "power-plan", State: "ready", Repository: "/demo/lab", Requested: requested, Action: action, Policy: policy, ReviewToken: "sha256:demo", Confirmation: confirmation, Issues: []domain.ValidationIssue{}}
+			plan := domain.ShutdownPlanReport{SchemaVersion: domain.SchemaVersion, Operation: "power-plan", State: "ready", Repository: "/demo/lab", Requested: requested, Action: action, Policy: policy, ReviewToken: "sha256:demo", Issues: []domain.ValidationIssue{}}
 			for _, host := range hosts.Hosts {
 				if requested != "" && !strings.Contains(","+requested+",", ","+host.Name+",") {
 					continue
@@ -285,6 +287,9 @@ func demoExploreActions(revision string) DashboardActions {
 					plan.Eligible++
 				}
 				plan.Targets = append(plan.Targets, target)
+			}
+			if plan.InterruptsSessions() {
+				plan.Confirmation = confirmation
 			}
 			return plan
 		},
@@ -305,11 +310,7 @@ func demoExploreActions(revision string) DashboardActions {
 			return demoExplorePresetPlan(catalog, profiles, request)
 		},
 		PlanSoftware: func(_ context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
-			confirmation := "SAVE"
-			if !request.Present {
-				confirmation = "REMOVE"
-			}
-			return domain.SoftwareChangePlanReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json", Request: request, AffectedClients: demoExploreClientNames(), ReviewToken: "sha256:demo", Confirmation: confirmation, Issues: []domain.ValidationIssue{}}
+			return domain.SoftwareChangePlanReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json", Request: request, AffectedClients: demoExploreClientNames(), ReviewToken: "sha256:demo", Issues: []domain.ValidationIssue{}}
 		},
 		SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 			return domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: "saved", Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedClients: plan.AffectedClients, Revision: revision, Message: "Software selection saved locally.", Issues: []domain.ValidationIssue{}}

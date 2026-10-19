@@ -44,7 +44,7 @@ imply that installation or deployment is ready.
 The controller offers Assistant (`a`) unless `lab.assistant` is explicitly false.
 Its account activation, subscription and consent
 checks precede content sharing. Ctrl+R reviews candidate changes and their Nix
-evaluation; SAVE records a local commit with a backup. Controller application
+evaluation; saving records a local commit with a backup. Controller application
 and Update computers remain separate reviews. See [Assistant](assistant.md).
 
 Installation offers network boot (PXE) and USB over SSH. PXE preparation builds
@@ -687,8 +687,7 @@ pc03  10.42.0.13  Reachable at last check
 pc04  10.42.0.14  Reachable at last check
 pc05  10.42.0.15  Reachable at last check
 
-Type DEPLOY to continue:
-> _
+Enter updates these computers.
 
 ! Target services may restart; unreachable computers may remain unchanged
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
@@ -743,8 +742,7 @@ Selected computers — latest availability check:
 pc01  10.42.0.11  Reachable at last check
 pc02  10.42.0.12  Not reached at last check
 
-Type DEPLOY to continue:
-> _
+Enter updates these computers.
 
 ! Target services may restart; unreachable computers may remain unchanged
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
@@ -767,8 +765,7 @@ Reviewed revision  0123456789abcdef0123456789abcdef01234567
 Selected computers — latest availability check:
 pc01  10.42.0.11  Reachable at last check
 
-Type DEPLOY to continue:
-> _
+Enter updates these computers.
 
 ! Target services may restart; unreachable computers may remain unchanged
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
@@ -836,8 +833,7 @@ Start network installation?
 
 Affects  enp1s0 · controller network
 
-Type START to continue:
-> _
+Enter starts network installation mode.
 
 ! Temporarily remove 10.42.0.99/24; remote connections may be interrupted
   Serve ProxyDHCP, TFTP, HTTP and cache via 192.168.1.123. Institutional DHCP remains authoritative; stop or
@@ -1133,8 +1129,7 @@ Complete draft: 2 files · 2 directories · 8.1 KiB
   Documents/Lessons/ · 0700
 Review lines 1–14 of 21
 
-Save and record the manifest and reviewed copies locally.
-Type SAVE: _
+Enter saves and records the manifest and reviewed copies locally.
 
 ↑/↓ Scroll  ·  Enter Save copies  ·  Esc Cancel  ·  F1 Help
 ```
@@ -1161,8 +1156,7 @@ Complete draft: 2 files · 2 directories · 8.1 KiB
   Documents/Lessons/run.sh · 96 B · 0700 · executable
 Review lines 1–14 of 22
 
-Save and record the manifest and reviewed copies locally.
-Type SAVE: _
+Enter saves and records the manifest and reviewed copies locally.
 
 ↑/↓ Scroll  ·  Enter Save copies  ·  Esc Cancel  ·  F1 Help
 ```
@@ -1259,8 +1253,7 @@ Destinations:
   pc02 (client)
 Review lines 1–13 of 38
 
-Save and record only the profile JSON; no system apply or reset.
-Type SAVE: _
+Enter saves and records only the profile JSON; no system apply or reset.
 
 ↑/↓ Scroll  ·  Enter Save JSON  ·  Esc Cancel  ·  F1 Help
 ```

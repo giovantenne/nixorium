@@ -7,10 +7,6 @@ import (
 	"time"
 )
 
-// DeploymentRecoveryConfirmation acknowledges an interrupted client update
-// after its computers were checked. It never declares that update successful.
-const DeploymentRecoveryConfirmation = "RECOVERED"
-
 // DeploymentActivity is one computer's read-only answer after an interrupted
 // update: the running revision and whether activation is still in progress.
 type DeploymentActivity struct {

@@ -14,18 +14,18 @@ import (
 // The editor holds declarations and capture IDs only. Captured bytes stay in
 // the application-owned snapshot and are never read by presentation.
 type homeFilesModel struct {
-	stage                                      string
-	loaded                                     domain.HomeFilesPlanReport
-	draft                                      domain.HomeFilesDraft
-	plan                                       domain.HomeFilesPlanReport
-	result                                     domain.HomeFilesApplyReport
-	pending                                    domain.HomeFilesCaptureReport
-	cursor, scroll                             int
-	source, destination, replace, confirmation string
-	completions                                []string
-	sizes                                      map[string]int64
-	requestID                                  uint64
-	saving                                     bool
+	stage                        string
+	loaded                       domain.HomeFilesPlanReport
+	draft                        domain.HomeFilesDraft
+	plan                         domain.HomeFilesPlanReport
+	result                       domain.HomeFilesApplyReport
+	pending                      domain.HomeFilesCaptureReport
+	cursor, scroll               int
+	source, destination, replace string
+	completions                  []string
+	sizes                        map[string]int64
+	requestID                    uint64
+	saving                       bool
 }
 
 func (m homeFilesModel) textEntry() bool {
@@ -207,7 +207,7 @@ func (model dashboardModel) finishHomeFilesRead(msg homeFilesReadMsg) (tea.Model
 			return model, nil
 		}
 		model.homeFiles.plan = msg.plan
-		model.homeFiles.confirmation, model.homeFiles.scroll = "", 0
+		model.homeFiles.scroll = 0
 		model.homeFiles.stage = "review"
 	case "capture":
 		if msg.capture.HasErrors() || msg.capture.CaptureID == "" {
@@ -381,7 +381,6 @@ func (model dashboardModel) updateHomeFilesKey(key tea.KeyPressMsg) (tea.Model, 
 		switch key.String() {
 		case "esc":
 			m.stage = "overview"
-			m.confirmation = ""
 			model.message = "Review cancelled; no configuration changed."
 		case "up":
 			m.scroll = max(0, m.scroll-1)
@@ -397,8 +396,8 @@ func (model dashboardModel) updateHomeFilesKey(key tea.KeyPressMsg) (tea.Model, 
 				model.message = "Declarations unchanged; student homes were not checked."
 				break
 			}
-			if m.plan.State != "ready" || m.plan.HasErrors() || m.plan.Confirmation != "SAVE" || m.plan.ReviewToken == "" || m.confirmation != "SAVE" {
-				model.message = "Type SAVE to save and record these captured copies locally."
+			if m.plan.State != "ready" || m.plan.HasErrors() || m.plan.ReviewToken == "" {
+				model.message = "This review cannot be saved. Go back and create a new one."
 				break
 			}
 			m.saving = true
@@ -407,10 +406,6 @@ func (model dashboardModel) updateHomeFilesKey(key tea.KeyPressMsg) (tea.Model, 
 			model.busy = "Rechecking, saving and recording the reviewed initial files"
 			model.message = ""
 			return model, func() tea.Msg { return homeFilesSaveMsg{id: id, report: model.actions.SaveHomeFiles(plan)} }
-		default:
-			if key.String() == "backspace" || len(m.confirmation)+len(key.Text) <= 4 {
-				m.confirmation = homeFilesEditText(m.confirmation, key)
-			}
 		}
 	case "result":
 		switch key.String() {

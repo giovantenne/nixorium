@@ -87,7 +87,7 @@ func TestHomeFilesCLIReviewSaveBoundaries(t *testing.T) {
 	} {
 		t.Run(item.name, func(t *testing.T) {
 			draft := domain.HomeFilesDraft{Profile: domain.HomeFilesProfile{SchemaVersion: 1}, CaptureIDs: []string{"immutable-capture"}, BaseFingerprint: "base"}
-			m := &fakeHomeFilesCommands{plan: domain.HomeFilesPlanReport{State: item.state, ReviewToken: "review", Candidate: &draft, Confirmation: "SAVE"}, result: domain.HomeFilesApplyReport{State: item.result}}
+			m := &fakeHomeFilesCommands{plan: domain.HomeFilesPlanReport{State: item.state, ReviewToken: "review", Candidate: &draft}, result: domain.HomeFilesApplyReport{State: item.result}}
 			var stdout, stderr bytes.Buffer
 			confirmations := 0
 			confirm := func(domain.HomeFilesPlanReport) (bool, error) {

@@ -130,7 +130,7 @@ test_guided_success_and_reboot() (
 2
 2
 ERASE
-REBOOT
+y
 EOF
   )
 

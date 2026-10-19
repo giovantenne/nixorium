@@ -12,25 +12,12 @@ func (model dashboardModel) updateDeploymentStop(key tea.KeyPressMsg) (tea.Model
 		model.deployment.stopReview = false
 		model.deployment.confirmation = ""
 	case "enter":
-		if model.deployment.confirmation == "STOP WAITING" && model.deployment.cancel != nil {
+		if model.deployment.cancel != nil {
 			model.deployment.stopReview = false
 			model.deployment.stopRequested = true
 			model.deployment.cancel()
 		}
 		model.deployment.confirmation = ""
-	case "backspace":
-		value := []rune(model.deployment.confirmation)
-		if len(value) > 0 {
-			model.deployment.confirmation = string(value[:len(value)-1])
-		}
-	case "space":
-		if len(model.deployment.confirmation) < 32 {
-			model.deployment.confirmation += " "
-		}
-	default:
-		if len(model.deployment.confirmation) < 32 {
-			model.deployment.confirmation += key.Text
-		}
 	}
 	return model, nil
 }
@@ -45,7 +32,7 @@ func (model dashboardModel) deploymentStopView() string {
 			"If apply started, new operations remain blocked until reviewed recovery.",
 			"Nixorium will still attempt bounded, authenticated client observations.",
 		}, "\n"),
-		fixedBody: "Type STOP WAITING to continue:\n> " + model.deployment.confirmation + "_",
+		fixedBody: "Enter stops waiting here; a computer already applying the update may keep going.",
 		actions:   []tuiAction{{key: "Enter", label: "Confirm"}, {key: "Esc", label: "Keep waiting"}, {key: "F1", label: "Help"}},
 	})
 }

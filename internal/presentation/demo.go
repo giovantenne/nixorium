@@ -238,7 +238,7 @@ func renderClassroomDemo(revision string, width, height int) DemoScenario {
 		return domain.ShutdownPlanReport{
 			SchemaVersion: domain.SchemaVersion, Operation: "restart-plan", State: "ready", Repository: "/demo/lab", Requested: requested,
 			Action: action, Policy: policy, Targets: []domain.ShutdownTargetPlan{{Name: "pc01", IP: "10.42.0.11", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}},
-			Eligible: 1, ReviewToken: "sha256:classroom-demo", Confirmation: "RESTART", Message: "The selected client is ready for restart.", Issues: []domain.ValidationIssue{},
+			Eligible: 1, ReviewToken: "sha256:classroom-demo", Message: "The selected client is ready for restart.", Issues: []domain.ValidationIssue{},
 		}
 	}
 	actions.ApplyShutdown = func(plan domain.ShutdownPlanReport) domain.ShutdownApplyReport {
@@ -259,7 +259,6 @@ func renderClassroomDemo(revision string, width, height int) DemoScenario {
 	r.pressAndCapture(demoCode(tea.KeySpace), "Select pc01", 700)
 	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Review the client restart", 2500)
-	r.typeAndCapture("RESTART", "Type the restart confirmation")
 	apply := r.key(demoCode(tea.KeyEnter))
 	r.capture("Send the reviewed restart request", 650)
 	r.command(apply)
@@ -351,13 +350,9 @@ func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenar
 		}
 	}
 	actions.PlanSoftware = func(ctx context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
-		confirmation := "SAVE"
-		if !request.Present {
-			confirmation = "REMOVE"
-		}
 		return domain.SoftwareChangePlanReport{
 			SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
-			Request: request, AffectedClients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, ReviewToken: "sha256:demo", Confirmation: confirmation, Issues: []domain.ValidationIssue{},
+			Request: request, AffectedClients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, ReviewToken: "sha256:demo", Issues: []domain.ValidationIssue{},
 		}
 	}
 	actions.SaveSoftware = func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
@@ -400,7 +395,6 @@ func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenar
 	r.model.deployment.context = ""
 	r.command(r.command(r.key(demoCode(tea.KeyEnter))))
 	r.capture("Review deployment to all five current clients", 2100)
-	r.typeAndCapture("DEPLOY", "Type the one-word deployment confirmation")
 	deployCommand := r.key(demoCode(tea.KeyEnter))
 	r.capture("Press Enter to start deployment", 650)
 	if deployCommand == nil {
@@ -474,7 +468,7 @@ func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario 
 		return domain.SoftwarePresetPlanReport{
 			SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-preset-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
 			Request: request, Preset: preset, SelectedPackages: selected, Additions: additions,
-			AffectedController: "pc99", AffectedClients: catalog.Clients, ReviewToken: "sha256:demo-profile-review", Confirmation: "ADD PROFILE", Issues: []domain.ValidationIssue{},
+			AffectedController: "pc99", AffectedClients: catalog.Clients, ReviewToken: "sha256:demo-profile-review", Issues: []domain.ValidationIssue{},
 		}
 	}
 	actions.SaveSoftwarePreset = func(plan domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport {
@@ -621,7 +615,6 @@ func renderInstallationDemo(revision string, width, height int) DemoScenario {
 	r.model.screen = dashboardPXEStartReview
 	r.model.installation.startPlan = domain.PXELifecycleReport{SchemaVersion: 1, Operation: "pxe-start-plan", State: "ready", Mode: "ready", Interface: "enp1s0", DHCPAddress: demoServiceAddress, StaticCIDR: "10.42.0.99/24"}
 	r.capture("Review the temporary network impact", 3300)
-	r.typeAndCapture("START", "Type the one-word network-impact confirmation")
 	startCommand := r.key(demoCode(tea.KeyEnter))
 	r.capture("Press Enter to start network installation", 650)
 	if startCommand == nil {
@@ -773,7 +766,6 @@ func renderShutdownDemo(revision string, width, height int) DemoScenario {
 	r.capture("Select pc02, pc04, and pc05; controller absent", 2200)
 	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Active sessions will shut down; unreachable clients are not sent", 3300)
-	r.typeAndCapture("SHUTDOWN", "Type the one-word confirmation")
 	shutdownCommand := r.key(demoCode(tea.KeyEnter))
 	r.capture("Press Enter to send the reviewed requests", 650)
 	r.command(shutdownCommand)

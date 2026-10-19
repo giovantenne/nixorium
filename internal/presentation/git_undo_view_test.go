@@ -35,7 +35,7 @@ func undoActions(t *testing.T, plan domain.GitUndoPlanReport, applied *int) Dash
 	return DashboardActions{
 		LoadGitReview: func(context.Context) domain.GitReviewReport { return review },
 		PlanController: func(context.Context) domain.ControllerRebuildPlanReport {
-			return domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "ready", Controller: "pc99", Revision: strings.Repeat("d", 40), Confirmation: "REBUILD"}
+			return domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "ready", Controller: "pc99", Revision: strings.Repeat("d", 40)}
 		},
 		ApplyController: func(controller domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 			return domain.ControllerRebuildExecutionReport{State: "completed", Applied: true, Verified: true, Revision: controller.Revision}
@@ -61,7 +61,7 @@ func pressUndoKey(t *testing.T, model dashboardModel, key tea.KeyPressMsg) (dash
 	return updated.(dashboardModel), command
 }
 
-func TestDashboardUndoesTheLastSavedChangeAfterReviewAndTypedWord(t *testing.T) {
+func TestDashboardUndoesTheLastSavedChangeAfterReviewAndEnter(t *testing.T) {
 	applied := 0
 	plan := undoTestPlan()
 	model := openGitReviewFor(t, undoActions(t, plan, &applied), 120, 40)
@@ -90,27 +90,20 @@ func TestDashboardUndoesTheLastSavedChangeAfterReviewAndTypedWord(t *testing.T) 
 		"modified      lab-software.json",
 		"added         modules/site.nix",
 		"What the undo changes:",
-		"Type UNDO to continue:",
+		"Enter saves a new change that puts these files back.",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("the undo review lacks %q:\n%s", expected, view)
 		}
 	}
 
-	// Enter without the word changes nothing.
-	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if command != nil || applied != 0 || !strings.Contains(model.View().Content, "Confirmation did not match; nothing was changed.") {
-		t.Fatalf("an empty confirmation was accepted (applied %d):\n%s", applied, model.View().Content)
+	if strings.Contains(view, "Type UNDO") || applied != 0 {
+		t.Fatalf("the review still asks for a word (applied %d):\n%s", applied, view)
 	}
-	// A wrong word changes nothing either.
+	// Typed text is ignored; Enter alone confirms the review on screen.
 	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Text: "undo"})
-	if model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter}); command != nil || applied != 0 {
-		t.Fatalf("a wrong word was accepted (applied %d)", applied)
-	}
-
-	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Text: "UNDO"})
-	if !strings.Contains(model.View().Content, "> UNDO_") {
-		t.Fatalf("the typed word is not shown:\n%s", model.View().Content)
+	if applied != 0 || model.confirmation != "" {
+		t.Fatalf("typed text was kept (applied %d, confirmation %q)", applied, model.confirmation)
 	}
 	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if command == nil || model.busy == "" {
@@ -152,7 +145,6 @@ func TestUndoResultContinuesToTheOrdinaryControllerReview(t *testing.T) {
 	model, command := pressUndoKey(t, model, tea.KeyPressMsg{Text: "u"})
 	updated, _ := model.Update(command())
 	model = updated.(dashboardModel)
-	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Text: "UNDO"})
 	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -195,7 +187,6 @@ func TestUndoResultEnterReturnsWhenThereIsNothingToChainTo(t *testing.T) {
 	model, command := pressUndoKey(t, model, tea.KeyPressMsg{Text: "u"})
 	updated, _ := model.Update(command())
 	model = updated.(dashboardModel)
-	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Text: "UNDO"})
 	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -213,7 +204,6 @@ func TestDashboardUndoCancelsWithEscAndChangesNothing(t *testing.T) {
 	model, command := pressUndoKey(t, model, tea.KeyPressMsg{Text: "u"})
 	updated, _ := model.Update(command())
 	model = updated.(dashboardModel)
-	model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Text: "UNDO"})
 	model, command = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if command != nil || applied != 0 || model.screen != dashboardGitReview || model.confirmation != "" {
 		t.Fatalf("cancel: applied %d, screen %d, confirmation %q", applied, model.screen, model.confirmation)
@@ -294,7 +284,7 @@ func TestDashboardUndoReviewFitsSmallTerminalsAndScrolls(t *testing.T) {
 		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 			t.Fatalf("the undo review does not fit %v (%dx%d):\n%s", size, lipgloss.Width(view), lipgloss.Height(view), view)
 		}
-		if !strings.Contains(view, "Type UNDO to continue:") || !strings.Contains(view, "Update computers so the clients use it too") && size[0] >= 120 {
+		if !strings.Contains(view, "Enter saves a new change") || !strings.Contains(view, "Update computers so the clients use it too") && size[0] >= 120 {
 			t.Fatalf("the confirmation or the next steps are hidden at %v:\n%s", size, view)
 		}
 		before := model.maintenance.gitScroll
@@ -312,7 +302,7 @@ func TestDashboardUndoReviewFitsSmallTerminalsAndScrolls(t *testing.T) {
 			model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyUp})
 		}
 		start := model.View().Content
-		if !strings.Contains(start, "Last change: chore: update laboratory software") || !strings.Contains(start, "Update computers so the clients use it too") || !strings.Contains(start, "Type UNDO to continue:") {
+		if !strings.Contains(start, "Last change: chore: update laboratory software") || !strings.Contains(start, "Update computers so the clients use it too") || !strings.Contains(start, "Enter saves a new change") {
 			t.Fatalf("the review lost its header at %v:\n%s", size, start)
 		}
 		// The window opens on the summary of a short terminal, or on the
@@ -338,7 +328,7 @@ func TestGitReviewHelpMentionsTheUndo(t *testing.T) {
 	model := openGitReviewFor(t, undoActions(t, undoTestPlan(), &applied), 160, 50)
 	model.helpOpen = true
 	view := model.View().Content
-	for _, expected := range []string{"u undo the last saved change", "UNDO saves a new change", "Enter on the result opens Apply to controller; then update the computers"} {
+	for _, expected := range []string{"u undo the last saved change", "saves a new change that puts the files", "Enter on the result opens Apply to controller; then update the computers"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("help lacks %q:\n%s", expected, view)
 		}

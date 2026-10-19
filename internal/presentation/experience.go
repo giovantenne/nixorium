@@ -209,7 +209,7 @@ func (model dashboardModel) helpView() string {
 	if model.screen == dashboardAssistant && (model.assistant.state == "chat" || model.assistant.state == "running") {
 		return assistantHelpText
 	}
-	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
+	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm what is on screen", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
 	case dashboardManagedJobs:
 		lines = append(lines, "Tab switches between controller and PXE jobs; status refreshes automatically.", "Esc leaves this read-only view; quitting does not cancel a managed job.", "Interrupted means a running progress record has no running unit.", "Inspect the named journal unit, then request a fresh review before retrying.", "Completion here is not verification of the current configuration.")
@@ -273,15 +273,15 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "Enter runs the visible recovery action; it never starts deployment.",
 				"For an installed computer awaiting its final check: turn it on, boot from its disk, and connect the network cable.",
 				"r checks installation status again; d shows technical details; i opens the existing installation when available.",
-				"Esc keeps your selection. Successful recovery creates a fresh review requiring DEPLOY again.")
+				"Esc keeps your selection. Successful recovery creates a fresh review that Enter confirms again.")
 			break
 		}
-		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers, or the review of an interrupted update   d technical details")
+		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping asks for Enter on its own review; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers, or the review of an interrupted update   d technical details")
 	case dashboardBackup:
 		lines = append(lines, "Backup is optional and never blocks installation or updates. Choose an encrypted file or a private Git repository.",
 			"An encrypted file contains the entire deployment and Git history. Mount the USB first, choose an existing folder outside the deployment, and enter a passphrase of at least 12 characters. Review, then Enter creates the archive.",
 			"For Git, use the SSH URL of a PRIVATE GitHub/GitLab repository. Configure an independent SSH key/agent and verify the host fingerprint outside Nixorium first.",
-			"The first Git backup reviews committed files, encrypts recovery keys, then requires PUSH. The remote branch is verified after sending; rejected or uncertain pushes are not backups.",
+			"The first Git backup reviews committed files, encrypts recovery keys, then pushes when you press Enter after confirming the repository is private. The remote branch is verified after sending; rejected or uncertain pushes are not backups.",
 			"Afterwards saved changes are pushed automatically while Nixorium is open, without the passphrase. Back up now pushes immediately. When keys, account passwords or trusted computers change, the passphrase is asked again.",
 			"For Git backups, configuration and Git history remain readable; private keys and managed account password hashes are encrypted. Other ignored files are excluded. Review custom files for credentials before committing.",
 			"Keep the passphrase and Git access separately. Changing the passphrase does not re-encrypt older Git history.",
@@ -296,7 +296,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardNetworkChange:
 		lines = append(lines, "Type the new network as address/prefix, for example 10.1.0.0/24, then Enter reviews it. Every computer keeps its number.",
 			"The review checks every computer: c continues without those that are off (they move when they are next updated, or are queued). Enter saves the step; no computer changes yet.",
-			"Then apply to the controller (it answers on both networks) and update the computers (each moves to its new address), each with its own review and typed confirmation.",
+			"Then apply to the controller (it answers on both networks) and update the computers (each moves to its new address), each with its own review confirmed with Enter.",
 			"During the change Enter opens the next step; f finishes when every computer is on the new network; u undoes the change, which is possible until it is finished.",
 			"After finishing, prepare network installation again before installing a computer by PXE.")
 	case dashboardDeferredUpdates:
@@ -334,7 +334,7 @@ func (model dashboardModel) helpView() string {
 			"Other settings: a adds a name and value, e edits, d removes, p takes a pasted settings file.",
 			"Guided fields, update settings and settings that can start programs cannot be added there.",
 			"v reviews the complete draft, dependencies and student destinations.",
-			"Type SAVE and Enter only after review to save and record just the workspace profile locally.",
+			"Enter on the review saves and records just the workspace profile locally.",
 			"Enter then opens a separate controller review. Runtime opt-in, deployment and home reset are never automatic.",
 			"A partial save opens Git review for inspection; do not replay the old save or apply systems before recovery.")
 		lines = append(lines, "Packaged extension updates use Maintenance → Update system and packages, which can also change the editor, desktop and operating system.")
@@ -346,7 +346,7 @@ func (model dashboardModel) helpView() string {
 			"u chooses a source again for the selected file or directory; d removes its declaration. The original source path is never saved.",
 			"Files are owned by the student: 0600 normally, 0700 when executable; directories 0700. Source permissions, ACLs, attributes and links are not inherited.",
 			"The student can edit these files and their modes during the session. Saving records only the reviewed copies locally.",
-			"v reviews the complete draft; type SAVE to save and record it. Computer application is separate, and the home is restored on the next boot.",
+			"v reviews the complete draft; Enter on the review saves and records it. Computer application is separate, and the home is restored on the next boot.",
 			"Esc cancels reads and drafts. Cancelled or late reads cannot save. A partial save requires Git inspection before system application.")
 	case dashboardTemplateReset:
 		lines = append(lines,
@@ -398,7 +398,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardLogs, dashboardLogDetail:
 		lines = append(lines, "Enter open log   r refresh list   ↑/↓/pg scroll detail")
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview, dashboardGitUndoReview:
-		lines = append(lines, "c select commit paths   x discard changes   u undo the last saved change   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "COMMIT creates a local commit; DISCARD restores files after saving their content; UNDO saves a new change that puts the files of the last saved change back. Nothing is pushed and no computer changes.", "After an undo, Enter on the result opens Apply to controller; then update the computers.")
+		lines = append(lines, "c select commit paths   x discard changes   u undo the last saved change   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "Enter on a commit review creates a local commit; DISCARD (typed) restores files after saving their content; Enter on the undo review saves a new change that puts the files of the last saved change back. Nothing is pushed and no computer changes.", "After an undo, Enter on the result opens Apply to controller; then update the computers.")
 	case dashboardUpdate, dashboardUpdateReview:
 		lines = append(lines, "During validation: l expands or collapses current check details in place.")
 		if model.updates.packageBase {

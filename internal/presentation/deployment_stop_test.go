@@ -10,14 +10,14 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func TestDeploymentStopRequiresSeparateConfirmationAndPreservesRecovery(t *testing.T) {
+func TestDeploymentStopIsConfirmedWithEnterAndPreservesRecovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	model := dashboardModel{screen: dashboardDeploy, busy: "Applying", width: 80, height: 24,
 		deployment: deploymentModel{applying: true, cancel: cancel, started: time.Now()}}
 	updated, _ := model.Update(keyPress("s"))
 	model = updated.(dashboardModel)
-	if !model.deployment.stopReview || !strings.Contains(model.View().Content, "STOP WAITING") {
+	if !model.deployment.stopReview || !strings.Contains(model.View().Content, "Enter stops waiting here") || strings.Contains(model.View().Content, "STOP WAITING") {
 		t.Fatal("stop review missing")
 	}
 	updated, _ = model.Update(keyPress("esc"))
@@ -25,15 +25,16 @@ func TestDeploymentStopRequiresSeparateConfirmationAndPreservesRecovery(t *testi
 	if ctx.Err() != nil || model.deployment.stopReview {
 		t.Fatal("closing stop review cancelled the deployment")
 	}
+	if ctx.Err() != nil {
+		t.Fatal("opening and closing the stop review cancelled the operation")
+	}
 	updated, _ = model.Update(keyPress("s"))
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(keyPress("enter"))
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "x"})
 	model = updated.(dashboardModel)
 	if ctx.Err() != nil {
-		t.Fatal("unconfirmed stop cancelled the operation")
+		t.Fatal("a key other than Enter cancelled the operation")
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "STOP WAITING"})
-	model = updated.(dashboardModel)
 	updated, _ = model.Update(keyPress("enter"))
 	model = updated.(dashboardModel)
 	if ctx.Err() == nil || !model.deployment.applying || !model.deployment.stopRequested || model.deployment.stopReview {

@@ -500,6 +500,16 @@ func shutdownActiveCount(plan domain.ShutdownPlanReport) int {
 	return count
 }
 
+func shutdownUnknownCount(plan domain.ShutdownPlanReport) int {
+	count := 0
+	for _, target := range plan.Targets {
+		if target.Eligible && target.Session == domain.ShutdownSessionUnknown {
+			count++
+		}
+	}
+	return count
+}
+
 func shutdownPolicyLabel(policy domain.ShutdownSessionPolicy) string {
 	if policy == domain.ShutdownAcknowledgeUnknown {
 		return "unknown states acknowledged"

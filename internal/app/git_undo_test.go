@@ -98,7 +98,7 @@ func TestGitUndoPlanReviewsTheLastSavedChange(t *testing.T) {
 	if plan.Title() != "Undo: chore: update laboratory software" || !strings.Contains(plan.CommitMessage, "This reverts commit "+undoHead+".") {
 		t.Fatalf("message = %q", plan.CommitMessage)
 	}
-	if plan.TreeID != source.facts.ParentTree || plan.Confirmation != "UNDO" || !strings.HasPrefix(plan.ReviewToken, "sha256:") {
+	if plan.TreeID != source.facts.ParentTree || plan.Confirmation != "" || !strings.HasPrefix(plan.ReviewToken, "sha256:") {
 		t.Fatalf("plan = %+v", plan)
 	}
 	if len(plan.Impacts) != 2 || plan.Impacts[0].Kind != "controller-apply" || !strings.HasPrefix(plan.Impacts[0].Detail, "Apply to controller") ||

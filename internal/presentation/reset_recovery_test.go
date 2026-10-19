@@ -22,7 +22,7 @@ func (fixture *resetRecoveryFixture) actions() DashboardActions {
 	return DashboardActions{
 		PlanResetRecovery: func(context.Context) domain.TemplateResetRecoveryPlan {
 			fixture.plans++
-			plan := domain.TemplateResetRecoveryPlan{State: "ready", Case: fixture.kind, Confirmation: domain.ResetRecoveryConfirmation, ReviewToken: "sha256:x",
+			plan := domain.TemplateResetRecoveryPlan{State: "ready", Case: fixture.kind, ReviewToken: "sha256:x",
 				Original: strings.Repeat("a", 40), Candidate: strings.Repeat("b", 40), Head: strings.Repeat("a", 40),
 				BackupRef: "refs/nixorium/template-backups/20261015T150400.000000000Z-aaaaaaaaaaaa", Branch: "refs/heads/main"}
 			if fixture.kind == domain.ResetRecoveryRestore {

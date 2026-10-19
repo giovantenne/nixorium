@@ -917,28 +917,12 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			model.screen = dashboardServices
 			model.confirmation = ""
 			model.message = "Service restart cancelled; no action was started."
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
-			if model.confirmation != "RESTART" {
-				model.confirmation = ""
-				model.message = "Confirmation did not match; the cache was not restarted."
-				return model, nil
-			}
 			model.busy = "Restarting and verifying the binary cache"
 			model.confirmation = ""
 			model.message = ""
 			return model, func() tea.Msg {
 				return dashboardServiceResultMsg{report: model.actions.RestartService("cache")}
-			}
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
 			}
 		}
 	case dashboardLogs:
@@ -1200,14 +1184,20 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				model.maintenance.gitScroll = maximum
 			}
 		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
+			if model.maintenance.gitDiscard {
+				value := []rune(model.confirmation)
+				if len(value) > 0 {
+					model.confirmation = string(value[:len(value)-1])
+				}
 			}
 		case "space":
-			model.confirmation += " "
+			if model.maintenance.gitDiscard {
+				model.confirmation += " "
+			}
 		case "enter":
-			if model.confirmation != model.maintenance.gitCommitPlan.Confirmation {
+			// Saving a commit changes nothing that cannot be undone, so Enter
+			// confirms it. Discarding unsaved changes keeps its typed word.
+			if model.maintenance.gitDiscard && model.confirmation != model.maintenance.gitCommitPlan.Confirmation {
 				model.confirmation = ""
 				model.message = "Confirmation did not match; nothing was changed."
 				return model, nil
@@ -1228,7 +1218,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				return dashboardGitCommitResultMsg{report: result, review: model.actions.LoadGitReview(ctx)}
 			}
 		default:
-			if key.Text != "" {
+			if model.maintenance.gitDiscard && key.Text != "" {
 				model.confirmation += key.Text
 			}
 		}
@@ -1470,29 +1460,13 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			model.screen = dashboardPXE
 			model.confirmation = ""
 			model.message = "PXE start cancelled; networking was not changed."
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
-			if model.confirmation != "START" {
-				model.confirmation = ""
-				model.message = "Confirmation did not match; networking was not changed."
-				return model, nil
-			}
 			model.busy = "Starting managed PXE installation mode"
 			model.confirmation = ""
 			model.message = ""
 			return model, model.runAction(func() string {
 				return model.actions.StartPXE().Message
 			}, dashboardPXE)
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
-			}
 		}
 	case dashboardPXELeaveReview:
 		switch key.String() {
@@ -1500,19 +1474,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			model.screen = dashboardPXE
 			model.confirmation = ""
 			model.message = "Continue the installation or stop PXE before leaving."
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
-			if model.confirmation != "LEAVE" {
-				model.confirmation = ""
-				model.message = "Confirmation did not match; Nixorium remains open."
-				return model, nil
-			}
 			return model, tea.Quit
 		case "x":
 			if model.actions.StopPXE == nil || model.actions.Refresh == nil {
@@ -1528,10 +1490,6 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 				defer cancel()
 				status, err := model.actions.Refresh(ctx)
 				return dashboardPXEExitMsg{lifecycle: lifecycle, status: status, statusErr: err}
-			}
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
 			}
 		}
 	}

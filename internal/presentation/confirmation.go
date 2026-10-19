@@ -1,8 +1,6 @@
 package presentation
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +10,11 @@ import (
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
+
+// continuePrompt is the question of every review whose confirmation is a
+// yes/no answer: only an action that destroys something or cannot be undone
+// asks for a typed word (ADR 0026, amended 2026-10-19).
+const continuePrompt = "Continue?"
 
 func IsInteractive(input *os.File) bool {
 	return input != nil && term.IsTerminal(input.Fd())
@@ -23,12 +26,7 @@ func ConfirmControllerApply(input io.Reader, output io.Writer, controller string
 	fmt.Fprintln(output, "Action: validate, build, and activate the reviewed Git configuration")
 	fmt.Fprintln(output, "Impact: services and networking may restart; this terminal connection may be interrupted")
 	fmt.Fprintln(output, "Reboot: not normally required")
-	fmt.Fprint(output, "Type APPLY to continue: ")
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == "APPLY", nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmControllerRebuild(input io.Reader, output io.Writer, report domain.ControllerRebuildPlanReport) (bool, error) {
@@ -38,12 +36,7 @@ func ConfirmControllerRebuild(input io.Reader, output io.Writer, report domain.C
 	fmt.Fprintln(output, "Action: validate, build, activate, and verify the reviewed Git configuration")
 	fmt.Fprintln(output, "Impact: services and networking may restart; this terminal connection may be interrupted")
 	fmt.Fprintln(output, "Retry: safe after inspecting the systemd unit journal and creating a fresh plan")
-	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == report.Confirmation, nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmServiceRestart(input io.Reader, output io.Writer, service domain.ManagedService) (bool, error) {
@@ -51,13 +44,7 @@ func ConfirmServiceRestart(input io.Reader, output io.Writer, service domain.Man
 	fmt.Fprintf(output, "Service: %s\n", service.Name)
 	fmt.Fprintln(output, "Impact: the binary cache will be briefly unavailable; active PXE clients may retry downloads")
 	fmt.Fprintln(output, "Safety: PXE networking and listeners are not controlled by this action")
-	fmt.Fprint(output, "Type RESTART to continue: ")
-	reader := bufio.NewReader(input)
-	value, err := reader.ReadString('\n')
-	if err != nil && !errors.Is(err, io.EOF) {
-		return false, err
-	}
-	return strings.TrimSpace(value) == "RESTART", nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecycleReport) (bool, error) {
@@ -67,12 +54,7 @@ func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecyc
 	fmt.Fprintf(output, "Service address: %s (institutional DHCP remains authoritative)\n", report.DHCPAddress)
 	fmt.Fprintln(output, "Services: ProxyDHCP, TFTP, HTTP, and the local binary cache")
 	fmt.Fprintln(output, "Recovery: `nixorium pxe stop` restores normal addressing; reboot recovery is enabled")
-	fmt.Fprint(output, "Type START to continue: ")
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == "START", nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.DeploymentPlanReport) (bool, error) {
@@ -82,12 +64,7 @@ func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.Dep
 	fmt.Fprintln(output, "Action: build every selected configuration, then apply it with Colmena")
 	fmt.Fprintln(output, "Impact: target services may restart; offline or failed targets will be reported")
 	fmt.Fprintln(output, "Retry: safe; Nixorium revalidates the revision and rebuilds before every apply")
-	fmt.Fprint(output, "Type DEPLOY to continue: ")
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == "DEPLOY", nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmGitCommit(input io.Reader, output io.Writer, report domain.GitCommitPlanReport) (bool, error) {
@@ -97,12 +74,7 @@ func ConfirmGitCommit(input io.Reader, output io.Writer, report domain.GitCommit
 	fmt.Fprintf(output, "Message: %s\n", report.CommitMessage)
 	fmt.Fprintln(output, "Action: create one local commit containing only the reviewed path versions")
 	fmt.Fprintln(output, "Safety: unrelated index/worktree changes remain; no hook, signing action, remote, or push is used")
-	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == report.Confirmation, nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmUpdate(input io.Reader, output io.Writer, report domain.UpdatePlanReport) (bool, error) {
@@ -116,12 +88,7 @@ func ConfirmUpdate(input io.Reader, output io.Writer, report domain.UpdatePlanRe
 	fmt.Fprintln(output, "Action: replace only flake.nix and flake.lock with the validated proposal")
 	fmt.Fprintln(output, "Safety: no branch, commit, push, activation, PXE action, or deployment is performed")
 	fmt.Fprintln(output, "Afterward: review and commit the two files separately before deploying")
-	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == report.Confirmation, nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmSoftwareChange(input io.Reader, output io.Writer, report domain.SoftwareChangePlanReport) (bool, error) {
@@ -134,12 +101,7 @@ func ConfirmSoftwareChange(input io.Reader, output io.Writer, report domain.Soft
 	fmt.Fprintln(output, "Action: atomically update only lab-software.json")
 	fmt.Fprintln(output, "Safety: no commit, build, controller activation, PXE action, or client deployment is performed")
 	fmt.Fprintln(output, "Afterward: review and commit the managed file, then prepare or distribute the system separately")
-	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == report.Confirmation, nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmSoftwarePreset(input io.Reader, output io.Writer, report domain.SoftwarePresetPlanReport) (bool, error) {
@@ -152,12 +114,7 @@ func ConfirmSoftwarePreset(input io.Reader, output io.Writer, report domain.Soft
 	fmt.Fprintln(output, "Action: atomically update only lab-software.json")
 	fmt.Fprintln(output, "Safety: no commit, build, controller activation, PXE action, or client deployment is performed")
 	fmt.Fprintln(output, "Afterward: review the complete current configuration before preparing or distributing systems")
-	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
-	}
-	return strings.TrimSpace(value) == report.Confirmation, nil
+	return ConfirmYesNo(input, output, continuePrompt)
 }
 
 func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPlanReport) (bool, error) {
@@ -171,17 +128,18 @@ func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPl
 	fmt.Fprintf(output, "Session safety: %s\n", shutdownPolicyLabel(report.Policy))
 	fmt.Fprintln(output, "Impact: unsaved user work may be lost; checks run again before dispatch")
 	if active := shutdownActiveCount(report); active > 0 {
-		fmt.Fprintf(output, "Explicit confirmation: %s authorizes %s of %s with an active user session\n", report.Confirmation, label, countNoun(active, "computer"))
+		fmt.Fprintf(output, "Explicit confirmation: %s authorizes %s of %s with an active user session\n", report.Action.Confirmation(), label, countNoun(active, "computer"))
+	}
+	if unknown := shutdownUnknownCount(report); unknown > 0 {
+		fmt.Fprintf(output, "Explicit confirmation: %s authorizes %s of %s whose session state is unknown\n", report.Action.Confirmation(), label, countNoun(unknown, "computer"))
 	}
 	if unused := shutdownUnusedCount(report); unused > 0 {
 		fmt.Fprintf(output, "Logged in but not in use: %s without recent keyboard or mouse input\n", countNoun(unused, "computer"))
 	}
 	fmt.Fprintln(output, "Outcome: acceptance confirms only that the operating system received the request, not physical power state")
 	fmt.Fprintln(output, "Retry: do not retry an unconfirmed request blindly")
-	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
-	value, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(value) == 0 {
-		return false, err
+	if !report.InterruptsSessions() {
+		return ConfirmYesNo(input, output, continuePrompt)
 	}
-	return strings.TrimSpace(value) == report.Confirmation, nil
+	return ConfirmWord(input, output, report.Action.Confirmation())
 }

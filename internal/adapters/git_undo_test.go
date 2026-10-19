@@ -50,7 +50,7 @@ func TestUndoRevertsTheLastSavedChange(t *testing.T) {
 	manager := app.NewGitUndoManager(Local{})
 
 	plan := manager.Plan(t.Context(), repository)
-	if plan.HasErrors() || plan.Revision != saved || plan.Undone.Parent != initial || plan.Confirmation != "UNDO" {
+	if plan.HasErrors() || plan.Revision != saved || plan.Undone.Parent != initial || plan.Confirmation != "" {
 		t.Fatalf("plan = %+v", plan)
 	}
 	if plan.Undone.Subject != "chore: update laboratory software" || time.Since(plan.Undone.Date) > time.Minute {

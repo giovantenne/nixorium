@@ -258,11 +258,6 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 	report.Proposal = proposal
 	report.Workspace = proposal.Workspace
 	report.ReviewToken = updateReviewToken(report, snapshot, proposal)
-	verb := "UPDATE"
-	if report.Downgrade {
-		verb = "DOWNGRADE"
-	}
-	report.Confirmation = verb
 	report.State = "ready"
 	return report
 }

@@ -2,9 +2,6 @@ package domain
 
 import "time"
 
-// GitUndoConfirmation confirms undoing the last saved change.
-const GitUndoConfirmation = "UNDO"
-
 // GitUndoFile is one file of the saved change that would be undone.
 type GitUndoFile struct {
 	Path string `json:"path"`

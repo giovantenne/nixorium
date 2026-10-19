@@ -124,11 +124,10 @@ func TestHomeFilesCapturedDraftExecutableSaveAndFollowup(t *testing.T) {
 	}
 	m, cmd = workspaceKey(m, demoText("v"))
 	m = workspaceComplete(t, m, cmd)
-	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
-	if cmd != nil || saves != 0 {
-		t.Fatal("saved without confirmation")
+	if saves != 0 {
+		t.Fatal("review saved before it was confirmed")
 	}
-	m, _ = workspaceKey(m, demoText("SAVE"))
+	// Enter on the review is the confirmation; no word is typed.
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 	// A local mutation stays protected from exit, and F1 cannot save again.
 	m, _ = workspaceKey(m, demoText("q"))
@@ -173,7 +172,6 @@ func TestHomeFilesCancelLateReadsAndSourceCompletionPreserveDraft(t *testing.T) 
 		t.Fatal("late direct message accepted")
 	}
 	m.homeFiles.stage = "review"
-	m.homeFiles.confirmation = "SAVE"
 	m.helpOpen = true
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 	if cmd != nil || m.homeFiles.saving {

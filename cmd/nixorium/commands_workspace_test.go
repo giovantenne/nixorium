@@ -81,7 +81,7 @@ func TestWorkspaceCommandReviewAndSaveBoundaries(t *testing.T) {
 	} {
 		t.Run(item.name, func(t *testing.T) {
 			manager := &fakeWorkspaceCommands{
-				plan:   domain.WorkspacePlanReport{SchemaVersion: 1, Operation: "workspace-plan", State: item.planState, ReviewToken: "review", Confirmation: "SAVE"},
+				plan:   domain.WorkspacePlanReport{SchemaVersion: 1, Operation: "workspace-plan", State: item.planState, ReviewToken: "review"},
 				result: domain.WorkspaceApplyReport{SchemaVersion: 1, Operation: "workspace-apply", State: item.resultState},
 			}
 			var stdout, stderr bytes.Buffer

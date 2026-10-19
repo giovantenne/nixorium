@@ -103,7 +103,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 					screen:       dashboardPXEStartReview,
 					installation: installationModel{startPlan: domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}},
 				},
-				expected: []string{"Type START to continue", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
+				expected: []string{"Enter starts network installation mode", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
 			},
 			{
 				name:     "recovery",
@@ -496,7 +496,6 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 	m := experienceFixture(2)
 	m.screen = dashboardDeployReview
 	m.deployment.plan = domain.DeploymentPlanReport{ColmenaSelector: "@lab"}
-	m.deployment.confirmation = "DEPLOY"
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	m = updated.(dashboardModel)
 	if !m.helpOpen {
@@ -537,13 +536,13 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.software.selected = "gimp"
 			m.software.scopeCursor = len(m.software.scopeOptions()) - 1
 			m.software.clientCursor = 199
-			m.software.plan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.software.catalog.Clients, Confirmation: "SAVE"}
+			m.software.plan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.software.catalog.Clients}
 			m.software.result = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 			m.shutdown.cursor = 199
 			m.shutdown.chosen = map[string]bool{"pc200": true}
 			m.shutdown.plan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
 			m.shutdown.result = domain.ShutdownApplyReport{State: "completed", Accepted: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc200", State: "accepted", Detail: "request accepted"}}}
-			m.controller.plan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD"}
+			m.controller.plan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40)}
 			m.installation.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
 			if screen == dashboardPXELeaveReview {
 				m.setupMode = true
@@ -563,7 +562,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
 			}
 			if screen == dashboardDeployReview {
-				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Selection") {
+				if !strings.Contains(view, "Enter updates these computers.") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Selection") {
 					t.Fatalf("deployment confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardShutdownReview {
@@ -571,11 +570,11 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 					t.Fatalf("shutdown confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
-				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+				if !strings.Contains(view, "Enter ") || !strings.Contains(view, "Cancel") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("PXE confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardServicesRestartReview {
-				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+				if !strings.Contains(view, "Enter restarts the software cache.") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardControllerReview {
@@ -746,29 +745,20 @@ func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 	}
 }
 
-func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
+func TestEnterReviewsIgnoreTypedTextAndEscCancelsSafely(t *testing.T) {
 	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview} {
 		m := experienceFixture(2)
 		m.screen = screen
-		if screen == dashboardDeployReview {
-			m.deployment.confirmation = "wrong"
-		} else {
-			m.confirmation = "wrong"
-		}
-		m.controller.plan.Confirmation = "REBUILD"
-		m.maintenance.gitCommitPlan.Confirmation = "COMMIT"
-		m.updates.plan.Confirmation = "UPDATE"
 		m.deployment.plan.ColmenaSelector = "@lab"
-		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-		m = updated.(dashboardModel)
-		confirmation := m.confirmation
-		if screen == dashboardDeployReview {
-			confirmation = m.deployment.confirmation
+		for _, key := range []tea.KeyPressMsg{{Text: "wrong"}, {Text: "DEPLOY"}} {
+			updated, command := m.Update(key)
+			m = updated.(dashboardModel)
+			confirmation := m.confirmation + m.deployment.confirmation
+			if command != nil || confirmation != "" || m.screen != screen || m.busy != "" {
+				t.Fatalf("screen %d kept or acted on typed text", screen)
+			}
 		}
-		if command != nil || confirmation != "" || m.screen != screen || m.busy != "" {
-			t.Fatalf("screen %d accepted incorrect input", screen)
-		}
-		updated, command = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 		m = updated.(dashboardModel)
 		if command != nil || m.screen == screen || m.busy != "" {
 			t.Fatalf("screen %d did not cancel safely", screen)
@@ -844,7 +834,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.software.plan = domain.SoftwareChangePlanReport{
 				State: "ready", ManagedFile: "lab-software.json",
 				Request:         domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
-				AffectedClients: []string{"pc01", "pc02", "pc03"}, Confirmation: "SAVE",
+				AffectedClients: []string{"pc01", "pc02", "pc03"},
 			}
 		case "software-result":
 			m.screen = dashboardSoftware

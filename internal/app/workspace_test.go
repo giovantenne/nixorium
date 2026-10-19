@@ -119,7 +119,7 @@ var minimalWorkspace = []byte(`{"schemaVersion":1}`)
 func TestWorkspaceFirstProfileIsNotAnUnchangedLegacyHome(t *testing.T) {
 	source, manager := workspaceManagerFixture()
 	plan := manager.Plan(t.Context(), "/deployment", minimalWorkspace)
-	if plan.HasErrors() || plan.State != "ready" || plan.Confirmation != "SAVE" || plan.ReviewToken == "" || source.writes != 0 || plan.Inspection.Base != nil {
+	if plan.HasErrors() || plan.State != "ready" || plan.Confirmation != "" || plan.ReviewToken == "" || source.writes != 0 || plan.Inspection.Base != nil {
 		t.Fatalf("first profile plan: %+v", plan)
 	}
 	result := manager.Apply(t.Context(), "/deployment", minimalWorkspace, plan.ReviewToken)

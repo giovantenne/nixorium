@@ -106,7 +106,9 @@ func (m *ShutdownManager) PlanAction(ctx context.Context, repository, requested 
 	report.State = "ready"
 	report.ExpiresAt = m.now().UTC().Truncate(shutdownReviewWindow).Add(shutdownReviewWindow)
 	report.ReviewToken = domain.ShutdownReviewToken(report)
-	report.Confirmation = action.Confirmation()
+	if report.InterruptsSessions() {
+		report.Confirmation = action.Confirmation()
+	}
 	report.Message = fmt.Sprintf("%d of %d selected computer(s) are eligible; checks will run again before requests are sent.", report.Eligible, len(report.Targets))
 	return report
 }

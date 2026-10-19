@@ -126,7 +126,6 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 	plan.State = "ready"
 	plan.ExpiresAt = m.now().UTC().Truncate(deploymentRecoveryWindow).Add(deploymentRecoveryWindow)
 	plan.ReviewToken = domain.DeploymentRecoveryToken(plan)
-	plan.Confirmation = domain.DeploymentRecoveryConfirmation
 	plan.Message = "Every reachable computer has finished. Confirming archives the record and unblocks operations; the interrupted update is not declared successful."
 	return plan
 }

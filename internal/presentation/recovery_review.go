@@ -116,7 +116,7 @@ func remoteInstallHostName(response domain.RemoteInstallResponse) string {
 
 func (review recoveryReview) ready() (bool, string) {
 	if review.kind == "deploy" {
-		return review.deployPlan.State == "ready" && !review.deployPlan.HasErrors(), review.deployPlan.Confirmation
+		return review.deployPlan.State == "ready" && !review.deployPlan.HasErrors(), ""
 	}
 	return review.resetPlan.State == "ready" && !review.resetPlan.HasErrors(), review.resetPlan.TypedConfirmation()
 }

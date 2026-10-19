@@ -43,12 +43,11 @@ type workspaceModel struct {
 	choiceNotes map[string]string
 	// Marketplace pins of the draft while the extension field is edited, and
 	// a downloaded proposal waiting for confirmation.
-	marketplace  map[string]domain.WorkspaceMarketplaceExtension
-	pending      *domain.WorkspaceMarketplaceCandidate
-	confirmation string
-	requestID    uint64
-	cancel       context.CancelFunc
-	saving       bool
+	marketplace map[string]domain.WorkspaceMarketplaceExtension
+	pending     *domain.WorkspaceMarketplaceCandidate
+	requestID   uint64
+	cancel      context.CancelFunc
+	saving      bool
 }
 
 func (model *workspaceModel) cancelRead() {

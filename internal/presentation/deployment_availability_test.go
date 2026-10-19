@@ -14,7 +14,7 @@ func mixedDeploymentPlan() domain.DeploymentPlanReport {
 	return domain.DeploymentPlanReport{Operation: "deploy-plan", State: "ready", Requested: "pc01,pc02", ColmenaSelector: "pc01,pc02", Revision: strings.Repeat("a", 40), ReachableRequested: "pc01", Targets: []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}, {Name: "pc02", IP: "10.0.0.2"}}, Availability: []domain.DeploymentTargetAvailability{{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable}, {Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown}}}
 }
 
-func TestDeploymentReachableOnlyCreatesFreshConfirmationAndExactSelection(t *testing.T) {
+func TestDeploymentReachableOnlyCreatesFreshReviewAndExactSelection(t *testing.T) {
 	original := mixedDeploymentPlan()
 	subset := original
 	subset.Requested = "pc01"
@@ -24,6 +24,7 @@ func TestDeploymentReachableOnlyCreatesFreshConfirmationAndExactSelection(t *tes
 	subset.ReachableRequested = ""
 	subset.Revision = strings.Repeat("b", 40)
 	calls := 0
+	var applied []string
 	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{PlanReachableDeployment: func(ctx context.Context, plan domain.DeploymentPlanReport) domain.DeploymentPlanReport {
 		calls++
 		if _, ok := ctx.Deadline(); !ok {
@@ -33,27 +34,34 @@ func TestDeploymentReachableOnlyCreatesFreshConfirmationAndExactSelection(t *tes
 			t.Fatal("presentation edited the old selector")
 		}
 		return subset
-	}, ApplyDeployment: func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
-		t.Fatal("subset dispatched a deployment")
+	}, ApplyDeployment: func(_ context.Context, plan domain.DeploymentPlanReport, _ func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+		applied = append(applied, plan.Revision+" "+plan.ColmenaSelector)
 		return domain.DeploymentExecutionReport{}
 	}}, false)
 	model.screen = dashboardDeployReview
 	model.deployment.plan = original
-	model.deployment.confirmation = "DEPLOY"
 	model.deployment.chosen = map[string]bool{"pc01": true, "pc02": true}
 	updated, command := model.Update(demoCode(tea.KeyF2))
 	model = updated.(dashboardModel)
-	if command == nil || model.deployment.confirmation != "" || model.deployment.applying {
-		t.Fatal("old authorization survived subset request")
+	if command == nil || model.deployment.applying {
+		t.Fatal("the subset request started a deployment")
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	if calls != 1 || model.screen != dashboardDeployReview || model.deployment.plan.Revision != subset.Revision || model.deployment.chosen["pc02"] || !model.deployment.chosen["pc01"] || model.deployment.confirmation != "" {
 		t.Fatalf("subset not independently reviewed: %+v", model.deployment)
 	}
+	if len(applied) != 0 {
+		t.Fatalf("the new review started a deployment by itself: %v", applied)
+	}
+	// Enter confirms the fresh review that is on screen, never the wider one.
 	updated, command = model.Update(demoCode(tea.KeyEnter))
-	if command != nil || updated.(dashboardModel).deployment.applying {
-		t.Fatal("subset skipped exact confirmation")
+	if command == nil || !updated.(dashboardModel).deployment.applying {
+		t.Fatal("Enter did not confirm the fresh subset review")
+	}
+	command()
+	if len(applied) != 1 || applied[0] != subset.Revision+" pc01" {
+		t.Fatalf("the deployment did not use the fresh subset review: %v", applied)
 	}
 }
 
@@ -64,7 +72,6 @@ func TestDeploymentSubsetCancellationKeepsOldReviewAndIgnoresLateReply(t *testin
 	}}, false)
 	model.screen = dashboardDeployReview
 	model.deployment.plan = original
-	model.deployment.confirmation = "DEPLOY"
 	updated, command := model.Update(demoCode(tea.KeyF2))
 	model = updated.(dashboardModel)
 	reply := command()

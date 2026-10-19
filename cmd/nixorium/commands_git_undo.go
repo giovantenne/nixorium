@@ -44,7 +44,7 @@ func parseGitUndoArguments(arguments []string) (options, error) {
 	flags.StringVar(&result.repository, "repo", "", "deployment path")
 	flags.StringVar(&result.expect, "expect", "", "review token")
 	flags.BoolVar(&result.json, "json", false, "JSON report")
-	flags.BoolVar(&result.yes, "yes", false, "undo without the typed confirmation")
+	flags.BoolVar(&result.yes, "yes", false, "undo without asking for confirmation")
 	flags.BoolVar(&result.help, "help", false, "usage")
 	flags.BoolVar(&result.help, "h", false, "usage")
 	if err := flags.Parse(arguments[1:]); err != nil {

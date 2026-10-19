@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
@@ -123,12 +121,7 @@ func runHomeFilesCommand(ctx context.Context, repository string, o options, stdo
 			output = stderr
 		}
 		presentation.HomeFilesPlanText(output, plan)
-		fmt.Fprint(output, "Type SAVE to write only the initial-file manifest and captured copies: ")
-		value, err := bufio.NewReader(os.Stdin).ReadString('\n')
-		if err != nil && len(value) == 0 {
-			return false, err
-		}
-		return strings.TrimSpace(value) == "SAVE", nil
+		return presentation.ConfirmYesNo(os.Stdin, output, "Write only the initial-file manifest and captured copies?")
 	}
 	return runHomeFilesWithManager(ctx, manager, repository, draft, o, confirm, stdout, stderr)
 }

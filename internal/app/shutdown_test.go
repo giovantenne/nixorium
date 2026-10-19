@@ -93,6 +93,40 @@ func TestShutdownPlanIncludesActiveSessionsAndProtectsUnknownSessions(t *testing
 	}
 }
 
+func TestPowerConfirmationWordIsAskedOnlyWhenSessionsMayBeInterrupted(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		session domain.ShutdownSessionState
+		policy  domain.ShutdownSessionPolicy
+		action  domain.ClientPowerAction
+		word    string
+	}{
+		{"idle shutdown confirms with Enter", domain.ShutdownSessionIdle, domain.ShutdownProtectUnknown, domain.ClientPowerOff, ""},
+		{"unused login shutdown confirms with Enter", domain.ShutdownSessionUnused, domain.ShutdownProtectUnknown, domain.ClientPowerOff, ""},
+		{"active session shutdown needs SHUTDOWN", domain.ShutdownSessionActive, domain.ShutdownProtectUnknown, domain.ClientPowerOff, "SHUTDOWN"},
+		{"acknowledged unknown session shutdown needs SHUTDOWN", domain.ShutdownSessionUnknown, domain.ShutdownAcknowledgeUnknown, domain.ClientPowerOff, "SHUTDOWN"},
+		{"idle restart confirms with Enter", domain.ShutdownSessionIdle, domain.ShutdownProtectUnknown, domain.ClientRestart, ""},
+		{"active session restart needs RESTART", domain.ShutdownSessionActive, domain.ShutdownProtectUnknown, domain.ClientRestart, "RESTART"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source, manager := shutdownFixture()
+			source.observations["pc01"] = domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: test.session}
+			plan := manager.PlanAction(context.Background(), "/deployment", "pc01", test.policy, test.action)
+			if plan.HasErrors() || plan.State != "ready" || plan.Confirmation != test.word || plan.InterruptsSessions() != (test.word != "") {
+				t.Fatalf("plan = %+v", plan)
+			}
+		})
+	}
+	// An ineligible computer with an active or unknown session does not make an
+	// otherwise idle review ask for a word: nothing is sent to it.
+	source, manager := shutdownFixture()
+	plan := manager.Plan(context.Background(), "/deployment", "pc01,pc02", domain.ShutdownProtectUnknown)
+	if plan.Eligible != 1 || plan.Targets[1].Eligible || plan.Confirmation != "" {
+		t.Fatalf("a computer that is not sent anything asked for a word: %+v", plan)
+	}
+	_ = source
+}
+
 func TestShutdownPlanRejectsControllerUnknownDuplicateAndConflicts(t *testing.T) {
 	for _, requested := range []string{"pc99", "pc04", "pc01,pc01", ""} {
 		_, manager := shutdownFixture()
@@ -179,7 +213,7 @@ func TestShutdownApplyDoesNotRetryBlindlyAfterUnconfirmedDispatch(t *testing.T) 
 func TestRestartUsesDistinctReviewAndDispatchAction(t *testing.T) {
 	source, manager := shutdownFixture()
 	plan := manager.PlanAction(context.Background(), "/deployment", "pc01", domain.ShutdownProtectUnknown, domain.ClientRestart)
-	if plan.HasErrors() || plan.Action != domain.ClientRestart || plan.Confirmation != "RESTART" || plan.Operation != "restart-plan" {
+	if plan.HasErrors() || plan.Action != domain.ClientRestart || plan.Confirmation != "" || plan.Operation != "restart-plan" {
 		t.Fatalf("restart plan = %+v", plan)
 	}
 	report := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)

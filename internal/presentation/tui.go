@@ -1799,10 +1799,14 @@ func (model dashboardModel) gitCommitReviewView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
+	fixedBody := tuiSection("Enter saves these changes as one local commit.", model.isDark)
+	if model.maintenance.gitDiscard {
+		fixedBody = tuiSection("Type "+model.maintenance.gitCommitPlan.Confirmation+" to continue:", model.isDark) + "\n> " + model.confirmation + "_"
+	}
 	return model.renderShell(tuiShell{
 		path:      path,
 		body:      strings.Join(lines, "\n"),
-		fixedBody: tuiSection("Type "+model.maintenance.gitCommitPlan.Confirmation+" to continue:", model.isDark) + "\n> " + model.confirmation + "_",
+		fixedBody: fixedBody,
 		notices:   notices,
 		actions:   gitReviewActions(model.maintenance.gitDiscard),
 	})
@@ -2383,7 +2387,7 @@ func (model dashboardModel) servicesView() string {
 		return model.renderShell(tuiShell{
 			path:      append(path, "Review"),
 			body:      body,
-			fixedBody: tuiSection("Type RESTART to continue:", model.isDark) + "\n> " + model.confirmation + "_",
+			fixedBody: tuiSection("Enter restarts the software cache.", model.isDark),
 			notices:   notices,
 			actions:   []tuiAction{{key: "Enter", label: "Restart cache"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
 		})
@@ -2630,7 +2634,7 @@ func (model dashboardModel) deployView() string {
 				tuiMuted("    The controller updates each of them as soon as it answers, and its user sees a notification.", model.isDark))
 		}
 		shell.body = strings.Join(lines, "\n")
-		shell.fixedBody = tuiSection("Type DEPLOY to continue:", model.isDark) + "\n> " + model.deployment.confirmation + "_"
+		shell.fixedBody = tuiSection("Enter updates these computers.", model.isDark)
 		shell.notices = append(shell.notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Target services may restart; unreachable computers may remain unchanged",
@@ -2919,7 +2923,7 @@ func (model dashboardModel) pxeView() string {
 		return model.renderShell(tuiShell{
 			path:      path,
 			body:      body,
-			fixedBody: tuiSection("Type START to continue:", model.isDark) + "\n> " + model.confirmation + "_",
+			fixedBody: tuiSection("Enter starts network installation mode.", model.isDark),
 			notices:   notices,
 			actions:   model.pxeActions(),
 		})
@@ -2941,7 +2945,7 @@ func (model dashboardModel) pxeView() string {
 		return model.renderShell(tuiShell{
 			path:      path,
 			body:      strings.Join(leaveLines, "\n"),
-			fixedBody: tuiSection("Keep it active", model.isDark) + "\n  Type LEAVE to continue:\n> " + model.confirmation + "_",
+			fixedBody: tuiSection("Keep it active", model.isDark) + "\n  Enter closes Nixorium and leaves installation mode active.",
 			notices:   notices,
 			actions:   model.pxeActions(),
 		})

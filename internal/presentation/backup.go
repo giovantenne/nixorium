@@ -19,7 +19,6 @@ type backupModel struct {
 	field                               int
 	remote, branch, destination, source string
 	passphrase, repeat                  []rune
-	confirmation                        string
 	plan                                domain.GitBackupPlan
 	reviewed, restore, standalone, done bool
 	result                              domain.BackupReport
@@ -214,7 +213,7 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 		fields = 3
 	case b.restore:
 		fields = 4
-	case b.archive || b.reviewed:
+	case b.archive:
 		fields = 3
 	}
 	switch key.String() {
@@ -270,10 +269,6 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 				}
 				b.reviewed = true
 				model.message = ""
-				return model, nil
-			}
-			if !b.archive && b.confirmation != "PUSH" {
-				model.message = "Confirm that this is your PRIVATE repository, then type PUSH."
 				return model, nil
 			}
 			if (b.archive && model.actions.CreateBackup == nil) || (!b.archive && model.actions.PublishGitBackup == nil) {
@@ -356,8 +351,6 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 				secret = &b.passphrase
 			case 1:
 				secret = &b.repeat
-			case 2:
-				plain = &b.confirmation
 			}
 		case b.field == 0:
 			plain = &b.remote
@@ -460,8 +453,8 @@ func (model dashboardModel) backupView() string {
 				"Use a passphrase of at least 12 characters. The whole archive is encrypted.", "")
 			fields = []field{{"Folder", b.destination}, {"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}}
 		case b.reviewed:
-			lines = append(lines, "Repository: "+b.plan.Remote, "Branch: "+b.plan.Branch+" · revision "+shortRevision(b.plan.Revision), fmt.Sprintf("%d tracked files and Git history; ignored files excluded.", b.plan.Files), "Configuration stays readable; password hashes and private keys are encrypted.", "Later saved changes are pushed automatically. The passphrase is needed again only", "when keys, account passwords or trusted computers change.", "Confirm the repository is PRIVATE on GitHub/GitLab. Type PUSH below.", "")
-			fields = []field{{"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}, {"Confirmation", b.confirmation}}
+			lines = append(lines, "Repository: "+b.plan.Remote, "Branch: "+b.plan.Branch+" · revision "+shortRevision(b.plan.Revision), fmt.Sprintf("%d tracked files and Git history; ignored files excluded.", b.plan.Files), "Configuration stays readable; password hashes and private keys are encrypted.", "Later saved changes are pushed automatically. The passphrase is needed again only", "when keys, account passwords or trusted computers change.", "Confirm the repository is PRIVATE on GitHub/GitLab, then press Enter to encrypt and push.", "")
+			fields = []field{{"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}}
 			actions[1].label = "Encrypt and push"
 		default:
 			lines = append(lines, "Save changes through Review Git changes first.", "Use a PRIVATE repository and independent SSH access; F1 explains setup.", "")

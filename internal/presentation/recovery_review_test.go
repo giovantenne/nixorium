@@ -53,7 +53,7 @@ func (fixture *recoveryFixture) actions() DashboardActions {
 					{Name: "pc02", IP: "10.0.0.2", State: domain.RecoveryTargetUnreachable, Detail: "off or not reachable; check it at the console"},
 				}}
 			if acknowledge {
-				plan.State, plan.Confirmation, plan.ReviewToken, plan.Message = "ready", "RECOVERED", "sha256:x", "Every reachable computer has finished."
+				plan.State, plan.ReviewToken, plan.Message = "ready", "sha256:x", "Every reachable computer has finished."
 			} else {
 				plan.Issues = []domain.ValidationIssue{{Field: "unreachable", Message: plan.Message}}
 			}

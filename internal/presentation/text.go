@@ -176,7 +176,7 @@ func GitCommitPlanText(writer io.Writer, report domain.GitCommitPlanReport) {
 	if report.CommitMessage != "" {
 		fmt.Fprintf(writer, "Commit message:  %s\n", report.CommitMessage)
 		fmt.Fprintf(writer, "Review token:    %s\n", report.ReviewToken)
-		fmt.Fprintf(writer, "Confirmation:    %s\n", report.Confirmation)
+		confirmationText(writer, "Confirmation:    ", report.Confirmation)
 		fmt.Fprintln(writer, "No remote or push is part of this plan.")
 	}
 	if report.Diff.Content != "" {
@@ -238,7 +238,7 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 	}
 	if report.ReviewToken != "" {
 		fmt.Fprintf(writer, "Review token:     %s\n", report.ReviewToken)
-		fmt.Fprintf(writer, "Confirmation:     %s\n", report.Confirmation)
+		confirmationText(writer, "Confirmation:     ", report.Confirmation)
 		fmt.Fprintln(writer, "No branch, commit, push, activation, PXE action, or deployment is part of this plan.")
 	}
 	if report.Diff.Content != "" {
@@ -621,7 +621,8 @@ func SoftwarePresetPlanText(writer io.Writer, report domain.SoftwarePresetPlanRe
 		fmt.Fprintf(writer, "Client configuration:     %s\n", strings.Join(report.AffectedClients, ", "))
 	}
 	if report.ReviewToken != "" {
-		fmt.Fprintf(writer, "Review token:             %s\nConfirmation:             %s\n", report.ReviewToken, report.Confirmation)
+		fmt.Fprintf(writer, "Review token:             %s\n", report.ReviewToken)
+		confirmationText(writer, "Confirmation:             ", report.Confirmation)
 	}
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
@@ -661,7 +662,8 @@ func SoftwareChangePlanText(writer io.Writer, report domain.SoftwareChangePlanRe
 		fmt.Fprintf(writer, "Configuration:     %s\n", strings.Join(report.AffectedClients, ", "))
 	}
 	if report.ReviewToken != "" {
-		fmt.Fprintf(writer, "Review token:      %s\nConfirmation:      %s\n", report.ReviewToken, report.Confirmation)
+		fmt.Fprintf(writer, "Review token:      %s\n", report.ReviewToken)
+		confirmationText(writer, "Confirmation:      ", report.Confirmation)
 	}
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
@@ -712,7 +714,7 @@ func ShutdownPlanText(writer io.Writer, report domain.ShutdownPlanReport) {
 	if report.ReviewToken != "" {
 		fmt.Fprintf(writer, "Review token:  %s\n", report.ReviewToken)
 		fmt.Fprintf(writer, "Expires:       %s\n", report.ExpiresAt.UTC().Format(time.RFC3339))
-		fmt.Fprintf(writer, "Confirmation:  %s\n", report.Confirmation)
+		confirmationText(writer, "Confirmation:  ", report.Confirmation)
 	}
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
@@ -878,4 +880,12 @@ func cleanText(dirty bool, changes int) string {
 		return countNoun(changes, "changed path")
 	}
 	return "clean"
+}
+
+// confirmationText prints the typed word of a plan. Most plans have none:
+// Enter or a yes/no answer confirms them (ADR 0026).
+func confirmationText(writer io.Writer, label, word string) {
+	if word != "" {
+		fmt.Fprintf(writer, "%s%s\n", label, word)
+	}
 }

@@ -93,7 +93,7 @@ func TestTemplateResetRecoverApplyAsksYesOrNoUnlessFilesAreRestored(t *testing.T
 		return code, stdout.String(), stderr.String()
 	}
 	plan := func(kind string) domain.TemplateResetRecoveryPlan {
-		return domain.TemplateResetRecoveryPlan{State: "ready", Case: kind, Confirmation: "RECOVERED", ReviewToken: "sha256:x",
+		return domain.TemplateResetRecoveryPlan{State: "ready", Case: kind, ReviewToken: "sha256:x",
 			Original: strings.Repeat("a", 40), Candidate: strings.Repeat("b", 40), Head: strings.Repeat("a", 40), BackupRef: "refs/nixorium/template-backups/x"}
 	}
 

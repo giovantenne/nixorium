@@ -63,7 +63,6 @@ func (m *ControllerManager) Plan(ctx context.Context, repository string) domain.
 		return report
 	}
 	report.Controller = meta.Controller.Name
-	report.Confirmation = "REBUILD"
 	var deployment domain.DeploymentStatus
 	if inspection != nil {
 		deployment = inspection.Deployment

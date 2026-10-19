@@ -81,7 +81,6 @@ func (model dashboardModel) finishWorkspacePlan(message dashboardWorkspacePlanMs
 	}
 	model.workspace.plan = report
 	model.workspace.scroll = 0
-	model.workspace.confirmation = ""
 	model.workspace.stage = workspaceReview
 	return model, nil
 }
@@ -194,7 +193,6 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 		switch key.String() {
 		case "esc":
 			model.workspace.stage = workspaceOverview
-			model.workspace.confirmation = ""
 			model.message = "Review cancelled; no file changed."
 		case "up":
 			model.workspace.scroll = max(0, model.workspace.scroll-1)
@@ -204,18 +202,14 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 			model.workspace.scroll = max(0, model.workspace.scroll-max(1, model.height-17))
 		case "pgdown":
 			model.workspace.scroll += max(1, model.height-17)
-		case "backspace":
-			if len(model.workspace.confirmation) > 0 {
-				model.workspace.confirmation = model.workspace.confirmation[:len(model.workspace.confirmation)-1]
-			}
 		case "enter":
 			if model.workspace.plan.State == "unchanged" {
 				model.workspace.stage = workspaceOverview
 				model.message = "The settings are unchanged; nothing needed saving."
 				return model, nil
 			}
-			if model.workspace.plan.HasErrors() || model.workspace.plan.State != "ready" || model.workspace.plan.Confirmation != "SAVE" || model.workspace.plan.ReviewToken == "" || model.workspace.confirmation != "SAVE" {
-				model.message = "Type SAVE to save these settings. Computers are updated separately."
+			if model.workspace.plan.HasErrors() || model.workspace.plan.State != "ready" || model.workspace.plan.ReviewToken == "" {
+				model.message = "This review cannot be saved. Go back and create a new one."
 				return model, nil
 			}
 			model.workspace.saving = true
@@ -224,10 +218,6 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 			model.busy = "Rechecking, saving and recording workspace-profile.json"
 			model.message = ""
 			return model, func() tea.Msg { return dashboardWorkspaceSaveMsg{id: id, report: model.actions.SaveWorkspace(plan)} }
-		default:
-			if key.Text != "" && len(model.workspace.confirmation)+len(key.Text) <= 4 {
-				model.workspace.confirmation += key.Text
-			}
 		}
 	case workspaceResult:
 		switch key.String() {
@@ -364,7 +354,7 @@ func (model dashboardModel) workspaceView() string {
 			start := min(w.scroll, max(0, len(wrapped)-capacity))
 			lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
 			lines = append(lines, fmt.Sprintf("Review lines %d–%d of %d", start+1, min(len(wrapped), start+capacity), len(wrapped)))
-			fixed = "Save and record only the profile JSON; no system apply or reset.\nType SAVE: " + w.confirmation + "_"
+			fixed = "Enter saves and records only the profile JSON; no system apply or reset."
 			label := "Save JSON"
 			if w.plan.State == "unchanged" {
 				fixed = "Settings unchanged. Student home folders have not been checked."
