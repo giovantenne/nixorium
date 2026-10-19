@@ -204,6 +204,11 @@ func (store AssistantStateStore) DeleteToken() error {
 	return root.Sync()
 }
 
+// assistantConsentTextVersion is the disclosure the saved consent accepted.
+// Version 3 adds allowlisted system configuration files (ADR 0032); an older
+// consent is asked again once.
+const assistantConsentTextVersion = 3
+
 func (store AssistantStateStore) ReadConsent() (bool, error) {
 	root, err := store.root()
 	if errors.Is(err, unix.ENOENT) {
@@ -225,7 +230,7 @@ func (store AssistantStateStore) ReadConsent() (bool, error) {
 		return false, errors.New("invalid Assistant consent")
 	}
 	_, err = time.Parse(time.RFC3339, consent.AcceptedAt)
-	return err == nil && consent.SchemaVersion == 1 && consent.TextVersion == 2, nil
+	return err == nil && consent.SchemaVersion == 1 && consent.TextVersion == assistantConsentTextVersion, nil
 }
 
 func (store AssistantStateStore) WriteConsent() error {
@@ -238,7 +243,7 @@ func (store AssistantStateStore) WriteConsentSharing(share bool) error {
 		return err
 	}
 	defer root.Close()
-	data, err := json.Marshal(domain.AssistantConsent{SchemaVersion: 1, AcceptedAt: time.Now().UTC().Format(time.RFC3339), TextVersion: 2, ShareConversations: share})
+	data, err := json.Marshal(domain.AssistantConsent{SchemaVersion: 1, AcceptedAt: time.Now().UTC().Format(time.RFC3339), TextVersion: assistantConsentTextVersion, ShareConversations: share})
 	if err != nil {
 		return err
 	}
@@ -267,7 +272,7 @@ func (store AssistantStateStore) sharingConsent() (domain.AssistantConsent, erro
 	if assistantDecodeStrict(data, &consent) != nil {
 		return domain.AssistantConsent{}, errors.New("invalid Assistant consent")
 	}
-	if _, err := time.Parse(time.RFC3339, consent.AcceptedAt); err != nil || consent.SchemaVersion != 1 || consent.TextVersion != 2 {
+	if _, err := time.Parse(time.RFC3339, consent.AcceptedAt); err != nil || consent.SchemaVersion != 1 || consent.TextVersion != assistantConsentTextVersion {
 		return domain.AssistantConsent{}, nil
 	}
 	return consent, nil

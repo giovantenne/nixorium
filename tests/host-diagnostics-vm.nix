@@ -52,6 +52,16 @@
     with subtest("no arbitrary unit, path or command and no reset mutation"):
       machine.fail("nixorium-host-diagnostics 'system;touch /tmp/diagnostics-mutated'")
       machine.fail("nixorium-host-diagnostics system extra")
+      # Allowlisted system files (ADR 0032): read, list, refuse secrets and homes.
+      hosts = json.loads(machine.succeed("nixorium-host-diagnostics file /etc/hosts"))
+      assert hosts["kind"] == "file" and "localhost" in hosts["content"] and hosts["resolved"].startswith("/nix/store/"), hosts
+      listing = json.loads(machine.succeed("nixorium-host-diagnostics file /etc"))
+      names = [entry["name"] for entry in listing["entries"]]
+      assert "hosts" in names and "shadow" not in names and listing["hidden"] >= 1, listing
+      for refused in ["/etc/shadow", "/etc/ssh/ssh_host_ed25519_key", "/root", "/home", "/etc/../root/.ssh"]:
+        machine.fail("nixorium-host-diagnostics file " + refused)
+      machine.fail("nixorium-host-diagnostics file '/etc/hosts;touch /tmp/file-mutated'")
+      machine.fail("test -e /tmp/file-mutated")
       machine.fail("test -e /tmp/diagnostics-mutated")
       assert machine.succeed("systemctl show home-reset.service --property=NRestarts --value").strip() == "0"
       machine.fail("test -e /var/lib/home-snapshots/.workspace-reset/pending.json")

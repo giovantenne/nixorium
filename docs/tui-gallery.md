@@ -397,8 +397,9 @@ Before you send
 
 Your messages, configuration files and saved configuration history read by
 Assistant are sent to the Nixorium Assistant service and its AI provider.
-Assistant may also read system state and limited recent logs from declared
-computers. Known secret patterns and common private identifiers are filtered;
+Assistant may also read system state, recent logs and configuration files
+(never home folders, passwords or keys) from declared computers. Known secret patterns and common private
+identifiers are filtered;
 filtering is best effort and may leave personal or sensitive text.
 Student home files are not read. The service does not keep configuration files.
 It keeps messages and answers for 30 days to detect abuse, then deletes them.

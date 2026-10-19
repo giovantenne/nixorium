@@ -178,6 +178,7 @@ The model has fixed tools, with no shell or system-operation tool:
 | `prepare_npm` | Capable controllers only: prepare a public npm CLI package/tag and its tested offline dependency artifact |
 | `host_diagnostics` | One exact declared computer and a fixed area; read-only state and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
+| `read_system_file` | Capable controllers only, after the updated consent: one allowlisted system file or directory of one declared computer (see [System files](#system-files)); 256 KiB of text, 500 listing entries, 60-second timeout |
 | `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
 
 Assistant never changes the laboratory network; for a new network address or
@@ -224,6 +225,28 @@ roles, missing helpers, insufficient journal permissions and incomplete evidence
 remain explicit; an empty journal is not proof of service health. Apply an
 updated configuration through ordinary reviews to install the helper on older
 computers. This tool never restarts a service, changes a system or runs a queue.
+
+### System files
+
+Controllers that advertise `system_files_v1` offer `read_system_file`: one
+path of one computer from fresh declared inventory, after the version-3
+disclosure. Only `/etc`, `/boot/grub`, `/boot/loader`, `/proc/cmdline`,
+`/proc/cpuinfo`, `/proc/meminfo`, `/proc/mounts`, `/proc/partitions`,
+`/proc/swaps`, `/proc/version`, `/sys/class/net`, `/sys/class/dmi/id`,
+`/var/lib/nixorium` and `/run/nixorium` are readable. Home folders, `/root`,
+shadow files, private SSH keys, Wi-Fi connections, Nixorium keys, reset
+snapshots, installation state and device serial numbers are refused, by path
+and by name (`secret`, `private`, `token`, `password`, key files), and so is
+any link leading there; links from `/etc` are followed into the Nix store
+only. A directory is listed with refused entries counted, not named. Text is
+returned up to 256 KiB, binary files only as such; lines that set passwords,
+tokens or keys keep only their first word. The fixed helper
+`nixorium-host-diagnostics file PATH` reads clients as root through the
+existing strict SSH trust; on the controller it runs as the administrator, so
+root-only files there (such as the boot menu on `/boot`) are reported as not
+readable. A computer whose helper is older answers `computer_needs_update`.
+The controller checks every answer again before it reaches the model. See
+ADR 0032.
 
 `git_history` reads only committed ancestors of the conversation's original
 base, with a default of ten and a maximum of twenty. An optional `path` is an

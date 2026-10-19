@@ -33,6 +33,7 @@ func AssistantToolsV1() []AssistantToolDefinition {
 		definition("host_diagnostics", map[string]any{"host": str, "area": map[string]any{"type": "string", "enum": []string{"system", "home_reset", "updates", "network", "cache", "pxe"}}}, []string{"host", "area"}),
 		definition("git_history", map[string]any{"limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 20}, "revision": str, "path": str}, []string{}),
 		definition("prefetch", map[string]any{"url": str}, []string{"url"}),
+		definition("read_system_file", map[string]any{"host": str, "path": str}, []string{"host", "path"}),
 	}
 }
 func ValidateAssistantArguments(name string, data []byte) bool {

@@ -10,6 +10,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Assistant can read system configuration files of the controller and the
+  computers, such as the boot menu or the settings in `/etc`, so it can, for
+  example, make Windows the default boot entry without asking you to look
+  anything up. It never reads home folders, passwords, keys or Wi-Fi
+  credentials. Assistant asks once more for consent because of this.
 - A [trademark policy](TRADEMARKS.md) says how the Nixorium name and logo can
   be used: freely to talk about and share Nixorium, with permission for forks,
   services and products that carry the name.

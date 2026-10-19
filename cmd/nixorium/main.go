@@ -335,7 +335,11 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	assistantReporter := app.AssistantConversationReporter{Client: assistantClient, Store: assistantWorkspace, Version: nixoriumVersion}
 	assistantLabStatus := app.AssistantLabStatus{Inspector: inspector, DeferredUpdates: newDeferredUpdateManager()}
 	assistantDiagnostics := app.AssistantDiagnostics{Source: local}
-	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace, LabStatus: assistantLabStatus.Execute, Diagnostics: assistantDiagnostics.Execute}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}
+	assistantSystemFiles := app.AssistantSystemFiles{Source: local, Errors: map[error]string{
+		adapters.ErrSystemFileRefused: "refused_path", adapters.ErrSystemFileMissing: "not_found",
+		adapters.ErrSystemFileUnreadable: "not_readable", adapters.ErrSystemFileOldComputer: "computer_needs_update",
+	}}
+	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace, LabStatus: assistantLabStatus.Execute, Diagnostics: assistantDiagnostics.Execute, SystemFiles: assistantSystemFiles.Execute}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}
 	actions := presentation.DashboardActions{
 		OpenURL:   desktopOpener(),
 		Assistant: assistantConfig,

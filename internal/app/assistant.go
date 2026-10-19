@@ -56,6 +56,7 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		Query   string
 		Package string
 		URL     string
+		Host    string
 	}
 	_ = json.Unmarshal(call.Arguments, &args)
 	switch call.Name {
@@ -81,6 +82,8 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		return "Preparing offline npm package " + args.Package
 	case "host_diagnostics":
 		return "Reading computer diagnostics"
+	case "read_system_file":
+		return "Reading " + args.Path + " on " + args.Host
 	case "git_history":
 		return "Reading saved configuration history"
 	case "prefetch":
@@ -185,7 +188,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			core = nil
 		}
 	}
-	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1", "settings_v1"}}
+	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1", "settings_v1", "system_files_v1"}}
 	if discovery, ok := runner.Store.(interface {
 		HomeFilesSupported(context.Context, domain.AssistantConversation) bool
 	}); ok && discovery.HomeFilesSupported(ctx, conversation) {
