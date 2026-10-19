@@ -1446,7 +1446,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			// Keep the ordinary active-PXE exit review below.
 		case "l":
 			if model.updates.planning {
-				model.progressDetails = !model.progressDetails
+				if model.updatePlanDetailsAvailable() {
+					model.progressDetails = !model.progressDetails
+				}
 				return model, nil
 			}
 			fallthrough
@@ -1500,9 +1502,12 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			return model, input.command
 		}
 	}
-	if key.String() == "l" && (model.deployment.applying || model.controller.applying || model.installation.pxePreparing || model.updates.planning) {
-		model.progressDetails = !model.progressDetails
-		model.pageScroll = 0
+	if key.String() == "l" && model.progressOperationRunning() {
+		// With nothing to expand the key is inert: no toggle, no empty view.
+		if model.progressDetailsAvailable() {
+			model.progressDetails = !model.progressDetails
+			model.pageScroll = 0
+		}
 		return model, nil
 	}
 	if model.deployment.applying && model.deployment.stopReview {

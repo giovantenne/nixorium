@@ -1876,12 +1876,8 @@ func (model dashboardModel) updateView() string {
 					lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updates.planProgress.Current, model.updates.planProgress.Total))
 				}
 			}
-			if model.progressDetails {
-				detail := model.updates.planProgress.Detail
-				if detail == "" {
-					detail = "Waiting for check details…"
-				}
-				lines = append(lines, "", tuiSection("Current check details: ", model.isDark)+detail)
+			if model.progressDetails && model.updatePlanDetailsAvailable() {
+				lines = append(lines, "", tuiSection("Current check details: ", model.isDark)+model.updates.planProgress.Detail)
 			}
 		} else {
 			lines = append(lines, model.busyView())
@@ -1893,7 +1889,7 @@ func (model dashboardModel) updateView() string {
 			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The current deployment remains unchanged", detail: "Downloads and local builds can take several minutes."})
 		}
 		actions := []tuiAction{{key: "F1", label: "Help"}}
-		if model.updates.planning {
+		if model.updates.planning && model.updatePlanDetailsAvailable() {
 			actions = append([]tuiAction{{key: "l", label: "Progress details"}}, actions...)
 		}
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
@@ -2596,7 +2592,10 @@ func (model dashboardModel) deployView() string {
 		if model.deployment.stopRequested {
 			shell.notices[0].detail = "Stopping local supervision and checking client state. Remote activation may continue; do not start another deployment."
 		}
-		shell.actions = []tuiAction{{key: "l", label: "Progress details"}}
+		shell.actions = nil
+		if model.deploymentDetailsAvailable() {
+			shell.actions = append(shell.actions, tuiAction{key: "l", label: "Progress details"})
+		}
 		if !model.deployment.stopRequested && model.deployment.cancel != nil {
 			shell.actions = append(shell.actions, tuiAction{key: "s", label: "Stop waiting"})
 		}
@@ -2746,7 +2745,8 @@ func (model dashboardModel) deploymentProgressView() []string {
 		index = 4
 	}
 	lines := phaseSteps([]string{"Building configurations", "Revalidating reviewed configuration", "Updating computers", "Verifying computers"}, index, progressState.Phase == domain.DeploymentPhaseComplete, model.isDark)
-	if model.progressDetails && len(progressState.Output) > 0 {
+	expanded := model.progressDetails && model.deploymentDetailsAvailable()
+	if expanded && len(progressState.Output) > 0 {
 		// Show actual activity above the fold in an 80x24 terminal instead of
 		// repeating the four-step overview and hiding the log below it.
 		lines = []string{"", fmt.Sprintf("Phase: %s · %d/%d steps complete", phaseLabels[progressState.Phase], progressState.Completed, progressState.Total)}
@@ -2758,7 +2758,7 @@ func (model dashboardModel) deploymentProgressView() []string {
 			lines = append(lines, tuiMuted("No recent output; this alone does not mean the operation has stopped.", model.isDark))
 		}
 	}
-	if !model.progressDetails {
+	if !expanded {
 		if progressState.TargetTotal > 0 {
 			lines = append(lines, "", fmt.Sprintf("Computers checked: %d/%d", progressState.TargetCurrent, progressState.TargetTotal))
 		}
@@ -2989,10 +2989,18 @@ func (model dashboardModel) pxeActions() []tuiAction {
 		return []tuiAction{{key: "x", label: "Stop and exit"}, {key: "Enter", label: "Leave active"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	}
 	if model.installation.pxePreparing {
-		return []tuiAction{{key: "l", label: "Progress details"}, {key: "q", label: "Quit Nixorium; work continues"}, {key: "F1", label: "Help"}}
+		actions := []tuiAction{{key: "q", label: "Quit Nixorium; work continues"}, {key: "F1", label: "Help"}}
+		if operationDetailsAvailable(model.installation.pxeProgress) {
+			actions = append([]tuiAction{{key: "l", label: "Progress details"}}, actions...)
+		}
+		return actions
 	}
 	if model.controller.applying {
-		return []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}
+		actions := []tuiAction{{key: "F1", label: "Help"}}
+		if model.controllerDetailsAvailable() {
+			actions = append([]tuiAction{{key: "l", label: "Progress details"}}, actions...)
+		}
+		return actions
 	}
 	if model.busy != "" {
 		return []tuiAction{{key: "q", label: "Quit Nixorium; work continues"}, {key: "F1", label: "Help"}}
@@ -3111,7 +3119,7 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 		"verify":    "Verifying activation",
 	}
 	lines := []string{title, "  Phase: " + phaseLabels[operation.Phase]}
-	if !model.progressDetails && !model.controller.details {
+	if !(model.progressDetails && operationDetailsAvailable(operation)) && !model.controller.details {
 		kind := tuiStatusNeutral
 		label := "● " + phaseLabels[operation.Phase] + " · Running"
 		if operation.State == "completed" {

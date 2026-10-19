@@ -276,7 +276,7 @@ func (model dashboardModel) helpView() string {
 				"Esc keeps your selection. Successful recovery creates a fresh review that Enter confirms again.")
 			break
 		}
-		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping asks for Enter on its own review; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers, or the review of an interrupted update   d technical details")
+		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details when there are any; s review stopping local supervision; q cannot interrupt", "Stopping asks for Enter on its own review; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers, or the review of an interrupted update   d technical details")
 	case dashboardBackup:
 		lines = append(lines, "Backup is optional and never blocks installation or updates. Choose an encrypted file or a private Git repository.",
 			"An encrypted file contains the entire deployment and Git history. Mount the USB first, choose an existing folder outside the deployment, and enter a passphrase of at least 12 characters. Review, then Enter creates the archive.",
@@ -376,7 +376,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "After review and save, apply the configuration to this controller, then update the computers. Esc returns to Accounts.")
 		}
 	case dashboardPXE:
-		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   r refresh", "l progress details while preparing; q closes only the view")
+		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   r refresh", "l progress details while preparing, when there are details; q closes only the view")
 		if pxeRecoveryMode(model.report.PXE.Mode) {
 			lines = append(lines, "After an interrupted network installation, Enter recovers the network: it puts back the controller's normal address and turns network installation off. Nothing changes on the student computers, so no word needs typing.",
 				"x stops both network installation services instead and checks the normal address. d shows the technical text of a failed attempt.")
@@ -400,7 +400,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview, dashboardGitUndoReview:
 		lines = append(lines, "c select commit paths   x discard changes   u undo the last saved change   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "Enter on a commit review creates a local commit; DISCARD (typed) restores files after saving their content; Enter on the undo review saves a new change that puts the files of the last saved change back. Nothing is pushed and no computer changes.", "After an undo, Enter on the result opens Apply to controller; then update the computers.")
 	case dashboardUpdate, dashboardUpdateReview:
-		lines = append(lines, "During validation: l expands or collapses current check details in place.")
+		lines = append(lines, "During validation: l expands or collapses current check details in place, when there are details.")
 		if model.updates.packageBase {
 			lines = append(lines, "Enter check current channel   m change channel   r inspect pin", "In the channel form, type nixos-YY.MM and Space to acknowledge unverified compatibility.", "Review/build precedes saving and controller activation. Client distribution is separate.", "Build success does not verify runtime or hardware; check boot and services afterwards.")
 		} else {
@@ -528,14 +528,14 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 		}
 		if model.read.cancel != nil {
 			shell.actions = []tuiAction{{key: "Esc", label: "Cancel read"}, {key: "F1", label: "Help"}}
-			if model.updates.planning {
+			if model.updates.planning && model.updatePlanDetailsAvailable() {
 				shell.actions = append([]tuiAction{{key: "l", label: "Progress details"}}, shell.actions...)
 			}
 		} else if !model.deployment.stopReview {
 			// The footer must not advertise navigation or repeat a mutation
 			// while its result is pending. Reviewed deployment stop is separate.
 			shell.actions = []tuiAction{{key: "F1", label: "Help"}}
-			if model.deployment.applying || model.controller.applying || model.installation.pxePreparing {
+			if model.operationDetailsActive() {
 				shell.actions = append([]tuiAction{{key: "l", label: "Progress details"}}, shell.actions...)
 			}
 			if model.deployment.applying && model.deployment.cancel != nil && !model.deployment.stopRequested {
