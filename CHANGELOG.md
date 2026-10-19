@@ -13,6 +13,14 @@ The project follows [Semantic Versioning](https://semver.org/).
   example, make Windows the default boot entry without asking you to look
   anything up. It never reads home folders, passwords, keys or Wi-Fi
   credentials. Assistant asks once more for consent because of this.
+- **Update Nixorium** can now change your own deployment files when a release
+  needs it, instead of asking you to edit them by hand. The review shows each
+  change with a one-line reason, and a "Manual change" with the text to replace
+  and the text to put instead when you have edited that file yourself. Saving
+  the update writes and commits the changed files with it, you can undo it with
+  Git like any update, and the new file `nixorium-migrations.json` records which
+  changes were made so each is made only once. See
+  [Updating](docs/updates.md#changes-to-your-own-files).
 
 ### Changed
 
@@ -67,7 +75,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Deployments created before 3.9.0 have a `modules/workstation.nix` that
   finds the controller by comparing `hostName`. Computers that share a
   configuration have no single name, so that test now stops the evaluation
-  with a message that says what to do: replace the line
+  with a message that says what to do. From this release on, Update Nixorium
+  makes this change for you: the review shows it as a change to
+  `modules/workstation.nix`, or as a "Manual change" if you edited that line.
+  Only when you update from 3.9.0 or older to this release, which cannot apply
+  it yet, do it by hand once: replace the line
   `isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);`
   with `isController = args.isController or false;`, save, then update
   Nixorium again.

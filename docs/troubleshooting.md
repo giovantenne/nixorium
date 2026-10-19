@@ -908,6 +908,38 @@ If the controller still runs 3.8.0, update Nixorium first: that update leaves
 the same inconsistency once more, and the newer release then repairs it as
 above.
 
+## The update review shows "Manual change"
+
+The review of **Update Nixorium** lists the changes the new release makes to
+your own files. "Manual change" means the release could not make one of them
+because the file is not as the release expects: you edited that place, the text
+appears more than once, or the file is not a saved file of the deployment. No
+file is touched for that change.
+
+1. Read the two texts in the review: `Replace:` is the text the release expects
+   to find and `With:` the text it wants.
+2. Open the file named in the review and make that change yourself: replace
+   the `Replace:` text with the `With:` text, keeping any other edit you made on
+   purpose. If the file already says what the `With:` text says, nothing needs
+   to change.
+3. Save it as a normal reviewed change (**Maintenance → Review Git changes**),
+   then run **Update Nixorium** again. Assistant can prepare this change as a
+   proposal for you to review.
+
+Do not edit `nixorium-migrations.json` to make the message go away: it records
+changes the update made and only the update writes it.
+
+If `nixorium-migrations.json` itself is not valid, the update stops with a
+message that names the file. Go back to an earlier saved version of the file in
+Git. A valid file has this form:
+
+```text
+{"schemaVersion":1,"applied":["2026-10-workstation-is-controller"]}
+```
+
+If there is no earlier version, remove the file in a reviewed change: the update
+then checks each change again, and records those your files already contain.
+
 ## An upstream update failed
 
 - A failed `update check` changes nothing. It is optional; when the controller

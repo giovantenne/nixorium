@@ -61,7 +61,9 @@ Open Maintenance:
    is supported. Resolution/evaluation/build failures still block.
 4. Review the bounded flake diff and checks. Enter explicitly saves the
    reviewed files and records them in local Git, then activates/verifies the
-   controller through the existing managed controller operation.
+   controller through the existing managed controller operation. The review
+   can also list changes the new release makes to your own files (see
+   [Changes to your own files](#changes-to-your-own-files)).
 5. If saving fails, recover saving first. If controller activation fails after
    saving, the desired configuration is saved but the running controller is
    not verified; retry controller activation, not a new input update.
@@ -119,8 +121,9 @@ nixorium package-base plan --target nixos-26.11 --allow-unverified
 nixorium package-base apply --target nixos-26.11 --allow-unverified --expect <review-token> --yes
 ```
 
-Unlike the ordinary TUI save, CLI apply writes only `flake.nix` and
-`flake.lock`. Review/commit those files locally, then use `controller plan`
+Unlike the ordinary TUI save, CLI apply writes only `flake.nix`,
+`flake.lock` and the files and record of the migrations of your own files (see
+[Changes to your own files](#changes-to-your-own-files)). Review/commit those files locally, then use `controller plan`
 and `controller apply --expect <reviewed-git-revision>`. Use the existing
 `deploy plan --on pc01` / `deploy apply` workflow separately for clients.
 No command above pushes a repository.
@@ -192,6 +195,41 @@ Neither output should be overridden to bypass failures.
 Build success remains explicitly runtime/hardware-unverified. No
 `--allow-unverified` flag bypasses input integrity, clean-state checks,
 readiness, builds, offline consistency or a stale review token.
+
+## Changes to your own files
+
+Some of your deployment's files, such as `modules/workstation.nix`, are copied
+from a template when the laboratory is created and then belong to you. When a
+release needs a change in one of them, the release lists that change exactly,
+and **Update Nixorium** applies it as part of the update. You see it before you
+save. The review shows, for each change:
+
+- `Migration:` the file and, in one sentence, why it changes. The change is
+  also in the diff. It is made only when the old text is found exactly once.
+- `Manual change:` the file could not be changed automatically, because you
+  edited it (the old text is missing or appears several times) or it is not a
+  saved file of the deployment. Nothing in that file is touched. The review
+  shows the text to replace (`Replace:`) and the text to put instead
+  (`With:`). Make that change yourself in a normal reviewed change, and update
+  again; Assistant can help prepare it as a proposal for you to review.
+
+Saving the update writes the changed files before `flake.lock` and `flake.nix`,
+and only if each file is still exactly as you reviewed it; otherwise the save is
+refused. The changed files are committed with the update in
+**Maintenance → Review Git changes** (message "chore: update Nixorium and
+migrate deployment files"). To go back, undo the saved change in Git as for any
+other update.
+
+The file `nixorium-migrations.json` records which changes were applied, so each
+one is made only once, even if the old text appears again later. It is created
+or updated in the same save and is committed with the rest. Do not edit it by
+hand. A change that your file already contains is recorded as done without
+touching the file. This feature never changes `flake.nix`, `flake.lock`,
+passwords, keys or hidden files.
+
+Changes to your own files are applied only when the controller already runs a
+release that has this feature (the release after 3.9.0). When you update from
+3.9.0 or older, the release notes list the steps to do by hand once.
 
 ## Updating one application independently
 
