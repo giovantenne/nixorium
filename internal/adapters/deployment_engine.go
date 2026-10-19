@@ -53,10 +53,7 @@ var (
 	clientActivationStartGrace = 30 * time.Second
 )
 
-var (
-	clientHostName  = regexp.MustCompile(`^pc[0-9]{1,4}$`)
-	clientClassName = regexp.MustCompile(`^shared-[0-9]{1,4}$`)
-)
+var clientHostName = regexp.MustCompile(`^pc[0-9]{1,4}$`)
 
 // clientBuildSource prepares the reviewed source of a build; tests replace it.
 var clientBuildSource = func(ctx context.Context, repository, revision string) (string, error) {
@@ -90,12 +87,12 @@ func buildClientSystems(ctx context.Context, plan domain.DeploymentPlanReport, o
 		if !clientHostName.MatchString(target.Name) {
 			return fmt.Errorf("invalid computer name %q", target.Name)
 		}
-		key, fragment := target.Name, "-nixos-system-"+target.Name+"-"
+		if !domain.ValidClientClass(target.Name, target.Class) {
+			return fmt.Errorf("invalid class %q of %s", target.Class, target.Name)
+		}
+		key, fragment := target.Name, "-nixos-system-"+domain.ClientSystemName(target.Name, target.Class)+"-"
 		if target.SharedSystem() {
-			if !clientClassName.MatchString(target.Class) {
-				return fmt.Errorf("invalid class %q of %s", target.Class, target.Name)
-			}
-			key, fragment = "class:"+target.Class, "-nixos-system-nixorium-client-"+target.Class+"-"
+			key = "class:" + target.Class
 		}
 		if existing := byKey[key]; existing != nil {
 			existing.members = append(existing.members, target.Name)

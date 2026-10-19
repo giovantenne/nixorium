@@ -89,6 +89,9 @@ type RemoteInstallHost struct {
 	Interface string `json:"interface"`
 	LiveIP    string `json:"liveIp"`
 	StaticIP  string `json:"staticIp"`
+	// Class is the computer's class (ADR 0033); it names the system the
+	// computer installs when it shares one.
+	Class string `json:"class"`
 }
 
 type RemoteInstallCache struct {
@@ -111,6 +114,7 @@ type RemoteInstallArtifacts struct {
 	HostName           string            `json:"hostName"`
 	HostInterface      string            `json:"hostInterface"`
 	HostStaticIP       string            `json:"hostStaticIp"`
+	HostClass          string            `json:"hostClass,omitempty"`
 	CachePublicKey     string            `json:"cachePublicKey"`
 	AdminPublicKey     string            `json:"adminPublicKey"`
 	PreparedAt         time.Time         `json:"preparedAt"`
@@ -425,7 +429,7 @@ func ValidateRemoteInstallPlan(plan RemoteInstallPlan) error {
 	if !gitRevisionPattern.MatchString(plan.DeploymentRevision) {
 		return errors.New("remote installation revision is not a full Git object ID")
 	}
-	if !validStorePath(plan.SystemPath) || !strings.Contains(plan.SystemPath, "-nixos-system-"+plan.Host.Name+"-") {
+	if !validStorePath(plan.SystemPath) || !strings.Contains(plan.SystemPath, "-nixos-system-"+ClientSystemName(plan.Host.Name, plan.Host.Class)+"-") {
 		return errors.New("remote installation system path does not match the host")
 	}
 	if err := validateRemoteHost(plan.Host); err != nil {
@@ -454,7 +458,8 @@ func ValidateRemoteInstallArtifacts(artifacts RemoteInstallArtifacts) error {
 		return errors.New("remote installation artifact revision is invalid")
 	}
 	if !validStorePath(artifacts.BundlePath) || !validStorePath(artifacts.SystemPath) ||
-		!strings.Contains(artifacts.SystemPath, "-nixos-system-"+artifacts.HostName+"-") {
+		!ValidClientClass(artifacts.HostName, artifacts.HostClass) ||
+		!strings.Contains(artifacts.SystemPath, "-nixos-system-"+ClientSystemName(artifacts.HostName, artifacts.HostClass)+"-") {
 		return errors.New("remote installation artifact store paths are invalid")
 	}
 	if artifacts.BundleClosureBytes == 0 || artifacts.SystemClosureBytes == 0 || artifacts.PreparedAt.IsZero() {
@@ -537,7 +542,7 @@ func ValidateRemoteInstallPreparation(preparation RemoteInstallPreparation) erro
 	if err := validateRemoteHost(preparation.Host); err != nil {
 		return err
 	}
-	if !strings.Contains(preparation.SystemPath, "-nixos-system-"+preparation.Host.Name+"-") {
+	if !strings.Contains(preparation.SystemPath, "-nixos-system-"+ClientSystemName(preparation.Host.Name, preparation.Host.Class)+"-") {
 		return errors.New("remote installation preparation system does not match the host")
 	}
 	if err := validateRemoteCache(preparation.Cache); err != nil {
@@ -669,7 +674,7 @@ func consumeRemoteJSONValue(decoder *json.Decoder) error {
 }
 
 func validateRemoteHost(host RemoteInstallHost) error {
-	if !remoteHostPattern.MatchString(host.Name) || !remoteInterfacePattern.MatchString(host.Interface) {
+	if !remoteHostPattern.MatchString(host.Name) || !remoteInterfacePattern.MatchString(host.Interface) || !ValidClientClass(host.Name, host.Class) {
 		return errors.New("remote installation host identity is invalid")
 	}
 	if err := validateRemoteIPv4(host.LiveIP); err != nil {

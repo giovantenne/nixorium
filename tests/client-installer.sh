@@ -326,6 +326,7 @@ test_offline_system_resolution_precedes_system_install() (
   # Reload the real command after the common fixture installs behavior mocks.
   source "${REPO_ROOT}/setup.sh"
   SELECTED_HOST=pc01
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","class":"pc01"}]'
   LAB_CONTROLLER_DHCP_IP=192.0.2.10
   LAB_CACHE_PORT=5000
   CACHE_KEY=cache.example:test-key
@@ -366,6 +367,7 @@ test_system_resolution_reports_cache_failures() (
   load_test_installer
   source "${REPO_ROOT}/setup.sh"
   SELECTED_HOST=pc01
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1"}]'
   LAB_CONTROLLER_DHCP_IP=192.0.2.10
   LAB_CACHE_PORT=5000
   CACHE_KEY=cache.example:test-key
@@ -389,6 +391,33 @@ test_system_resolution_reports_cache_failures() (
   if resolve_system 2> "${FIXTURE_DIR}/missing.log"; then return 1; fi
   grep -Fq "The controller has not prepared pc01 for this configuration" "${FIXTURE_DIR}/missing.log"
   grep -Fq "Installation -> Prepare clients again, then restart this installer." "${FIXTURE_DIR}/missing.log"
+)
+
+test_shared_class_installs_the_class_system() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+  source "${REPO_ROOT}/setup.sh"
+  SELECTED_HOST=pc02
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","class":"shared-1"},{"name":"pc02","ip":"10.0.0.2","class":"shared-1"}]'
+  LAB_CONTROLLER_DHCP_IP=192.0.2.10
+  LAB_CACHE_PORT=5000
+  CACHE_KEY=cache.example:test-key
+  local answer
+  nix() {
+    if [[ " $* " == *" eval "* ]]; then
+      printf '%s' "$answer"
+    elif [[ " $* " == *" store info "* ]]; then
+      return 0
+    else
+      printf '%s\t%s\n' "$answer" 10737418240
+    fi
+  }
+  answer=/nix/store/00000000000000000000000000000000-nixos-system-nixorium-client-shared-1-test
+  resolve_system
+  answer=/nix/store/00000000000000000000000000000000-nixos-system-pc02-test
+  if resolve_system 2> "${FIXTURE_DIR}/per-host.log"; then return 1; fi
+  grep -Fq "invalid system path for pc02" "${FIXTURE_DIR}/per-host.log"
 )
 
 test_precompiled_disko_receives_validated_basename() (
@@ -419,6 +448,7 @@ test_embedded_metadata_avoids_nix_evaluation
 test_runtime_controller_address_overrides_embedded_hint
 test_offline_system_resolution_precedes_system_install
 test_system_resolution_reports_cache_failures
+test_shared_class_installs_the_class_system
 test_precompiled_disko_receives_validated_basename
 
 echo "Client installer tests passed."

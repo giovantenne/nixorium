@@ -32,6 +32,34 @@ func (target DeploymentTarget) SharedSystem() bool {
 	return target.Class != "" && target.Class != target.Name
 }
 
+// ClientSystemName is the name inside a client's system store path: its own
+// name, or `nixorium-client-<class>` when it shares its class's system
+// (ADR 0033). An empty class is a per-host system.
+func ClientSystemName(host, class string) string {
+	if class == "" || class == host {
+		return host
+	}
+	return "nixorium-client-" + class
+}
+
+// ValidClientClass accepts the class of a client: none (metadata before
+// classes), its own name, or a shared class.
+func ValidClientClass(host, class string) bool {
+	if class == "" || class == host {
+		return true
+	}
+	digits, found := strings.CutPrefix(class, "shared-")
+	if !found || digits == "" || len(digits) > 4 {
+		return false
+	}
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // ClientNumber is the number in a client name such as pc07.
 func ClientNumber(name string) (int, bool) {
 	digits, found := strings.CutPrefix(name, "pc")
