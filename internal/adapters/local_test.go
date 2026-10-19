@@ -135,6 +135,21 @@ func TestCurrentSystemProbeParsesOnlyStandardOutput(t *testing.T) {
 	}
 }
 
+func TestCurrentSystemProbeReadsTheIdentityNumber(t *testing.T) {
+	system := "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system"
+	revision := strings.Repeat("a", 40)
+	writeFakeSSH(t, "printf '%s\\n%s\\n7\\n' '"+system+"' '"+revision+"'")
+	if probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil); probe.Number != 7 || probe.Revision != revision {
+		t.Fatalf("probe = %+v", probe)
+	}
+	for _, third := range []string{"07", "0", "x", "12345"} {
+		writeFakeSSH(t, "printf '%s\\n%s\\n"+third+"\\n' '"+system+"' '"+revision+"'")
+		if probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil); probe.SystemPath != "" {
+			t.Fatalf("third line %q accepted: %+v", third, probe)
+		}
+	}
+}
+
 func TestCurrentSystemProbeKeepsWhatAnInvalidAnswerSaid(t *testing.T) {
 	const prefix = "authenticated system observation returned invalid state"
 	for _, test := range []struct {

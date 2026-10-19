@@ -677,7 +677,7 @@ let
   nixoriumPackage = bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {};
   hostState = bootstrapPkgs.writeShellApplication {
     name = "nixorium-host-state";
-    runtimeInputs = [ bootstrapPkgs.coreutils ];
+    runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.gnused ];
     text = ''
       system_path="$(readlink -f /run/current-system)"
       [[ "$system_path" == /nix/store/* && "$system_path" != *[[:space:]]* ]] \
@@ -686,7 +686,14 @@ let
         || { echo "active deployment revision is unavailable" >&2; exit 1; }
       [[ "$revision" =~ ^[0-9a-f]{40,64}$ ]] \
         || { echo "active deployment revision is invalid" >&2; exit 1; }
-      printf '%s\n%s\n' "$system_path" "$revision"
+      # A third line names the computer number of a valid identity record,
+      # which a shared system needs to know which computer it is (ADR 0033).
+      number="$(sed -n 's/^{"schemaVersion":1,"number":\([1-9][0-9]\{0,3\}\)}$/\1/p' /var/lib/nixorium/identity.json 2>/dev/null || true)"
+      if [[ -n "$number" ]]; then
+        printf '%s\n%s\n%s\n' "$system_path" "$revision" "$number"
+      else
+        printf '%s\n%s\n' "$system_path" "$revision"
+      fi
     '';
   };
   # Clients need only this helper in their system profile. The controller also

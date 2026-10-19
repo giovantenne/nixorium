@@ -325,6 +325,33 @@ func TestDeploymentVerificationGivesUpAfterThreeAttempts(t *testing.T) {
 	}
 }
 
+func TestDeploymentVerificationOfASharedSystemNeedsTheComputersIdentity(t *testing.T) {
+	base := readyDeploymentSource()
+	base.meta.Clients.Hosts[0].Class = "shared-1"
+	base.meta.Clients.Hosts[1].Class = "shared-1"
+	base.meta.Clients.Hosts[2].Class = "pc03"
+	shared := "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-nixorium-client-shared-1"
+	base.current["pc01"] = domain.HostSystemProbe{SystemPath: shared, Revision: base.revision, Number: 1}
+	base.current["pc02"] = domain.HostSystemProbe{SystemPath: shared, Revision: base.revision, Number: 5}
+	source := &scriptedProbeSource{fakeDeploymentSource: base, answers: []map[string]domain.HostSystemProbe{base.current}}
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "@lab", base.revision, "", io.Discard)
+	states := []string{}
+	for _, target := range report.Verification.Targets {
+		states = append(states, target.Name+" "+target.State+" "+target.Detail)
+	}
+	want := []string{
+		"pc01 verified ",
+		"pc02 unverified the computer's identity record names computer number 5",
+		"pc03 verified ",
+	}
+	if !reflect.DeepEqual(states, want) || len(source.asked) != 1 {
+		t.Fatalf("verification = %q, asked = %v", states, source.asked)
+	}
+	if identityMismatchDetail(0) != "the computer reports no identity record; its name and address are not set" {
+		t.Fatal(identityMismatchDetail(0))
+	}
+}
+
 func TestDeploymentVerificationDoesNotRetryRevisionMismatch(t *testing.T) {
 	base := readyDeploymentSource()
 	base.current["pc01"] = domain.HostSystemProbe{SystemPath: base.current["pc01"].SystemPath, Revision: "fedcba9876543210"}

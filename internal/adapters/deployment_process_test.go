@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,7 +28,9 @@ for argument in "$@"; do
       name=${argument#*#nixosConfigurations.}; name=${name%%.*}
       [ "$first" = 1 ] || printf ','
       first=0
-      printf '{"drvPath":"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-x.drv","outputs":{"out":"/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-nixos-system-%s-test"}}' "$name"
+      printf '%s\n' "$name" >> "$NIXORIUM_TEST_STATE/builds"
+      system=${NIXORIUM_TEST_SYSTEM_NAME:-$name}
+      printf '{"drvPath":"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-x.drv","outputs":{"out":"/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-nixos-system-%s-test"}}' "$system"
       ;;
   esac
 done
@@ -42,19 +45,25 @@ echo "copying path"
 `
 
 const fakeEngineSSH = `#!/bin/sh
-for remote; do :; done
+host=
+for remote; do case "$remote" in root@*) host=${remote#root@} ;; esac; done
 state=$NIXORIUM_TEST_STATE
 case "$remote" in
+  *identity.json*)
+    printf '%s %s\n' "$host" "$(printf '%s' "$remote" | sed -n "s/^expected='\(.*\)'$/\1/p")" >> "$state/identities"
+    [ "$NIXORIUM_TEST_IDENTITY" = conflict ] && exit 3
+    exit 0
+    ;;
   *systemd-run*)
     test -s "$NIXORIUM_TEST_PENDING" || exit 99
     grep -q '"state":"started"' "$NIXORIUM_TEST_PENDING" || exit 98
     [ "$NIXORIUM_TEST_ACTIVATION" = busy ] && exit 75
-    printf '%s' "$remote" | sed -n 's/.*NIXORIUM_ACTIVATION=\([0-9a-f]*\).*/\1/p' > "$state/id"
+    printf '%s' "$remote" | sed -n 's/.*NIXORIUM_ACTIVATION=\([0-9a-f]*\).*/\1/p' > "$state/id-$host"
     touch "$state/started"
     exit 0
     ;;
   *'--- unit'*)
-    id=$(cat "$state/id" 2>/dev/null)
+    id=$(cat "$state/id-$host" 2>/dev/null)
     case "$NIXORIUM_TEST_ACTIVATION" in
       hang) printf '\n--- unit\nrunning\n' ;;
       vanish) printf '\n--- unit\ndead\n' ;;
@@ -130,6 +139,94 @@ func TestDeploymentEngineActivatesOnceAndClearsTheRecord(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDeploymentEngineBuildsAClassOnceAndWritesIdentities(t *testing.T) {
+	plan, directory, state := deploymentProcessFixture(t, "0")
+	t.Setenv("NIXORIUM_TEST_SYSTEM_NAME", "nixorium-client-shared-1")
+	plan.Targets = []domain.DeploymentTarget{
+		{Name: "pc01", IP: "192.0.2.1", Class: "shared-1"},
+		{Name: "pc02", IP: "192.0.2.2", Class: "shared-1"},
+	}
+	var output bytes.Buffer
+	if err := buildAndApply(t, plan, directory, &output); err != nil {
+		t.Fatalf("apply: %v\n%s", err, output.String())
+	}
+	if builds, _ := os.ReadFile(filepath.Join(state, "builds")); string(builds) != "pc01\n" {
+		t.Fatalf("builds = %q, want the class once", builds)
+	}
+	if !strings.Contains(output.String(), "1 configuration(s) for 2 computer(s)") {
+		t.Fatalf("log:\n%s", output.String())
+	}
+	identities, _ := os.ReadFile(filepath.Join(state, "identities"))
+	for _, want := range []string{`192.0.2.1 {"schemaVersion":1,"number":1}`, `192.0.2.2 {"schemaVersion":1,"number":2}`} {
+		if !strings.Contains(string(identities), want) {
+			t.Fatalf("identities = %q", identities)
+		}
+	}
+	copies, _ := os.ReadFile(filepath.Join(state, "copies"))
+	if strings.Count(string(copies), "nixos-system-nixorium-client-shared-1-test") != 2 {
+		t.Fatalf("copies = %q", copies)
+	}
+}
+
+func TestDeploymentEngineLeavesAComputerWithAnotherIdentityUnchanged(t *testing.T) {
+	plan, directory, state := deploymentProcessFixture(t, "0")
+	t.Setenv("NIXORIUM_TEST_SYSTEM_NAME", "nixorium-client-shared-1")
+	t.Setenv("NIXORIUM_TEST_IDENTITY", "conflict")
+	plan.Targets = []domain.DeploymentTarget{{Name: "pc01", IP: "192.0.2.1", Class: "shared-1"}}
+	var output bytes.Buffer
+	err := buildAndApply(t, plan, directory, &output)
+	if err == nil || !strings.Contains(err.Error(), "identity record names another computer") {
+		t.Fatalf("apply = %v\n%s", err, output.String())
+	}
+	if _, statErr := os.Lstat(filepath.Join(state, "started")); statErr == nil {
+		t.Fatal("an activation started on a computer with another identity")
+	}
+	if checkDeploymentPendingPath(directory) != nil {
+		t.Fatal("a computer left unchanged must not stay pending")
+	}
+}
+
+func TestDeploymentEngineRefusesASharedSystemUnderAnotherName(t *testing.T) {
+	plan, directory, _ := deploymentProcessFixture(t, "0")
+	plan.Targets = []domain.DeploymentTarget{{Name: "pc01", IP: "192.0.2.1", Class: "shared-1"}}
+	err := runDeploymentPhase(context.Background(), plan, domain.DeploymentPhaseBuild, io.Discard, directory, false, time.Minute)
+	if err == nil || !strings.Contains(err.Error(), "unexpected system for pc01") {
+		t.Fatalf("build = %v", err)
+	}
+}
+
+func TestClientIdentityCommandWritesOnceAndKeepsAnotherComputer(t *testing.T) {
+	root := t.TempDir()
+	run := func(number int) int {
+		script := strings.ReplaceAll(clientIdentityCommand(number), "/var/lib/nixorium", root)
+		command := exec.Command("sh", "-c", script)
+		if err := command.Run(); err != nil {
+			var exit *exec.ExitError
+			if errors.As(err, &exit) {
+				return exit.ExitCode()
+			}
+			t.Fatal(err)
+		}
+		return 0
+	}
+	if status := run(7); status != 0 {
+		t.Fatalf("first write = %d", status)
+	}
+	content, _ := os.ReadFile(filepath.Join(root, "identity.json"))
+	if string(content) != "{\"schemaVersion\":1,\"number\":7}\n" {
+		t.Fatalf("record = %q", content)
+	}
+	if status := run(7); status != 0 {
+		t.Fatalf("same number again = %d", status)
+	}
+	if status := run(8); status != clientIdentityConflictStatus {
+		t.Fatalf("another number = %d", status)
+	}
+	if content, _ := os.ReadFile(filepath.Join(root, "identity.json")); string(content) != "{\"schemaVersion\":1,\"number\":7}\n" {
+		t.Fatalf("record changed to %q", content)
 	}
 }
 

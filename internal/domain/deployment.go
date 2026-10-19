@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type DeploymentPhase string
 
@@ -18,6 +21,31 @@ type DeploymentTarget struct {
 	// PreviousIP is set during a change of laboratory network: a computer
 	// that answers only there is updated over it and checked on both.
 	PreviousIP string `json:"previousIp,omitempty"`
+	// Class is the computer's class (HostMeta.Class).
+	Class string `json:"class,omitempty"`
+}
+
+// SharedSystem reports a computer whose system is shared by its class
+// (ADR 0033): it takes name and address from its identity record, which the
+// deployment writes before switching it.
+func (target DeploymentTarget) SharedSystem() bool {
+	return target.Class != "" && target.Class != target.Name
+}
+
+// ClientNumber is the number in a client name such as pc07.
+func ClientNumber(name string) (int, bool) {
+	digits, found := strings.CutPrefix(name, "pc")
+	if !found || digits == "" || len(digits) > 4 {
+		return 0, false
+	}
+	number := 0
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return 0, false
+		}
+		number = number*10 + int(digit-'0')
+	}
+	return number, number > 0
 }
 
 // DeploymentProgress is an in-process, bounded update authored by the

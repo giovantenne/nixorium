@@ -41,6 +41,9 @@ const (
 	clientCommandTimeout        = 30 * time.Second
 	// Exit status of the start command when another activation runs.
 	clientActivationBusyStatus = 75
+	// Exit status of the identity command when the record names another
+	// computer.
+	clientIdentityConflictStatus = 3
 )
 
 // Polling bounds, variables so that tests can shorten them.
@@ -50,7 +53,10 @@ var (
 	clientActivationStartGrace = 30 * time.Second
 )
 
-var clientHostName = regexp.MustCompile(`^pc[0-9]{1,4}$`)
+var (
+	clientHostName  = regexp.MustCompile(`^pc[0-9]{1,4}$`)
+	clientClassName = regexp.MustCompile(`^shared-[0-9]{1,4}$`)
+)
 
 // clientBuildSource prepares the reviewed source of a build; tests replace it.
 var clientBuildSource = func(ctx context.Context, repository, revision string) (string, error) {
@@ -69,32 +75,63 @@ func builtSystemsKey(repository, revision string) string {
 }
 
 // buildClientSystems builds the system of every selected computer and keeps
-// the resulting store paths for the apply of this revision.
+// the resulting store paths for the apply of this revision. Computers of a
+// class share one system (ADR 0033): it is built once, through its first
+// selected member.
 func buildClientSystems(ctx context.Context, plan domain.DeploymentPlanReport, output io.Writer) error {
-	names := make([]string, 0, len(plan.Targets))
+	type build struct {
+		name     string
+		fragment string
+		members  []string
+	}
+	builds := []*build{}
+	byKey := map[string]*build{}
 	for _, target := range plan.Targets {
 		if !clientHostName.MatchString(target.Name) {
 			return fmt.Errorf("invalid computer name %q", target.Name)
 		}
-		names = append(names, target.Name)
+		key, fragment := target.Name, "-nixos-system-"+target.Name+"-"
+		if target.SharedSystem() {
+			if !clientClassName.MatchString(target.Class) {
+				return fmt.Errorf("invalid class %q of %s", target.Class, target.Name)
+			}
+			key, fragment = "class:"+target.Class, "-nixos-system-nixorium-client-"+target.Class+"-"
+		}
+		if existing := byKey[key]; existing != nil {
+			existing.members = append(existing.members, target.Name)
+			continue
+		}
+		byKey[key] = &build{name: target.Name, fragment: fragment, members: []string{target.Name}}
+		builds = append(builds, byKey[key])
 	}
-	if len(names) == 0 {
+	if len(builds) == 0 {
 		return errors.New("no computer was selected")
 	}
 	source, err := clientBuildSource(ctx, plan.Repository, plan.Revision)
 	if err != nil {
 		return err
 	}
+	if len(builds) < len(plan.Targets) {
+		fmt.Fprintf(output, "%d configuration(s) for %d computer(s)\n", len(builds), len(plan.Targets))
+	}
 	systems := map[string]string{}
-	for start := 0; start < len(names); start += clientBuildBatch {
-		batch := names[start:min(len(names), start+clientBuildBatch)]
-		fmt.Fprintf(output, "Building %s\n", strings.Join(batch, ", "))
-		built, err := buildClientBatch(ctx, source, batch, output)
+	for start := 0; start < len(builds); start += clientBuildBatch {
+		batch := builds[start:min(len(builds), start+clientBuildBatch)]
+		names, fragments, labels := []string{}, map[string]string{}, []string{}
+		for _, entry := range batch {
+			names = append(names, entry.name)
+			fragments[entry.name] = entry.fragment
+			labels = append(labels, strings.Join(entry.members, ", "))
+		}
+		fmt.Fprintf(output, "Building %s\n", strings.Join(labels, "; "))
+		built, err := buildClientBatch(ctx, source, names, fragments, output)
 		if err != nil {
 			return err
 		}
-		for name, path := range built {
-			systems[name] = path
+		for _, entry := range batch {
+			for _, member := range entry.members {
+				systems[member] = built[entry.name]
+			}
 		}
 	}
 	builtClientSystems.Lock()
@@ -103,7 +140,7 @@ func buildClientSystems(ctx context.Context, plan domain.DeploymentPlanReport, o
 	return nil
 }
 
-func buildClientBatch(ctx context.Context, source string, names []string, output io.Writer) (map[string]string, error) {
+func buildClientBatch(ctx context.Context, source string, names []string, fragments map[string]string, output io.Writer) (map[string]string, error) {
 	arguments := []string{"--extra-experimental-features", "nix-command flakes", "build", "--no-link", "--json", "--no-write-lock-file"}
 	for _, name := range names {
 		arguments = append(arguments, source+"#nixosConfigurations."+name+".config.system.build.toplevel")
@@ -127,7 +164,7 @@ func buildClientBatch(ctx context.Context, source string, names []string, output
 	systems := map[string]string{}
 	for index, name := range names {
 		path := results[index].Outputs["out"]
-		if !validSystemPath(path) || !strings.Contains(path, "-nixos-system-"+name+"-") {
+		if !validSystemPath(path) || !strings.Contains(path, fragments[name]) {
 			return nil, fmt.Errorf("the build returned an unexpected system for %s", name)
 		}
 		systems[name] = path
@@ -229,6 +266,28 @@ func applyClientSystems(ctx context.Context, plan domain.DeploymentPlanReport, o
 	return nil
 }
 
+// clientIdentityCommand writes the identity record of a computer that is
+// about to run a shared system, once, durably. A record naming another
+// computer is kept (exit clientIdentityConflictStatus): two computers with
+// the same number need a person to decide which one is which.
+func clientIdentityCommand(number int) string {
+	expected := fmt.Sprintf(`{"schemaVersion":1,"number":%d}`, number)
+	return fmt.Sprintf(`set -eu
+record=/var/lib/nixorium/identity.json
+expected='%s'
+if [ -e "$record" ]; then
+  [ "$(cat "$record")" = "$expected" ] && exit 0
+  exit %d
+fi
+mkdir -p /var/lib/nixorium
+printf '%%s\n' "$expected" > "$record.tmp"
+chmod 0644 "$record.tmp"
+sync "$record.tmp"
+mv -f "$record.tmp" "$record"
+sync /var/lib/nixorium
+[ "$(cat "$record")" = "$expected" ]`, expected, clientIdentityConflictStatus)
+}
+
 func newActivationID() (string, error) {
 	value := make([]byte, 16)
 	if _, err := rand.Read(value); err != nil {
@@ -267,6 +326,24 @@ func applyClientSystem(ctx context.Context, target domain.DeploymentTarget, addr
 		say("copy failed: %v", err)
 		outcome.detail = "copy failed"
 		return outcome
+	}
+
+	// A shared system takes the computer's name and address from its
+	// identity record: write it first, or leave the computer unchanged.
+	if target.SharedSystem() {
+		number, _ := domain.ClientNumber(target.Name)
+		status, err := runClientCommand(ctx, address, clientIdentityCommand(number))
+		switch {
+		case err == nil:
+		case status == clientIdentityConflictStatus:
+			say("its identity record names another computer; it keeps its current system")
+			outcome.detail = "identity record names another computer"
+			return outcome
+		default:
+			say("its identity record could not be written (%v); it keeps its current system", err)
+			outcome.detail = "identity record not written"
+			return outcome
+		}
 	}
 
 	activationSlots <- struct{}{}

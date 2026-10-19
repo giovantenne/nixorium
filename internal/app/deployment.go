@@ -262,6 +262,8 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 			}
 		case probe.Revision != report.Revision:
 			verification.Detail = "authenticated host revision differs from the reviewed revision"
+		case target.SharedSystem() && probe.Number != expectedNumber(target.Name):
+			verification.Detail = identityMismatchDetail(probe.Number)
 		default:
 			verification.State = "verified"
 			verification.Detail = ""
@@ -353,6 +355,20 @@ func NewDeploymentManager(source DeploymentSource) *DeploymentManager {
 
 // sleepContext waits for the duration, or returns the context's error as soon
 // as the context ends.
+func expectedNumber(name string) int {
+	number, _ := domain.ClientNumber(name)
+	return number
+}
+
+// identityMismatchDetail explains why a computer running a shared system is
+// not verified: its identity record names no computer or another one.
+func identityMismatchDetail(recorded int) string {
+	if recorded == 0 {
+		return "the computer reports no identity record; its name and address are not set"
+	}
+	return fmt.Sprintf("the computer's identity record names computer number %d", recorded)
+}
+
 func sleepContext(ctx context.Context, duration time.Duration) error {
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
@@ -560,7 +576,7 @@ func selectDeploymentTargets(hosts []domain.HostMeta, requested string) ([]domai
 	targets := make([]domain.DeploymentTarget, 0, len(names))
 	for _, name := range names {
 		host := available[name]
-		targets = append(targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP, PreviousIP: host.PreviousIP})
+		targets = append(targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP, PreviousIP: host.PreviousIP, Class: host.Class})
 	}
 	selector := strings.Join(names, ",")
 	if requested == "@lab" && len(issues) == 0 {

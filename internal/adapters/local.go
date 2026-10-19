@@ -381,11 +381,21 @@ func probeCurrentSystemArguments(ctx context.Context, timeout time.Duration, arg
 		}
 		return domain.HostSystemProbe{HostKeyCondition: sshHostKeyCondition(stderr.String() + stdout.String()), Detail: "authenticated system observation failed: " + detail}
 	}
+	// A third line, from systems that know identity records, is the number in
+	// the computer's record.
 	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
-	if len(lines) != 2 || !validSystemPath(lines[0]) || !validGitRevision(lines[1]) {
+	number := 0
+	if len(lines) == 3 {
+		parsed, valid := domain.ClientNumber("pc" + lines[2])
+		if !valid || "pc"+lines[2] != fmt.Sprintf("pc%d", parsed) {
+			lines = nil
+		}
+		number = parsed
+	}
+	if len(lines) < 2 || len(lines) > 3 || !validSystemPath(lines[0]) || !validGitRevision(lines[1]) {
 		return domain.HostSystemProbe{Detail: invalidSystemObservationDetail(stdout.String(), stderr.String())}
 	}
-	return domain.HostSystemProbe{SystemPath: lines[0], Revision: lines[1]}
+	return domain.HostSystemProbe{SystemPath: lines[0], Revision: lines[1], Number: number}
 }
 
 // invalidSystemObservationDetail says what a computer answered when the answer
