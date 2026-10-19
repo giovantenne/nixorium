@@ -17,7 +17,7 @@ is easy to miss and error-prone for a teacher or school technician, and an
 update that did not take the note into account could stop with an evaluation
 error.
 
-Release 3.10 made one such change mandatory: the workstation profile of
+The release that introduced client classes (ADR 0033) made one such change mandatory: the workstation profile of
 deployments created before 3.9.0 finds the controller by comparing `hostName`,
 and computers that share a configuration (ADR 0033) have no single name. The
 note existed, but nothing applied it.
@@ -44,7 +44,10 @@ files, and Update Nixorium applies them as part of the reviewed update.
   - `manual`: the file was changed (`from` absent or present several times) or
     is missing or not tracked. Nothing is touched. The review shows "Manual
     change" with the text to replace and the text to put instead, and the
-    administrator makes that change as an ordinary reviewed change.
+    administrator makes that change as an ordinary reviewed change. A manual
+    migration does not block the update by itself: the update is refused only
+    when the candidate, built without that change, does not evaluate or build,
+    and then the review's error says why.
 - **Record.** Applied and done ids are written to the tracked file
   `nixorium-migrations.json` (`{"schemaVersion":1,"applied":[...]}`), created
   or updated in the same save. A migration therefore runs once, even if the old

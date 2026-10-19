@@ -100,7 +100,7 @@ from a small record on its own disk.
   by hand, or a reinstall, which writes the record).
 - Rollback uses the boot menu. The previous per-host generation does not
   depend on the record: it starts with its own name and address. A per-host
-  generation of release 3.10 or later writes the record when it is missing
+  generation of a release with identity records writes the record when it is missing
   and never changes an existing one.
 - Scripts that read the `colmena` flake output must stop; they were never
   part of Nixorium's own tools after ADR 0031.
