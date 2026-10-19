@@ -760,7 +760,6 @@ in
     environment.systemPackages = [
       nixoriumPackage
       nixoriumLauncher
-      pkgs.colmena
       pkgs.git
     ] ++ lib.optionals (labSettings.classroomView or true) [
       classroomLauncher

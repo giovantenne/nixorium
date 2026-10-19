@@ -128,7 +128,7 @@ in
     assert builtins.deepSeq (discoveryLab.nixoriumSearchSoftwarePackages { query = "hello"; limit = 1; }) true;
     assert builtins.deepSeq discoveryLab.nixoriumUpdateTargets true;
     assert builtins.all (name: !(builtins.tryEval discoveryLab.${name}).success) [
-      "deploymentStatus" "nixosConfigurations" "colmena"
+      "deploymentStatus" "nixosConfigurations"
       "nixoriumWorkspace" "nixoriumOfflineCheck"
       "nixoriumValidateWorkspaceCandidate" "nixoriumResolveWorkspaceCandidate"
       "nixoriumValidateControllerSoftwareCandidate"
