@@ -176,7 +176,7 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		model.busy = "Building and applying the reviewed deployment"
 		model.message = ""
 		plan := model.deployment.plan
-		events := make(chan tea.Msg)
+		events := make(chan tea.Msg, deploymentEventBuffer)
 		model.deployment.events = events
 		ctx, cancel := context.WithCancel(context.Background())
 		model.deployment.cancel = cancel

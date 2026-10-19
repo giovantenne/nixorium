@@ -1101,16 +1101,43 @@ func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
+// deploymentEventBuffer lets the deployment goroutine hand over its last
+// messages without waiting for the interface.
+const deploymentEventBuffer = 4
+
+// startDeployment runs the deployment in the background. The deployment holds
+// the controller operation lock, so it must never wait for the interface:
+// progress is a best-effort snapshot dropped while the interface is behind,
+// and the final result displaces any queued progress instead of blocking.
 func startDeployment(ctx context.Context, action func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport, plan domain.DeploymentPlanReport, events chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		go func() {
 			report := action(ctx, plan, func(progress domain.DeploymentProgress) {
-				events <- dashboardDeploymentProgressMsg{progress: progress}
+				select {
+				case events <- dashboardDeploymentProgressMsg{progress: progress}:
+				default:
+				}
 			})
-			events <- dashboardDeploymentResultMsg{report: report}
+			sendDeploymentResult(events, dashboardDeploymentResultMsg{report: report})
 			close(events)
 		}()
 		return <-events
+	}
+}
+
+// sendDeploymentResult delivers the last message of a deployment without
+// blocking: when the buffer is full of older progress, the oldest is dropped.
+func sendDeploymentResult(events chan tea.Msg, result tea.Msg) {
+	for {
+		select {
+		case events <- result:
+			return
+		default:
+		}
+		select {
+		case <-events:
+		default:
+		}
 	}
 }
 
