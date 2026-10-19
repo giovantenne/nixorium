@@ -335,8 +335,13 @@ func updateReviewToken(report domain.UpdatePlanReport, snapshot domain.UpdateInp
 		fmt.Fprintf(digest, "%s\x00%t\x00%s\x00", report.Kind, report.AllowUnverified, report.Repository)
 	}
 	// The files the release's migrations change are part of what is reviewed.
+	if proposal.Migrator != "" {
+		fmt.Fprintf(digest, "migrator\x00%s\x00", proposal.Migrator)
+		_, _ = digest.Write(proposal.MigrationReport)
+		_, _ = digest.Write([]byte{0})
+	}
 	for _, file := range proposal.MigratedFiles {
-		fmt.Fprintf(digest, "migration\x00%s\x00%t\x00%o\x00", file.Path, file.Create, file.Mode)
+		fmt.Fprintf(digest, "migration\x00%s\x00%t\x00%t\x00%o\x00", file.Path, file.Create, file.Delete, file.Mode)
 		for _, content := range [][]byte{file.Before, file.After} {
 			_, _ = digest.Write(content)
 			_, _ = digest.Write([]byte{0})

@@ -292,20 +292,24 @@ func validateUpdateCandidate(ctx context.Context, repository, currentFlake strin
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
-	// The target release's changes to the deployment's own files: the
-	// candidate is evaluated and built with them (ADR 0034).
-	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Reading the target release's changes to deployment files", 0, 0)
-	migrationList, err := candidateDeploymentMigrations(ctx, flake)
-	if err != nil {
-		return domain.UpdateProposal{}, err
+	// The target release's changes to the deployment's own files, made by
+	// its own migrator: the candidate is evaluated and built with them
+	// (ADR 0034). A package-base update keeps the Nixorium revision and has
+	// none.
+	revisionChanges := lockedNixoriumRevision(proposedLock) != lockedNixoriumRevision(snapshot.LockContent)
+	if revisionChanges {
+		emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Running the target release's changes to deployment files", 0, 0)
 	}
-	migrations, migratedFiles, err := planDeploymentMigrations(ctx, repository, migrationList)
+	migrations, migratedFiles, migrationReport, migrator, err := planDeploymentMigrations(ctx, repository, flake, revisionChanges)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
 	if len(migratedFiles) > 0 {
 		for _, file := range migratedFiles {
 			replacements[file.Path] = file.After
+			if file.Delete {
+				replacements[file.Path] = nil
+			}
 		}
 		if flake, err = candidateFlakeSource(ctx, repository, replacements); err != nil {
 			return domain.UpdateProposal{}, err
@@ -396,13 +400,15 @@ func validateUpdateCandidate(ctx context.Context, repository, currentFlake strin
 		return domain.UpdateProposal{}, err
 	}
 	return domain.UpdateProposal{
-		FlakeContent:  proposedFlake,
-		LockContent:   proposedLock,
-		Diff:          domain.GitDiff{Scope: "nixorium-update", Content: diff},
-		Checks:        checks,
-		Workspace:     workspace,
-		Migrations:    migrations,
-		MigratedFiles: migratedFiles,
+		FlakeContent:    proposedFlake,
+		LockContent:     proposedLock,
+		Diff:            domain.GitDiff{Scope: "nixorium-update", Content: diff},
+		Checks:          checks,
+		Workspace:       workspace,
+		Migrations:      migrations,
+		MigratedFiles:   migratedFiles,
+		MigrationReport: migrationReport,
+		Migrator:        migrator,
 	}, nil
 }
 
@@ -673,14 +679,17 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 	lockPath := filepath.Join(repository, "flake.lock")
 	flakePath := filepath.Join(repository, "flake.nix")
 	if err := os.Rename(lockTemp, lockPath); err != nil {
+		if restoreErr := restoreMigratedFiles(repository, proposal.MigratedFiles); restoreErr != nil {
+			return true, fmt.Errorf("replace flake.lock: %w; restoring migrated files also failed: %v", err, restoreErr)
+		}
 		return false, fmt.Errorf("replace flake.lock: %w", err)
 	}
 	if err := os.Rename(flakeTemp, flakePath); err != nil {
-		rollbackErr := restoreUpdateLock(repository, expected)
+		rollbackErr := errors.Join(restoreUpdateLock(repository, expected), restoreMigratedFiles(repository, proposal.MigratedFiles))
 		if rollbackErr != nil {
-			return true, fmt.Errorf("replace flake.nix: %w; restoring flake.lock also failed: %v", err, rollbackErr)
+			return true, fmt.Errorf("replace flake.nix: %w; restoring flake.lock and migrated files also failed: %v", err, rollbackErr)
 		}
-		return false, fmt.Errorf("replace flake.nix: %w; original flake.lock was restored", err)
+		return false, fmt.Errorf("replace flake.nix: %w; original flake.lock and files were restored", err)
 	}
 	if err := root.Sync(); err != nil {
 		return true, fmt.Errorf("sync deployment root after update: %w", err)
@@ -688,58 +697,83 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 	return false, nil
 }
 
-// applyMigratedFiles writes the reviewed migrations, each only if the file
-// is still exactly as reviewed.
+// applyMigratedFiles writes the reviewed migrations, only if every file is
+// still exactly as reviewed; on a failure it restores those already written.
 func applyMigratedFiles(repository string, files []domain.MigratedFile) error {
 	for _, file := range files {
-		if !validMigrationFile(file.Path) {
+		if !validMigrationFile(file.Path) && file.Path != domain.DeploymentMigrationsFile {
 			return fmt.Errorf("deployment migration names a file it may not change: %s", file.Path)
 		}
-		path := filepath.Join(repository, file.Path)
-		info, err := os.Lstat(path)
-		if file.Create {
-			if !errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("%s appeared after update review", file.Path)
-			}
-			continue
-		}
-		if err != nil || !info.Mode().IsRegular() {
+		current, exists, err := readMigratedFile(repository, file.Path)
+		switch {
+		case err != nil:
 			return fmt.Errorf("%s changed after update review", file.Path)
-		}
-		current, err := os.ReadFile(path)
-		if err != nil || !bytes.Equal(current, file.Before) {
+		case file.Create && exists:
+			return fmt.Errorf("%s appeared after update review", file.Path)
+		case !file.Create && (!exists || !bytes.Equal(current, file.Before)):
 			return fmt.Errorf("%s changed after update review", file.Path)
 		}
 	}
 	for index, file := range files {
-		temporary, err := writeUpdateTemporary(filepath.Join(repository, filepath.Dir(file.Path)), filepath.Base(file.Path), file.After, os.FileMode(file.Mode))
-		if err != nil {
-			return migrationWriteError(repository, files[:index], err)
-		}
-		if err := os.Rename(temporary, filepath.Join(repository, file.Path)); err != nil {
-			_ = os.Remove(temporary)
-			return migrationWriteError(repository, files[:index], err)
+		if err := writeMigratedState(repository, file, false); err != nil {
+			restoreErr := restoreMigratedFiles(repository, files[:index])
+			return errors.Join(fmt.Errorf("write deployment migration: %w", err), restoreErr)
 		}
 	}
 	return nil
 }
 
-// migrationWriteError restores the files already migrated, so a failed save
-// leaves the deployment as reviewed.
-func migrationWriteError(repository string, written []domain.MigratedFile, cause error) error {
-	for _, file := range written {
-		if file.Create {
-			_ = os.Remove(filepath.Join(repository, file.Path))
-			continue
-		}
-		directory := filepath.Join(repository, filepath.Dir(file.Path))
-		if temporary, err := writeUpdateTemporary(directory, filepath.Base(file.Path), file.Before, os.FileMode(file.Mode)); err == nil {
-			if os.Rename(temporary, filepath.Join(repository, file.Path)) != nil {
-				_ = os.Remove(temporary)
-			}
+// restoreMigratedFiles puts back the reviewed originals of migrated files.
+func restoreMigratedFiles(repository string, files []domain.MigratedFile) error {
+	var problems []error
+	for _, file := range files {
+		if err := writeMigratedState(repository, file, true); err != nil {
+			problems = append(problems, fmt.Errorf("%s: %w", file.Path, err))
 		}
 	}
-	return fmt.Errorf("write deployment migration: %w", cause)
+	return errors.Join(problems...)
+}
+
+// writeMigratedState writes a file's state after (or, restoring, before)
+// its migrations: content, absence, and mode.
+func writeMigratedState(repository string, file domain.MigratedFile, restoring bool) error {
+	path := filepath.Join(repository, file.Path)
+	absent, content := file.Delete, file.After
+	if restoring {
+		absent, content = file.Create, file.Before
+	}
+	if absent {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return err
+	}
+	temporary, err := writeUpdateTemporary(directory, filepath.Base(file.Path), content, os.FileMode(file.Mode))
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(temporary, path); err != nil {
+		_ = os.Remove(temporary)
+		return err
+	}
+	return nil
+}
+
+func readMigratedFile(repository, name string) ([]byte, bool, error) {
+	path := filepath.Join(repository, name)
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, true, errors.New("not a regular file")
+	}
+	content, err := os.ReadFile(path)
+	return content, true, err
 }
 
 func writeUpdateTemporary(repository, name string, content []byte, mode os.FileMode) (string, error) {

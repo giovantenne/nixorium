@@ -261,16 +261,13 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 func deploymentMigrationLines(migrations []domain.DeploymentMigrationResult) []string {
 	lines := []string{}
 	for _, result := range migrations {
-		migration := result.Migration
 		switch result.State {
 		case domain.MigrationApplied:
-			lines = append(lines, fmt.Sprintf("Migration:        %s — %s", migration.File, safeWorkspaceText(migration.Description)))
+			lines = append(lines, fmt.Sprintf("Migration:        %s — %s", safeWorkspaceText(strings.Join(result.Files, ", ")), safeWorkspaceText(result.Description)))
 		case domain.MigrationManual:
 			lines = append(lines,
-				fmt.Sprintf("Manual change:    %s — %s", migration.File, safeWorkspaceText(migration.Description)),
-				fmt.Sprintf("                  Not changed automatically: %s.", safeWorkspaceText(result.Detail)),
-				"                  Replace:  "+safeWorkspaceText(strings.TrimRight(migration.From, "\n")),
-				"                  With:     "+safeWorkspaceText(strings.TrimRight(migration.To, "\n")))
+				"Manual change:    "+safeWorkspaceText(result.Description),
+				"                  "+safeWorkspaceText(result.Detail))
 		}
 	}
 	return lines

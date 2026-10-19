@@ -28,7 +28,7 @@ const maximumCandidateSourceBytes = 512 * 1024 * 1024
 // and ignored files are never copied.
 func candidateFlakeSource(ctx context.Context, repository string, replacements map[string][]byte) (string, error) {
 	for name := range replacements {
-		if name != "flake.nix" && name != "flake.lock" && !validMigrationFile(name) {
+		if name != "flake.nix" && name != "flake.lock" && !validMigrationFile(name) && name != domain.DeploymentMigrationsFile {
 			return "", fmt.Errorf("candidate source cannot replace %s", name)
 		}
 	}
@@ -65,6 +65,13 @@ func candidateFlakeSource(ctx context.Context, repository string, replacements m
 	for name, content := range replacements {
 		path := filepath.Join(stage, name)
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		// A nil replacement removes the file (a deployment migration).
+		if content == nil {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return "", err
 		}
 		if err := os.WriteFile(path, content, 0600); err != nil {

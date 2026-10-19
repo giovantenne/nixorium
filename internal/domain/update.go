@@ -74,16 +74,21 @@ type UpdateProposal struct {
 	// are the files the applied ones change, written when the update is saved.
 	Migrations    []DeploymentMigrationResult
 	MigratedFiles []MigratedFile
+	// MigrationReport and Migrator are the raw report and the store path of
+	// the migrator that produced them; the review token binds both.
+	MigrationReport []byte
+	Migrator        string
 }
 
-// MigratedFile is a deployment file before and after its applied migrations.
-// Create marks a file that does not exist yet (the migration record).
+// MigratedFile is a deployment file before and after the migrations: Create
+// marks a new file, Delete a removed one.
 type MigratedFile struct {
 	Path   string
 	Before []byte
 	After  []byte
 	Mode   uint32
 	Create bool
+	Delete bool
 }
 
 // DeploymentMigrationsFile records, in the deployment, the migrations already
@@ -91,32 +96,26 @@ type MigratedFile struct {
 // but saved and reviewed with the configuration).
 const DeploymentMigrationsFile = "nixorium-migrations.json"
 
-// DeploymentMigration is one change a release makes to a deployment's own
-// file: one exact, known text replaced by another (ADR 0034).
-type DeploymentMigration struct {
-	ID          string `json:"id"`
-	File        string `json:"file"`
-	Description string `json:"description"`
-	From        string `json:"from"`
-	To          string `json:"to"`
-}
-
-// Outcomes of a deployment migration.
+// Outcomes of a deployment migration, as the migrator of the release being
+// installed reports them (ADR 0034).
 const (
-	// MigrationApplied: the update review changes the file; saving the
-	// update writes it.
+	// MigrationApplied: the migration changed the files it lists; saving
+	// the update writes them.
 	MigrationApplied = "applied"
-	// MigrationDone: the file already has the new text.
+	// MigrationDone: the deployment already has the change.
 	MigrationDone = "done"
-	// MigrationManual: the known text is not there exactly once (the file
-	// was changed, or is missing); nothing is touched.
+	// MigrationManual: the files were changed by hand; nothing is touched
+	// and Detail says what to change.
 	MigrationManual = "manual"
 )
 
+// DeploymentMigrationResult is one migration of the release being installed.
 type DeploymentMigrationResult struct {
-	Migration DeploymentMigration `json:"migration"`
-	State     string              `json:"state"`
-	Detail    string              `json:"detail,omitempty"`
+	ID          string   `json:"id"`
+	Description string   `json:"description"`
+	State       string   `json:"state"`
+	Detail      string   `json:"detail,omitempty"`
+	Files       []string `json:"files,omitempty"`
 }
 
 // WorkspaceUpdateImpact compares pinned declarations, not live home state,

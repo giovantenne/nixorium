@@ -162,7 +162,7 @@ func TestPrepareUpdateRecordsTheNewReferenceAsOriginal(t *testing.T) {
 	}
 	log, _ := os.ReadFile(logPath)
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) < 6 || !strings.Contains(lines[3], "deploymentMigrations") || !strings.Contains(lines[4], "flake lock --no-update-lock-file path:/nix/store/") || !strings.Contains(lines[5], "#labMeta") || strings.Contains(string(log), "--reference-lock-file") {
+	if len(lines) < 5 || !strings.Contains(lines[3], "flake lock --no-update-lock-file path:/nix/store/") || !strings.Contains(lines[4], "#labMeta") || strings.Contains(string(log), "--reference-lock-file") {
 		t.Fatalf("Nix invocations:\n%s", log)
 	}
 	if !strings.Contains(proposal.Diff.Content, `"ref":"v3.8.0"`) {
