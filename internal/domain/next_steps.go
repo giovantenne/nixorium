@@ -127,6 +127,13 @@ var nextSteps = map[string]NextStep{
 		Action: "Nothing to do",
 		TUI:    "Computers → Queued updates", Command: "nixorium deploy queue status", Screen: RecoveryDeferredUpdates,
 	},
+	"UPDATES-NEED-REVIEW": {
+		Code:   "UPDATES-NEED-REVIEW",
+		Title:  "A queued update needs a new review",
+		Why:    "The configuration changed after the update was queued, which the controller never sends on its own, or the update kept failing.",
+		Action: "Review the queued updates",
+		TUI:    "Computers → Queued updates", Command: "nixorium deploy queue status", Screen: RecoveryDeferredUpdates,
+	},
 	"BACKUP-DUE": {
 		Code:   "BACKUP-DUE",
 		Title:  "A backup of this laboratory is due",

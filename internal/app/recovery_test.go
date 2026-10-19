@@ -143,3 +143,49 @@ func TestRecoveryShowsARunningUpdateAsBusyNotInterrupted(t *testing.T) {
 		})
 	}
 }
+
+type fakeQueuedRecoverySource struct {
+	fakeRecoverySource
+	waiting, attention int
+}
+
+func (s fakeQueuedRecoverySource) DeferredUpdateSummary(context.Context, string) (int, int) {
+	return s.waiting, s.attention
+}
+
+func TestRecoveryDoesNotCallAQueuedUpdateThatNeedsReviewNothingToDo(t *testing.T) {
+	for _, test := range []struct {
+		name               string
+		waiting, attention int
+		code, detail       string
+	}{
+		{"only waiting", 2, 0, "UPDATES-QUEUED", "2 computers will update when switched on."},
+		{"one stale entry", 0, 1, "UPDATES-NEED-REVIEW", "Queued updates: 1 computer needs attention. "},
+		{"several need review", 0, 3, "UPDATES-NEED-REVIEW", "Queued updates: 3 computers need attention. "},
+		{"mixed", 2, 1, "UPDATES-NEED-REVIEW", "Queued updates: 1 computer needs attention, 2 computers will update when switched on. "},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			report := NewRecoveryInspector(fakeQueuedRecoverySource{waiting: test.waiting, attention: test.attention}).Observe(context.Background(), "/srv/lab")
+			if len(report.Conditions) != 1 {
+				t.Fatalf("a queue is one condition, got %+v", report.Conditions)
+			}
+			condition, found := report.Condition(domain.RecoveryDeferredUpdates)
+			if !found || condition.Next.Code != test.code || !strings.HasPrefix(condition.Detail, test.detail) {
+				t.Fatalf("condition = %+v, %v; want %s %q", condition, found, test.code, test.detail)
+			}
+			if condition.Title != condition.Next.Title {
+				t.Fatalf("title %q differs from the catalogue %q", condition.Title, condition.Next.Title)
+			}
+			if test.attention > 0 {
+				if condition.Next.Action == "Nothing to do" || strings.Contains(condition.Title, "will update when") || !strings.Contains(condition.Detail, "review") {
+					t.Fatalf("a queued update that needs review reads as harmless: %+v", condition)
+				}
+			} else if condition.Next.Action != "Nothing to do" {
+				t.Fatalf("waiting entries lost their reassurance: %+v", condition.Next)
+			}
+		})
+	}
+	if report := NewRecoveryInspector(fakeQueuedRecoverySource{}).Observe(context.Background(), "/srv/lab"); len(report.Conditions) != 0 {
+		t.Fatalf("an empty queue is not a condition: %+v", report.Conditions)
+	}
+}

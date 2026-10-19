@@ -131,11 +131,18 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	}
 	if queued, ok := inspector.source.(deferredUpdatesSource); ok {
 		if waiting, attention := queued.DeferredUpdateSummary(ctx, root); waiting+attention > 0 {
-			detail := fmt.Sprintf("%s will update when switched on.", countLabel(waiting, "computer"))
+			// One condition: an entry that needs a review must not be
+			// presented as "nothing to do", whatever else is still waiting.
+			code, detail := "UPDATES-QUEUED", fmt.Sprintf("%s will update when switched on.", countLabel(waiting, "computer"))
 			if attention > 0 {
-				detail = fmt.Sprintf("Queued updates: %s. Their configuration changed after queueing, or the last attempt failed; open the queue to review them.", attentionLabel(attention))
+				code = "UPDATES-NEED-REVIEW"
+				detail = "Queued updates: " + attentionLabel(attention)
+				if waiting > 0 {
+					detail += fmt.Sprintf(", %s will update when switched on", countLabel(waiting, "computer"))
+				}
+				detail += ". Open the queue to review: a configuration changed after queueing, or an update kept failing."
 			}
-			add(domain.RecoveryDeferredUpdates, "UPDATES-QUEUED", detail, "", nil, nil)
+			add(domain.RecoveryDeferredUpdates, code, detail, "", nil, nil)
 		}
 	}
 	if changes, ok := inspector.source.(networkChangeSource); ok {

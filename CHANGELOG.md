@@ -37,6 +37,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 - While an update of the student computers is still running, the Overview
   shows it as a running operation instead of also listing it as an
   interrupted update.
+- When a queued update needs a new review, because the configuration changed
+  after it was queued or it kept failing, the Overview now says so and points
+  to **Computers → Queued updates**, instead of saying that nothing needs to
+  be done. Update plans, the troubleshooting guide and the interrupted-update
+  message also use plainer words and no longer mention the old deployment tool.
 
 ## [3.9.0] - 2026-10-19
 
