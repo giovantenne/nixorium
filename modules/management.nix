@@ -546,6 +546,8 @@ let
       ${builtins.readFile ../scripts/lib/pxe-build.sh}
 
       mapfile -t CLIENT_NAMES < <(jq -er '.clients.hosts[].name' <<<"$META")
+      # Parallel to the names: computers of a class share one system.
+      mapfile -t CLIENT_CLASSES < <(jq -er '.clients.hosts[] | (.class // .name)' <<<"$META")
       publish_progress running clients \
         "Evaluating shared artifacts and client systems in bounded batches" 0 "''${#CLIENT_NAMES[@]}"
       build_pxe_outputs "$FLAKE_URL" "''${CLIENT_NAMES[@]}"
