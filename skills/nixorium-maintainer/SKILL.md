@@ -51,8 +51,9 @@ Do not execute saves, apply commands, commits, pushes, input updates, installati
 deployment, queued updates, controller activation, PXE lifecycle, restarts,
 shutdown, classroom control, backup/restore, cleanup, template reset, home reset,
 trust rotation, key generation, secret installation or telemetry consent.
-Do not supply confirmation words, `--yes`, tokens to apply commands or terminal
-keystrokes on the operator's behalf.
+Do not supply confirmation words, `y` answers, `--yes`, tokens to apply commands
+or terminal keystrokes, including the Enter that confirms a review, on the
+operator's behalf.
 
 Do not edit settings, software declarations, saved workspace profiles, catalogs,
 modules, scripts, assets, inputs/locks, keys, Git metadata, recovery records or

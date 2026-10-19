@@ -26,6 +26,8 @@ access and interactive session state, checks PXE/controller-network conflicts,
 and returns an expiring content-bound review token and the one-word
 `SHUTDOWN` confirmation. When an active session is present, the confirmation
 prompt states explicitly that this word authorizes its interruption.
+(Amended 2026-10-19 by ADR 0026: the CLI types the word only when an eligible
+computer has an active or unknown session; otherwise it asks `Continue? [y/N]`.)
 Unreachable clients remain visible but ineligible and no request is
 queued for later.
 

@@ -374,6 +374,19 @@ that release's notes, so a release is not finished until the site follows it.
   resolution within that evaluator only; always parse/validate candidate JSON
   and retain downstream hooks and fresh evaluation after source or pin changes.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
+- Confirmation is proportionate to what the action destroys (ADR 0026, amended
+  2026-10-19). A review is confirmed with Enter in the TUI and a `Continue?
+  [y/N]` question in the CLI interactive prompt (`presentation.ConfirmYesNo`);
+  `--yes` and `--expect <token>` are unchanged, and every review token, expiry,
+  recheck and refusal stays. A typed word is kept only where something is
+  destroyed or cannot be undone: `ERASE` (disk erase, in `setup.sh`, the
+  remote installer and USB installation), `RESET DEPLOYMENT` and `RESTORE`
+  (template reset and its recovery), `DISCARD`, `ROTATE HOST KEY`, `CLEAN`,
+  `CLOSE` after a possible disk change, `MATCH` (comparing the physical
+  fingerprint), and `SHUTDOWN`/`RESTART` in the CLI only when the review
+  includes a computer whose session is active or unknown. Plans leave
+  `confirmation` empty (the JSON field is omitted) for every Enter review; never
+  add a new typed word for a reversible change.
 - Never leave the administrator or teacher stuck: every refusal names the next
   step, persistent blockers appear on the Overview, and recovery is a reviewed
   command, not a manual file edit. See the "Never leave the operator stuck"
@@ -414,9 +427,9 @@ that release's notes, so a release is not finished until the site follows it.
   modules or systemd changed. Never restart automatically.
   Per-computer outcomes must retain uncertainty and recovery requirements;
   never infer individual activation success from an aggregate batch result.
-- Client shutdown expands only evaluated client identities and never the controller. The session helper (`scripts/session-state.sh`) is a versioned one-word contract: `idle`, `unused` (local graphical session without input for ten minutes or since login, read from the user's GNOME Shell) or `active`, which it must keep for anything it cannot observe; older clients print only `active`/`idle`. Active sessions remain eligible after an explicit data-loss warning; when any are present, the review must state that the one-word `SHUTDOWN` confirmation authorizes their interruption. Preserve explicit acknowledgement for unknown sessions, expiring content-bound review, PXE/recovery conflict check, immediate inventory/session recheck, and the classroom lease of ADR 0030: shutdown and restart never wait for maintenance, take `classroom.lock` shared while they recheck and send, and leave alone every computer named in `deployment-pending.json` (an unreadable record or a USB installation still refuses them all). Adapters may issue only the fixed `nixorium-session-state` and `systemctl poweroff --no-block` SSH commands. Report accepted/not-sent/unconfirmed requests without inferring physical power state or retrying unconfirmed dispatches.
+- Client shutdown expands only evaluated client identities and never the controller. The session helper (`scripts/session-state.sh`) is a versioned one-word contract: `idle`, `unused` (local graphical session without input for ten minutes or since login, read from the user's GNOME Shell) or `active`, which it must keep for anything it cannot observe; older clients print only `active`/`idle`. Active sessions remain eligible after an explicit data-loss warning; when any are present, the review must state that the one-word `SHUTDOWN` confirmation authorizes their interruption. The CLI asks for the typed `SHUTDOWN` (or `RESTART`) only when the review includes at least one eligible computer whose session is active or unknown; when every computer is idle, logged in without use, or off, it asks `Continue? [y/N]` and the plan carries no `confirmation`. The administrator TUI confirms the review with Enter (the earlier decision for power actions). Preserve explicit acknowledgement for unknown sessions, expiring content-bound review, PXE/recovery conflict check, immediate inventory/session recheck, and the classroom lease of ADR 0030: shutdown and restart never wait for maintenance, take `classroom.lock` shared while they recheck and send, and leave alone every computer named in `deployment-pending.json` (an unreadable record or a USB installation still refuses them all). Adapters may issue only the fixed `nixorium-session-state` and `systemctl poweroff --no-block` SSH commands. Report accepted/not-sent/unconfirmed requests without inferring physical power state or retrying unconfirmed dispatches.
 - Client restart shares the shutdown review and safety boundary but binds the
-  distinct action and `RESTART` confirmation; its adapter may additionally
+  distinct action and the `RESTART` word under the same rule; its adapter may additionally
   issue only `systemctl reboot --no-block`. Never infer completion from network
   loss. The teacher dashboard reaches inventory, Internet and client power only
   through the group-private classroom worker running as `admin`; keep the
@@ -551,12 +564,12 @@ that release's notes, so a release is not finished until the site follows it.
   paths, links, submodules, Git attribute rules, a change of the laboratory
   network (guided change only), a managed file whose earlier version is not
   valid, and files that cannot go back safely. Reuse the commit boundary:
-  fixed Git commands, content-bound token, typed `UNDO`, compare-and-update of
+  fixed Git commands, content-bound token, an Enter / `[y/N]` confirmation, compare-and-update of
   HEAD, two-tree `read-tree` for the files, no hook, signing, remote or push.
   It never applies to the controller or computers; its review names those
   steps. The Git review screen offers it with `u` through the typed
   `PlanGitUndo`/`ApplyGitUndo` callbacks: presentation shows the review, the
-  refusal with its catalogued next step and the typed word, and never decides
+  refusal with its catalogued next step and what Enter does, and never decides
   what can be undone. Enter on a saved undo chains to the ordinary controller
   review through `continueSavedConfiguration`, like a settings save.
 - Upstream update planning must preserve the configured source identity, accept

@@ -214,7 +214,7 @@ journalctl -u harmonia.service -b
 nixorium services restart cache
 ```
 
-The restart action requires exact confirmation and verifies both the unit and
+The restart action is confirmed with Enter on its review and verifies both the unit and
 HTTP endpoint. If the signing key is missing, run `nixorium setup keys`, review
 only the public-key change, then `nixorium setup install-secrets`. A public/
 private mismatch or a different installed secret fails closed; do not overwrite
@@ -586,7 +586,7 @@ generous upper bounds of six hours for build and two hours for apply. These
 are safety ceilings, not progress estimates or proof that a remote job stopped.
 
 If waiting is no longer useful, `s` opens a separate **Stop waiting** review.
-Only typing `STOP WAITING` confirms termination of local Colmena/SSH processes.
+Enter on that review confirms termination of local Colmena/SSH processes; Esc keeps waiting.
 Nixorium then attempts bounded authenticated client observations. This is not
 a remote cancellation or rollback; activation may still be running.
 
@@ -940,7 +940,7 @@ fetch the backup without first needing the keys inside it.
 
 Save configuration edits through **Maintenance → Review Git changes** first.
 Back up lab reviews the destination, branch and saved revision, then asks for a
-passphrase of at least 12 characters, its repetition and `PUSH`. Confirm on your
+passphrase of at least 12 characters and its repetition; Enter then pushes. Confirm on your
 provider that the destination is private: Git transport cannot establish repository
 visibility. Only `nixorium-recovery.age` is added by the backup operation. It uses
 age/scrypt and contains the original `secret-key`, `admin-ssh`,

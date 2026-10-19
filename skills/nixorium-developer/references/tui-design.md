@@ -98,9 +98,14 @@ action bar. Responsive layouts may shorten labels, but must not silently omit
 the primary action, cancellation, safety state, or indication that more help is
 available.
 
-Use exact typed confirmation only when a mistake has material destructive or
-operational impact. A review must distinguish desired configuration, observed
-state, and the action that will happen now. Keep the existing token binding,
+Confirm a review with Enter in the TUI and `Continue? [y/N]` in the CLI. Use an
+exact typed word only where something is destroyed or cannot be undone
+(`ERASE`, `RESET DEPLOYMENT`/`RESTORE`, `DISCARD`, `ROTATE HOST KEY`, `CLEAN`,
+`CLOSE` after a possible disk change, `MATCH`, and the CLI `SHUTDOWN`/`RESTART`
+when a session is active or unknown; ADR 0026 as amended 2026-10-19). The
+screen says in one plain sentence what Enter does ("Enter updates these
+computers."). A review must distinguish desired configuration, observed state,
+and the action that will happen now. Keep the existing token binding,
 rechecks, privilege boundaries, and typed callbacks; visual simplification must
 not weaken operational safety.
 
@@ -130,9 +135,10 @@ step. Apply these rules to every operation, refusal and recovery state:
 7. Every loss of access (password, keys, controller disk) has a recovery
    procedure exercised at least in a VM.
 8. Recovery adds a review; it never removes review tokens, rechecks or
-   privilege boundaries. A typed word stays for destructive or uncertain
-   actions; a recovery that changes nothing on any computer and only archives
-   a record is confirmed with Enter (ADR 0026). Every recovery screen has
+   privilege boundaries. A typed word stays only for what destroys data or
+   cannot be undone; every other review, including a recovery that changes
+   nothing on any computer and only archives a record, is confirmed with
+   Enter (ADR 0026). Every recovery screen has
    three parts in plain words: what Nixorium found, what you can do (each
    action named by what it does), and the confirmation, which says what
    Enter or the typed word will change.

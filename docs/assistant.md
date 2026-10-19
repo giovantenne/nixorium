@@ -454,7 +454,7 @@ laboratory again and says how long ago it was verified; any edit evaluates
 afresh.
 Read the full comparison with arrows, PgUp/PgDn and Home/End.
 
-Type **SAVE**, then **Enter**, to record the reviewed proposal. The complete
+Choose **Save and update the controller** or **Save only** and press **Enter** to record the reviewed proposal (typing `save` in the chat only opens this review). The complete
 diff must fit within 2 MiB and the evaluation must pass. A review expires after
 ten minutes; changes to the candidate or deployment require another review.
 The save repeats evaluation, under the same reuse rule, and checks the

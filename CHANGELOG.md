@@ -20,6 +20,15 @@ The project follows [Semantic Versioning](https://semver.org/).
   scheduled shut-down no longer wait while the administrator updates
   computers. Only the computers being updated, or whose last update was
   interrupted, are left alone, and the review says so.
+- Most reviews are now confirmed with Enter on the review screen, or with a
+  `Continue? [y/N]` question on the command line. A word still has to be typed
+  only before something that cannot be undone: erasing a disk, resetting the
+  configuration template, discarding unsaved changes, trusting a new computer
+  key, removing old versions, or, on the command line, switching off or
+  restarting computers someone is using. Every review still shows what will
+  happen and can be cancelled with Esc, and `--yes` and `--expect` work as
+  before. Reviews that no longer need a word leave `confirmation` out of their
+  JSON output.
 - The log of **Update computers** shows when each step started and how long it
   took, with the total time at the end, so it is clear where an update spends
   its time.

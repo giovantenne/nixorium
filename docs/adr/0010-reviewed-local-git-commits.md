@@ -30,8 +30,9 @@ plaintext secret additions.
 The proposal contains the exact tree ID, redacted diff, fixed generated commit
 message, and a SHA-256 token bound to parent revision, tree, paths, and message.
 Apply repeats the entire plan and requires that token. Advanced interactive Git
-commands additionally require the exact one-word `COMMIT` confirmation (or
-explicit automation-only `--yes`). An application-level `Save configuration`
+commands additionally ask `Continue? [y/N]` (or take the explicit
+automation-only `--yes`); amended by ADR 0026, the typed `COMMIT` was dropped
+because a local commit changes nothing that cannot be undone. An application-level `Save configuration`
 operation may consume its own just-created token without exposing Git or a
 second confirmation after the user has reviewed and accepted the configuration
 change itself.

@@ -633,9 +633,9 @@ the computers.
    new network with a record of the previous one and changes no computer.
    Trusted SSH keys are recorded for the new addresses from the keys already
    trusted for the previous ones, so no new fingerprint has to be accepted.
-2. **Apply to controller** (its own review, `REBUILD`). The controller then
+2. **Apply to controller** (its own review, confirmed with Enter). The controller then
    carries both addresses.
-3. **Update computers** (its own review, `DEPLOY`). Every computer is
+3. **Update computers** (its own review, confirmed with Enter). Every computer is
    selected; a computer still on the previous network is reached there, moves
    to its new address and is checked on it. Computers that are off can be
    queued (F3) and move when they are switched on.
@@ -867,7 +867,7 @@ expands only configured clients, and prints the revision-bound apply command.
 In the dashboard the selection lists each computer's state at the last check
 (`r` checks again, `n` selects those needing the update), and Inventory's `u`
 opens the same review for every computer that needed it.
-Apply repeats the preflight, requires the one-word `DEPLOY` confirmation, builds before
+Apply repeats the preflight, asks `Continue? [y/N]` in the CLI (Enter on the review in the dashboard), builds before
 activation, and streams output to a mode-0600 log. In the dashboard, the same
 foreground operation shows elapsed time, named stages and authenticated-computer
 verification counts. `l` expands the progress bar and up to five authored
@@ -932,8 +932,8 @@ nix run .#nixorium -- restart apply --on @lab \
 
 Planning checks installation/network recovery and concurrent client work as
 well as access and sessions. When an active session is present, the review says
-explicitly that `SHUTDOWN` or `RESTART` authorizes interrupting it. Apply requires the matching single word (or explicit
-automation-only `--yes`), takes the same client-operation lock as deployment,
+explicitly that `SHUTDOWN` or `RESTART` authorizes interrupting it. In the CLI, apply requires that matching single word only when such a session (or an acknowledged unknown one) is part of the review; when every computer is idle, logged in without use, or off, it asks `Continue? [y/N]`. Explicit
+automation-only `--yes` skips the question, takes the same client-operation lock as deployment,
 and repeats inventory, conflict, and session checks immediately before sending
 the fixed operating-system request. Use
 `--acknowledge-unknown-sessions` on both plan and apply only after reviewing
@@ -1103,7 +1103,7 @@ nix run .#nixorium -- git undo apply --expect REVIEW_TOKEN
 
 The review shows the description, date and files of the change that will be
 undone, what the undo does to those files, and the steps that follow. Applying
-it (confirm by typing `UNDO`) saves one new change named `Undo: <description of the
+it (confirm with Enter, or answer `y` in the CLI) saves one new change named `Undo: <description of the
 undone change>` and puts the files back; the undone change stays in the history
 and nothing is pushed. No computer changes yet: run **Apply to controller**, then
 **Update computers**, so the controller and the student computers return too. In
@@ -1135,7 +1135,7 @@ nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 ```
 
-Apply requires the one-word `REBUILD` confirmation, starts only the matching revision-bound
+Apply is confirmed with Enter on the review (`Continue? [y/N]` in the CLI), starts only the matching revision-bound
 systemd unit, builds as the deployment owner, refuses repository drift, and
 records success only after activation and active-system verification. Closing
 the dashboard does not stop the systemd-owned job. The dashboard shows elapsed
@@ -1163,7 +1163,7 @@ nix run .#nixorium -- services restart cache
 ```
 
 The report combines the persistent signed cache and on-demand PXE lifecycle.
-Cache restart requires the one-word `RESTART` confirmation and succeeds only after both systemd and
+Cache restart is confirmed with Enter and succeeds only after both systemd and
 HTTP checks pass. PXE uses its dedicated transactional workflow and cannot be
 mutated through this generic service action.
 
@@ -1180,7 +1180,7 @@ Backup is optional and never blocks client installation or updates. Open
   enter its folder instead. Enter and repeat a passphrase, review, then create the archive.
   The entire deployment, Git history, private keys and account hashes are encrypted.
 - **Private Git repository**: save local edits first, choose your school's **private**
-  GitHub/GitLab repository and branch, then confirm with a passphrase and `PUSH`.
+  GitHub/GitLab repository and branch, then enter a passphrase and press Enter once you have confirmed it is private.
   Configure independent SSH access and verify the Git server's fingerprint first.
   Private keys and account hashes are encrypted; configuration and history remain
   readable. A Git backup is complete only after the remote revision is verified.
@@ -1291,8 +1291,8 @@ name to use.
 
 `setup install-secrets` starts a fixed sandboxed action that installs only
 verified key material to fixed destinations. After reviewed settings and public
-keys are committed, `setup apply` requires a clean ready deployment and exact
-`APPLY` confirmation. The build runs as `admin`; only exact-closure activation
+keys are committed, `setup apply` requires a clean ready deployment and a
+`Continue? [y/N]` answer (or `--yes`). The build runs as `admin`; only exact-closure activation
 runs as root. Completion requires the active system and root-owned success
 receipt to match the reviewed revision.
 While it runs, `setup apply` reports typed validation, build, activation, and
@@ -1346,7 +1346,7 @@ nix run .#nixorium -- pxe recover
 ```
 
 Start validates preparation, live addressing, cache, and services before
-requiring the one-word `START` confirmation. Stop restores normal controller addressing. Recover
+requiring Enter on its review (`Continue? [y/N]` in the CLI). Stop restores normal controller addressing. Recover
 reconciles an interrupted session, and boot recovery performs the same repair
 automatically. These actions are idempotent; a failed start rolls back before
 returning. Quitting the dashboard does not stop active systemd-owned services.
@@ -1594,7 +1594,7 @@ builds their resolved derivations without repeating the deployment evaluation. C
 preflight also shares one fresh evaluation while preserving the separate checks
 before activation and after completion. After validation, review
 the scrollable two-file patch (`F4` expands candidate checks), then press Enter.
-The longer exact phrase remains part of the explicit CLI apply workflow.
+The CLI apply asks `Continue? [y/N]`, or takes `--yes`.
 
 > [!IMPORTANT]
 > The TUI saves these files transparently, then builds, activates, and verifies
