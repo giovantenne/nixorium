@@ -199,7 +199,7 @@ let
   };
 
   baseHostModules = [
-    ({ lib, hostName, ... }:
+    ({ lib, isController, ... }:
       {
         warnings = lib.optionals laboratoryEnabled (
           lib.optional (cachePublicKeyFile == null) "Missing cache public key"
@@ -208,7 +208,7 @@ let
             "lab.networkTransition is ignored because no client computers are configured; remove it from lab-settings.json";
         environment.systemPackages = [ hostState hostSessionState hostCleanGenerations hostDiagnostics ];
         environment.etc."nixorium-host-diagnostics.json".text = builtins.toJSON {
-          controller = hostName == masterHostName;
+          controller = isController;
           systemctl = "${bootstrapPkgs.systemd}/bin/systemctl";
           journalctl = "${bootstrapPkgs.systemd}/bin/journalctl";
         };
@@ -256,6 +256,9 @@ let
     inherit nixoriumPackage;
     inherit hostIp;
     hostName = name;
+    # The role is explicit so modules never infer it from the host name.
+    nixoriumRole = if name == masterHostName then "controller" else "client";
+    isController = name == masterHostName;
   };
 
   labMeta = {
@@ -843,6 +846,9 @@ builtins.mapAttrs (name: value:
         inherit labAssets;
         hostName = "netboot";
         hostIp = masterDhcpIp;
+        # The installer image is not the controller; it trusts the controller cache.
+        nixoriumRole = "client";
+        isController = false;
       };
       modules = [
         "${nixpkgs}/nixos/modules/installer/netboot/netboot-minimal.nix"

@@ -1,8 +1,7 @@
-{ hostName, labSettings, lib, pkgs, ... }:
+{ isController, labSettings, lib, pkgs, ... }:
 
 let
   # Master controller: no autologin (teacher selects account)
-  isMaster = hostName == labSettings.masterHostName;
   normalUsers = [ "admin" labSettings.teacherUser ];
   repairUserHome = user: ''
     HOME_DIR="/home/${user}"
@@ -70,7 +69,7 @@ in
   };
 
   services.displayManager.autoLogin = {
-    enable = !isMaster;
+    enable = !isController;
     user = labSettings.studentUser;
   };
 

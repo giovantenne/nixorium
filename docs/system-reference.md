@@ -798,6 +798,21 @@ installer so client installation needs no second checkout.
 | `updateValidationHosts` | Extra generated hosts with private host-conditional policy; included in base-update builds and offline equivalence |
 | `netbootModules` | Additional modules applied only to the PXE environment |
 
+Every module of a deployment receives these special arguments:
+
+| Argument | Value |
+|---|---|
+| `isController` | `true` on the controller, `false` on every client computer |
+| `nixoriumRole` | `"controller"` or `"client"` |
+| `hostName` | The generated host name, for example `pc01` |
+| `hostIp` | The host's static address on the laboratory network |
+| `hostSoftwarePackages` | The host's effective managed package IDs |
+
+Test the computer's role with `isController` or `nixoriumRole`, not by comparing
+`hostName` with `labSettings.masterHostName`; the built-in modules do the same.
+Use `hostName` only for a real per-host difference, and declare it through
+`hostModules` or `updateValidationHosts`.
+
 `groupModules` defaults to `{}` and refers to existing `clientGroups`:
 
 ```nix

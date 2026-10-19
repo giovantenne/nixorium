@@ -1,4 +1,4 @@
-{ config, lib, hostName, labSettings, ... }:
+{ config, lib, isController, labSettings, ... }:
 {
   options.services.nixorium.assistant = {
     endpoint = lib.mkOption {
@@ -13,7 +13,7 @@
     };
   };
 
-  config = lib.mkIf (hostName == labSettings.masterHostName && (labSettings.assistant or true)) {
+  config = lib.mkIf (isController && (labSettings.assistant or true)) {
     environment.etc."nixorium/assistant.json" = {
       mode = "0444";
       text = builtins.toJSON {

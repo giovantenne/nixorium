@@ -1,6 +1,5 @@
-{ config, hostName, labSettings, nixoriumPackage, lib, pkgs, ... }:
+{ config, isController, labSettings, nixoriumPackage, lib, pkgs, ... }:
 let
-  isController = hostName == labSettings.masterHostName;
   cfg = config.services.nixorium;
   migrateKnownHosts = pkgs.writeShellApplication {
     name = "nixorium-migrate-known-hosts";

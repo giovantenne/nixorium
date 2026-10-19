@@ -1,6 +1,5 @@
-{ pkgs, lib, hostName, labSettings, labAssets, ... }:
+{ pkgs, lib, isController, labSettings, labAssets, ... }:
 let
-  isMaster = hostName == labSettings.masterHostName;
   backgroundFiles = builtins.listToAttrs (map (background: {
     name = "lab/backgrounds/${builtins.baseNameOf (builtins.unsafeDiscardStringContext (toString background))}";
     value.source = background;
@@ -33,7 +32,7 @@ in
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
 
-  systemd.services.gdm-monitor-config = lib.mkIf isMaster {
+  systemd.services.gdm-monitor-config = lib.mkIf isController {
     description = "Copy admin monitor layout to GDM and teacher";
     wantedBy = [ "display-manager.service" ];
     before = [ "display-manager.service" ];

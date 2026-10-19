@@ -1,6 +1,5 @@
-{ config, hostName, labSettings, lib, pkgs, ... }:
+{ config, isController, labSettings, lib, pkgs, ... }:
 let
-  isController = hostName == labSettings.masterHostName;
   preparationFile = "/var/lib/nixorium/prepared/prepared.json";
   sessionFile = "/var/lib/nixorium/pxe/session.json";
   lastSessionFile = "/var/lib/nixorium/pxe/last-session.json";

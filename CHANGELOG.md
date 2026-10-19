@@ -25,6 +25,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   running the queue waits for the next minute instead of counting a failure.
 - **Update computers** selects the computers whose queued update is out of
   date, so the new review includes them; the selection can still be changed.
+- Modules of a deployment can test the computer's role with the `isController`
+  and `nixoriumRole` arguments instead of comparing host names.
 
 ### Fixed
 

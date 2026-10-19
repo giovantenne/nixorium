@@ -24,7 +24,7 @@ pkgs.testers.runNixOSTest {
   name = "nixorium-classroom-view";
   nodes.client = { ... }: {
     imports = [ ../modules/classroom-view.nix ];
-    _module.args = { inherit labSettings nixoriumPackage; hostName = "pc01"; };
+    _module.args = { inherit labSettings nixoriumPackage; hostName = "pc01"; isController = false; };
     virtualisation.memorySize = 3072;
     virtualisation.resolution = { x = 1280; y = 800; };
     services.displayManager.gdm.enable = true;

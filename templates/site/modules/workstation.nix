@@ -1,6 +1,6 @@
 args@{ pkgs, lib, labSettings, hostSoftwarePackages, ... }:
 let
-  isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);
+  isController = args.isController or false;
   has = package: builtins.elem package hostSoftwarePackages;
   hasGhostty = has "ghostty";
   hasChromium = has "chromium";

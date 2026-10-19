@@ -1,7 +1,7 @@
-{ hostName, labSettings, pkgs, lib, ... }:
+{ isController, labSettings, pkgs, lib, ... }:
 let
   isClient = (labSettings.deploymentMode or "laboratory") == "laboratory"
-    && hostName != labSettings.masterHostName;
+    && !isController;
   transition = labSettings.networkTransition or null;
   rules = pkgs.writeText "nixorium-internet-block.nft" (import ../lib/client-internet-rules.nix {
     interface = if labSettings.ifaceExplicit or true then labSettings.ifaceName else null;

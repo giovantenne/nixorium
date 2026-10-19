@@ -1,6 +1,5 @@
-{ config, labSettings, lib, ... }:
+{ config, isController, labSettings, lib, ... }:
 let
-  isMaster = config.networking.hostName == labSettings.masterHostName;
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   signingKeyPath = "/var/lib/nixorium/keys/harmonia-secret-key";
   transition = labSettings.networkTransition or null;
@@ -12,13 +11,13 @@ in
     # previous one second. Clients use only the controller: updates never need
     # the Internet, and filtered school networks reject cache.nixos.org. This
     # replaces the NixOS default; a deployment adding client caches uses mkForce.
-    substituters = if isMaster then [] else lib.mkOverride 90 (map
+    substituters = if isController then [] else lib.mkOverride 90 (map
       (address: "http://${address}:${toString labSettings.cachePort}")
       ([ labSettings.masterIp ] ++ lib.optional (transition != null) transition.masterIp));
     trusted-public-keys = if labSettings.cachePublicKey == null then [] else [ labSettings.cachePublicKey ];
   };
 
-  services.harmonia.cache = lib.mkIf (isMaster && laboratoryEnabled) {
+  services.harmonia.cache = lib.mkIf (isController && laboratoryEnabled) {
     enable = true;
     signKeyPaths = [ signingKeyPath ];
     # Every address of the controller, so the cache answers on both laboratory
@@ -28,7 +27,7 @@ in
 
   # Keep the native Harmonia unit while exposing a stable product-level name
   # to the management application and operators.
-  systemd.services.harmonia = lib.mkIf (isMaster && laboratoryEnabled) {
+  systemd.services.harmonia = lib.mkIf (isController && laboratoryEnabled) {
     aliases = [ "nixorium-harmonia.service" ];
     wantedBy = [ "multi-user.target" ];
   };

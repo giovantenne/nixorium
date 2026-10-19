@@ -18,7 +18,7 @@
 let
   keys = import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs;
   hostArgs = lab: {
-    inherit (lab.nixosConfigurations.pc01._module.specialArgs) hostName hostIp labSettings;
+    inherit (lab.nixosConfigurations.pc01._module.specialArgs) hostName hostIp isController labSettings;
   };
   forced = args: lib.mapAttrs (_: lib.mkForce) args;
   clientModules = [
@@ -175,6 +175,7 @@ in
       ];
       _module.args = {
         hostName = "pc99";
+        isController = true;
         labSettings = {
           masterHostName = "pc99";
           masterIp = "10.0.0.99";

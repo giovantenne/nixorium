@@ -30,6 +30,7 @@ in
     internetModule = import ../modules/client-internet.nix {
       inherit pkgs lib;
       hostName = "pc01";
+      isController = false;
       labSettings = {
         masterHostName = "pc99";
         ifaceName = "lab0";
@@ -258,6 +259,7 @@ in
 
     _module.args = {
       hostName = "pc99";
+      isController = true;
       labSettings = {
         masterHostName = "pc99";
         masterIp = "10.0.0.99";

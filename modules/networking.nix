@@ -1,7 +1,6 @@
-{ hostIp, hostName, labSettings, lib, pkgs, ... }:
+{ hostIp, hostName, isController, labSettings, lib, pkgs, ... }:
 let
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
-  isController = hostName == labSettings.masterHostName;
   # mkLab sets `ifaceExplicit` for every host. The controller and any client
   # with a clientIfaceName or hostIfaceNames entry use their configured name.
   # Other clients ignore the template fallback name and configure the wired

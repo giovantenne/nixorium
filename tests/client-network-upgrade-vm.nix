@@ -26,6 +26,7 @@ in
         # the previous release's behaviour (name-based scripted networking).
         _module.args = {
           hostName = "pc01";
+          isController = false;
           hostIp = "10.0.0.1";
           labSettings = {
             deploymentMode = "laboratory";

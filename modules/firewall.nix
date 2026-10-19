@@ -1,6 +1,5 @@
-{ hostName, labSettings, lib, ... }:
+{ isController, labSettings, lib, ... }:
 let
-  isController = hostName == labSettings.masterHostName;
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   isClient = laboratoryEnabled && !isController;
   # Clients without an explicit interface name are configured by type (ADR 0017).
