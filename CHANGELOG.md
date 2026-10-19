@@ -35,6 +35,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   before reporting a computer as unverified, because a computer that has just
   switched to its new system can take a moment to answer. When the answer is
   still unexpected, the report says what the computer replied.
+- An update that changes NetworkManager's settings on computers configured
+  by network card type no longer can fail to write their laboratory network
+  profile: the profile writer waits for NetworkManager to answer.
 - In the classroom view the **Power** menu opens towards the left, so it
   stays readable when the window is maximised.
 - While an update of the student computers is still running, the Overview

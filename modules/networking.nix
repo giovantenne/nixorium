@@ -79,6 +79,16 @@ in
   systemd.services.NetworkManager-ensure-profiles = lib.mkIf byType {
     serviceConfig.RemainAfterExit = true;
     path = [ pkgs.networkmanager pkgs.gawk pkgs.gnugrep ];
+    # A deployment that changes NetworkManager's settings restarts it, and
+    # the profile writer, although ordered after it, can then run before
+    # NetworkManager answers ("NetworkManager is not running"). Wait for it,
+    # at most a minute.
+    preStart = ''
+      for _ in $(seq 120); do
+        nmcli -t general status >/dev/null 2>&1 && exit 0
+        sleep 0.5
+      done
+    '';
     # Upgrading a running client (Colmena switch) replaces the scripted lab
     # address with this profile: the old address is removed and the restarted
     # NetworkManager adopts the card as "connected (externally)", which blocks
