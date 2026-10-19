@@ -45,3 +45,28 @@ func TestSavedInstallationSummaryContinuesEditsAndCancels(t *testing.T) {
 		t.Fatal("incomplete fresh preflight accepted")
 	}
 }
+
+func TestSavedInstallationSummaryAlsoServesUSBInstallation(t *testing.T) {
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+	m.installation = installationModel{flow: true, startingLabSetup: true, method: domain.RemoteInstallUSBSSH}
+	m.actions.LoadSetup = func(context.Context) domain.SetupReport {
+		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageValidate}
+	}
+	updated, cmd := m.Update(dashboardSettingsMsg{settings: wizardSettings()})
+	m = updated.(dashboardModel)
+	if cmd != nil || !m.installation.savedSummary || m.screen != dashboardSettings {
+		t.Fatal("complete settings replayed the form for a USB installation")
+	}
+	m.width, m.height = 120, 30
+	if view := m.View().Content; !strings.Contains(view, "USB over SSH") || strings.Contains(view, "Network boot") {
+		t.Fatal("summary names the wrong installation method")
+	}
+	cancel, cmd := workspaceKey(m, demoCode(tea.KeyEscape))
+	if cmd != nil || cancel.installation.flow || cancel.screen != dashboardInstallationArea {
+		t.Fatal("cancel did not return to the installation area")
+	}
+	continued, cmd := workspaceKey(m, demoCode(tea.KeyEnter))
+	if cmd == nil || continued.installation.savedSummary {
+		t.Fatal("preflight skipped")
+	}
+}

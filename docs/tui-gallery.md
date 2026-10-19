@@ -860,7 +860,7 @@ Accounts            admin / teacher / student
 
 Continue the guided preparation using these saved values.
 Keys, configuration, controller and installation files are checked next.
-This summary is not a readiness check. Starting network installation still requires its own review.
+This summary is not a readiness check. The installation still requires its own review.
 
 Enter Continue  ·  e Edit settings  ·  Esc Back  ·  F1 Help
 ```

@@ -939,7 +939,11 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settings.fromAccounts = false
 		if model.installation.startingLabSetup {
 			model.installation.startingLabSetup = false
-			if model.installation.method == "pxe" && message.settings.InstallationSettingsComplete() {
+			// Both installation methods reuse complete saved settings; the
+			// installation preflight still runs after Continue. Guided first
+			// setup (no method yet) always shows the form.
+			method := model.installation.method
+			if (method == "pxe" || method == domain.RemoteInstallUSBSSH) && message.settings.InstallationSettingsComplete() {
 				model.installation.savedSummary = true
 				model.screen, model.message = dashboardSettings, ""
 				return model, nil

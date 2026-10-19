@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func (model dashboardModel) installationSummaryView() string {
@@ -22,7 +23,7 @@ func (model dashboardModel) installationSummaryView() string {
 		"Accounts            admin / " + lab.TeacherUser + " / " + lab.StudentUser,
 		"", "Continue the guided preparation using these saved values.",
 		"Keys, configuration, controller and installation files are checked next.",
-		"This summary is not a readiness check. Starting network installation still requires its own review.",
+		"This summary is not a readiness check. The installation still requires its own review.",
 	}
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
@@ -31,7 +32,11 @@ func (model dashboardModel) installationSummaryView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return model.renderShell(tuiShell{path: []string{"Installation", "Network boot", "Saved settings"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Continue"}, {key: "e", label: "Edit settings"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}})
+	method := "Network boot"
+	if model.installation.method == domain.RemoteInstallUSBSSH {
+		method = "USB over SSH"
+	}
+	return model.renderShell(tuiShell{path: []string{"Installation", method, "Saved settings"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Continue"}, {key: "e", label: "Edit settings"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) updateInstallationSummary(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -39,6 +44,9 @@ func (model dashboardModel) updateInstallationSummary(key tea.KeyPressMsg) (tea.
 	case "esc":
 		model.installation.savedSummary, model.installation.flow = false, false
 		model.screen = dashboardPXE
+		if model.installation.method == domain.RemoteInstallUSBSSH {
+			model.screen = dashboardInstallationArea
+		}
 	case "e":
 		model.installation.savedSummary = false
 		model.settings.editor = model.newSettingsEditor(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
