@@ -22,6 +22,9 @@ header .title { display: flex; align-items: baseline; gap: 1rem; }
 .toolbar .group { display: flex; gap: 0.4rem; }
 .toolbar .actions-menu.disabled summary, .viewer-actions.disabled summary { opacity: 0.45; pointer-events: none; }
 .toolbar .actions-menu .menu { right: auto; left: 0; }
+/* Power is the last toolbar item, at the window's right edge when maximised:
+   its menu opens leftwards so it stays on screen. */
+.toolbar .power-menu .menu { right: 0; left: auto; }
 #selected-count { color: var(--muted); min-width: 7rem; }
 button { padding: 0.35rem 0.9rem; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: inherit; font: inherit; cursor: pointer; }
 button:disabled { opacity: 0.45; cursor: default; }

@@ -26,6 +26,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 - The `l` key for progress details appears only when there are details to
   show, instead of on every progress screen.
 
+### Fixed
+
+- In the classroom view the **Power** menu opens towards the left, so it
+  stays readable when the window is maximised.
+
 ## [3.9.0] - 2026-10-19
 
 ### Added
