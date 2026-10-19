@@ -89,7 +89,7 @@ and JSON issues carry a `next` object with the same code and texts; the JSON
 
 ## The controller DHCP lease changed
 
-Normal administration and Colmena deployment use the static laboratory address.
+Normal administration and computer updates use the static laboratory address.
 PXE preparation separately binds one live non-static controller address to the
 session so a routine DHCP lease change does not require a configuration commit.
 
@@ -150,9 +150,9 @@ output with the same sentence and keep their JSON report unchanged.
 
 `DISK-FREE` warns below 10 GiB available or when the filesystem probe failed;
 it is not an estimate of the space required by the next build. `COMMAND-NIX`,
-`COMMAND-GIT`, `COMMAND-SYSTEMCTL`, `COMMAND-SSH` and `COMMAND-COLMENA` report
+`COMMAND-GIT`, `COMMAND-SYSTEMCTL`, `COMMAND-SSH` and `COMMAND-NIX-COPY-CLOSURE` report
 missing executables in the command's environment. Neither condition starts
-a repair. Inspect `df -h /nix` and `command -v nix git systemctl ssh colmena`.
+a repair. Inspect `df -h /nix` and `command -v nix git systemctl ssh nix-copy-closure`.
 
 Run the packaged command from the deployment's supported controller environment.
 A missing tool may require a separately reviewed controller rebuild. For low
@@ -559,7 +559,7 @@ Never delete the whole trust file or disable host-key verification.
 
 ## A deployment failed
 
-A Colmena failure can leave selected machines at different generations.
+A failed update can leave selected machines at different generations.
 Nixorium does not claim an automatic rollback across hosts. Unexpected terminal
 loss can interrupt the foreground deployment and uses this same recovery path.
 
@@ -579,21 +579,21 @@ update successful history. Historical success never overrides the live result.
 
 The distribution percentage counts phases, not bytes or updated computers.
 During build/apply, `l` shows a bounded, terminal-safe tail of the private
-Colmena log and the time since its last output. Silence alone is not failure.
+update log and the time since its last output. Silence alone is not failure.
 SSH connects with a 10-second limit and one attempt; unanswered server-alive
 checks use a 10-second interval and a count of three. Phase supervision has
 generous upper bounds of six hours for build and two hours for apply. These
 are safety ceilings, not progress estimates or proof that a remote job stopped.
 
 If waiting is no longer useful, `s` opens a separate **Stop waiting** review.
-Enter on that review confirms termination of local Colmena/SSH processes; Esc keeps waiting.
+Enter on that review confirms termination of the local Nixorium update and SSH processes; Esc keeps waiting.
 Nixorium then attempts bounded authenticated client observations. This is not
 a remote cancellation or rollback; activation may still be running.
 
 Before dispatching apply, Nixorium durably creates the administrator-owned
 mode-0600 `/var/lib/nixorium/coordination/deployment-pending.json`, containing
 the repository, reviewed revision, selected names/addresses and start time.
-A normal successful Colmena return clears it. A failed/disconnected/timed-out
+A normal successful finish of the update clears it. A failed/disconnected/timed-out
 apply, terminal loss or process death retains it, even across controller reboot.
 New managed deployments, installation starts, network installation and other
 maintenance operations are refused. Classroom controls (Internet access, shut
@@ -659,15 +659,15 @@ Only when the guided review cannot run, recover by hand:
 
 1. Keep the private operation log and the pending record; do not delete or
    overwrite them, and review them before sharing.
-2. Confirm that the Nixorium process that started the update and its Colmena
-   and SSH children have exited (a stored PID is only a hint).
+2. Confirm that the Nixorium process that started the update and its SSH
+   child processes have exited (a stored PID is only a hint).
 3. Inspect every recorded computer, over SSH or at its console, for running
    activation and pending systemd jobs; resolve them first. A matching
    revision or a lost connection is not proof that activation finished.
 4. With no operation running, hold `operation.lock` exclusively and move the
    exact record to a new private file under `recovered/`; never delete or
-   recreate the lock files, and never bypass them with old binaries or raw
-   Colmena.
+   recreate the lock files, and never bypass them with old binaries or by
+   running a manual activation.
 5. Check the computers again and authorize a fresh reviewed update.
 
 ### Last resort: activate the controller with NixOS

@@ -79,8 +79,8 @@ The **Community Edition** is free and open source.
   Assistant can also inspect bounded computer diagnostics and saved configuration
   history after renewed consent, without changing systems or Git.
 
-Under the hood: NixOS builds every PC from the same description, Colmena
-deploys it, Harmonia serves the cache and Disko lays out the disks.
+Under the hood: NixOS builds every PC from the same description, Nixorium
+copies and activates it, Harmonia serves the cache and Disko lays out the disks.
 
 [Administrator guide](templates/site/README.md) · [Menu tour](docs/tui-gallery.md)
 

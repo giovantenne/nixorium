@@ -71,6 +71,9 @@ func TestReadyDeploymentPlanShowsRevisionBoundNextCommand(t *testing.T) {
 	if !strings.Contains(output.String(), "nixorium deploy apply --on @lab --expect 0123456789abcdef") {
 		t.Fatalf("ready plan does not show exact next command:\n%s", output.String())
 	}
+	if !strings.Contains(output.String(), "build each selected computer's system once, then copy and activate it on the computer") || strings.Contains(strings.ToLower(output.String()), "colmena") {
+		t.Fatalf("ready plan does not describe the update engine in plain words:\n%s", output.String())
+	}
 }
 
 func TestDeploymentExecutionTextShowsFailureAndRecovery(t *testing.T) {
