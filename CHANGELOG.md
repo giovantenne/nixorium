@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.10.0-beta.1] - 2026-10-19
+
 ### Added
 
 - Assistant can read system configuration files of the controller and the
@@ -84,7 +86,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   `modules/workstation.nix`, or as a "Manual change" if you edited that line.
   A controller that runs 3.9.0 or older cannot do it during the update to this
   release. Once, in your deployment folder, run
-  `nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment migrate --root .`,
+  `nix run github:giovantenne/nixorium/v3.10.0-beta.1#nixorium -- deployment migrate --root .`,
   review the result with `git diff`, save it in **Maintenance → Review Git
   changes**, then run Update Nixorium. If you prefer to edit by hand, replace
   the line
@@ -2447,7 +2449,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.9.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.1...HEAD
+[3.10.0-beta.1]: https://github.com/giovantenne/nixorium/compare/v3.9.0...v3.10.0-beta.1
 [3.9.0]: https://github.com/giovantenne/nixorium/compare/v3.8.2...v3.9.0
 [3.8.2]: https://github.com/giovantenne/nixorium/compare/v3.8.1...v3.8.2
 [3.8.1]: https://github.com/giovantenne/nixorium/compare/v3.8.0...v3.8.1
