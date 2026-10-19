@@ -558,6 +558,58 @@ system or certify its installed revision: refresh Computers before a fresh
 deployment plan. Unexpected key changes require investigation, not rotation.
 Never delete the whole trust file or disable host-key verification.
 
+## This computer has no Nixorium identity
+
+Computers of the same kind share one system, and each one keeps its name and
+laboratory address from a small identity record,
+`/var/lib/nixorium/identity.json`, which holds only its number. If that record
+is missing or not valid, the computer starts without its laboratory address,
+and `systemctl status nixorium-identity.service` shows a failed unit with the
+message "This computer has no Nixorium identity". In the inventory the computer
+is offline or unknown, and it cannot be reached from the controller.
+
+Typical causes are a disk restored or copied from another computer, a record
+edited by hand, or a computer that was installed with an older installer.
+
+1. Connect a keyboard and screen to the computer, or reach it at its address
+   on the institutional network if it has one.
+2. If the computer can still be reached, **update it from the controller**
+   (Computers → Update): the update writes the record before it switches the
+   computer, then verifies the number.
+3. If it cannot be reached, reinstall it from the controller (network
+   installation or USB). The installer writes the record before the first
+   start. A reinstall erases the disk, so use it when the update cannot reach
+   the computer.
+
+Do not copy the record from another computer. Two computers with the same
+number refuse each other's address and neither works reliably.
+
+## The update says "identity record names another computer"
+
+Before it switches a computer to a shared system, the update checks the
+identity record on that computer. If the record names a different computer
+number than the one the controller is updating, the update leaves the
+computer unchanged and reports "identity record names another computer". It
+never overwrites the record, because that could hide a swapped disk or two
+computers whose places were exchanged.
+
+1. Decide which computer is which: the label on the case, the inventory entry
+   (Computers) and the address the controller used.
+2. On the computer that holds the wrong record, correct it by hand as
+   administrator. For computer number 3, for example, the file must contain
+   exactly this line:
+
+   ```text
+   {"schemaVersion":1,"number":3}
+   ```
+
+   Save it as `/var/lib/nixorium/identity.json`.
+3. Run `nixorium hosts` to refresh the state, then update the computer again.
+
+If you are not sure which computer is which, leave the computer as it is and
+check the inventory first: a wrong correction gives the computer another
+computer's name and address.
+
 ## A deployment failed
 
 A failed update can leave selected machines at different generations.
