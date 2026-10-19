@@ -60,6 +60,15 @@
       assert "hosts" in names and "shadow" not in names and listing["hidden"] >= 1, listing
       for refused in ["/etc/shadow", "/etc/ssh/ssh_host_ed25519_key", "/root", "/home", "/etc/../root/.ssh"]:
         machine.fail("nixorium-host-diagnostics file " + refused)
+      # Links into the system's own locations, as on real hardware.
+      address = json.loads(machine.succeed("nixorium-host-diagnostics file /sys/class/net/lo/address"))
+      assert address["content"].strip() == "00:00:00:00:00:00" and address["resolved"].startswith("/sys/devices/"), address
+      model = json.loads(machine.succeed("nixorium-host-diagnostics file /sys/class/dmi/id/product_name"))
+      assert model["kind"] == "file" and model["resolved"].startswith("/sys/devices/"), model
+      mounts = json.loads(machine.succeed("nixorium-host-diagnostics file /proc/mounts"))
+      assert " / " in mounts["content"], mounts
+      for refused in ["/sys/class/dmi/id/product_serial", "/sys/class/dmi/id/product_uuid", "/etc/machine-id", "/etc/static/sudoers.d"]:
+        machine.fail("nixorium-host-diagnostics file " + refused)
       machine.fail("nixorium-host-diagnostics file '/etc/hosts;touch /tmp/file-mutated'")
       machine.fail("test -e /tmp/file-mutated")
       machine.fail("test -e /tmp/diagnostics-mutated")

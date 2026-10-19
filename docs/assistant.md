@@ -237,10 +237,13 @@ disclosure. Only `/etc`, `/boot/grub`, `/boot/loader`, `/proc/cmdline`,
 shadow files, private SSH keys, Wi-Fi connections, Nixorium keys, reset
 snapshots, installation state and device serial numbers are refused, by path
 and by name (`secret`, `private`, `token`, `password`, key files), and so is
-any link leading there; links from `/etc` are followed into the Nix store
-only. A directory is listed with refused entries counted, not named. Text is
+any link leading there; links are followed into the Nix store and, for the
+paths that need them, into `/sys/devices`, `/proc/PID/mounts`, `/var/lib/cups`
+and `/run/systemd/resolve`. `/etc/machine-id` and `/etc/passwd` are refused on
+purpose. A directory is listed with refused entries counted, not named. Text is
 returned up to 256 KiB, binary files only as such; lines that set passwords,
-tokens or keys keep only their first word. The fixed helper
+passphrases, pre-shared keys, tokens or keys keep only their first word, and
+credentials in URIs are withheld. The fixed helper
 `nixorium-host-diagnostics file PATH` reads clients as root through the
 existing strict SSH trust; on the controller it runs as the administrator, so
 root-only files there (such as the boot menu on `/boot`) are reported as not

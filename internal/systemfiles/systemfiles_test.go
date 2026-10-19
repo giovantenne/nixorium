@@ -124,3 +124,73 @@ func TestDecodeRechecksTheAnswer(t *testing.T) {
 		t.Error("unknown field accepted")
 	}
 }
+
+func TestStaticEtcAndStoreKeepTheEtcRefusals(t *testing.T) {
+	for _, path := range []string{"/etc/static/sudoers.d/x", "/etc/static/wpa_supplicant.conf", "/etc/wpa_supplicant.conf", "/etc/shadow-", "/etc/machine-id",
+		"/var/lib/nixorium/prepared/roots/abc/pc01", "/run/nixorium/remote-install/x", "/sys/class/dmi/id/product_uuid"} {
+		if Readable(path) {
+			t.Errorf("%s should be refused", path)
+		}
+	}
+	if !Readable("/etc/static/hosts") {
+		t.Error("/etc/static/hosts should be readable")
+	}
+	for _, resolved := range []string{
+		"/nix/store/" + strings.Repeat("a", 32) + "-etc/etc/sudoers.d/x",
+		"/nix/store/" + strings.Repeat("a", 32) + "-etc/etc/NetworkManager/system-connections/school.nmconnection",
+	} {
+		if resolvedAllowed("/etc/static/x", resolved) {
+			t.Errorf("%s should be refused", resolved)
+		}
+	}
+	// A store hash may contain any letters: it is not a name.
+	if !resolvedAllowed("/etc/hosts", "/nix/store/0psk"+strings.Repeat("a", 28)+"-etc-hosts") {
+		t.Error("a store path whose hash contains psk was refused")
+	}
+}
+
+func TestResolvedSystemLocationsOnlyForTheirRequests(t *testing.T) {
+	for _, test := range []struct {
+		request, resolved string
+		allowed           bool
+	}{
+		{"/sys/class/net/eth0/address", "/sys/devices/pci0000:00/0000:00:03.0/net/eth0/address", true},
+		{"/sys/class/dmi/id/product_name", "/sys/devices/virtual/dmi/id/product_name", true},
+		{"/sys/class/dmi/id/product_serial", "/sys/devices/virtual/dmi/id/product_serial", false},
+		{"/proc/mounts", "/proc/1234/mounts", true},
+		{"/etc/mtab", "/proc/self/mounts", true},
+		{"/etc/cups/printers.conf", "/var/lib/cups/printers.conf", true},
+		{"/etc/cups/ssl/server.key", "/var/lib/cups/ssl/server.key", false},
+		{"/etc/resolv.conf", "/run/systemd/resolve/stub-resolv.conf", true},
+		{"/etc/hosts", "/sys/devices/virtual/dmi/id/product_name", false},
+		{"/etc/hosts", "/proc/1/mounts", false},
+		{"/etc/hosts", "/home/admin/x", false},
+	} {
+		if got := resolvedAllowed(test.request, test.resolved); got != test.allowed {
+			t.Errorf("%s -> %s: %v", test.request, test.resolved, got)
+		}
+	}
+	answer, _ := Encode(Result{Path: "/sys/class/net/eth0", Resolved: "/sys/devices/pci0000:00/net/eth0", Kind: "directory"})
+	if _, err := Decode(answer, "/sys/class/net/eth0"); err != nil {
+		t.Fatal(err)
+	}
+	misplaced, _ := Encode(Result{Path: "/etc/hosts", Resolved: "/sys/devices/x", Kind: "file"})
+	if _, err := Decode(misplaced, "/etc/hosts"); err == nil {
+		t.Fatal("a resolution reserved for /sys was accepted for /etc")
+	}
+}
+
+func TestSecretFormsAreWithheld(t *testing.T) {
+	text := withholdSecretLines("[Peer]\nPresharedKey = abc123\nnetwork={\n  passphrase=\"hunter2\"\n  wep_key0=\"x\"\n}\n" +
+		"DeviceURI smb://teacher:s3cret@printserver/laser\nwpa_passphrase=topsecret\nInfo Laser\n")
+	for _, leaked := range []string{"abc123", "hunter2", "s3cret", "topsecret", `"x"`} {
+		if strings.Contains(text, leaked) {
+			t.Errorf("leaked %q:\n%s", leaked, text)
+		}
+	}
+	for _, kept := range []string{"[Peer]", "PresharedKey [withheld]", "smb://[withheld]@printserver/laser", "Info Laser"} {
+		if !strings.Contains(text, kept) {
+			t.Errorf("lost %q:\n%s", kept, text)
+		}
+	}
+}

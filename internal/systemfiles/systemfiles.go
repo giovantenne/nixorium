@@ -3,7 +3,10 @@
 // readable; secrets, keys, Wi-Fi credentials and every home folder are
 // refused, whatever path or link leads to them. The reader never writes and
 // never follows a link out of the readable locations, except into the Nix
-// store where NixOS keeps the files /etc links to.
+// store where NixOS keeps the files /etc links to, and the few system
+// locations of resolvedRoots. Links are resolved before the file is opened;
+// no directory below a readable root is writable by students or teachers, so
+// only root or the administrator could race that check.
 package systemfiles
 
 import (
@@ -62,16 +65,37 @@ var refusedPrefixes = []string{
 	"/var/lib/nixorium/assistant",
 	"/var/lib/nixorium/telemetry",
 	"/var/lib/nixorium/backup",
-	"/sys/class/dmi/id/product_serial",
-	"/sys/class/dmi/id/product_uuid",
-	"/sys/class/dmi/id/board_serial",
-	"/sys/class/dmi/id/chassis_serial",
+	// Garbage-collector roots link to whole systems in the store.
+	"/var/lib/nixorium/prepared/roots",
+	"/run/nixorium/remote-install",
+	// A stable per-computer identifier, like the serial numbers below.
+	"/etc/machine-id",
 }
 
 // refusedNames are file or directory names that hold secrets or personal
 // data wherever they appear.
 var refusedNames = regexp.MustCompile(`(?i)(secret|private|token|passw|credential|shadow|psk|snapshot|recovery|` +
-	`\.key$|_key$|-key$|^key$|\.pem$|\.p12$|\.pfx$|\.age$|^id_(rsa|dsa|ecdsa|ed25519)$|keytab|htpasswd)`)
+	`\.key$|_key$|-key$|^key$|\.pem$|\.p12$|\.pfx$|\.age$|^id_(rsa|dsa|ecdsa|ed25519)$|keytab|htpasswd|` +
+	`^(product_serial|product_uuid|board_serial|chassis_serial)$)`)
+
+// resolvedRoots are the locations a readable path may link to besides the
+// readable roots and the Nix store, each only for requests below the given
+// prefix: network cards and firmware data live under /sys/devices, the mount
+// table under /proc/PID, CUPS keeps /etc/cups in /var/lib/cups, and
+// systemd-resolved owns /etc/resolv.conf.
+var resolvedRoots = []struct{ request, target string }{
+	{"/sys/class/net", "/sys/devices/"},
+	{"/sys/class/dmi/id", "/sys/devices/"},
+	{"/etc/cups", "/var/lib/cups/"},
+	{"/etc/cups", "/var/lib/cups"},
+	{"/etc/resolv.conf", "/run/systemd/resolve/"},
+}
+
+var procMounts = regexp.MustCompile(`^/proc/([0-9]+|self)/mounts$`)
+
+// storeEtc matches the generated /etc tree in the store, which /etc/static
+// links to.
+var storeEtc = regexp.MustCompile(`^/nix/store/[0-9a-z]{32}-etc/etc(/.*)?$`)
 
 var storeRoot = "/nix/store"
 
@@ -111,10 +135,23 @@ func Readable(path string) bool {
 }
 
 func refused(path string) bool {
+	// The same /etc refusals hold through /etc/static and its store copy.
+	if rest, found := strings.CutPrefix(path, "/etc/static/"); found {
+		path = "/etc/" + rest
+	} else if match := storeEtc.FindStringSubmatch(path); match != nil {
+		path = "/etc" + match[1]
+	}
 	for _, prefix := range refusedPrefixes {
-		if path == prefix || strings.HasPrefix(path, prefix) {
+		// The prefix itself, below it, and its "-", "." and "~" siblings
+		// (backups such as /etc/shadow- and files such as /etc/wpa_supplicant.conf).
+		if path == prefix || strings.HasPrefix(path, prefix+"/") || strings.HasPrefix(path, prefix+"-") ||
+			strings.HasPrefix(path, prefix+".") || strings.HasPrefix(path, prefix+"~") {
 			return true
 		}
+	}
+	// A store entry's hash is not a name: it can contain any letters.
+	if rest, found := strings.CutPrefix(path, storeRoot+"/"); found && len(rest) > 33 && rest[32] == '-' {
+		path = storeRoot + "/" + rest[33:]
 	}
 	for _, part := range strings.Split(path, "/") {
 		if part != "" && refusedNames.MatchString(part) {
@@ -122,6 +159,29 @@ func refused(path string) bool {
 			if strings.HasSuffix(part, ".pub") && !strings.Contains(strings.ToLower(part), "private") {
 				continue
 			}
+			return true
+		}
+	}
+	return false
+}
+
+// resolvedAllowed decides where a readable request may lead after links are
+// resolved: to another readable path, into the Nix store, or to the few
+// system locations of resolvedRoots for the requests that need them. The
+// refusals apply to the target as well.
+func resolvedAllowed(request, resolved string) bool {
+	if refused(resolved) {
+		return false
+	}
+	if Readable(resolved) || strings.HasPrefix(resolved, storeRoot+"/") {
+		return true
+	}
+	if (request == "/proc/mounts" || request == "/etc/mtab") && procMounts.MatchString(resolved) {
+		return true
+	}
+	for _, root := range resolvedRoots {
+		below := request == root.request || strings.HasPrefix(request, root.request+"/")
+		if below && (resolved == root.target || strings.HasPrefix(resolved, root.target)) {
 			return true
 		}
 	}
@@ -161,7 +221,7 @@ func Read(path string) (Result, error) {
 		}
 		return Result{}, fmt.Errorf("resolve %s: %w", path, err)
 	}
-	if resolved != path && !Readable(resolved) && !(strings.HasPrefix(resolved, storeRoot+"/") && !refused(resolved)) {
+	if resolved != path && !resolvedAllowed(path, resolved) {
 		return Result{}, ErrRefused
 	}
 	descriptor, err := syscall.Open(resolved, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
@@ -211,11 +271,16 @@ func readText(file *os.File, info os.FileInfo, result Result) (Result, error) {
 
 // secretLine matches a line that sets a password, key or token, such as a
 // GRUB password_pbkdf2 entry or a key = value pair.
-var secretLine = regexp.MustCompile(`(?i)(password|passwd|secret|token|psk|private[_-]?key|api[_-]?key)`)
+var secretLine = regexp.MustCompile(`(?i)(password|passwd|passphrase|secret|token|psk|preshared|wep_key|wpa_pass|private[_-]?key|api[_-]?key)`)
+
+// uriCredentials matches the user:password part of a URI, as in a printer's
+// smb://user:password@host/queue.
+var uriCredentials = regexp.MustCompile(`://[^/\s:@]+:[^/\s@]+@`)
 
 // withholdSecretLines keeps the first word of a line that may carry a
 // secret, so the file's structure stays readable, and withholds the rest.
 func withholdSecretLines(text string) string {
+	text = uriCredentials.ReplaceAllString(text, "://[withheld]@")
 	lines := strings.Split(text, "\n")
 	for index, line := range lines {
 		if !secretLine.MatchString(line) {
@@ -294,7 +359,7 @@ func Decode(data []byte, requested string) (Result, error) {
 	if result.Path != requested || !Readable(requested) {
 		return Result{}, errors.New("answer does not match the request")
 	}
-	if result.Resolved != "" && !Readable(result.Resolved) && !(strings.HasPrefix(result.Resolved, storeRoot+"/") && !refused(result.Resolved)) {
+	if result.Resolved != "" && !resolvedAllowed(requested, result.Resolved) {
 		return Result{}, errors.New("answer resolves to a refused path")
 	}
 	switch result.Kind {

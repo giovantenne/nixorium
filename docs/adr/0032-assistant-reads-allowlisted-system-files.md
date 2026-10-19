@@ -39,11 +39,19 @@ controllers that advertise `system_files_v1`:
   file suffix. Public `.pub` keys stay readable.
 - The requested path must be a plain absolute path of common characters,
   without `.` or `..` parts. Links are resolved: the target must itself be
-  readable, or be in the Nix store (where NixOS keeps what `/etc` links to)
-  and not refused.
+  readable, or be in the Nix store (where NixOS keeps what `/etc` links to),
+  or be one of the few system locations a readable path legitimately links
+  to: `/sys/devices` for `/sys/class/net` and `/sys/class/dmi/id`,
+  `/proc/PID/mounts` for `/proc/mounts` and `/etc/mtab`, `/var/lib/cups` for
+  `/etc/cups`, `/run/systemd/resolve` for `/etc/resolv.conf`. The refusals
+  apply to the target too, and the `/etc` refusals also hold through
+  `/etc/static` and its store copy. `/etc/machine-id`, garbage-collector
+  roots of prepared systems and device serial numbers are refused. Names
+  containing `passw` are refused on purpose, so `/etc/passwd` is not readable.
 - A file returns at most 256 KiB of text; a binary file returns only that
-  fact. Lines that set a password, token or key keep their first word and are
-  otherwise withheld. A directory returns up to 500 readable entries and the
+  fact. Lines that set a password, passphrase, pre-shared key, token or key
+  keep their first word and are otherwise withheld, and the `user:password@`
+  part of URIs (printer queues) is withheld. A directory returns up to 500 readable entries and the
   number of refused ones, never their names.
 - The fixed helper `nixorium-host-diagnostics file PATH` runs on a client as
   root through the existing strict SSH trust (no key enrolment or update), and
