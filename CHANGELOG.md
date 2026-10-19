@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-10-19
+
 ### Added
 
 - A [trademark policy](TRADEMARKS.md) says how the Nixorium name and logo can
@@ -2358,7 +2360,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.8.2...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.9.0...HEAD
+[3.9.0]: https://github.com/giovantenne/nixorium/compare/v3.8.2...v3.9.0
 [3.8.2]: https://github.com/giovantenne/nixorium/compare/v3.8.1...v3.8.2
 [3.8.1]: https://github.com/giovantenne/nixorium/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/giovantenne/nixorium/compare/v3.7.0...v3.8.0
