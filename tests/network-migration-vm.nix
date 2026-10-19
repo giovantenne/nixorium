@@ -124,6 +124,7 @@ let
         # Like the transient unit started with --no-block: the activation
         # runs on its own and survives the connection.
         ${pkgs.util-linux}/bin/setsid ${clientEngineActivation} "$VARIANT" "$REVISION" "$ID" "$SYSTEM" </dev/null >/dev/null 2>&1 &
+        echo nixorium-activation-started
         ;;
       *) exec ${pkgs.bash}/bin/bash -c "$remote" ;;
     esac

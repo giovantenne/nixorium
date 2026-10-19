@@ -55,18 +55,24 @@ case "$remote" in
     exit 0
     ;;
   *systemd-run*)
+    [ "$NIXORIUM_TEST_ACTIVATION" = refused ] && { echo "ssh: connect to host $host port 22: Connection refused" >&2; exit 255; }
     test -s "$NIXORIUM_TEST_PENDING" || exit 99
     grep -q '"state":"started"' "$NIXORIUM_TEST_PENDING" || exit 98
     [ "$NIXORIUM_TEST_ACTIVATION" = busy ] && exit 75
+    [ "$NIXORIUM_TEST_ACTIVATION" = startfail ] && exit 70
     printf '%s' "$remote" | sed -n 's/.*NIXORIUM_ACTIVATION=\([0-9a-f]*\).*/\1/p' > "$state/id-$host"
     touch "$state/started"
+    # The unit started although systemd-run reported a failure.
+    [ "$NIXORIUM_TEST_ACTIVATION" = startfail-ran ] && exit 70
+    echo nixorium-activation-started
     exit 0
     ;;
   *'--- unit'*)
     id=$(cat "$state/id-$host" 2>/dev/null)
     case "$NIXORIUM_TEST_ACTIVATION" in
       hang) printf '\n--- unit\nrunning\n' ;;
-      vanish) printf '\n--- unit\ndead\n' ;;
+      vanish|startfail) printf '\n--- unit\ndead\n' ;;
+      startfail-ran) printf '{"activationId":"%s","systemPath":"/nix/store/x","exitCode":0}\n\n--- unit\nexited\n' "$id" ;;
       *) printf '{"activationId":"%s","systemPath":"/nix/store/x","exitCode":%s}\n\n--- unit\nexited\n' "$id" "$NIXORIUM_TEST_ACTIVATION" ;;
     esac
     ;;
@@ -225,8 +231,54 @@ func TestClientIdentityCommandWritesOnceAndKeepsAnotherComputer(t *testing.T) {
 	if status := run(8); status != clientIdentityConflictStatus {
 		t.Fatalf("another number = %d", status)
 	}
+	// A damaged record is written again.
+	if err := os.WriteFile(filepath.Join(root, "identity.json"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if status := run(8); status != 0 {
+		t.Fatalf("damaged record = %d", status)
+	}
+	if content, _ := os.ReadFile(filepath.Join(root, "identity.json")); string(content) != "{\"schemaVersion\":1,\"number\":8}\n" {
+		t.Fatalf("rewritten record = %q", content)
+	}
+	if err := os.WriteFile(filepath.Join(root, "identity.json"), []byte("{\"schemaVersion\":1,\"number\":7}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if content, _ := os.ReadFile(filepath.Join(root, "identity.json")); string(content) != "{\"schemaVersion\":1,\"number\":7}\n" {
 		t.Fatalf("record changed to %q", content)
+	}
+}
+
+// A start command whose systemd-run reported a failure is "not started"
+// only when the computer shows no unit and no result; a refused connection
+// started nothing either.
+func TestDeploymentEngineTellsAFailedStartFromAnUnconfirmedOne(t *testing.T) {
+	for _, test := range []struct {
+		activation string
+		failed     string
+	}{
+		{"startfail", "activation could not start"},
+		{"refused", "computer not reachable"},
+	} {
+		t.Run(test.activation, func(t *testing.T) {
+			plan, directory, state := deploymentProcessFixture(t, test.activation)
+			var output bytes.Buffer
+			err := buildAndApply(t, plan, directory, &output)
+			if err == nil || !strings.Contains(err.Error(), test.failed) {
+				t.Fatalf("apply = %v\n%s", err, output.String())
+			}
+			if checkDeploymentPendingPath(directory) != nil {
+				t.Fatal("a computer where nothing started stays pending")
+			}
+			if _, statErr := os.Lstat(filepath.Join(state, "started")); statErr == nil {
+				t.Fatal("the fake unit started")
+			}
+		})
+	}
+	plan, directory, _ := deploymentProcessFixture(t, "startfail-ran")
+	var output bytes.Buffer
+	if err := buildAndApply(t, plan, directory, &output); err != nil || !strings.Contains(output.String(), "watching the computer") || !strings.Contains(output.String(), "activation finished") {
+		t.Fatalf("an activation that ran after a reported failure was not followed: %v\n%s", err, output.String())
 	}
 }
 

@@ -83,6 +83,14 @@ from a small record on its own disk.
 
 ## Consequences
 
+- A controller rolled back through its boot menu to a release before
+  identity records does not understand the third line of the host state of
+  updated computers and reports them as unverified: roll back the controller
+  before updating computers, or apply the controller again.
+- A configuration-template reset that moves a computer into or out of a
+  shared class changes its configured host name (the placeholder
+  `nixorium-client` in a shared system) and is refused as a change of
+  protected host settings; make such a change as an ordinary saved change.
 - An update of a laboratory of identical computers evaluates and builds one
   system per class instead of one per computer; network installation prepares
   one evaluation per class.

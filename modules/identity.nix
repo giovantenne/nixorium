@@ -27,12 +27,16 @@ let
       identity = lib.findFirst (entry: entry.number == number) null (labSettings.clientIdentities or []);
     in ''
       ${coreutils}/mkdir -p /var/lib/nixorium /run/nixorium
-      if [ ! -e ${record} ]; then
+      ${readNumber}
+      # A missing or damaged record (empty after a power loss, edited) is
+      # written again: this system knows its number. A valid record naming
+      # another computer is kept and reported.
+      if [ -z "$recorded" ]; then
         printf '{"schemaVersion":1,"number":%d}\n' ${toString number} > ${record}.tmp
         ${coreutils}/chmod 0644 ${record}.tmp
         ${coreutils}/mv -f ${record}.tmp ${record}
+        ${readNumber}
       fi
-      ${readNumber}
       if [ "$recorded" != "${toString number}" ]; then
         echo "nixorium: ${record} names computer number ''${recorded:-unknown}, but this system is ${hostName}; the record was kept" >&2
       fi
@@ -53,6 +57,10 @@ let
     esac
     if [ -z "$name" ]; then
       echo "nixorium: this computer has no valid identity record (${record}); it gets no laboratory address" >&2
+      # Show the broken state at the console instead of an old name.
+      ${coreutils}/rm -f /etc/hostname
+      printf 'nixorium-client\n' > /etc/hostname
+      printf 'nixorium-client\n' > /proc/sys/kernel/hostname
     else
       number=$recorded
       ${writeEnvironment}
@@ -80,7 +88,7 @@ in
       serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
       script = ''
         test -s ${environment} || {
-          echo "This computer has no Nixorium identity (${record}); reinstall it, or let the controller restore it by updating it." >&2
+          echo "This computer has no Nixorium identity (${record}), so it has no laboratory address and the controller cannot reach it. At this computer, start the previous generation from the boot menu or write its number in ${record}, then update it from the controller; or reinstall it." >&2
           exit 1
         }
       '';

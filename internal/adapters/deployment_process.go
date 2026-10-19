@@ -18,11 +18,16 @@ import (
 
 const deploymentPendingName = "deployment-pending.json"
 
-func deploymentPhaseTimeout(phase domain.DeploymentPhase) time.Duration {
-	if phase == domain.DeploymentPhaseApply {
-		return 2 * time.Hour
+// deploymentPhaseTimeout bounds a phase. The apply bound grows with the
+// computers, so that copies and activations proceeding normally on a large
+// laboratory are never cut off at once and left unknown.
+func deploymentPhaseTimeout(phase domain.DeploymentPhase, targets int) time.Duration {
+	if phase != domain.DeploymentPhaseApply {
+		return 6 * time.Hour
 	}
-	return 6 * time.Hour
+	copies := time.Duration((targets+clientCopyParallelism-1)/clientCopyParallelism) * clientCopyTimeout
+	activations := time.Duration((targets+clientActivationParallelism-1)/clientActivationParallelism) * clientActivationTimeout
+	return max(2*time.Hour, copies+activations+10*time.Minute)
 }
 
 // A pending record is written and synced before dispatch, while the caller
@@ -160,14 +165,15 @@ func (pending *pendingRecord) clear() error {
 
 // close keeps the record on disk for a later review, noting that this
 // process no longer acts on any computer.
-func (pending *pendingRecord) close() {
-	_ = pending.rewrite(func(record *domain.PendingDeployment) error {
+func (pending *pendingRecord) close() error {
+	err := pending.rewrite(func(record *domain.PendingDeployment) error {
 		record.ApplyReturned = true
 		return nil
 	})
 	pending.mutex.Lock()
 	defer pending.mutex.Unlock()
 	pending.file.Close()
+	return err
 }
 
 // ownDeploymentApplies counts the client applies of this process that hold

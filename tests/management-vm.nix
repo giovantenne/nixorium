@@ -134,6 +134,7 @@ in
           printf 'activate\n' >> /tmp/nixorium-test-engine-activations
           ${pkgs.jq}/bin/jq -e '.activations[0].state == "started"' /var/lib/nixorium/coordination/deployment-pending.json >/dev/null
           printf '%s' "$remote" | ${pkgs.gnused}/bin/sed -n 's/.*NIXORIUM_ACTIVATION=\([0-9a-f]*\).*/\1/p' > /tmp/nixorium-test-engine-id
+          echo nixorium-activation-started
           ;;
         *"--- unit"*)
           if [ -e /tmp/nixorium-test-engine-lose ]; then

@@ -31,6 +31,21 @@ func (Local) ProcessRunning(pid int, start string) bool {
 	return processRunningAt("/proc", pid, start)
 }
 
+// BootTime is when this computer started, from /proc/stat.
+func (Local) BootTime() (time.Time, bool) {
+	content, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return time.Time{}, false
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		if value, found := strings.CutPrefix(line, "btime "); found {
+			seconds, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+			return time.Unix(seconds, 0), err == nil
+		}
+	}
+	return time.Time{}, false
+}
+
 func processRunningAt(procRoot string, pid int, start string) bool {
 	if start != "" {
 		current, err := processStartTimeAt(procRoot, pid)

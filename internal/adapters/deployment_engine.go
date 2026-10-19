@@ -44,6 +44,9 @@ const (
 	// Exit status of the identity command when the record names another
 	// computer.
 	clientIdentityConflictStatus = 3
+	// Exit status of the start command when systemd-run itself failed; the
+	// unit may still exist (a reply lost while the manager was busy).
+	clientActivationStartFailedStatus = 70
 )
 
 // Polling bounds, variables so that tests can shorten them.
@@ -251,8 +254,12 @@ func applyClientSystems(ctx context.Context, plan domain.DeploymentPlanReport, o
 		}
 	}
 	if len(unknown) > 0 {
-		record.close()
-		return &domain.DeploymentUnconfirmedError{Err: fmt.Errorf("the activation result of %s is not known yet", strings.Join(unknown, ", "))}
+		message := fmt.Sprintf("the activation result of %s is not known yet", strings.Join(unknown, ", "))
+		if err := record.close(); err != nil {
+			// Without the mark, recovery waits for this process: say so.
+			message += fmt.Sprintf("; the record could not be marked as returned (%v), so close Nixorium before reviewing it", err)
+		}
+		return &domain.DeploymentUnconfirmedError{Err: errors.New(message)}
 	}
 	if err := record.clear(); err != nil {
 		return &domain.DeploymentUnconfirmedError{Err: fmt.Errorf("every activation finished, but clearing the pending record failed: %w", err)}
@@ -264,9 +271,11 @@ func applyClientSystems(ctx context.Context, plan domain.DeploymentPlanReport, o
 }
 
 // clientIdentityCommand writes the identity record of a computer that is
-// about to run a shared system, once, durably. A record naming another
+// about to run a shared system, durably. A valid record naming another
 // computer is kept (exit clientIdentityConflictStatus): two computers with
-// the same number need a person to decide which one is which.
+// the same number need a person to decide which one is which. A damaged
+// record (empty after a power loss, edited) is written again: the computer
+// answered with its pinned host key at this computer's address.
 func clientIdentityCommand(number int) string {
 	expected := fmt.Sprintf(`{"schemaVersion":1,"number":%d}`, number)
 	return fmt.Sprintf(`set -eu
@@ -274,7 +283,9 @@ record=/var/lib/nixorium/identity.json
 expected='%s'
 if [ -e "$record" ]; then
   [ "$(cat "$record")" = "$expected" ] && exit 0
-  exit %d
+  if grep -Eqx '\{"schemaVersion":1,"number":[1-9][0-9]{0,3}\}' "$record"; then
+    exit %d
+  fi
 fi
 mkdir -p /var/lib/nixorium
 printf '%%s\n' "$expected" > "$record.tmp"
@@ -356,20 +367,24 @@ func applyClientSystem(ctx context.Context, target domain.DeploymentTarget, addr
 	}
 	outcome.started = true
 	say("activating")
-	status, startErr := runClientCommand(ctx, address, clientActivationStartCommand(system, activationID))
+	startOutput, status, startErr := runClientSSH(ctx, address, clientActivationStartCommand(system, activationID))
+	notStarted := func(message, detail string) clientActivation {
+		say("%s", message)
+		outcome.started, outcome.detail = false, detail
+		_ = record.update(target.Name, func(activation *domain.PendingActivation) { activation.State = domain.ActivationPlanned })
+		return outcome
+	}
 	switch {
-	case startErr == nil:
+	case startErr == nil && strings.Contains(startOutput, clientActivationStarted):
 	case status == clientActivationBusyStatus:
-		say("another activation is running on this computer; nothing was started")
-		outcome.started, outcome.detail = false, "another activation is running"
-		_ = record.update(target.Name, func(activation *domain.PendingActivation) { activation.State = domain.ActivationPlanned })
-		return outcome
-	case status > 0 && status != 255:
-		// The remote shell answered: systemd-run refused, so no unit exists.
-		say("the activation could not start: %v", startErr)
-		outcome.started, outcome.detail = false, "activation could not start"
-		_ = record.update(target.Name, func(activation *domain.PendingActivation) { activation.State = domain.ActivationPlanned })
-		return outcome
+		return notStarted("another activation is running on this computer; nothing was started", "another activation is running")
+	case status == clientActivationStartFailedStatus && clientActivationAbsent(ctx, address, activationID):
+		// systemd-run failed and the computer shows neither a unit nor a
+		// result for this activation: nothing was started.
+		return notStarted(fmt.Sprintf("the activation could not start: %v", startErr), "activation could not start")
+	case status == 255 && sshNeverConnected(startErr):
+		// The connection failed before authentication: nothing ran.
+		return notStarted(fmt.Sprintf("the computer did not accept the connection (%v); nothing was started", startErr), "computer not reachable")
 	default:
 		say("the start request was not confirmed (%v); watching the computer", startErr)
 	}
@@ -490,7 +505,38 @@ func clientActivationStartCommand(system, activationID string) string {
 		`--property=RemainAfterExit=yes --expand-environment=no --no-block --quiet ` +
 		`--setenv=PATH=/run/current-system/sw/bin:/run/wrappers/bin ` +
 		`--setenv=NIXORIUM_ACTIVATION=` + activationID + ` --setenv=NIXORIUM_SYSTEM=` + system + ` ` +
-		`/bin/sh -c '` + clientActivationScript + `'`
+		`/bin/sh -c '` + clientActivationScript + `' && echo ` + clientActivationStarted + ` || exit ` + fmt.Sprint(clientActivationStartFailedStatus)
+}
+
+// clientActivationStarted is printed once systemd-run accepted the unit.
+const clientActivationStarted = "nixorium-activation-started"
+
+// clientActivationAbsent reports that the computer has no activation unit
+// (or only a stopped one) and no result for this activation.
+func clientActivationAbsent(ctx context.Context, address, activationID string) bool {
+	output, err := runClientOutput(ctx, address, clientActivationObserveCommand)
+	if err != nil {
+		return false
+	}
+	_, unitText, found := strings.Cut(output, "--- unit\n")
+	observation := parseClientActivation(output, activationID)
+	state := strings.TrimSpace(unitText)
+	return found && observation.result == "" && !observation.running && (state == "" || state == "dead")
+}
+
+// sshNeverConnected recognises ssh errors raised before authentication,
+// when no remote command can have run.
+func sshNeverConnected(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	for _, reason := range []string{"Connection refused", "Connection timed out", "No route to host", "Network is unreachable", "Could not resolve hostname"} {
+		if strings.Contains(message, reason) {
+			return true
+		}
+	}
+	return false
 }
 
 // clientActivationObserveCommand prints the last activation result, a

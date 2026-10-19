@@ -104,6 +104,20 @@ func TestDeferredUpdatesRunAppliesReachableCurrentEntriesOnly(t *testing.T) {
 	}
 }
 
+// An unknown result is not a failure: the computer waits without backoff
+// for the interrupted update to close itself.
+func TestDeferredUpdatesWaitWithoutBackoffWhenTheResultIsUnknown(t *testing.T) {
+	manager, store, source, _ := deferredManagerFixture(t)
+	store.queue.Put(domain.DeferredUpdate{Host: "pc01", IP: "10.0.0.1", Revision: source.revision, QueuedAt: time.Unix(1_799_999_000, 0).UTC()})
+	manager.deploy = func(context.Context, string, []string, string) (domain.DeploymentExecutionReport, bool) {
+		return domain.DeploymentExecutionReport{State: "failed", RecoveryRequired: true}, false
+	}
+	report := manager.Run(context.Background(), "/deployment")
+	if report.Results[0].State != "waiting" || store.queue.Updates[0].Attempts != 0 || store.queue.Updates[0].LastError != "" {
+		t.Fatalf("unknown result = %+v / %+v", report.Results, store.queue.Updates)
+	}
+}
+
 func TestDeferredUpdatesRecordFailuresAndWaitWhenBusy(t *testing.T) {
 	manager, store, source, _ := deferredManagerFixture(t)
 	store.queue.Put(domain.DeferredUpdate{Host: "pc01", IP: "10.0.0.1", Revision: source.revision, QueuedAt: time.Unix(1_799_999_000, 0).UTC()})

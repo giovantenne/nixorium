@@ -84,7 +84,7 @@ func (Local) GitRevision(ctx context.Context, repository string) (string, error)
 }
 
 func (Local) RunDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, phase domain.DeploymentPhase, output io.Writer) error {
-	return runDeploymentPhase(ctx, plan, phase, output, managedCoordinationDirectory, true, deploymentPhaseTimeout(phase))
+	return runDeploymentPhase(ctx, plan, phase, output, managedCoordinationDirectory, true, deploymentPhaseTimeout(phase, len(plan.Targets)))
 }
 
 func environmentWithValue(environment []string, name, value string) []string {

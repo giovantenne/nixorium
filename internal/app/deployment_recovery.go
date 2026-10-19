@@ -52,9 +52,21 @@ func (m *DeploymentRecoveryManager) ForProcess(pid int) *DeploymentRecoveryManag
 	return m
 }
 
-func (m *DeploymentRecoveryManager) recorderRunning(pid int, start string) bool {
+// bootTimeSource tells when the controller started, so that a record of a
+// release without process start times (3.9.0) is not attributed to a
+// process that reused its PID after a reboot.
+type bootTimeSource interface {
+	BootTime() (time.Time, bool)
+}
+
+func (m *DeploymentRecoveryManager) recorderRunning(pid int, start string, startedAt time.Time) bool {
 	if pid <= 0 || !m.source.ProcessRunning(pid, start) {
 		return false
+	}
+	if boot, ok := m.source.(bootTimeSource); ok && start == "" {
+		if booted, known := boot.BootTime(); known && startedAt.Before(booted) {
+			return false
+		}
 	}
 	if pid != m.ownPID {
 		return true
@@ -92,7 +104,7 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 		return plan
 	}
 	plan.Pending = pending
-	if !pending.ApplyReturned && m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart) {
+	if !pending.ApplyReturned && m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart, pending.StartedAt) {
 		return issue("process", fmt.Sprintf("the Nixorium process that started the update (PID %d) is still running; wait for it to finish or close it first", pending.ControllerPID))
 	}
 	// A computer the engine never started needs no observation; one whose
@@ -204,7 +216,7 @@ func (m *DeploymentRecoveryManager) Apply(ctx context.Context, plan domain.Deplo
 	if !present || err != nil || !samePendingDeployment(pending, plan.Pending) {
 		return refuse("record", "the interrupted update record changed after review; create a fresh review")
 	}
-	if !pending.ApplyReturned && m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart) {
+	if !pending.ApplyReturned && m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart, pending.StartedAt) {
 		return refuse("process", "the Nixorium process that started the update is running again; create a fresh review")
 	}
 	previous := map[string]string{}

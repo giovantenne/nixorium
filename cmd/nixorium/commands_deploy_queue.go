@@ -41,7 +41,7 @@ func runDeploymentQueueCommand(ctx context.Context, repository string, options o
 		// An interrupted update whose outcome is now known on every computer
 		// closes itself first (ADR 0031), so the queue can continue.
 		if closed, done := app.NewDeploymentRecoveryManager(adapters.Local{}).ForProcess(os.Getpid()).AutoClose(ctx, repository); done {
-			fmt.Fprintln(stdout, "Closed the interrupted update: every computer's result is known.", closed.Archive)
+			fmt.Fprintln(stderr, "Closed the interrupted update: every computer's result is known.", closed.Archive)
 		}
 		report := manager.Run(ctx, repository)
 		if options.json {
