@@ -21,6 +21,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   changed" when the review was made just before the clock passed a
   five-minute mark. A host-key review now stays valid for four to five
   minutes, from the command line and from the computer's details.
+- **Update computers** keeps each student computer on its own network
+  interface. When `clientIfaceName`, `controllerIfaceName` or
+  `hostIfaceNames` differed from `ifaceName`, the update configured the
+  `ifaceName` interface instead: the computers lost their laboratory address,
+  DHCP and Internet and could no longer be reached. Start an affected computer
+  from the previous entry in its boot menu, then update the computers again.
 
 ## [3.8.2] - 2026-10-16
 

@@ -769,7 +769,6 @@ let
     {
       inherit name;
       value = {
-        _module.args = specialArgsForHost name hostIp;
         imports = modulesForHost name false;
         deployment = {
           targetHost = hostIp;
@@ -1022,17 +1021,19 @@ builtins.mapAttrs (name: value:
       nixpkgs = import nixpkgs {
         inherit system;
       };
-      specialArgs = {
-        inherit labSettings;
-        inherit labAssets;
-      };
+      # Colmena gives specialArgs precedence over _module.args. Only per-node
+      # arguments keep the resolved interface and host identity authoritative.
+      nodeSpecialArgs = { ${masterHostName} = specialArgsForHost masterHostName masterIp; }
+        // builtins.listToAttrs (map (n: {
+          name = "pc${padNumber n}";
+          value = specialArgsForHost "pc${padNumber n}" (mkHostIp n);
+        }) clientNumbers);
     };
     defaults.deployment = {
       targetUser = "root";
       buildOnTarget = false;
     };
     ${masterHostName} = {
-      _module.args = specialArgsForHost masterHostName masterIp;
       imports = modulesForHost masterHostName true;
       deployment = {
         targetHost = "localhost";

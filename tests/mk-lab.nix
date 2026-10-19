@@ -78,6 +78,24 @@ let
     };
     publicKeys = { cache = null; ssh = null; };
   });
+  # Reproduce Colmena 0.4 node evaluation: global specialArgs, then per-node
+  # specialArgs, both overriding any _module.args the node itself declares.
+  colmenaNode = lab: name:
+    let
+      hive = lab.colmena;
+      node = hive.${name};
+    in
+    import "${hive.meta.nixpkgs.path}/nixos/lib/eval-config.nix" {
+      system = "x86_64-linux";
+      modules = [
+        { nixpkgs.pkgs = hive.meta.nixpkgs; }
+        (builtins.removeAttrs node [ "deployment" ])
+      ];
+      specialArgs = (hive.meta.specialArgs or { })
+        // (hive.meta.nodeSpecialArgs.${name} or { })
+        // { inherit name; };
+    };
+  colmenaRoleServices = name: (colmenaNode roleInterfaceLab name).config.systemd.services;
   keyboardLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       keyboardLayout = "it";
@@ -508,6 +526,12 @@ assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.firewall.inte
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.interfaces ? enp2s0;
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.firewall.interfaces ? enp3s0;
 assert subnetLab.colmena.pc01.deployment.targetHost == "10.23.4.129";
+# Deployed clients must keep the role/host interface, not the shared fallback.
+assert (colmenaRoleServices "pc01") ? "network-addresses-enp2s0";
+assert !((colmenaRoleServices "pc01") ? "network-addresses-enp0s3");
+assert (colmenaRoleServices "pc02") ? "network-addresses-enp3s0";
+assert (colmenaRoleServices "pc99") ? "network-addresses-eno1";
+assert (colmenaNode roleInterfaceLab "pc01").config.networking.firewall.interfaces ? enp2s0;
 # Colmena starts from the unmodified package set. Each host's module graph
 # applies the laboratory overlay exactly once while evaluating that node.
 assert !(builtins.elem "-Dvnc=true" (colmenaBaseGnomeRemoteDesktop.mesonFlags or [ ]));

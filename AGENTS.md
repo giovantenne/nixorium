@@ -288,6 +288,9 @@ that release's notes, so a release is not finished until the site follows it.
   uncertain dispatch, and reboot evidence forbid this path; never reuse the
   old authorization or accept a replacement identity for recovery.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
+  Colmena receives them only as per-node `meta.nodeSpecialArgs`: its global
+  `meta.specialArgs` overrides node `_module.args`, so never put host-resolved
+  values (interface, address, software) there.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - Guided software changes use `software catalog`, `software plan`, and
