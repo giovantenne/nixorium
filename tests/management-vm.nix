@@ -691,6 +691,10 @@ in
     # An interrupted client update: visible, guided, archived only after review.
     controller.succeed("rev=$(git -C /tmp/deployment rev-parse HEAD); ip=$(jq -r '.targets[0].ip' /tmp/shutdown-plan.json); printf '%s\\n' \"$rev\" > /tmp/nixorium-test-recover-revision; printf '{\"schemaVersion\":1,\"repository\":\"/tmp/deployment\",\"revision\":\"%s\",\"targets\":[{\"name\":\"pc01\",\"ip\":\"%s\"}],\"startedAt\":\"2026-10-01T10:00:00Z\",\"controllerPid\":1}\\n' \"$rev\" \"$ip\" > /var/lib/nixorium/coordination/deployment-pending.json; chmod 0600 /var/lib/nixorium/coordination/deployment-pending.json")
     controller.succeed("nixorium recovery status --repo /tmp/deployment --json | jq -e 'any(.conditions[]; .kind == \"deployment-pending\" and .next.code == \"DEPLOY-PENDING\")'")
+    # Classroom controls leave alone only the computers the record names
+    # (ADR 0030), and never wait for a maintenance operation.
+    controller.succeed("test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/classroom.lock)\" = root:nixorium-operations:660")
+    controller.succeed("nixorium shutdown plan --repo /tmp/deployment --on pc01 --json > /tmp/shutdown-updating.json || test $? = 1; jq -e '(.targets[0].eligible | not) and (.targets[0].detail | contains(\"being updated\"))' /tmp/shutdown-updating.json")
     controller.succeed("nixorium deploy recover plan --repo /tmp/deployment --json > /tmp/recover-plan.json || { cat /tmp/recover-plan.json; false; }; jq -e '.state == \"ready\" and .targets[0].state == \"finished-reviewed\" and .confirmation == \"RECOVERED\"' /tmp/recover-plan.json")
     controller.succeed("token=$(jq -r .reviewToken /tmp/recover-plan.json); nixorium deploy recover apply --repo /tmp/deployment --expect \"$token\" --yes --json | jq -e '.state == \"completed\"'; test ! -e /var/lib/nixorium/coordination/deployment-pending.json; ls /var/lib/nixorium/coordination/recovered/deployment-*.json")
     controller.succeed("nixorium recovery status --repo /tmp/deployment --json | jq -e 'all(.conditions[]; .kind != \"deployment-pending\")'")

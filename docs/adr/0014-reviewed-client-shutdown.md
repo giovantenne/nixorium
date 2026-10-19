@@ -66,3 +66,10 @@ explicit risk acknowledgement; their next normal deployment installs the
 helper. The workflow cannot prove ACPI completion, physical power state, or
 whether an unconfirmed request took effect. Wake-on-LAN, scheduling, and
 automatic retry remain outside this decision.
+
+## Amendment (2026-10-19)
+
+[ADR 0030](0030-classroom-controls-beside-maintenance.md) lets Internet access,
+shut down, restart and the schedule run beside maintenance: they refuse only
+the computers named in an unfinished client update, through a per-operation
+lease on `classroom.lock`, instead of the shared operation gate.

@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"errors"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -116,5 +118,40 @@ func TestInternetUnconfirmedAndInvalidTargets(t *testing.T) {
 		if p := m.Plan(context.Background(), ".", target, domain.InternetBlock); !p.HasErrors() {
 			t.Fatal(p)
 		}
+	}
+}
+
+type classroomLeaseInternetSource struct {
+	*fakeInternetSource
+	blocked map[string]string
+}
+
+func (s classroomLeaseInternetSource) ClassroomBlockedHosts() (map[string]string, error) {
+	return s.blocked, nil
+}
+
+func (s classroomLeaseInternetSource) AcquireClassroomLease(string) (io.Closer, map[string]string, error) {
+	return shutdownLease{}, s.blocked, nil
+}
+
+func TestInternetBlockRunsBesideMaintenanceAndLeavesComputersBeingUpdated(t *testing.T) {
+	s, _ := internetFixture()
+	s.active, s.acquireErr = true, errors.New("another operation is running")
+	s.states["pc02"] = domain.InternetObservation{SchemaVersion: 1, BootID: "22222222-2222-4222-8222-222222222222", State: "enabled"}
+	source := classroomLeaseInternetSource{fakeInternetSource: s, blocked: map[string]string{"pc02": domain.ClassroomBusyReason}}
+	m := NewInternetManager(source)
+	m.now = func() time.Time { return time.Unix(1000, 0).UTC() }
+	p := m.Plan(context.Background(), ".", "pc01,pc02", domain.InternetBlock)
+	if p.HasErrors() || !p.Targets[0].Eligible || p.Targets[1].Eligible || !strings.Contains(p.Message, "pc02") {
+		t.Fatalf("plan: %+v", p)
+	}
+	r := m.Apply(context.Background(), p, p.ReviewToken)
+	if len(s.changed) != 1 || s.changed[0] != "pc01" || r.Targets[1].State != "not-sent" || !strings.Contains(r.Targets[1].Detail, "being updated") {
+		t.Fatalf("report: %+v changed %v", r, s.changed)
+	}
+	source.blocked = map[string]string{"pc01": domain.ClassroomBusyReason}
+	m.source = source
+	if p := m.Plan(context.Background(), ".", "pc01", domain.InternetBlock); !p.HasErrors() || !strings.Contains(p.Message, "being updated") {
+		t.Fatalf("plan with only a computer being updated: %+v", p)
 	}
 }

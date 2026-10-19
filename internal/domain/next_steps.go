@@ -39,7 +39,7 @@ var nextSteps = map[string]NextStep{
 	"DEPLOY-PENDING": {
 		Code:   "DEPLOY-PENDING",
 		Title:  "A previous update of the student computers was interrupted",
-		Why:    "Nixorium does not know how it ended on every computer, so the student computers wait until you review it.",
+		Why:    "Nixorium does not know how it ended on every computer, so maintenance waits until you review it; classroom controls leave only those computers alone.",
 		Action: "Review the interrupted update",
 		TUI:    "Overview", Command: "nixorium deploy recover plan", Screen: RecoveryDeploymentPending,
 	},
@@ -366,3 +366,7 @@ func BlockedIssue(field, code, message string) ValidationIssue {
 	}
 	return issue
 }
+
+// ClassroomBusyReason is why a classroom control (Internet access, power)
+// leaves a computer alone: it is named in an unfinished client update.
+const ClassroomBusyReason = "it is being updated, or its last update was interrupted; try again when the administrator has finished"

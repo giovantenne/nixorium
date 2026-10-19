@@ -813,6 +813,7 @@ in
       "d /var/cache/nixorium/admin 0700 admin users -"
       "d /var/lib/nixorium/coordination 0770 root nixorium-operations -"
       "f /var/lib/nixorium/coordination/operation.lock 0660 root nixorium-operations -"
+      "f /var/lib/nixorium/coordination/classroom.lock 0660 root nixorium-operations -"
       "d /var/lib/nixorium/remote-install 0700 admin users -"
       "d /var/lib/nixorium/remote-install/logs 0700 admin users -"
       "d /home/admin/.local 0700 admin users -"

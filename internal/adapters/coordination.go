@@ -232,7 +232,18 @@ func ensureTestCoordinationDirectory(stateRoot string) (string, error) {
 		file.Close()
 		return "", err
 	}
-	return directory, file.Close()
+	if err := file.Close(); err != nil {
+		return "", err
+	}
+	classroom, err := os.OpenFile(filepath.Join(directory, classroomLockName), os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return "", err
+	}
+	if err := classroom.Chmod(0600); err != nil {
+		classroom.Close()
+		return "", err
+	}
+	return directory, classroom.Close()
 }
 
 type remoteInstallReservation struct {

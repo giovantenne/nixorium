@@ -155,7 +155,12 @@ func runDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, p
 		// so a recovery review in this process never sees it unowned.
 		ownDeploymentApplies.Add(1)
 		defer ownDeploymentApplies.Add(-1)
+		unlockClassroom, err := lockClassroomForPending(directory, managed, deploymentPendingLockWait)
+		if err != nil {
+			return fmt.Errorf("prepare the client update; nothing was started: %w", err)
+		}
 		pending, err = createDeploymentPending(directory, plan)
+		unlockClassroom()
 		if err != nil {
 			return &domain.DeploymentUnconfirmedError{Err: fmt.Errorf("persist deployment intent; no new apply started: %w", err)}
 		}

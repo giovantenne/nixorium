@@ -379,6 +379,8 @@ func scheduleShutdownSkip(target domain.ShutdownTargetPlan) domain.ScheduleOutco
 	outcome := domain.ScheduleOutcome{Name: target.Name}
 	switch {
 	case target.Eligible:
+	case target.Detail == domain.ClassroomBusyReason:
+		outcome.State, outcome.Detail = domain.ScheduleOutcomeNotSent, "It is being updated; it was left on."
 	case target.Reachability != domain.ReachabilityReachable || target.SSH != domain.SSHAvailable:
 		outcome.State, outcome.Detail = domain.ScheduleOutcomeNotReachable, "Off or not reachable."
 	case target.Session == domain.ShutdownSessionActive:

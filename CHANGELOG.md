@@ -16,6 +16,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Blocking Internet, switching computers off or restarting them, and the
+  scheduled shut-down no longer wait while the administrator updates
+  computers. Only the computers being updated, or whose last update was
+  interrupted, are left alone, and the review says so.
 - The log of **Update computers** shows when each step started and how long it
   took, with the total time at the end, so it is clear where an update spends
   its time.

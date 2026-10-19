@@ -73,15 +73,32 @@ func (m *ShutdownManager) PlanAction(ctx context.Context, repository, requested 
 	if len(selectionIssues) > 0 {
 		return report
 	}
-	active, err := m.source.ClientOperationActive()
-	if message, refused := operationRefusal(active, err, "another client deployment or shutdown is already running", "inspect active client operations: "); refused {
-		return shutdownPlanIssue(report, "operation", message)
+	blocked := map[string]string{}
+	if lease, ok := classroomLeaseFor(m.source); ok {
+		blocked, err = lease.ClassroomBlockedHosts()
+		if err != nil {
+			return shutdownPlanIssue(report, "operation", err.Error())
+		}
+	} else {
+		active, activeErr := m.source.ClientOperationActive()
+		if message, refused := operationRefusal(active, activeErr, "another client deployment or shutdown is already running", "inspect active client operations: "); refused {
+			return shutdownPlanIssue(report, "operation", message)
+		}
 	}
 	if conflict := shutdownPXEConflict(m.source, ctx); conflict != "" {
 		return shutdownPlanIssue(report, "installation", conflict)
 	}
 	hosts := shutdownHostMeta(selected)
 	report.Targets, report.Eligible = shutdownTargetsFromObservations(hosts, m.source.ShutdownObservations(ctx, hosts, shutdownObservationTimeout), policy)
+	for index, target := range report.Targets {
+		if reason, found := blocked[target.Name]; found {
+			if target.Eligible {
+				report.Eligible--
+			}
+			report.Targets[index].Eligible = false
+			report.Targets[index].Detail = reason
+		}
+	}
 	if report.Eligible == 0 {
 		report.Message = "No selected computer is currently eligible for this power action. Nothing will be queued for later."
 		return shutdownPlanIssue(report, "targets", "power on a selected computer, restore management access, or review unknown-session risk")
@@ -119,7 +136,14 @@ func (m *ShutdownManager) ApplyPlan(ctx context.Context, plan domain.ShutdownPla
 	if plan.Action == domain.ClientRestart {
 		label = "Restart computers"
 	}
-	lease, err := acquireOperation(m.source, label)
+	var lease io.Closer
+	blocked := map[string]string{}
+	var err error
+	if classroom, ok := classroomLeaseFor(m.source); ok {
+		lease, blocked, err = classroom.AcquireClassroomLease(label)
+	} else {
+		lease, err = acquireOperation(m.source, label)
+	}
 	if err != nil {
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "operation", Message: err.Error()})
 		report.Message = "Shutdown was not started because another client operation is running."
@@ -149,6 +173,11 @@ func (m *ShutdownManager) ApplyPlan(ctx context.Context, plan domain.ShutdownPla
 	for _, target := range plan.Targets {
 		if !target.Eligible {
 			outcomes[target.Name] = domain.ShutdownTargetOutcome{Name: target.Name, State: "not-sent", Detail: "not eligible in the reviewed plan"}
+			report.NotSent++
+			continue
+		}
+		if reason, found := blocked[target.Name]; found {
+			outcomes[target.Name] = domain.ShutdownTargetOutcome{Name: target.Name, State: "not-sent", Detail: "pre-dispatch check: " + reason}
 			report.NotSent++
 			continue
 		}

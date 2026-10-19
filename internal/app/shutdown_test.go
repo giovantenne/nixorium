@@ -187,3 +187,47 @@ func TestRestartUsesDistinctReviewAndDispatchAction(t *testing.T) {
 		t.Fatalf("restart report = %+v, dispatched action = %q", report, source.action)
 	}
 }
+
+type classroomLeaseShutdownSource struct {
+	*fakeShutdownSource
+	blocked map[string]string
+}
+
+func (s classroomLeaseShutdownSource) ClassroomBlockedHosts() (map[string]string, error) {
+	return s.blocked, nil
+}
+
+func (s classroomLeaseShutdownSource) AcquireClassroomLease(string) (io.Closer, map[string]string, error) {
+	return shutdownLease{}, s.blocked, nil
+}
+
+func TestShutdownRunsBesideMaintenanceAndLeavesComputersBeingUpdated(t *testing.T) {
+	source, _ := shutdownFixture()
+	// Maintenance holds the operation gate: classroom controls do not wait.
+	source.active, source.acquireErr = true, errors.New("another operation is running")
+	source.observations["pc02"] = domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle}
+	lease := classroomLeaseShutdownSource{fakeShutdownSource: source, blocked: map[string]string{}}
+	manager := NewShutdownManager(lease)
+	manager.now = func() time.Time { return time.Unix(1000, 0).UTC() }
+
+	plan := manager.Plan(context.Background(), "/deployment", "pc01,pc02", domain.ShutdownProtectUnknown)
+	if plan.HasErrors() || plan.Eligible != 2 {
+		t.Fatalf("plan = %+v", plan)
+	}
+	// An update naming pc01 starts after the review: pc01 is left alone.
+	lease.blocked = map[string]string{"pc01": domain.ClassroomBusyReason}
+	manager.source = lease
+	report := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
+	if len(source.dispatchHosts) != 1 || source.dispatchHosts[0].Name != "pc02" || report.NotSent != 1 {
+		t.Fatalf("dispatched %v, report %+v", source.dispatchHosts, report)
+	}
+	if !strings.Contains(report.Targets[0].Detail, "being updated") {
+		t.Fatalf("pc01 outcome = %+v", report.Targets[0])
+	}
+
+	// A review made while pc01 is named marks it ineligible with the reason.
+	plan = manager.Plan(context.Background(), "/deployment", "pc01,pc02", domain.ShutdownProtectUnknown)
+	if plan.HasErrors() || plan.Eligible != 1 || plan.Targets[0].Eligible || plan.Targets[0].Detail != domain.ClassroomBusyReason {
+		t.Fatalf("plan = %+v", plan)
+	}
+}

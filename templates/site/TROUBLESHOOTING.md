@@ -57,7 +57,7 @@ for example:
 
 ```text
 ! The computers were not updated: a previous update of the student computers was interrupted.
-  Nixorium does not know how it ended on every computer, so the student computers wait until you review it.
+  Nixorium does not know how it ended on every computer, so maintenance waits until you review it; classroom controls leave only those computers alone.
   Next: Review the interrupted update (Enter)
 ```
 
@@ -595,10 +595,12 @@ mode-0600 `/var/lib/nixorium/coordination/deployment-pending.json`, containing
 the repository, reviewed revision, selected names/addresses and start time.
 A normal successful Colmena return clears it. A failed/disconnected/timed-out
 apply, terminal loss or process death retains it, even across controller reboot.
-New managed deployments, installation starts, network installation and fleet
-mutations, including classroom controls, are refused. Inventory and logs remain
-readable. Malformed or unsafe pending evidence also blocks operations rather
-than being silently removed.
+New managed deployments, installation starts, network installation and other
+maintenance operations are refused. Classroom controls (Internet access, shut
+down, restart and the schedule) keep working on the other computers and leave
+alone only the computers named in the record. Inventory and logs remain
+readable. Malformed or unsafe pending evidence also blocks operations, and
+classroom controls on every computer, rather than being silently removed.
 
 **Update Nixorium** and **Maintenance → Apply to controller** stay available,
 so a newer release can always reach the controller, even when the fix is in

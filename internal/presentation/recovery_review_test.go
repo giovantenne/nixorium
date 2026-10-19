@@ -202,7 +202,7 @@ func TestUpdateResultNoticeOpensTheInterruptedUpdateReview(t *testing.T) {
 	view := plainView(model)
 	for _, want := range []string{
 		"! The controller was not updated: a previous update of the student computers was interrupted.",
-		"  Nixorium does not know how it ended on every computer, so the student computers wait until you review it.",
+		"  Nixorium does not know how it ended on every computer, so maintenance waits until you review it; classroom controls leave only those computers alone.",
 		"  Next: Review the interrupted update (Enter)",
 		"Enter Review the interrupted update", "a Retry controller", "d Details", "Esc Maintenance",
 	} {
