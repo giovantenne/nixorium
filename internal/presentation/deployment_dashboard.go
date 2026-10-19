@@ -151,7 +151,7 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		previous := model.deployment.plan
 		model.busy = "Creating a fresh review for the reachable computers"
 		model.message = ""
-		return model.startRead(func(ctx context.Context) tea.Msg {
+		return model.startBoundedRead(dashboardBuildTimeout, func(ctx context.Context) tea.Msg {
 			return dashboardDeploymentPlanMsg{report: model.actions.PlanReachableDeployment(ctx, previous)}
 		})
 	case deploymentCloseIntent:

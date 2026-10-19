@@ -21,6 +21,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   the update.
 - During a change of laboratory network, that review also checks computers
   still on their previous address.
+- Preparing the review of **Update computers** no longer stops with "Loading
+  took too long" right after Nixorium was updated.
 - **Computers → Queued updates** opens again; selecting it did nothing.
 - Trusting a reinstalled computer's new SSH key no longer fails with "review
   changed" when the review was made just before the clock passed a

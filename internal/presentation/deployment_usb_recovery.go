@@ -63,7 +63,9 @@ func (model dashboardModel) planSelectedDeployment(requested string) (tea.Model,
 	}
 	model.busy = "Validating revision and selected computers"
 	model.message = ""
-	return model.startRead(func(ctx context.Context) tea.Msg {
+	// The review evaluates Nix and probes computers over SSH; the first
+	// evaluation after a Nixorium update can exceed the ordinary read limit.
+	return model.startBoundedRead(dashboardBuildTimeout, func(ctx context.Context) tea.Msg {
 		return dashboardDeploymentPlanMsg{report: model.actions.PlanDeployment(ctx, requested)}
 	})
 }
