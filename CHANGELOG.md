@@ -23,6 +23,19 @@ The project follows [Semantic Versioning](https://semver.org/).
   whose result is truly unknown still needs a review, and that review closes
   itself as soon as the computer reports how its update ended. The log shows
   each computer's progress and its activation messages.
+- Identical computers now share one configuration. An update, and network
+  installation, builds it once instead of once for every computer. Each
+  computer keeps its own name and laboratory address from a small identity
+  record, `/var/lib/nixorium/identity.json`, that the update or the installer
+  writes before the computer starts its new system. A computer without a
+  valid record shows "This computer has no Nixorium identity"; updating it from
+  the controller writes the record again, and an update never overwrites a
+  record that names another computer.
+- A private module that uses a computer's name or address (`hostName` or
+  `hostIp`) now needs that computer listed in `hostModules` or
+  `updateValidationHosts`; otherwise the evaluation stops with a message that
+  says so. The flake no longer has a `colmena` output, because Nixorium has
+  its own update engine.
 - The `l` key for progress details appears only when there are details to
   show, instead of on every progress screen.
 - The readiness check of the laboratory configuration, which takes about 20
