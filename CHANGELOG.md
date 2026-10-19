@@ -6,8 +6,6 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [3.9.0] - 2026-10-19
-
 ### Added
 
 - Assistant can read system configuration files of the controller and the
@@ -15,11 +13,6 @@ The project follows [Semantic Versioning](https://semver.org/).
   example, make Windows the default boot entry without asking you to look
   anything up. It never reads home folders, passwords, keys or Wi-Fi
   credentials. Assistant asks once more for consent because of this.
-- A [trademark policy](TRADEMARKS.md) says how the Nixorium name and logo can
-  be used: freely to talk about and share Nixorium, with permission for forks,
-  services and products that carry the name.
-- The keyboard help (F1 or `?`) now shows the address for questions and
-  feedback, hello@nixorium.org.
 
 ### Changed
 
@@ -30,6 +23,19 @@ The project follows [Semantic Versioning](https://semver.org/).
   whose result is truly unknown still needs a review, and that review closes
   itself as soon as the computer reports how its update ended. The log shows
   each computer's progress and its activation messages.
+
+## [3.9.0] - 2026-10-19
+
+### Added
+
+- A [trademark policy](TRADEMARKS.md) says how the Nixorium name and logo can
+  be used: freely to talk about and share Nixorium, with permission for forks,
+  services and products that carry the name.
+- The keyboard help (F1 or `?`) now shows the address for questions and
+  feedback, hello@nixorium.org.
+
+### Changed
+
 - Reviews and updates prepare the configuration for evaluation once instead
   of several times, which shortens every update a little.
 - Blocking Internet, switching computers off or restarting them, and the
