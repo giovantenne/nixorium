@@ -585,10 +585,19 @@ func nixJSONAt(ctx context.Context, repository, revision, attribute string, dest
 	if err != nil {
 		return err
 	}
+	cachePath, cacheable := evaluationCachePath(flake, attribute)
+	if cacheable {
+		if cached, found := readCachedEvaluation(cachePath); found && json.Unmarshal(cached, destination) == nil {
+			return nil
+		}
+	}
 	reference := flake + "#" + attribute
 	output, err := runOutput(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", reference, "--json", "--no-write-lock-file")
 	if err != nil {
 		return err
+	}
+	if cacheable {
+		writeCachedEvaluation(cachePath, []byte(output))
 	}
 	if err := json.Unmarshal([]byte(output), destination); err != nil {
 		return fmt.Errorf("decode %s JSON: %w", attribute, err)

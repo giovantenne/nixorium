@@ -25,6 +25,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   each computer's progress and its activation messages.
 - The `l` key for progress details appears only when there are details to
   show, instead of on every progress screen.
+- The readiness check of the laboratory configuration, which takes about 20
+  seconds, is done once per saved configuration and then reused: updating
+  computers no longer repeats it when it reviews and again after the build.
 
 ### Fixed
 
