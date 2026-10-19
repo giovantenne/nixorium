@@ -81,7 +81,7 @@ func TestTheTargetReleaseMigratesACopyAndTheDifferenceIsReviewed(t *testing.T) {
 	if content, _ := os.ReadFile(filepath.Join(repository, "modules/workstation.nix")); !strings.Contains(string(content), "args.hostName") {
 		t.Fatal("planning changed the deployment")
 	}
-	if err := applyMigratedFiles(repository, files); err != nil {
+	if _, err := applyMigratedFiles(repository, files); err != nil {
 		t.Fatal(err)
 	}
 	if content, _ := os.ReadFile(filepath.Join(repository, domain.DeploymentMigrationsFile)); !strings.Contains(string(content), "2026-10-workstation-is-controller") {
@@ -121,6 +121,24 @@ func TestUndeclaredOrForbiddenChangesRefuseTheUpdate(t *testing.T) {
 			}
 		})
 	}
+	// A record that loses or invents ids is refused.
+	for name, extra := range map[string]func(string){
+		"record loses an id": func(directory string) {
+			_ = os.WriteFile(filepath.Join(directory, domain.DeploymentMigrationsFile), []byte(`{"schemaVersion":1,"applied":["2026-10-workstation-is-controller"]}`+"\n"), 0o644)
+		},
+		"record invents an id": func(directory string) {
+			_ = os.WriteFile(filepath.Join(directory, domain.DeploymentMigrationsFile), []byte(`{"schemaVersion":1,"applied":["2025-01-old","2026-10-workstation-is-controller","2027-09-invented"]}`+"\n"), 0o644)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			repository := migrationRepository(t, map[string]string{"modules/workstation.nix": oldControllerTest,
+				domain.DeploymentMigrationsFile: `{"schemaVersion":1,"applied":["2025-01-old"]}` + "\n"})
+			useMigrator(t, deploymigrate.Registry, extra)
+			if _, _, _, _, err := planDeploymentMigrations(context.Background(), repository, "path:/nix/store/00000000000000000000000000000000-source", true); err == nil || !strings.Contains(err.Error(), "record") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
 	// A migration that claims a change it did not make is refused too.
 	repository := migrationRepository(t, map[string]string{"modules/workstation.nix": oldControllerTest})
 	useMigrator(t, []deploymigrate.Migration{{ID: "2027-01-claims-too-much", Description: "x", Apply: func(deploymigrate.Tree) deploymigrate.Outcome {
@@ -144,7 +162,7 @@ func TestMigrationsMayCreateAndRemoveFiles(t *testing.T) {
 	if err != nil || len(files) != 3 {
 		t.Fatalf("files = %+v, %v", files, err)
 	}
-	if err := applyMigratedFiles(repository, files); err != nil {
+	if _, err := applyMigratedFiles(repository, files); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(repository, "modules/old.nix")); !os.IsNotExist(err) {
@@ -175,7 +193,7 @@ func TestMigratedFilesAreWrittenOnlyAsReviewed(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repository, "modules/workstation.nix"), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := applyMigratedFiles(repository, files); err == nil || !strings.Contains(err.Error(), "changed after update review") {
+	if _, err := applyMigratedFiles(repository, files); err == nil || !strings.Contains(err.Error(), "changed after update review") {
 		t.Fatalf("apply = %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(repository, domain.DeploymentMigrationsFile)); !os.IsNotExist(err) {

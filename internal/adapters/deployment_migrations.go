@@ -70,7 +70,7 @@ var buildTargetMigrator = func(ctx context.Context, candidate string) (string, e
 	if !migrationCandidatePrefix.MatchString(candidate) {
 		return "", errors.New("deployment migrations need a prepared candidate source")
 	}
-	expression := `(builtins.getFlake "` + candidate + `").inputs.nixorium.packages.x86_64-linux.nixorium`
+	expression := `(builtins.getFlake "` + candidate + `").inputs.nixorium.packages.${builtins.currentSystem}.nixorium`
 	output, err := runBoundedNix(ctx, 64*1024, "build", "--no-link", "--print-out-paths", "--impure", "--expr", expression)
 	if err != nil {
 		return "", fmt.Errorf("build the target release's Nixorium for its deployment migrations: %w", err)
@@ -218,7 +218,55 @@ func planDeploymentMigrations(ctx context.Context, repository, candidate string,
 			return nil, nil, nil, "", fmt.Errorf("the target release declared a change to %s that it did not make", path)
 		}
 	}
+	for _, file := range files {
+		if file.Path == domain.DeploymentMigrationsFile {
+			if err := checkMigrationRecord(file, results); err != nil {
+				return nil, nil, nil, "", err
+			}
+		}
+	}
 	return results, files, raw, migrator, nil
+}
+
+// checkMigrationRecord accepts a new record only if it keeps every id the
+// deployment had and adds just the migrations reported applied or done.
+func checkMigrationRecord(file domain.MigratedFile, results []domain.DeploymentMigrationResult) error {
+	type record struct {
+		SchemaVersion int      `json:"schemaVersion"`
+		Applied       []string `json:"applied"`
+	}
+	var before, after record
+	if !file.Create && (json.Unmarshal(file.Before, &before) != nil || before.SchemaVersion != 1) {
+		return fmt.Errorf("%s is not a valid migration record; restore it from Git", domain.DeploymentMigrationsFile)
+	}
+	if json.Unmarshal(file.After, &after) != nil || after.SchemaVersion != 1 || after.Applied == nil {
+		return errors.New("the target release wrote an invalid migration record")
+	}
+	kept := map[string]bool{}
+	for _, id := range after.Applied {
+		if !migrationIDPattern.MatchString(id) || kept[id] {
+			return errors.New("the target release wrote an invalid migration record")
+		}
+		kept[id] = true
+	}
+	for _, id := range before.Applied {
+		if !kept[id] {
+			return fmt.Errorf("the target release removed %s from the migration record", id)
+		}
+		delete(kept, id)
+	}
+	reported := map[string]bool{}
+	for _, result := range results {
+		if result.State == domain.MigrationApplied || result.State == domain.MigrationDone {
+			reported[result.ID] = true
+		}
+	}
+	for id := range kept {
+		if !reported[id] {
+			return fmt.Errorf("the target release recorded %s without reporting it", id)
+		}
+	}
+	return nil
 }
 
 // parseMigrationReport checks the report and returns the outcomes and the
@@ -268,6 +316,9 @@ type treeEntry struct {
 	content []byte
 	mode    fs.FileMode
 	regular bool
+	// large: over the size a migration may change; content is a size and
+	// time fingerprint, not the file.
+	large bool
 }
 
 func (entry treeEntry) executable() bool { return entry.mode&0o100 != 0 }
@@ -309,8 +360,8 @@ func diffMigratedTrees(original, migrated string) ([]domain.MigratedFile, error)
 			return nil, fmt.Errorf("the target release's migrations changed %s, which is not a regular file", path)
 		case !hasNew && path == domain.DeploymentMigrationsFile:
 			return nil, errors.New("the target release's migrations removed the migration record")
-		case hasNew && len(updated.content) > maximumMigratedFile:
-			return nil, fmt.Errorf("the target release's migrations made %s too large", path)
+		case (hadOld && old.large) || (hasNew && (updated.large || len(updated.content) > maximumMigratedFile)):
+			return nil, fmt.Errorf("the target release's migrations changed %s, which is too large", path)
 		}
 		file := domain.MigratedFile{Path: path, Create: !hadOld, Delete: !hasNew, Mode: 0o644}
 		if hadOld {
@@ -351,8 +402,13 @@ func readMigrationTree(root string) (map[string]treeEntry, error) {
 		}
 		item := treeEntry{mode: info.Mode().Perm(), regular: info.Mode().IsRegular()}
 		if item.regular {
-			if info.Size() > maximumCandidateSourceBytes {
-				return fmt.Errorf("%s is too large", relative)
+			// Larger files are kept by size only: the diff rule refuses a
+			// change to them without reading them whole.
+			if info.Size() > maximumMigratedFile {
+				item.large = true
+				item.content = []byte(fmt.Sprintf("%d %d", info.Size(), info.ModTime().UnixNano()))
+				entries[relative] = item
+				return nil
 			}
 			if item.content, err = os.ReadFile(path); err != nil {
 				return err

@@ -180,6 +180,27 @@ func TestResolvedSystemLocationsOnlyForTheirRequests(t *testing.T) {
 	}
 }
 
+func TestCompactSecretsAndKeyBlocksAreWithheld(t *testing.T) {
+	text := withholdSecretLines(`{"password":"hunter2"}` + "\npassword:compact1\nbindpw ldapsecret\n" +
+		"-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\n" +
+		"<tls-auth>\nf00dfeedf00dfeed\n</tls-auth>\nremote vpn.example 1194\n")
+	for _, leaked := range []string{"hunter2", "compact1", "ldapsecret", "MIIEvQIBADANBgkqhkiG9w0BAQEFAASC", "f00dfeedf00dfeed"} {
+		if strings.Contains(text, leaked) {
+			t.Errorf("leaked %q:\n%s", leaked, text)
+		}
+	}
+	for _, kept := range []string{`{"password" [withheld]`, "password [withheld]", "-----BEGIN PRIVATE KEY-----", "</tls-auth>", "remote vpn.example 1194"} {
+		if !strings.Contains(text, kept) {
+			t.Errorf("lost %q:\n%s", kept, text)
+		}
+	}
+	for _, refused := range []string{"/etc/openvpn/client.conf", "/etc/cups/certs/0", "/sys/class/net/eth0/device/resource0", "/sys/class/net/eth0/device/rom"} {
+		if Readable(refused) {
+			t.Errorf("%s is readable", refused)
+		}
+	}
+}
+
 func TestSecretFormsAreWithheld(t *testing.T) {
 	text := withholdSecretLines("[Peer]\nPresharedKey = abc123\nnetwork={\n  passphrase=\"hunter2\"\n  wep_key0=\"x\"\n}\n" +
 		"DeviceURI smb://teacher:s3cret@printserver/laser\nwpa_passphrase=topsecret\nInfo Laser\n")

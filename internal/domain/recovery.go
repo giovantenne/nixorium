@@ -9,6 +9,8 @@ type OperationHolder struct {
 	User      string
 	StartedAt time.Time
 	Known     bool
+	// PID is the confirmed holder process (same PID and start time).
+	PID int
 }
 
 // Description says what is running in a few words.

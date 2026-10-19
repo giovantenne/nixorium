@@ -29,13 +29,13 @@ type recorderSource interface {
 }
 
 // updateRunning reports a pending record whose update is still under way:
-// its recorder is alive, has not returned from its apply, and holds the
-// operation lock. The Overview then shows the running operation, not an
-// interrupted update. A recorder that is alive but no longer holds the lock
-// left its record behind, so the record is reported.
-func (inspector *RecoveryInspector) updateRunning(pending domain.PendingDeployment, err error, busy bool) bool {
+// its recorder is alive, has not returned from its apply, and is the
+// confirmed holder of the operation lock. The Overview then shows the
+// running operation, not an interrupted update. A recorder that is alive but
+// does not hold the lock left its record behind, so the record is reported.
+func (inspector *RecoveryInspector) updateRunning(pending domain.PendingDeployment, err error, holder domain.OperationHolder, busy bool) bool {
 	recorder, ok := inspector.source.(recorderSource)
-	return ok && err == nil && busy && !pending.ApplyReturned && pending.ControllerPID > 0 &&
+	return ok && err == nil && busy && holder.Known && holder.PID == pending.ControllerPID && !pending.ApplyReturned && pending.ControllerPID > 0 &&
 		recorder.ProcessRunning(pending.ControllerPID, pending.ControllerPIDStart)
 }
 
@@ -79,7 +79,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	}
 
 	holder, busy := inspector.source.OperationLockHolder()
-	if pending, present, pendingErr := inspector.source.PendingDeployment(); present && !inspector.updateRunning(pending, pendingErr, busy) {
+	if pending, present, pendingErr := inspector.source.PendingDeployment(); present && !inspector.updateRunning(pending, pendingErr, holder, busy) {
 		detail := ""
 		var since *time.Time
 		var affects []string

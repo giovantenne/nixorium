@@ -116,7 +116,9 @@ func TestDoctorStillReportsWhenTheLaboratoryCannotBeRead(t *testing.T) {
 
 func TestRecoveryShowsARunningUpdateAsBusyNotInterrupted(t *testing.T) {
 	pending := domain.PendingDeployment{SchemaVersion: 1, Revision: strings.Repeat("a", 40), Targets: []domain.DeploymentTarget{{Name: "pc01"}}, StartedAt: time.Now(), ControllerPID: 4242, ControllerPIDStart: "77"}
-	holder := domain.OperationHolder{Operation: "Update computers", User: "admin", Known: true}
+	holder := domain.OperationHolder{Operation: "Update computers", User: "admin", Known: true, PID: 4242}
+	other := holder
+	other.PID = 5151
 	for _, test := range []struct {
 		name        string
 		source      fakeRecorderSource
@@ -131,6 +133,7 @@ func TestRecoveryShowsARunningUpdateAsBusyNotInterrupted(t *testing.T) {
 			return returned
 		}(), pendingFound: true, holder: holder, busy: true}, true}, true},
 		{"recorder unknown", fakeRecorderSource{fakeRecoverySource{pending: domain.PendingDeployment{Targets: pending.Targets}, pendingFound: true, holder: holder, busy: true}, true}, true},
+		{"another process holds the lock", fakeRecorderSource{fakeRecoverySource{pending: pending, pendingFound: true, holder: other, busy: true}, true}, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			report := NewRecoveryInspector(test.source).Observe(context.Background(), "/srv/lab")

@@ -70,13 +70,18 @@ var refusedPrefixes = []string{
 	"/run/nixorium/remote-install",
 	// A stable per-computer identifier, like the serial numbers below.
 	"/etc/machine-id",
+	// VPN profiles and printer authentication certificates carry keys.
+	"/etc/openvpn",
+	"/etc/cups/certs",
 }
 
 // refusedNames are file or directory names that hold secrets or personal
 // data wherever they appear.
 var refusedNames = regexp.MustCompile(`(?i)(secret|private|token|passw|credential|shadow|psk|snapshot|recovery|` +
 	`\.key$|_key$|-key$|^key$|\.pem$|\.p12$|\.pfx$|\.age$|^id_(rsa|dsa|ecdsa|ed25519)$|keytab|htpasswd|` +
-	`^(product_serial|product_uuid|board_serial|chassis_serial)$)`)
+	`^(product_serial|product_uuid|board_serial|chassis_serial)$|` +
+	// PCI resources and ROMs: reading some has side effects on the device.
+	`^(resource[0-9]*(_wc)?|rom|config)$)`)
 
 // resolvedRoots are the locations a readable path may link to besides the
 // readable roots and the Nix store, each only for requests below the given
@@ -271,26 +276,47 @@ func readText(file *os.File, info os.FileInfo, result Result) (Result, error) {
 
 // secretLine matches a line that sets a password, key or token, such as a
 // GRUB password_pbkdf2 entry or a key = value pair.
-var secretLine = regexp.MustCompile(`(?i)(password|passwd|passphrase|secret|token|psk|preshared|wep_key|wpa_pass|private[_-]?key|api[_-]?key)`)
+var secretLine = regexp.MustCompile(`(?i)(password|passwd|passphrase|secret|token|psk|preshared|wep_key|wpa_pass|private[_-]?key|api[_-]?key|bindpw|rootpw|authtok)`)
+
+// Blocks whose every line is secret: PEM data and OpenVPN inline keys.
+var (
+	secretBlockStart = regexp.MustCompile(`^\s*(-----BEGIN [A-Z0-9 ]+-----|<(key|tls-auth|tls-crypt|tls-crypt-v2|secret|pkcs12)>)`)
+	secretBlockEnd   = regexp.MustCompile(`^\s*(-----END [A-Z0-9 ]+-----|</(key|tls-auth|tls-crypt|tls-crypt-v2|secret|pkcs12)>)`)
+)
 
 // uriCredentials matches the user:password part of a URI, as in a printer's
 // smb://user:password@host/queue.
 var uriCredentials = regexp.MustCompile(`://[^/\s:@]+:[^/\s@]+@`)
 
-// withholdSecretLines keeps the first word of a line that may carry a
-// secret, so the file's structure stays readable, and withholds the rest.
+// withholdSecretLines keeps the name of a setting that may carry a secret,
+// so the file's structure stays readable, and withholds its value; the body
+// of a PEM or inline key block is withheld whole.
 func withholdSecretLines(text string) string {
 	text = uriCredentials.ReplaceAllString(text, "://[withheld]@")
 	lines := strings.Split(text, "\n")
+	inBlock := false
 	for index, line := range lines {
-		if !secretLine.MatchString(line) {
+		switch {
+		case inBlock:
+			if secretBlockEnd.MatchString(line) {
+				inBlock = false
+				continue
+			}
+			lines[index] = "[withheld]"
+			continue
+		case secretBlockStart.MatchString(line):
+			inBlock = true
+			continue
+		case !secretLine.MatchString(line):
 			continue
 		}
 		trimmed := strings.TrimLeft(line, " \t")
 		indent := line[:len(line)-len(trimmed)]
-		first, _, _ := strings.Cut(trimmed, " ")
-		first, _, _ = strings.Cut(first, "=")
-		lines[index] = indent + first + " [withheld]"
+		name := trimmed
+		if cut := strings.IndexAny(trimmed, " \t=:"); cut >= 0 {
+			name = trimmed[:cut]
+		}
+		lines[index] = indent + name + " [withheld]"
 	}
 	return strings.Join(lines, "\n")
 }

@@ -296,7 +296,10 @@ func validateUpdateCandidate(ctx context.Context, repository, currentFlake strin
 	// its own migrator: the candidate is evaluated and built with them
 	// (ADR 0034). A package-base update keeps the Nixorium revision and has
 	// none.
-	revisionChanges := lockedNixoriumRevision(proposedLock) != lockedNixoriumRevision(snapshot.LockContent)
+	// An unreadable revision on either side counts as a change: migrations
+	// run rather than being skipped silently.
+	proposedRevision, currentRevision := lockedNixoriumRevision(proposedLock), lockedNixoriumRevision(snapshot.LockContent)
+	revisionChanges := proposedRevision == "" || currentRevision == "" || proposedRevision != currentRevision
 	if revisionChanges {
 		emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Running the target release's changes to deployment files", 0, 0)
 	}
@@ -659,8 +662,8 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 	// The release's changes to the deployment's own files go first: they
 	// work with the current release too, and a failure leaves the update
 	// input untouched (ADR 0034).
-	if err := applyMigratedFiles(repository, proposal.MigratedFiles); err != nil {
-		return false, err
+	if partial, err := applyMigratedFiles(repository, proposal.MigratedFiles); err != nil {
+		return partial, err
 	}
 	lockMode := os.FileMode(expected.LockMode)
 	if !expected.HasLock {
@@ -699,28 +702,29 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 
 // applyMigratedFiles writes the reviewed migrations, only if every file is
 // still exactly as reviewed; on a failure it restores those already written.
-func applyMigratedFiles(repository string, files []domain.MigratedFile) error {
+// partial reports that the restore failed too.
+func applyMigratedFiles(repository string, files []domain.MigratedFile) (partial bool, err error) {
 	for _, file := range files {
 		if !validMigrationFile(file.Path) && file.Path != domain.DeploymentMigrationsFile {
-			return fmt.Errorf("deployment migration names a file it may not change: %s", file.Path)
+			return false, fmt.Errorf("deployment migration names a file it may not change: %s", file.Path)
 		}
 		current, exists, err := readMigratedFile(repository, file.Path)
 		switch {
 		case err != nil:
-			return fmt.Errorf("%s changed after update review", file.Path)
+			return false, fmt.Errorf("%s changed after update review", file.Path)
 		case file.Create && exists:
-			return fmt.Errorf("%s appeared after update review", file.Path)
+			return false, fmt.Errorf("%s appeared after update review", file.Path)
 		case !file.Create && (!exists || !bytes.Equal(current, file.Before)):
-			return fmt.Errorf("%s changed after update review", file.Path)
+			return false, fmt.Errorf("%s changed after update review", file.Path)
 		}
 	}
 	for index, file := range files {
 		if err := writeMigratedState(repository, file, false); err != nil {
 			restoreErr := restoreMigratedFiles(repository, files[:index])
-			return errors.Join(fmt.Errorf("write deployment migration: %w", err), restoreErr)
+			return restoreErr != nil, errors.Join(fmt.Errorf("write deployment migration: %w", err), restoreErr)
 		}
 	}
-	return nil
+	return false, nil
 }
 
 // MigratedFilesSaved reports whether every migrated file on disk is exactly
@@ -736,9 +740,11 @@ func (Local) MigratedFilesSaved(repository string, files []domain.MigratedFile) 
 }
 
 // restoreMigratedFiles puts back the reviewed originals of migrated files.
+// Files are restored in reverse order, undoing later writes first.
 func restoreMigratedFiles(repository string, files []domain.MigratedFile) error {
 	var problems []error
-	for _, file := range files {
+	for index := len(files) - 1; index >= 0; index-- {
+		file := files[index]
 		if err := writeMigratedState(repository, file, true); err != nil {
 			problems = append(problems, fmt.Errorf("%s: %w", file.Path, err))
 		}

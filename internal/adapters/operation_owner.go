@@ -134,7 +134,7 @@ func operationBusy(lock *os.File) *OperationBusyError {
 	if len(operation) > 80 || strings.ContainsAny(operation, "\n\r\x1b") {
 		return busy
 	}
-	busy.Operation, busy.User, busy.StartedAt, busy.Known = operation, owner.User, owner.StartedAt, true
+	busy.Operation, busy.User, busy.StartedAt, busy.Known, busy.PID = operation, owner.User, owner.StartedAt, true, owner.PID
 	return busy
 }
 
