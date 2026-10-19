@@ -381,6 +381,11 @@ assert subnetLab.nixosConfigurations.pc01.config.networking.nftables.tables.nixo
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules
   == "iifname \"enp2s0\" ip saddr 10.0.0.99 tcp dport 22 accept\n";
 assert labHttpSubstituters subnetLab.nixosConfigurations.pc01.config == [ "http://10.23.4.227:5000" ];
+# Clients use only the controller cache; the controller keeps the public one.
+assert subnetLab.nixosConfigurations.pc01.config.nix.settings.substituters == [ "http://10.23.4.227:5000" ];
+assert transitionClient.nix.settings.substituters == [ "http://10.1.0.99:5000" "http://10.0.0.99:5000" ];
+assert (colmenaNode roleInterfaceLab "pc01").config.nix.settings.substituters == [ "http://10.0.0.99:5000" ];
+assert builtins.elem "https://cache.nixos.org/" subnetLab.nixosConfigurations.pc99.config.nix.settings.substituters;
 assert import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; } == ''
   table inet nixorium_internet {
     chain output {
