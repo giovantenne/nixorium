@@ -69,7 +69,8 @@ Nixorium builds and applies client systems itself:
   activations) always wait for the reviewed recovery.
 
 The flake output `colmena` and the `colmena` command stay available for
-manual use; Nixorium no longer runs them.
+manual use; Nixorium no longer runs them. (ADR 0033 later removed the flake
+output.)
 
 ## Consequences
 
