@@ -407,7 +407,12 @@ func loginBarrier(config Config, uid int) error {
 			return err
 		}
 		found := false
+		name := ""
 		for _, line := range strings.Split(string(data), "\n") {
+			if value, ok := strings.CutPrefix(line, "Name:"); ok {
+				name = strings.TrimSpace(value)
+				continue
+			}
 			if !strings.HasPrefix(line, "Uid:") {
 				continue
 			}
@@ -418,7 +423,8 @@ func loginBarrier(config Config, uid int) error {
 			found = true
 			for _, field := range fields[1:] {
 				if field == strconv.Itoa(uid) {
-					return errors.New("managed account still has running processes")
+					// Name the process so the journal identifies the conflicting service.
+					return fmt.Errorf("managed account still has running processes (pid %s, %s)", entry.Name(), strconv.QuoteToASCII(name))
 				}
 			}
 		}

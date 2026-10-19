@@ -66,6 +66,9 @@ in
       in !cfg.systemd.services.home-reset.restartIfChanged
         && cfg.systemd.services.home-reset.unitConfig.RefuseManualStart
         && builtins.elem "systemd-user-sessions.service" cfg.systemd.services.home-reset.requiredBy
+        # Services acting as the student must not overlap the boot reset.
+        && builtins.all (unit: builtins.elem unit cfg.systemd.services.home-reset.before)
+          [ "httpd.service" "logrotate.service" ]
         && cfg.environment.etc ? "nixorium-workspace-reset.json"
         && !(lib.hasInfix "/var/lib/home-template/${labConfig.studentUser}" cfg.system.activationScripts.createHomeTemplates.text)
         && !(lib.hasInfix "/home/${labConfig.studentUser}" cfg.system.activationScripts.nixoriumUserHomeOwnership.text)

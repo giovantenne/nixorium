@@ -27,6 +27,16 @@ The project follows [Semantic Versioning](https://semver.org/).
   `ifaceName` interface instead: the computers lost their laboratory address,
   DHCP and Internet and could no longer be reached. Start an affected computer
   from the previous entry in its boot menu, then update the computers again.
+- Student computers with the Programming web server no longer stop at boot
+  with "Failed to start Restore the configured student workspace before
+  login". The daily log rotation, which briefly acts as the student account
+  for the web server's logs, could run during the first boot of the day and
+  interrupt the home restore; the restore now finishes first. A computer
+  already stopped keeps its recovery evidence: when
+  `/var/lib/home-snapshots/.workspace-reset` has no `previous` entry, the
+  home was not changed, and moving `pending.json`, `prepared` and `keyfiles`
+  out of that folder lets the next boot restore the home again. The journal
+  now names the process that blocked a restore.
 
 ## [3.8.2] - 2026-10-16
 

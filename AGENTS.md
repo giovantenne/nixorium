@@ -736,7 +736,10 @@ that release's notes, so a release is not finished until the site follows it.
   helper accepts no target arguments and reads only its store-backed system
   configuration. The isolated `modules/workspace-reset.nix` service retains
   the `home-reset` unit name, never restarts on switch, and gates both the
-  display manager and normal user sessions. Preserve manual-start refusal,
+  display manager and normal user sessions. Order it before every boot
+  service that runs as, or switches to, the student (Apache, logrotate):
+  the process guard after the pending record otherwise fails closed.
+  Preserve manual-start refusal,
   no automatic retry, and `X-OnlyManualStart` so first-time installation during
   a rebuild also waits for boot. Keep student ownership repair, template writes
   and login preference changes out of this path; staff homes keep theirs.

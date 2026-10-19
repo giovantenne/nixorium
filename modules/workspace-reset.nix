@@ -16,7 +16,11 @@
     description = "Restore the configured student workspace before login";
     wantedBy = [ "multi-user.target" ];
     requiredBy = [ "systemd-user-sessions.service" "display-manager.service" ];
-    before = [ "systemd-user-sessions.service" "display-manager.service" ];
+    # The reset refuses to run while any process uses the student account.
+    # Apache as the student, and logrotate switching to that account for its
+    # logs, must wait: a persistent daily logrotate run at boot otherwise
+    # interrupts the reset and leaves recovery evidence that blocks login.
+    before = [ "systemd-user-sessions.service" "display-manager.service" "httpd.service" "logrotate.service" ];
     after = [ "local-fs.target" "systemd-tmpfiles-setup.service" ];
     # A new profile takes effect at the next normal boot, not during switch.
     restartIfChanged = false;

@@ -3,6 +3,7 @@ package homereset
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,7 +111,7 @@ func TestResetLifecycleVM(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = process.Process.Kill(); _ = process.Wait() }()
-		rejected(t, config, "still has running processes")
+		rejected(t, config, fmt.Sprintf("still has running processes (pid %d, \"sleep\")", process.Process.Pid))
 	})
 	t.Run("symlink-parent", func(t *testing.T) {
 		linkFixture(t, "/outside-home", home+"/.config")
