@@ -1013,12 +1013,13 @@ with these differences:
   or whose session cannot be read, stays on, and so does one that is off or
   does not answer. A computer where the student is logged in but has not
   touched keyboard or mouse for ten minutes does shut down;
-- when another operation (a deployment, for example) or a network
-  installation keeps the controller from starting at the set time, it tries
-  again every minute for up to ten minutes after that time, then gives up for
-  that day and writes one line to the history saying so; once it has started
-  it is not repeated. A time at which the controller was off is not made up
-  afterwards.
+- an update of the computers does not hold it back: a computer that is being
+  updated, or whose last update was interrupted, simply stays on. When a
+  network or USB installation keeps the controller from starting at the set
+  time, it tries again every minute for up to ten minutes after that time,
+  then gives up for that day and writes one line to the history saying so;
+  once it has started it is not repeated. A time at which the controller was
+  off is not made up afterwards.
 
 Every run that does something is a line in the operation history that
 `nixorium logs` lists for the administrator (`schedule-run`, with counts only;

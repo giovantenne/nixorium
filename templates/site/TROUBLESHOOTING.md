@@ -420,6 +420,10 @@ checked against the live process; it is never a reason to remove the lock.
 Without a confirmed holder the message says so; do not delete
 `/var/lib/nixorium/coordination/operation.lock`.
 
+Classroom controls (Internet access, shut down, restart and the schedule) do
+not wait for a running operation: they leave alone only the computers being
+updated, or named by an interrupted update.
+
 ## Codes shown to the teacher
 
 Classroom controls replace administrative detail with a short code. The
