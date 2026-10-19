@@ -31,12 +31,30 @@ The project follows [Semantic Versioning](https://semver.org/).
   with "Failed to start Restore the configured student workspace before
   login". The daily log rotation, which briefly acts as the student account
   for the web server's logs, could run during the first boot of the day and
-  interrupt the home restore; the restore now finishes first. A computer
-  already stopped keeps its recovery evidence: when
-  `/var/lib/home-snapshots/.workspace-reset` has no `previous` entry, the
-  home was not changed, and moving `pending.json`, `prepared` and `keyfiles`
-  out of that folder lets the next boot restore the home again. The journal
-  now names the process that blocked a restore.
+  interrupt the home restore; the restore now finishes first.
+- A student computer that stops before the login screen because its home
+  restore was interrupted now repairs itself at the next boot. A refusal
+  before the home changes no longer blocks later boots. After a power loss,
+  the restore starts again if the old home was untouched, or completes from
+  the read-only snapshot of the old home, which is kept in the teacher's
+  snapshots. Computers already stopped this way, with an older Nixorium,
+  recover at their first boot after the update. If that single automatic
+  attempt also fails, the computer stays closed for the administrator, as
+  before; see [Troubleshooting](docs/troubleshooting.md#a-student-computer-stops-before-the-login-screen).
+  The journal now names the process that blocked a restore.
+- Student computers no longer try `cache.nixos.org` while they are updated;
+  they use only the controller's cache. On school networks that filter HTTPS
+  this removes the `SSL peer certificate … was not OK` warnings during
+  **Update computers** and the time spent on them. The controller still
+  downloads from the public cache. A deployment that adds its own client
+  caches must now set them with `lib.mkForce`.
+- **Installation → USB over SSH** no longer asks again for the network,
+  interface and number of computers when they are already saved: like network
+  boot, it shows the saved values with **Continue** and **Edit settings**.
+- A USB installation is no longer refused with "remote disk is below the
+  minimum capacity" because of a small extra disk, such as a card reader, a
+  second USB stick or the live USB itself. Such disks are listed as excluded;
+  only the disk chosen for installation must hold at least 8 GiB.
 
 ## [3.8.2] - 2026-10-16
 

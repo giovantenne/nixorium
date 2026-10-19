@@ -1008,8 +1008,15 @@ Reset success records bind the seed, user and boot ID under the root-only
 `/var/lib/home-snapshots/.workspace-reset` directory. They are not fleet status
 and are not currently consumed by the TUI.
 
-An incomplete attempt leaves `pending.json` and recovery data, blocks normal
-login and refuses subsequent attempts, including after reboot. The root-only helper is not an interactive reset or
+An attempt records its phase in `pending.json`. A refusal before the original
+home changes (for example a student-owned process) removes that attempt's own
+work, so the next boot simply tries again. An interruption, such as a power
+loss, is recovered automatically at the next boot: before the read-only
+snapshot exists the reset starts again; after it, the reset completes from
+that snapshot and publishes it, so the student's files are kept. If that
+single automatic attempt fails too (`recovery.json`), or the evidence is
+unknown or inconsistent, the computer stays at the login barrier until an
+administrator inspects it. The root-only helper is not an interactive reset or
 recovery command. Inspect the `home-reset.service` journal and preserve the
 private evidence before administrator-led recovery; never delete the marker
 or rerun the reset just to clear an error. Snapshot recovery, external backups

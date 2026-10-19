@@ -124,7 +124,8 @@ Student npm globals and agent credentials/state are ephemeral and excluded
 from managed snapshots. Never change exclusions or seed secrets for persistence.
 Local snapshots are not external backups.
 
-After a failed reset, keep pending evidence, login barriers and the profile
-unchanged. Do not retry the helper, reboot or clear markers. Use
+The next boot recovers an interrupted reset by itself, once. After a reset
+that still fails, keep pending evidence, login barriers and the profile
+unchanged. Do not retry the helper or clear markers. Use
 [operations](operations.md) for operator-led diagnosis/recovery. Distinguish
 proposed preferences from runtime behavior that has actually been tested.

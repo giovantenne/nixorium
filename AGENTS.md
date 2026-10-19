@@ -255,6 +255,9 @@ that release's notes, so a release is not finished until the site follows it.
   omit interface names, and installers skip the name check. Keep these paths
   consistent (ADR 0017).
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
+- Clients substitute only from the controller's Harmonia cache: `modules/cache.nix`
+  replaces the NixOS `cache.nixos.org` default on clients (override priority 90),
+  so updates never contact the Internet. The controller keeps the public cache.
 - USB/SSH installation supports the official NixOS 26.05 Minimal or Graphical (GNOME) ISO on
   `x86_64-linux`, UEFI, and reachable Ethernet or Wi-Fi networking (prefer
   Minimal on computers with 4 GB of RAM or less: the live system keeps the
@@ -730,9 +733,15 @@ that release's notes, so a release is not finished until the site follows it.
   boot-reset engine. Preserve complete preflight, no-follow traversal,
   mount/subvolume checks, immutable seed validation, account/process checks,
   and a held login barrier. The private recovery snapshot is sanitized before
-  publication; five read-only managed snapshots are kept. Durable pending evidence must block retries after failure and
-  reboot. Never delete it automatically or treat a previous success receipt as
-  completion of a pending attempt. The fixed root-only `nixorium-home-reset`
+  publication; five read-only managed snapshots are kept. The durable pending
+  record carries a phase (ADR 0029): a failure before the restore phase
+  discards that attempt's own work; at the next boot an interrupted prepare
+  phase restarts, and a restore/published phase completes from the read-only
+  retained snapshot at most once (`recovery.json`). Unknown, malformed,
+  writable-snapshot or already-recovered states still block login until an
+  administrator inspects them. Never overwrite or rotate away the retained
+  snapshot, repeat a verified publication, or treat a previous success
+  receipt as completion of a pending attempt. The fixed root-only `nixorium-home-reset`
   helper accepts no target arguments and reads only its store-backed system
   configuration. The isolated `modules/workspace-reset.nix` service retains
   the `home-reset` unit name, never restarts on switch, and gates both the

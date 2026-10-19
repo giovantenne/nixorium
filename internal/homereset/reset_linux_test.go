@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -111,7 +112,8 @@ func TestResetLifecycleVM(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = process.Process.Kill(); _ = process.Wait() }()
-		rejected(t, config, fmt.Sprintf("still has running processes (pid %d, \"sleep\")", process.Process.Pid))
+		// The kernel truncates the process name, so match only the PID.
+		rejected(t, config, fmt.Sprintf("still has running processes (pid %d, ", process.Process.Pid))
 	})
 	t.Run("symlink-parent", func(t *testing.T) {
 		linkFixture(t, "/outside-home", home+"/.config")
@@ -145,31 +147,17 @@ func TestResetLifecycleVM(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Run("preparation-failure-preserves-home", func(t *testing.T) {
+	t.Run("preparation-failure-discards-its-work", func(t *testing.T) {
 		candidate := config
 		candidate.Dconf = os.Getenv("NIXORIUM_FAILING_DCONF")
 		if err := Reset(candidate); err == nil || !strings.Contains(err.Error(), "dconf failed") {
 			t.Fatal("preparation failure not reported", err)
 		}
-		intact(t, home+"/lesson.txt")
-		if _, err := os.Stat(resetState + "/pending.json"); err != nil {
-			t.Fatal("preparation failure evidence missing", err)
-		}
-		if err := Reset(config); err == nil || !strings.Contains(err.Error(), "administrator recovery") {
-			t.Fatal("preparation failure retried", err)
-		}
-		// Fixture-only recovery: no home mutation or snapshot has happened.
-		// Production deliberately offers no automatic evidence-removal command.
-		for _, directory := range []string{resetState + "/prepared", resetState + "/keyfiles"} {
-			if err := cleanHome(directory, true); err != nil {
-				t.Fatal(err)
+		// Nothing changed the home, so the failure must not block later boots.
+		for _, name := range []string{"prepared", "keyfiles", "previous", "pending.new", "recovery.json"} {
+			if _, err := os.Lstat(resetState + "/" + name); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("preparation failure left", name, err)
 			}
-			if err := os.Remove(directory); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if err := os.Remove(resetState + "/pending.json"); err != nil {
-			t.Fatal(err)
 		}
 		intactHome(t)
 	})
@@ -267,22 +255,149 @@ func TestResetLifecycleVM(t *testing.T) {
 			}
 		}
 	})
-	t.Run("partial-copy-blocks-retry", func(t *testing.T) {
+	snapshotCount := func(t *testing.T) int {
+		t.Helper()
+		entries, err := os.ReadDir(publishedSnapshots)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(entries)
+	}
+	recovered := func(t *testing.T) {
+		t.Helper()
+		if err := Reset(config); err != nil {
+			t.Fatal("interrupted reset not recovered", err)
+		}
+		entries, err := os.ReadDir(resetState)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range entries {
+			if entry.Name() != "lock" && entry.Name() != "success.json" {
+				t.Fatal("recovery left", entry.Name())
+			}
+		}
+		settings, err := os.ReadFile(home + "/.config/Code/User/settings.json")
+		if err != nil || !strings.Contains(string(settings), `"editor.fontSize":15`) {
+			t.Fatal("profile not restored", string(settings), err)
+		}
+	}
+	legacyPending := func(t *testing.T) {
+		t.Helper()
+		record := `{"schemaVersion":1,"seed":` + strconv.Quote(config.Seed) + `,"user":` + strconv.Quote(config.User) + "}\n"
+		if err := os.WriteFile(resetState+"/pending.json", []byte(record), 0600); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"prepared", "keyfiles"} {
+			if err := os.Mkdir(resetState+"/"+name, 0700); err != nil {
+				t.Fatal(err)
+			}
+			writeFixture(t, resetState+"/"+name+"/partial")
+		}
+	}
+	staff, err := user.LookupGroup("nixorium-staff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	staffGID, err := strconv.Atoi(staff.Gid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Reproduce a retained snapshot exactly as the reset leaves it before the
+	// restore phase: sanitized permissions, then read-only.
+	retainHome := func(t *testing.T) {
+		t.Helper()
+		if err := command(config.Btrfs, "subvolume", "snapshot", home, resetState+"/previous"); err != nil {
+			t.Fatal(err)
+		}
+		if err := snapshotPermissions(resetState+"/previous", staffGID); err != nil {
+			t.Fatal(err)
+		}
+		if err := command(config.Btrfs, "property", "set", "-ts", resetState+"/previous", "ro", "true"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Run("interrupted-preparation-restarts", func(t *testing.T) {
+		// An older reset interrupted before its snapshot: the home is untouched.
+		writeFixture(t, home+"/before-preparation.txt")
+		legacyPending(t)
+		before := snapshotCount(t)
+		recovered(t)
+		intact(t, publishedSnapshots+"/snapshot-1/before-preparation.txt")
+		if after := snapshotCount(t); after != before && after != before+1 {
+			t.Fatal("unexpected snapshot count", before, after)
+		}
+	})
+	t.Run("interrupted-restore-completes-from-retained-snapshot", func(t *testing.T) {
+		// An older reset interrupted after its read-only snapshot, with the
+		// home partly removed: the snapshot is the only copy of the lesson.
+		writeFixture(t, home+"/retained-lesson.txt")
+		legacyPending(t)
+		retainHome(t)
+		if err := os.Remove(home + "/retained-lesson.txt"); err != nil {
+			t.Fatal(err)
+		}
+		writeFixture(t, home+"/partially-copied")
+		recovered(t)
+		intact(t, publishedSnapshots+"/snapshot-1/retained-lesson.txt")
+		if _, err := os.Lstat(home + "/partially-copied"); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("partial restore survived recovery", err)
+		}
+	})
+	t.Run("interrupted-publication-is-not-repeated", func(t *testing.T) {
+		writeFixture(t, home+"/published-lesson.txt")
+		record, err := pendingJSON(config, phaseRestore)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(resetState+"/pending.json", record, 0600); err != nil {
+			t.Fatal(err)
+		}
+		retainHome(t)
+		if err := publishSnapshot(config, staffGID); err != nil {
+			t.Fatal(err)
+		}
+		// Interrupt a second rotation halfway: slot 3 is free, 1 and 2 remain.
+		if err := os.Rename(publishedSnapshots+"/snapshot-3", publishedSnapshots+"/snapshot-3-moved"); err != nil {
+			t.Fatal(err)
+		}
+		if err := command(config.Btrfs, "subvolume", "delete", publishedSnapshots+"/snapshot-3-moved"); err != nil {
+			t.Fatal(err)
+		}
+		before := snapshotCount(t)
+		recovered(t)
+		if after := snapshotCount(t); after != before {
+			t.Fatal("publication repeated after interruption", before, after)
+		}
+		intact(t, publishedSnapshots+"/snapshot-1/published-lesson.txt")
+		// The next rotation fills the free slot instead of deleting the oldest.
+		if err := Reset(config); err != nil {
+			t.Fatal(err)
+		}
+		if after := snapshotCount(t); after != before+1 {
+			t.Fatal("rotation discarded a snapshot while a slot was free", before, after)
+		}
+	})
+	t.Run("failed-recovery-blocks-retry", func(t *testing.T) {
 		writeFixture(t, home+"/last-lesson.txt")
 		failure := errors.New("injected copy failure")
-		err := runReset(config, func(source, destination string, uid, gid int) error {
+		failingRestore := func(source, destination string, uid, gid int) error {
 			writeFixture(t, destination+"/partially-copied")
 			return failure
-		})
-		if !errors.Is(err, failure) {
+		}
+		if err := runReset(config, failingRestore); !errors.Is(err, failure) {
 			t.Fatal("injected failure not reported", err)
 		}
 		intact(t, resetState+"/previous/last-lesson.txt")
-		if _, err := os.Stat(resetState + "/pending.json"); err != nil {
-			t.Fatal("failure evidence missing", err)
+		// The next boot makes one automatic attempt; it fails again.
+		if err := runReset(config, failingRestore); !errors.Is(err, failure) {
+			t.Fatal("automatic recovery not attempted", err)
 		}
-		if err := Reset(config); err == nil {
-			t.Fatal("failed reset was retried")
+		if _, err := os.Stat(resetState + "/recovery.json"); err != nil {
+			t.Fatal("recovery attempt not recorded", err)
+		}
+		if err := Reset(config); err == nil || !strings.Contains(err.Error(), "already failed") {
+			t.Fatal("failed recovery was retried", err)
 		}
 		intact(t, home+"/partially-copied")
 		intact(t, resetState+"/previous/last-lesson.txt")
@@ -297,8 +412,8 @@ func TestResetFailureSurvivesRebootVM(t *testing.T) {
 	if err := command(config.Systemctl, "stop", "systemd-user-sessions.service"); err != nil {
 		t.Fatal(err)
 	}
-	if err := Reset(config); err == nil {
-		t.Fatal("incomplete reset was retried after reboot")
+	if err := Reset(config); err == nil || !strings.Contains(err.Error(), "already failed") {
+		t.Fatal("failed recovery was retried after reboot", err)
 	}
 	intact(t, "/home/"+config.User+"/partially-copied")
 	intact(t, resetState+"/previous/last-lesson.txt")

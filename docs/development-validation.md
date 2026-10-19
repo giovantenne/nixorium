@@ -340,8 +340,11 @@ subvolumes on a disposable VM disk. It also exercises immutable-seed validation,
 account ownership, a held login barrier, active student-process rejection,
 whole-home preflight, private snapshot sanitization, five-snapshot rotation,
 restore ownership, editable preferences and dconf/wallpaper composition.
-Injected failures before deletion and during restoration retain durable
-evidence, prevent blind retries and preserve recovery data across a VM reboot.
+A failure before deletion discards its own work. Simulated interruptions
+before and after the read-only snapshot, and after publication, recover at
+the next attempt without losing the retained snapshot or repeating its
+publication; a recovery that fails again records `recovery.json` and blocks
+further attempts across a VM reboot.
 Negative lifecycle cases assert the rejection reason, not just any error.
 These are internal engine tests, not proof of systemd ordering, deployment
 activation. Mount/lifecycle tests are explicitly disabled

@@ -501,6 +501,33 @@ with a known address stays off:
 - check that it is on the same network segment as the controller: the packet
   is a broadcast and does not cross a router.
 
+## A student computer stops before the login screen
+
+The boot shows `Failed to start Restore the configured student workspace
+before login` and no login screen appears. The student home is restored at
+every boot; when that cannot finish, login stays closed so nobody works in a
+half-restored home. The computer still answers SSH from the controller.
+
+A computer that was switched off during the restore repairs itself at the next
+boot: before the snapshot of the old home exists, the restore starts again;
+after it, the restore completes and publishes that snapshot. Restart it once
+before investigating. Read the reason from the controller:
+
+```sh
+ssh root@<client-address> 'journalctl -b -u home-reset.service --no-pager | tail -5'
+ssh root@<client-address> 'ls -la /var/lib/home-snapshots/.workspace-reset'
+```
+
+- `managed account still has running processes (pid …, "…")`: a service ran as
+  the student during the restore. Nothing changed in the home and the next
+  boot tries again; report the named process if it repeats.
+- `automatic recovery of an interrupted reset already failed`, or any other
+  message with `administrator recovery is required`: the computer stays
+  closed. Keep every file in `.workspace-reset`, especially `previous`, which
+  can be the only copy of the student's files, and ask for support with the
+  journal output. Never delete the folder, rerun `nixorium-home-reset` or
+  disable the student profile to open the login.
+
 ## A client was deliberately reinstalled and its SSH key changed
 
 An address match does not prove identity. Save and commit the declared inventory.
