@@ -208,8 +208,8 @@ How it works, in short: Update Nixorium makes a copy of your saved deployment
 (without passwords or keys), runs the new release's program on the copy in a
 closed sandbox (no network, 2 minutes at most), and compares the copy with your
 files. It accepts only plain changes to your own files: never `flake.nix`,
-`flake.lock`, keys, credentials or hidden files, and never more than a few
-files. It does this only when the update changes the Nixorium release, not for
+`flake.lock`, keys, credentials or hidden files, and at most 256 files of
+1 MiB each. It does this only when the update changes the Nixorium release, not for
 an update of the system and packages alone. The review shows, for each change:
 
 - `Migration:` the files and, in one sentence, why they change. The change is
