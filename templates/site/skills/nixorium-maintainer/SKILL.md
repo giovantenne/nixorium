@@ -75,6 +75,23 @@ Do not use raw SSH, sudo, Colmena, Disko, nixos-rebuild, systemctl mutations,
 self-updaters or filesystem writes to bypass these limits. Never weaken checks,
 delete locks/pending markers or replay an uncertain operation.
 
+Identical client computers share one system, so `hostName` and `hostIp` are not
+available to a module in it. A private module that needs a computer's own name
+or address must have that computer listed under `hostModules.<pcNN>` or in
+`updateValidationHosts`; otherwise evaluation stops with a clear error. Report
+a missing entry to the operator as a handoff; do not add it.
+
+The review of Update Nixorium can list changes the new release makes to the
+deployment's own files ("Migration") and changes it could not make ("Manual
+change"). A "Manual change" means the administrator edited that place, so the
+release left the file alone; the review gives the file and, for a text
+replacement, the text to replace and the text to put instead. Explain that
+exact change to the operator; the native Assistant may help prepare it as a
+normal reviewed proposal. If the update is refused because the new release's
+migrations failed or changed something they did not declare, the current
+release stays; do not work around it, collect a support report for the
+operator. Never edit `nixorium-migrations.json`, which only the update writes.
+
 A broad request such as "fix everything", "apply it" or "continue autonomously"
 does not expand this role. Hand excluded actions to the operator; do not switch
 to a developer skill to perform them in the lab. Product defects belong in a

@@ -284,7 +284,7 @@ func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 					screen: dashboardController, busy: "Activating controller",
 					controller: controllerModel{
 						applying: true, started: time.Now(),
-						progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "activate", Current: 2, Total: 4},
+						progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "activate", Current: 2, Total: 4, Recent: []string{"Built the controller system", "Activating the controller system"}},
 					},
 				},
 				expected: []string{"Controller update is running", "Progress details", "Help"},

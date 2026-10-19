@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -18,32 +18,39 @@ import (
 
 const deploymentPendingName = "deployment-pending.json"
 
-func deploymentPhaseTimeout(phase domain.DeploymentPhase) time.Duration {
-	if phase == domain.DeploymentPhaseApply {
-		return 2 * time.Hour
+// deploymentPhaseTimeout bounds a phase. The apply bound grows with the
+// computers, so that copies and activations proceeding normally on a large
+// laboratory are never cut off at once and left unknown.
+func deploymentPhaseTimeout(phase domain.DeploymentPhase, targets int) time.Duration {
+	if phase != domain.DeploymentPhaseApply {
+		return 6 * time.Hour
 	}
-	return 6 * time.Hour
+	copies := time.Duration((targets+clientCopyParallelism-1)/clientCopyParallelism) * clientCopyTimeout
+	activations := time.Duration((targets+clientActivationParallelism-1)/clientActivationParallelism) * clientActivationTimeout
+	return max(2*time.Hour, copies+activations+10*time.Minute)
 }
 
 // A pending record is written and synced before dispatch, while the caller
 // holds the fleet gate. Even process death or controller reboot leaves the
-// affected operation blocked until an administrator reviews remote completion.
-func createDeploymentPending(directory *os.File, plan domain.DeploymentPlanReport) (*os.File, error) {
-	if !filepath.IsAbs(plan.Repository) || !validGitRevision(plan.Revision) || len(plan.Targets) == 0 || plan.ColmenaSelector == "" {
+// affected computers blocked until their outcome is known or reviewed.
+// The engine then rewrites it atomically as each computer progresses.
+type pendingRecord struct {
+	mutex     sync.Mutex
+	directory *os.File
+	file      *os.File
+	record    domain.PendingDeployment
+}
+
+func createDeploymentPending(directory *os.File, plan domain.DeploymentPlanReport, activations []domain.PendingActivation) (*pendingRecord, error) {
+	if !filepath.IsAbs(plan.Repository) || !validGitRevision(plan.Revision) || len(plan.Targets) == 0 {
 		return nil, errors.New("deployment pending identity is invalid")
 	}
 	// The start time binds the record to this process; without it the record
 	// is still written, and the review falls back to the PID alone.
 	start, _ := processStartTime(os.Getpid())
-	content, err := json.Marshal(struct {
-		SchemaVersion      int                       `json:"schemaVersion"`
-		Repository         string                    `json:"repository"`
-		Revision           string                    `json:"revision"`
-		Targets            []domain.DeploymentTarget `json:"targets"`
-		StartedAt          time.Time                 `json:"startedAt"`
-		ControllerPID      int                       `json:"controllerPid"`
-		ControllerPIDStart string                    `json:"controllerPidStart,omitempty"`
-	}{1, plan.Repository, plan.Revision, plan.Targets, time.Now().UTC(), os.Getpid(), start})
+	record := domain.PendingDeployment{SchemaVersion: 1, Repository: plan.Repository, Revision: plan.Revision, Targets: plan.Targets,
+		StartedAt: time.Now().UTC(), ControllerPID: os.Getpid(), ControllerPIDStart: start, Activations: activations}
+	content, err := json.Marshal(record)
 	if err != nil {
 		return nil, err
 	}
@@ -62,27 +69,111 @@ func createDeploymentPending(directory *os.File, plan domain.DeploymentPlanRepor
 		file.Close()
 		return nil, err
 	}
-	return file, nil
+	return &pendingRecord{directory: directory, file: file, record: record}, nil
 }
 
-func clearDeploymentPending(directory, pending *os.File) error {
-	// Never unlink a replacement supplied after dispatch.
-	path := filepath.Join(directory.Name(), deploymentPendingName)
-	original, err := pending.Stat()
+func (pending *pendingRecord) activation(name string) domain.PendingActivation {
+	pending.mutex.Lock()
+	defer pending.mutex.Unlock()
+	return pending.record.ActivationOf(name)
+}
+
+// update changes one computer's progress and replaces the record atomically.
+// It refuses when the record on disk is no longer the one this process wrote.
+func (pending *pendingRecord) update(name string, change func(*domain.PendingActivation)) error {
+	return pending.rewrite(func(record *domain.PendingDeployment) error {
+		for index := range record.Activations {
+			if record.Activations[index].Name == name {
+				change(&record.Activations[index])
+				return nil
+			}
+		}
+		return fmt.Errorf("%s is not part of the pending record", name)
+	})
+}
+
+func (pending *pendingRecord) rewrite(change func(*domain.PendingDeployment) error) error {
+	pending.mutex.Lock()
+	defer pending.mutex.Unlock()
+	if err := pending.unchanged(); err != nil {
+		return err
+	}
+	next := pending.record
+	next.Activations = append([]domain.PendingActivation(nil), pending.record.Activations...)
+	if err := change(&next); err != nil {
+		return err
+	}
+	content, err := json.Marshal(next)
 	if err != nil {
 		return err
 	}
-	current, err := os.Lstat(path)
+	const temporaryName = deploymentPendingName + ".next"
+	_ = syscall.Unlinkat(int(pending.directory.Fd()), temporaryName)
+	fd, err := syscall.Openat(int(pending.directory.Fd()), temporaryName, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_EXCL|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
+	if err != nil {
+		return err
+	}
+	file := os.NewFile(uintptr(fd), deploymentPendingName)
+	if _, err = file.Write(append(content, '\n')); err == nil {
+		err = file.Sync()
+	}
+	if err == nil {
+		err = syscall.Renameat(int(pending.directory.Fd()), temporaryName, int(pending.directory.Fd()), deploymentPendingName)
+	}
+	if err == nil {
+		err = pending.directory.Sync()
+	}
+	if err != nil {
+		file.Close()
+		_ = syscall.Unlinkat(int(pending.directory.Fd()), temporaryName)
+		return err
+	}
+	pending.file.Close()
+	pending.file, pending.record = file, next
+	return nil
+}
+
+func (pending *pendingRecord) unchanged() error {
+	original, err := pending.file.Stat()
+	if err != nil {
+		return err
+	}
+	current, err := os.Lstat(filepath.Join(pending.directory.Name(), deploymentPendingName))
 	if err != nil {
 		return err
 	}
 	if !os.SameFile(original, current) {
 		return errors.New("deployment pending record changed during execution")
 	}
-	if err := syscall.Unlinkat(int(directory.Fd()), deploymentPendingName); err != nil {
+	return nil
+}
+
+// clear removes the record once every computer's outcome is known. It never
+// unlinks a replacement supplied by someone else.
+func (pending *pendingRecord) clear() error {
+	pending.mutex.Lock()
+	defer pending.mutex.Unlock()
+	if err := pending.unchanged(); err != nil {
 		return err
 	}
-	return directory.Sync()
+	if err := syscall.Unlinkat(int(pending.directory.Fd()), deploymentPendingName); err != nil {
+		return err
+	}
+	pending.file.Close()
+	return pending.directory.Sync()
+}
+
+// close keeps the record on disk for a later review, noting that this
+// process no longer acts on any computer.
+func (pending *pendingRecord) close() error {
+	err := pending.rewrite(func(record *domain.PendingDeployment) error {
+		record.ApplyReturned = true
+		return nil
+	})
+	pending.mutex.Lock()
+	defer pending.mutex.Unlock()
+	pending.file.Close()
+	return err
 }
 
 // ownDeploymentApplies counts the client applies of this process that hold
@@ -112,41 +203,19 @@ func checkDeploymentPendingPath(directory string) error {
 }
 
 func runDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, phase domain.DeploymentPhase, output io.Writer, coordinationDirectory string, managed bool, timeout time.Duration) error {
-	arguments, err := deploymentCommand(phase, plan.ColmenaSelector)
-	if err != nil {
-		return err
-	}
 	phaseContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	if _, err := os.Lstat(filepath.Join(plan.Repository, credentialsFile)); err == nil {
-		source, err := (Local{}).EvaluationSource(phaseContext, plan.Repository, plan.Revision)
-		if err != nil {
-			return err
+	switch phase {
+	case domain.DeploymentPhaseBuild:
+		if err := buildClientSystems(phaseContext, plan, output); err != nil {
+			if phaseContext.Err() != nil {
+				return fmt.Errorf("build: %w", phaseContext.Err())
+			}
+			return fmt.Errorf("build: %w", err)
 		}
-		arguments = append(arguments, "--config", source)
-	}
-	command := exec.CommandContext(phaseContext, "colmena", arguments...)
-	// Bound both process lifetime and inherited output pipes. Killing only
-	// Colmena can otherwise leave local ssh children holding the log pipe open.
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	command.Cancel = func() error {
-		err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
-		if errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return err
-	}
-	command.WaitDelay = 2 * time.Second
-	command.Dir = plan.Repository
-	command.Stdout, command.Stderr = output, output
-	var directory, pending *os.File
-	if phase == domain.DeploymentPhaseApply {
-		cleanup, err := configureColmenaSSH(command, colmenaRedirects(plan))
-		if err != nil {
-			return fmt.Errorf("prepare Colmena SSH policy: %w", err)
-		}
-		defer cleanup()
-		directory, err = openCoordinationDirectory(coordinationDirectory, managed)
+		return nil
+	case domain.DeploymentPhaseApply:
+		directory, err := openCoordinationDirectory(coordinationDirectory, managed)
 		if err != nil {
 			return err
 		}
@@ -155,43 +224,8 @@ func runDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, p
 		// so a recovery review in this process never sees it unowned.
 		ownDeploymentApplies.Add(1)
 		defer ownDeploymentApplies.Add(-1)
-		unlockClassroom, err := lockClassroomForPending(directory, managed, deploymentPendingLockWait)
-		if err != nil {
-			return fmt.Errorf("prepare the client update; nothing was started: %w", err)
-		}
-		pending, err = createDeploymentPending(directory, plan)
-		unlockClassroom()
-		if err != nil {
-			return &domain.DeploymentUnconfirmedError{Err: fmt.Errorf("persist deployment intent; no new apply started: %w", err)}
-		}
-		defer pending.Close()
+		return applyClientSystems(phaseContext, plan, output, directory, managed)
+	default:
+		return fmt.Errorf("unsupported deployment phase %q", phase)
 	}
-	if err := command.Start(); err != nil {
-		if pending != nil {
-			if clearErr := clearDeploymentPending(directory, pending); clearErr != nil {
-				return &domain.DeploymentUnconfirmedError{Err: fmt.Errorf("apply never started, but clearing its intent failed: %w", clearErr)}
-			}
-		}
-		return fmt.Errorf("start colmena %s: %w", phase, err)
-	}
-	err = command.Wait()
-	if err != nil {
-		_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
-	}
-	if phaseContext.Err() != nil {
-		err = phaseContext.Err()
-	}
-	if err != nil {
-		result := fmt.Errorf("colmena %s: %w", phase, err)
-		if pending != nil {
-			return &domain.DeploymentUnconfirmedError{Err: result}
-		}
-		return result
-	}
-	if pending != nil {
-		if err := clearDeploymentPending(directory, pending); err != nil {
-			return &domain.DeploymentUnconfirmedError{Err: fmt.Errorf("apply returned, but clearing its pending record failed: %w", err)}
-		}
-	}
-	return nil
 }

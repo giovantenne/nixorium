@@ -357,7 +357,7 @@ partition_disk() {
 }
 
 resolve_system() {
-  local PATH_INFO REPORTED_PATH CACHE_URL
+  local PATH_INFO REPORTED_PATH CACHE_URL CLASS SYSTEM_NAME
   SELECTED_SYSTEM_PATH=$(
     nix --extra-experimental-features "nix-command flakes" \
       eval "${REPO_ROOT}#nixosConfigurations.${SELECTED_HOST}.config.system.build.toplevel.outPath" \
@@ -365,7 +365,14 @@ resolve_system() {
       --offline \
       --no-write-lock-file
   )
-  if ! [[ "$SELECTED_SYSTEM_PATH" =~ ^/nix/store/[0-9a-z]{32}-nixos-system-${SELECTED_HOST}-[^/[:space:]]+$ ]]; then
+  CLASS=$(jq -r --arg name "$SELECTED_HOST" '
+    [.[] | select(.name == $name)] | if length == 1 then (.[0].class // "") else error("unknown host") end
+  ' <<< "$LAB_CLIENT_HOSTS_JSON") || {
+    echo "Error: installer metadata does not describe ${SELECTED_HOST}." >&2
+    return 1
+  }
+  SYSTEM_NAME=$(nixorium_expected_system_name "$SELECTED_HOST" "$CLASS") || return 1
+  if ! [[ "$SELECTED_SYSTEM_PATH" =~ ^/nix/store/[0-9a-z]{32}-nixos-system-${SYSTEM_NAME}-[^/[:space:]]+$ ]]; then
     echo "Error: evaluation returned an invalid system path for ${SELECTED_HOST}." >&2
     return 1
   fi
@@ -411,7 +418,8 @@ install_system() {
 }
 
 verify_installation() {
-  nixorium_verify_installed_profile "$SELECTED_SYSTEM_PATH" "$SELECTED_DISK"
+  nixorium_verify_installed_profile "$SELECTED_SYSTEM_PATH" "$SELECTED_DISK" &&
+    nixorium_write_identity_record "$SELECTED_HOST"
 }
 
 reboot_system() {

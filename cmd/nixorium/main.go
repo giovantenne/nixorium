@@ -99,6 +99,10 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 }
 
 func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Writer) int {
+	// Works on a directory, never on the configured deployment (ADR 0034).
+	if len(arguments) >= 2 && arguments[0] == "deployment" && arguments[1] == "migrate" {
+		return runDeploymentMigrate(arguments[2:], stdout, stderr)
+	}
 	options, err := parseArguments(arguments)
 	if err != nil {
 		fmt.Fprintln(stderr, "Error:", err)
@@ -335,7 +339,11 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	assistantReporter := app.AssistantConversationReporter{Client: assistantClient, Store: assistantWorkspace, Version: nixoriumVersion}
 	assistantLabStatus := app.AssistantLabStatus{Inspector: inspector, DeferredUpdates: newDeferredUpdateManager()}
 	assistantDiagnostics := app.AssistantDiagnostics{Source: local}
-	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace, LabStatus: assistantLabStatus.Execute, Diagnostics: assistantDiagnostics.Execute}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}
+	assistantSystemFiles := app.AssistantSystemFiles{Source: local, Errors: map[error]string{
+		adapters.ErrSystemFileRefused: "refused_path", adapters.ErrSystemFileMissing: "not_found",
+		adapters.ErrSystemFileUnreadable: "not_readable", adapters.ErrSystemFileOldComputer: "computer_needs_update",
+	}}
+	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace, LabStatus: assistantLabStatus.Execute, Diagnostics: assistantDiagnostics.Execute, SystemFiles: assistantSystemFiles.Execute}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}
 	actions := presentation.DashboardActions{
 		OpenURL:   desktopOpener(),
 		Assistant: assistantConfig,
@@ -1617,7 +1625,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|wake|schedule show|schedule set|schedule clear|schedule run|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|git undo plan|git undo apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|network migrate plan|network migrate start|network migrate status|network migrate finish|network migrate undo|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|wake|schedule show|schedule set|schedule clear|schedule run|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deployment migrate|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|git undo plan|git undo apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|network migrate plan|network migrate start|network migrate status|network migrate finish|network migrate undo|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       home-files import plan --source <local-file-or-folder> --destination <relative-home-path> [--replace] [--json] captures materials for review")
 	fmt.Fprintln(writer, "       home-files plan --file <draft-or-profile.json> [--json] reviews shared student initial files")
@@ -1668,6 +1676,7 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       backup restore <file> --to <empty-directory> [--passphrase-file <file>]")
 	fmt.Fprintln(writer, "       deploy recover plan [--acknowledge-unreachable]  reviews an interrupted client update; the flag continues without the computers that do not answer")
 	fmt.Fprintln(writer, "       deploy recover apply --expect <review-token> [--acknowledge-unreachable] [--yes]  marks it as reviewed after a yes/no question")
+	fmt.Fprintln(writer, "       deployment migrate --root <deployment> [--contract N] [--json]  applies this release's changes to deployment files in that directory; review them with git diff")
 	fmt.Fprintln(writer, "       template-reset recover plan")
 	fmt.Fprintln(writer, "       template-reset recover apply --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       cleanup plan --on <controller,pcNN,...|@lab>")

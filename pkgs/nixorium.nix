@@ -44,6 +44,11 @@ in
   '';
 
   postFixup = ''
+    # The release that runs Update Nixorium looks for this file before it runs
+    # `nixorium deployment migrate` of the release it installs (ADR 0034):
+    # the migration contract versions this release speaks, one per line.
+    mkdir -p "$out/share/nixorium"
+    echo 1 > "$out/share/nixorium/deployment-migrate-contract"
     wrapProgram "$out/bin/nixorium" \
       --set NIXORIUM_NPM_BWRAP ${bubblewrap}/bin/bwrap \
       --set NIXORIUM_NPM_RESOLVER "$out/bin/nixorium-npm-resolver" \

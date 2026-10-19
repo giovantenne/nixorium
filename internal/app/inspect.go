@@ -427,7 +427,7 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 		add(domain.Finding{ID: "DISK-FREE", Level: domain.LevelWarning, Summary: "Available disk space could not be determined", Evidence: freeErr.Error()})
 	}
 
-	for _, command := range []string{"nix", "git", "systemctl", "ssh", "colmena"} {
+	for _, command := range []string{"nix", "git", "systemctl", "ssh", "nix-copy-closure"} {
 		if i.source.CommandAvailable(command) {
 			add(domain.Finding{ID: "COMMAND-" + strings.ToUpper(command), Level: domain.LevelOK, Summary: command + " is available"})
 		} else {

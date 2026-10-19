@@ -83,13 +83,14 @@ and JSON issues carry a `next` object with the same code and texts; the JSON
 | `DISK-LOW` | The controller is low on disk space | Free disk space (Maintenance → Free disk space) |
 | `CONTROLLER-NOT-APPLIED` | The controller is not running its saved configuration | Apply the saved configuration to the controller ([Controller apply failed](#controller-apply-failed)) |
 | `UPDATES-QUEUED` | Some computers will update when they are switched on | Nothing to do (Computers → Queued updates shows them; review again those marked as changed) |
+| `UPDATES-NEED-REVIEW` | A queued update needs a new review | Review the queued updates (Computers → Queued updates; `nixorium deploy queue status`): the configuration changed after queueing, or the update kept failing |
 | `BACKUP-DUE` | A backup of this laboratory is due | Back up the lab ([Backups and restoration](#backups-and-restoration)) |
 | `EVAL-FAILED` | The configuration has an error | Open Diagnostics and fix the first reported error (`nixorium doctor`; do not retry other operations) |
 | `PIN-OUTDATED` | The saved Nixorium version is recorded inconsistently | Repeat the update for the configured Nixorium version ([Updating the computers fails with a read-only flake.lock](#updating-the-computers-fails-with-a-read-only-flakelock)) |
 
 ## The controller DHCP lease changed
 
-Normal administration and Colmena deployment use the static laboratory address.
+Normal administration and computer updates use the static laboratory address.
 PXE preparation separately binds one live non-static controller address to the
 session so a routine DHCP lease change does not require a configuration commit.
 
@@ -150,9 +151,9 @@ output with the same sentence and keep their JSON report unchanged.
 
 `DISK-FREE` warns below 10 GiB available or when the filesystem probe failed;
 it is not an estimate of the space required by the next build. `COMMAND-NIX`,
-`COMMAND-GIT`, `COMMAND-SYSTEMCTL`, `COMMAND-SSH` and `COMMAND-COLMENA` report
+`COMMAND-GIT`, `COMMAND-SYSTEMCTL`, `COMMAND-SSH` and `COMMAND-NIX-COPY-CLOSURE` report
 missing executables in the command's environment. Neither condition starts
-a repair. Inspect `df -h /nix` and `command -v nix git systemctl ssh colmena`.
+a repair. Inspect `df -h /nix` and `command -v nix git systemctl ssh nix-copy-closure`.
 
 Run the packaged command from the deployment's supported controller environment.
 A missing tool may require a separately reviewed controller rebuild. For low
@@ -561,9 +562,69 @@ system or certify its installed revision: refresh Computers before a fresh
 deployment plan. Unexpected key changes require investigation, not rotation.
 Never delete the whole trust file or disable host-key verification.
 
+## This computer has no Nixorium identity
+
+Computers of the same kind share one system, and each one keeps its name and
+laboratory address from a small identity record,
+`/var/lib/nixorium/identity.json`, which holds only its number. If that record
+is missing or not valid, the computer starts without its laboratory address,
+and `systemctl status nixorium-identity.service` shows a failed unit with the
+message "This computer has no Nixorium identity". In the inventory the computer
+is offline or unknown, and it cannot be reached from the controller.
+
+Typical causes are a disk restored or copied from another computer, or a
+record removed or edited by hand. Without its laboratory address the
+controller cannot update the computer, so the fix starts at the computer:
+
+1. If the computer was moved to the shared system by an update, restart it
+   and choose the previous generation in the boot menu. That system knows the
+   computer's number: it writes the record and starts with the laboratory
+   address. Then update the computer from the controller (Computers → Update
+   computers).
+2. Otherwise, as administrator at the computer, write its number in the
+   record and restart. For computer number 3 the file
+   `/var/lib/nixorium/identity.json` must contain exactly this line:
+
+   ```text
+   {"schemaVersion":1,"number":3}
+   ```
+
+3. If neither is possible, reinstall the computer from the controller
+   (network installation or USB). The installer writes the record before the
+   first start. A reinstall erases the disk.
+
+Do not copy the record from another computer. Two computers with the same
+number refuse each other's address and neither works reliably.
+
+## The update says "identity record names another computer"
+
+Before it switches a computer to a shared system, the update checks the
+identity record on that computer. If the record names a different computer
+number than the one the controller is updating, the update leaves the
+computer unchanged and reports "identity record names another computer". It
+never overwrites the record, because that could hide a swapped disk or two
+computers whose places were exchanged.
+
+1. Decide which computer is which: the label on the case, the inventory entry
+   (Computers) and the address the controller used.
+2. On the computer that holds the wrong record, correct it by hand as
+   administrator. For computer number 3, for example, the file must contain
+   exactly this line:
+
+   ```text
+   {"schemaVersion":1,"number":3}
+   ```
+
+   Save it as `/var/lib/nixorium/identity.json`.
+3. Run `nixorium hosts` to refresh the state, then update the computer again.
+
+If you are not sure which computer is which, leave the computer as it is and
+check the inventory first: a wrong correction gives the computer another
+computer's name and address.
+
 ## A deployment failed
 
-A Colmena failure can leave selected machines at different generations.
+A failed update can leave selected machines at different generations.
 Nixorium does not claim an automatic rollback across hosts. Unexpected terminal
 loss can interrupt the foreground deployment and uses this same recovery path.
 
@@ -583,21 +644,21 @@ update successful history. Historical success never overrides the live result.
 
 The distribution percentage counts phases, not bytes or updated computers.
 During build/apply, `l` shows a bounded, terminal-safe tail of the private
-Colmena log and the time since its last output. Silence alone is not failure.
+update log and the time since its last output. Silence alone is not failure.
 SSH connects with a 10-second limit and one attempt; unanswered server-alive
 checks use a 10-second interval and a count of three. Phase supervision has
 generous upper bounds of six hours for build and two hours for apply. These
 are safety ceilings, not progress estimates or proof that a remote job stopped.
 
 If waiting is no longer useful, `s` opens a separate **Stop waiting** review.
-Enter on that review confirms termination of local Colmena/SSH processes; Esc keeps waiting.
+Enter on that review confirms termination of the local Nixorium update and SSH processes; Esc keeps waiting.
 Nixorium then attempts bounded authenticated client observations. This is not
 a remote cancellation or rollback; activation may still be running.
 
 Before dispatching apply, Nixorium durably creates the administrator-owned
 mode-0600 `/var/lib/nixorium/coordination/deployment-pending.json`, containing
 the repository, reviewed revision, selected names/addresses and start time.
-A normal successful Colmena return clears it. A failed/disconnected/timed-out
+A normal successful finish of the update clears it. A failed/disconnected/timed-out
 apply, terminal loss or process death retains it, even across controller reboot.
 New managed deployments, installation starts, network installation and other
 maintenance operations are refused. Classroom controls (Internet access, shut
@@ -663,15 +724,15 @@ Only when the guided review cannot run, recover by hand:
 
 1. Keep the private operation log and the pending record; do not delete or
    overwrite them, and review them before sharing.
-2. Confirm that the Nixorium process that started the update and its Colmena
-   and SSH children have exited (a stored PID is only a hint).
+2. Confirm that the Nixorium process that started the update and its SSH
+   child processes have exited (a stored PID is only a hint).
 3. Inspect every recorded computer, over SSH or at its console, for running
    activation and pending systemd jobs; resolve them first. A matching
    revision or a lost connection is not proof that activation finished.
 4. With no operation running, hold `operation.lock` exclusively and move the
    exact record to a new private file under `recovered/`; never delete or
-   recreate the lock files, and never bypass them with old binaries or raw
-   Colmena.
+   recreate the lock files, and never bypass them with old binaries or by
+   running a manual activation.
 5. Check the computers again and authorize a fresh reviewed update.
 
 ### Last resort: activate the controller with NixOS
@@ -850,6 +911,70 @@ controller. The same command repairs a `nixpkgs` reference that disagrees with
 If the controller still runs 3.8.0, update Nixorium first: that update leaves
 the same inconsistency once more, and the newer release then repairs it as
 above.
+
+## The update review shows "Manual change"
+
+The review of **Update Nixorium** lists the changes the new release makes to
+your own files. "Manual change" means the release could not make one of them
+because the file is not as the release expects: you edited that place, or the
+file is missing. No file is touched for that change.
+
+1. Read the line under "Manual change" in the review. For a text replacement it
+   names the file and says what to do: `Replace "…" with "…".`
+2. Open the file named in the review and make that change yourself: replace
+   the first text with the second, keeping any other edit you made on purpose.
+   If the file already says what the second text says, nothing needs to change.
+3. Save it as a normal reviewed change (**Maintenance → Review Git changes**),
+   then run **Update Nixorium** again. Assistant can prepare this change as a
+   proposal for you to review.
+
+Do not edit `nixorium-migrations.json` to make the message go away: it records
+changes the update made and only the update writes it.
+
+If `nixorium-migrations.json` itself is not valid, the update stops with a
+message that names the file. Go back to an earlier saved version of the file in
+Git. A valid file has this form:
+
+```text
+{"schemaVersion":1,"applied":["2026-10-workstation-is-controller"]}
+```
+
+If there is no earlier version, remove the file in a reviewed change: the update
+then checks each change again, and records those your files already contain.
+
+## The update is refused because of the new release's changes to your files
+
+The new release brings its own program that changes your deployment's files. It
+runs on a copy, without network, and **Update Nixorium** accepts only the
+changes it can show you in the review. The update is refused, and nothing is
+saved, when:
+
+- the new release's migrations fail, do not finish in 2 minutes, or say they
+  cannot migrate this deployment (the message gives the reason, for example
+  that `nixorium-migrations.json` is not valid);
+- they change something they did not declare, or a file they must not touch
+  (`flake.nix`, `flake.lock`, keys, credentials, hidden files), or too much;
+- the sandbox that runs them cannot start on the controller (the message says
+  so).
+
+The current release keeps working. Do not try to work around it:
+
+1. Fix what the message names, if it is on your side (for example restore
+   `nixorium-migrations.json` from Git), and update again.
+2. Otherwise stay on the current release and collect a support report
+   (`nixorium support export`) to send with the message. This is a problem of
+   the new release, not of your laboratory.
+
+If the message says **update to an intermediate release first**, the new
+release migrates files in a newer way than the release you run knows. Update
+to the release that the message or the release notes name as intermediate, then
+update again.
+
+If you run a release from before deployment migrations existed, the update
+cannot run them. In the deployment folder run
+`nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment migrate --root .`,
+review the result with `git diff` (or **Maintenance → Review Git changes**),
+save it, and then run **Update Nixorium**.
 
 ## An upstream update failed
 

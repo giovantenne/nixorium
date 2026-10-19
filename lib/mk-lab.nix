@@ -170,6 +170,15 @@ let
     inherit networkBase;
     inherit networkPrefixLength;
     inherit clientIps;
+    # Every client's number, name and addresses: a shared system selects its
+    # row with the number in the computer's identity record.
+    clientIdentities = map (n: {
+      number = n;
+      name = "pc${padNumber n}";
+      address = mkHostIp n;
+    } // lib.optionalAttrs (networkTransition != null) {
+      previousAddress = mkPreviousHostIp n;
+    }) clientNumbers;
     inherit networkTransition;
     inherit pcCount;
     inherit ifaceName;
@@ -222,6 +231,7 @@ let
     (upstreamRoot + "/modules/common.nix")
     (upstreamRoot + "/modules/users.nix")
     (upstreamRoot + "/modules/networking.nix")
+    (upstreamRoot + "/modules/identity.nix")
     (upstreamRoot + "/modules/cache.nix")
     (upstreamRoot + "/modules/filesystems.nix")
     (upstreamRoot + "/modules/home-reset.nix")
@@ -259,7 +269,20 @@ let
     # The role is explicit so modules never infer it from the host name.
     nixoriumRole = if name == masterHostName then "controller" else "client";
     isController = name == masterHostName;
+    nixoriumClass = if name == masterHostName then controllerClass else nixoriumClassFor clientClassOf.${name};
   };
+
+  # A shared system knows the computers of its class, not which one it runs
+  # on: modules that need a computer's own name or address fail clearly.
+  specialArgsForClass = class:
+    let
+      members = builtins.concatStringsSep ", " class.members;
+      unknown = what: throw "${what} is not known in the configuration shared by ${members}. A module that only tests whether it runs on the controller should use isController (in modules/workstation.nix of deployments created before 3.9.0, replace the hostName comparison with: isController = args.isController or false;); a module that needs the computer's own name or address needs its own configuration with hostModules or updateValidationHosts";
+    in
+    specialArgsForHost class.representative null // {
+      hostName = unknown "hostName";
+      hostIp = unknown "hostIp";
+    };
 
   labMeta = {
     schemaVersion = 2;
@@ -279,7 +302,9 @@ let
         ip = mkHostIp n;
         ifaceName = ifaceForHost "pc${padNumber n}";
         ifaceExplicit = ifaceExplicitForHost "pc${padNumber n}";
+        class = classIdFor clientClassOf."pc${padNumber n}";
       }) clientNumbers;
+      classes = map (class: { inherit (nixoriumClassFor class) id shared members; }) clientClasses;
       groups = clientGroups;
     };
     network = {
@@ -407,6 +432,31 @@ let
         (members: builtins.filter (name: !(builtins.elem name singleClassHosts)) members)
         (builtins.attrValues updateClientVariants)))
   );
+  # Classes of client computers (ADR 0033). The members of a class with
+  # several computers share one system: each takes its name and laboratory
+  # address from its identity record. A class with one member keeps the
+  # per-host system of earlier releases. Ids are the computer's name for a
+  # class of one and `shared-<n>` otherwise, numbered by first member, so a
+  # software change does not rename every class.
+  clientClasses = builtins.filter (class: class.representative != masterHostName) hostClasses;
+  sharedClientClasses = builtins.filter (class: builtins.length class.members > 1) clientClasses;
+  classIdFor = class:
+    if builtins.length class.members == 1 then class.representative
+    else "shared-${toString (1 + lib.lists.findFirstIndex
+      (other: other.representative == class.representative) null sharedClientClasses)}";
+  nixoriumClassFor = class: {
+    id = classIdFor class;
+    shared = builtins.length class.members > 1;
+    inherit (class) members representative;
+  };
+  clientClassOf = builtins.listToAttrs (lib.concatMap
+    (class: map (member: { name = member; value = class; }) class.members) clientClasses);
+  controllerClass = {
+    id = masterHostName;
+    shared = false;
+    members = [ masterHostName ];
+    representative = masterHostName;
+  };
   defaultPasswordHash = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
   credentialIssues =
     lib.optional (teacherPassword == defaultPasswordHash) "teacherPassword still uses the public default"
@@ -499,13 +549,14 @@ let
     || (scope.kind == "all-clients" && builtins.elem name validClientNames)
     || (scope.kind == "group" && builtins.elem name clientGroups.${scope.group})
     || (scope.kind == "clients" && builtins.elem name scope.clients);
-  managedSoftwareModule = { pkgs, hostName, ... }: {
+  # Members of a class share their managed software by construction.
+  managedSoftwareModule = { pkgs, nixoriumClass, ... }: {
     environment.systemPackages = map
       (entry:
         let package = lib.attrByPath (lib.splitString "." entry.package) null pkgs;
         in if package != null && lib.isDerivation package then package
         else throw "lab-software.json: package ${entry.package} is unavailable in the pinned package set")
-      (hostSoftwareEntries hostName);
+      (hostSoftwareEntries nixoriumClass.representative);
   };
   # Resolve against actual declarative system packages, including GNOME core
   # packages and downstream modules, not just managed software declarations.
@@ -626,7 +677,7 @@ let
   nixoriumPackage = bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {};
   hostState = bootstrapPkgs.writeShellApplication {
     name = "nixorium-host-state";
-    runtimeInputs = [ bootstrapPkgs.coreutils ];
+    runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.gnused ];
     text = ''
       system_path="$(readlink -f /run/current-system)"
       [[ "$system_path" == /nix/store/* && "$system_path" != *[[:space:]]* ]] \
@@ -635,7 +686,14 @@ let
         || { echo "active deployment revision is unavailable" >&2; exit 1; }
       [[ "$revision" =~ ^[0-9a-f]{40,64}$ ]] \
         || { echo "active deployment revision is invalid" >&2; exit 1; }
-      printf '%s\n%s\n' "$system_path" "$revision"
+      # A third line names the computer number of a valid identity record,
+      # which a shared system needs to know which computer it is (ADR 0033).
+      number="$(sed -n 's/^{"schemaVersion":1,"number":\([1-9][0-9]\{0,3\}\)}$/\1/p' /var/lib/nixorium/identity.json 2>/dev/null || true)"
+      if [[ -n "$number" ]]; then
+        printf '%s\n%s\n%s\n' "$system_path" "$revision" "$number"
+      else
+        printf '%s\n%s\n' "$system_path" "$revision"
+      fi
     '';
   };
   # Clients need only this helper in their system profile. The controller also
@@ -742,18 +800,32 @@ let
 
   effectiveInstallerSource = if installerSource == null then installerBundle else installerSource;
 
+  sharedClassSystems = builtins.listToAttrs (map (class: {
+    name = classIdFor class;
+    value = nixpkgs.lib.nixosSystem {
+      inherit system;
+      specialArgs = specialArgsForClass class;
+      modules = modulesForHost class.representative false;
+    };
+  }) sharedClientClasses);
+
+  # Every member of a shared class is an alias of the same value, so it is
+  # evaluated and built once.
   mkHost = n:
     let
       name = "pc${padNumber n}";
       hostIp = mkHostIp n;
+      class = clientClassOf.${name};
     in
     {
       inherit name;
-      value = nixpkgs.lib.nixosSystem {
-        inherit system;
-        specialArgs = specialArgsForHost name hostIp;
-        modules = modulesForHost name false;
-      };
+      value =
+        if builtins.length class.members > 1 then sharedClassSystems.${classIdFor class}
+        else nixpkgs.lib.nixosSystem {
+          inherit system;
+          specialArgs = specialArgsForHost name hostIp;
+          modules = modulesForHost name false;
+        };
     };
 
   hostConfigurations = builtins.listToAttrs (map mkHost pcNumbers) // {
@@ -763,22 +835,6 @@ let
       modules = modulesForHost masterHostName true;
     };
   };
-
-  mkColmenaHost = n:
-    let
-      name = "pc${padNumber n}";
-      hostIp = mkHostIp n;
-    in
-    {
-      inherit name;
-      value = {
-        imports = modulesForHost name false;
-        deployment = {
-          targetHost = hostIp;
-          tags = [ "lab" ];
-        };
-      };
-    };
 
   runDisko = bootstrapPkgs.writeShellApplication {
     name = "nixorium-disko";
@@ -1021,32 +1077,6 @@ builtins.mapAttrs (name: value:
       requiresKeys = laboratoryEnabled;
     };
   };
-
-  colmena = {
-    meta = {
-      nixpkgs = import nixpkgs {
-        inherit system;
-      };
-      # Colmena gives specialArgs precedence over _module.args. Only per-node
-      # arguments keep the resolved interface and host identity authoritative.
-      nodeSpecialArgs = { ${masterHostName} = specialArgsForHost masterHostName masterIp; }
-        // builtins.listToAttrs (map (n: {
-          name = "pc${padNumber n}";
-          value = specialArgsForHost "pc${padNumber n}" (mkHostIp n);
-        }) clientNumbers);
-    };
-    defaults.deployment = {
-      targetUser = "root";
-      buildOnTarget = false;
-    };
-    ${masterHostName} = {
-      imports = modulesForHost masterHostName true;
-      deployment = {
-        targetHost = "localhost";
-        tags = [ "master" ];
-      };
-    };
-  } // builtins.listToAttrs (map mkColmenaHost clientNumbers);
 
   apps.${system} = {
     nixorium = {

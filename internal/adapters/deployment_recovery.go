@@ -3,6 +3,7 @@ package adapters
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -20,7 +21,7 @@ import (
 
 // deploymentActivityCommand is a fixed read-only probe: the running system
 // and revision, queued systemd jobs, and any running activation.
-const deploymentActivityCommand = "nixorium-host-state 2>/dev/null; echo '--- jobs'; systemctl list-jobs --no-legend --no-pager 2>/dev/null; echo '--- activation'; pgrep -c -f '[s]witch-to-configuration' 2>/dev/null; true"
+const deploymentActivityCommand = "nixorium-host-state 2>/dev/null; echo '--- jobs'; systemctl list-jobs --no-legend --no-pager 2>/dev/null; echo '--- activation'; pgrep -c -f '[s]witch-to-configuration' 2>/dev/null; echo '--- result'; cat /var/lib/nixorium/activation/last.json 2>/dev/null; true"
 
 // ProcessRunning reports whether the process that wrote the pending record
 // still runs. With a recorded start time the PID must still have that start
@@ -28,6 +29,21 @@ const deploymentActivityCommand = "nixorium-host-state 2>/dev/null; echo '--- jo
 // Without one (older records) the PID must belong to a Nixorium process.
 func (Local) ProcessRunning(pid int, start string) bool {
 	return processRunningAt("/proc", pid, start)
+}
+
+// BootTime is when this computer started, from /proc/stat.
+func (Local) BootTime() (time.Time, bool) {
+	content, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return time.Time{}, false
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		if value, found := strings.CutPrefix(line, "btime "); found {
+			seconds, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+			return time.Unix(seconds, 0), err == nil
+		}
+	}
+	return time.Time{}, false
 }
 
 func processRunningAt(procRoot string, pid int, start string) bool {
@@ -65,7 +81,15 @@ func (Local) ObserveDeploymentActivity(ctx context.Context, hosts []domain.HostM
 func parseDeploymentActivity(output string) domain.DeploymentActivity {
 	activity := domain.DeploymentActivity{Reachable: true}
 	state, rest, _ := strings.Cut(output, "--- jobs\n")
-	jobs, activation, _ := strings.Cut(rest, "--- activation\n")
+	jobs, rest, _ := strings.Cut(rest, "--- activation\n")
+	activation, result, _ := strings.Cut(rest, "--- result\n")
+	var record struct {
+		ActivationID string `json:"activationId"`
+		ExitCode     *int   `json:"exitCode"`
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(result)), &record) == nil && record.ExitCode != nil && len(record.ActivationID) == 32 {
+		activity.LastActivationID, activity.LastExitCode = record.ActivationID, record.ExitCode
+	}
 	if lines := strings.Fields(state); len(lines) >= 2 && validGitRevision(lines[1]) {
 		activity.Revision = lines[1]
 	}

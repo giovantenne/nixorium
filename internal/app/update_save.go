@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"slices"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -49,9 +50,17 @@ func (m UpdateSaveManager) Save(ctx context.Context, plan domain.UpdatePlanRepor
 		return report
 	}
 
+	// The update saves flake.nix, flake.lock and the files the release's
+	// migrations change (ADR 0034), in one commit.
+	savePaths := []string{"flake.lock", "flake.nix"}
+	for _, file := range plan.Proposal.MigratedFiles {
+		savePaths = append(savePaths, file.Path)
+	}
+	slices.Sort(savePaths)
+	savePaths = slices.Compact(savePaths)
 	targetChanged := false
 	for _, change := range review.Changes {
-		if change.OriginalPath != "" || (change.Path != "flake.nix" && change.Path != "flake.lock") {
+		if change.OriginalPath != "" || !slices.Contains(savePaths, change.Path) {
 			return updateSaveIssue(report, "storage", "Other deployment files changed after review; resolve them in Advanced and validate the release again.")
 		}
 		targetChanged = true
@@ -62,7 +71,7 @@ func (m UpdateSaveManager) Save(ctx context.Context, plan domain.UpdatePlanRepor
 			return updateSaveIssue(report, "review", "Deployment HEAD changed after review; inspect the pending save before retrying.")
 		}
 		current, err := m.source.InspectUpdateInput(plan.Repository)
-		if err != nil || !updateProposalIsCurrent(current, plan.Proposal) {
+		if err != nil || !updateProposalIsCurrent(current, plan.Proposal) || !m.migratedFilesSaved(plan) {
 			return updateSaveIssue(report, "storage", "The update files differ from the reviewed proposal; resolve them in Advanced and validate the release again.")
 		}
 		report.Updated = true
@@ -75,7 +84,7 @@ func (m UpdateSaveManager) Save(ctx context.Context, plan domain.UpdatePlanRepor
 		report.Updated = true
 	}
 
-	saved := m.record.SaveChanged(ctx, plan.Repository, []string{"flake.lock", "flake.nix"})
+	saved := m.record.SaveChanged(ctx, plan.Repository, savePaths)
 	report.State = saved.State
 	report.Revision = saved.Revision
 	report.RecoveryRequired = saved.RecoveryRequired
@@ -93,6 +102,20 @@ func (m UpdateSaveManager) Save(ctx context.Context, plan domain.UpdatePlanRepor
 		report.Message = "System and package update saved locally. Running systems were not changed."
 	}
 	return report
+}
+
+// migratedFilesSource checks, when a save is retried, that the migrated
+// files on disk are exactly the reviewed result.
+type migratedFilesSource interface {
+	MigratedFilesSaved(repository string, files []domain.MigratedFile) bool
+}
+
+func (m UpdateSaveManager) migratedFilesSaved(plan domain.UpdatePlanReport) bool {
+	if len(plan.Proposal.MigratedFiles) == 0 {
+		return true
+	}
+	source, ok := m.source.(migratedFilesSource)
+	return ok && source.MigratedFilesSaved(plan.Repository, plan.Proposal.MigratedFiles)
 }
 
 func updateProposalIsCurrent(current domain.UpdateInputSnapshot, proposal domain.UpdateProposal) bool {

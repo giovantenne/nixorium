@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -85,86 +84,7 @@ func (Local) GitRevision(ctx context.Context, repository string) (string, error)
 }
 
 func (Local) RunDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, phase domain.DeploymentPhase, output io.Writer) error {
-	return runDeploymentPhase(ctx, plan, phase, output, managedCoordinationDirectory, true, deploymentPhaseTimeout(phase))
-}
-
-func deploymentCommand(phase domain.DeploymentPhase, selector string) ([]string, error) {
-	if selector == "" {
-		return nil, errors.New("Colmena selector is empty")
-	}
-	switch phase {
-	case domain.DeploymentPhaseBuild:
-		return []string{"build", "--on", selector, "--verbose", "--color", "never"}, nil
-	case domain.DeploymentPhaseApply:
-		return []string{"apply", "switch", "--on", selector, "--verbose", "--color", "never"}, nil
-	default:
-		return nil, fmt.Errorf("unsupported deployment phase %q", phase)
-	}
-}
-
-// colmenaRedirects maps the laboratory address of each computer that, during
-// a change of laboratory network, answered only on its previous address to
-// that address. Colmena then reaches it there; SSH still checks the key
-// recorded for the address it connects to.
-func colmenaRedirects(plan domain.DeploymentPlanReport) map[string]string {
-	redirects := map[string]string{}
-	for _, target := range plan.Targets {
-		if target.PreviousIP == "" {
-			continue
-		}
-		for _, observed := range plan.Availability {
-			if observed.Name == target.Name && observed.IP == target.IP && observed.Network == domain.HostNetworkPrevious {
-				redirects[target.IP] = target.PreviousIP
-			}
-		}
-	}
-	return redirects
-}
-
-func colmenaSSHConfig(redirects map[string]string) (string, error) {
-	content := ""
-	addresses := make([]string, 0, len(redirects))
-	for address := range redirects {
-		addresses = append(addresses, address)
-	}
-	slices.Sort(addresses)
-	for _, address := range addresses {
-		if canonicalRemoteIPv4(address) == "" || canonicalRemoteIPv4(redirects[address]) == "" {
-			return "", fmt.Errorf("invalid laboratory address for %s", address)
-		}
-		content += "Host " + address + "\n  HostName " + redirects[address] + "\n"
-	}
-	return content + "Host *\n  BatchMode yes\n  PasswordAuthentication no\n  KbdInteractiveAuthentication no\n  StrictHostKeyChecking accept-new\n  ConnectTimeout 10\n  ConnectionAttempts 1\n  ServerAliveInterval 10\n  ServerAliveCountMax 3\n", nil
-}
-
-func configureColmenaSSH(command *exec.Cmd, redirects map[string]string) (func(), error) {
-	content, err := colmenaSSHConfig(redirects)
-	if err != nil {
-		return nil, err
-	}
-	config, err := os.CreateTemp("", "nixorium-colmena-ssh-*")
-	if err != nil {
-		return nil, err
-	}
-	path := config.Name()
-	cleanup := func() {
-		_ = os.Remove(path)
-	}
-	if _, err := io.WriteString(config, content); err != nil {
-		_ = config.Close()
-		cleanup()
-		return nil, err
-	}
-	if err := config.Close(); err != nil {
-		cleanup()
-		return nil, err
-	}
-	environment := command.Env
-	if environment == nil {
-		environment = os.Environ()
-	}
-	command.Env = environmentWithValue(environment, "SSH_CONFIG_FILE", path)
-	return cleanup, nil
+	return runDeploymentPhase(ctx, plan, phase, output, managedCoordinationDirectory, true, deploymentPhaseTimeout(phase, len(plan.Targets)))
 }
 
 func environmentWithValue(environment []string, name, value string) []string {
@@ -446,22 +366,67 @@ func probeCurrentSystemArguments(ctx context.Context, timeout time.Duration, arg
 	probeContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	command := exec.CommandContext(probeContext, "ssh", arguments...)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		detail := strings.TrimSpace(string(output))
+	var stdout, stderr bytes.Buffer
+	command.Stdout, command.Stderr = &stdout, &stderr
+	if err := command.Run(); err != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if detail == "" {
+			detail = strings.TrimSpace(stdout.String())
+		}
 		if detail == "" {
 			detail = err.Error()
 		}
 		if len(detail) > 512 {
 			detail = detail[:512]
 		}
-		return domain.HostSystemProbe{HostKeyCondition: sshHostKeyCondition(string(output)), Detail: "authenticated system observation failed: " + detail}
+		return domain.HostSystemProbe{HostKeyCondition: sshHostKeyCondition(stderr.String() + stdout.String()), Detail: "authenticated system observation failed: " + detail}
 	}
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(lines) != 2 || !validSystemPath(lines[0]) || !validGitRevision(lines[1]) {
-		return domain.HostSystemProbe{Detail: "authenticated system observation returned invalid state"}
+	// A third line, from systems that know identity records, is the number in
+	// the computer's record.
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	number := 0
+	if len(lines) == 3 {
+		parsed, valid := domain.ClientNumber("pc" + lines[2])
+		if !valid || "pc"+lines[2] != fmt.Sprintf("pc%d", parsed) {
+			lines = nil
+		}
+		number = parsed
 	}
-	return domain.HostSystemProbe{SystemPath: lines[0], Revision: lines[1]}
+	if len(lines) < 2 || len(lines) > 3 || !validSystemPath(lines[0]) || !validGitRevision(lines[1]) {
+		return domain.HostSystemProbe{Detail: invalidSystemObservationDetail(stdout.String(), stderr.String())}
+	}
+	return domain.HostSystemProbe{SystemPath: lines[0], Revision: lines[1], Number: number}
+}
+
+// invalidSystemObservationDetail says what a computer answered when the answer
+// was not a system path and a revision, so the next occurrence can be
+// diagnosed. Only a short printable excerpt of each stream is kept.
+func invalidSystemObservationDetail(stdout, stderr string) string {
+	detail := "authenticated system observation returned invalid state"
+	var streams []string
+	for _, stream := range []struct{ name, text string }{{"stdout", stdout}, {"stderr", stderr}} {
+		if excerpt := observationExcerpt(stream.text); excerpt != "" {
+			streams = append(streams, stream.name+": "+excerpt)
+		}
+	}
+	if len(streams) == 0 {
+		return detail
+	}
+	return detail + " (" + strings.Join(streams, "; ") + ")"
+}
+
+// observationExcerpt keeps the first 160 bytes of text. Quoting shows newlines
+// as \n and replaces every other non-printable character with an escape, so
+// the excerpt is always plain printable text.
+func observationExcerpt(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	if len(text) > 160 {
+		text = strings.ToValidUTF8(text[:160], "")
+	}
+	return strconv.Quote(text)
 }
 
 func sshHostKeyCondition(output string) domain.HostKeyCondition {
@@ -630,10 +595,19 @@ func nixJSONAt(ctx context.Context, repository, revision, attribute string, dest
 	if err != nil {
 		return err
 	}
+	cachePath, cacheable := evaluationCachePath(flake, attribute)
+	if cacheable {
+		if cached, found := readCachedEvaluation(cachePath); found && json.Unmarshal(cached, destination) == nil {
+			return nil
+		}
+	}
 	reference := flake + "#" + attribute
 	output, err := runOutput(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", reference, "--json", "--no-write-lock-file")
 	if err != nil {
 		return err
+	}
+	if cacheable {
+		writeCachedEvaluation(cachePath, []byte(output))
 	}
 	if err := json.Unmarshal([]byte(output), destination); err != nil {
 		return fmt.Errorf("decode %s JSON: %w", attribute, err)

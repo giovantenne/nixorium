@@ -59,6 +59,37 @@ func TestClassroomLeaseIgnoresMaintenanceAndRefusesOnlyNamedComputers(t *testing
 	}
 }
 
+// Once the update's apply returned, only computers whose result is unknown
+// keep classroom controls away.
+func TestClassroomLeaseBlocksOnlyUnknownComputersAfterTheApply(t *testing.T) {
+	directory, err := ensureTestCoordinationDirectory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := json.Marshal(domain.PendingDeployment{
+		SchemaVersion: 1, Repository: "/deployment", Revision: strings.Repeat("a", 40), StartedAt: time.Unix(1_800_000_000, 0).UTC(), ControllerPID: 1,
+		Targets: []domain.DeploymentTarget{{Name: "pc01"}, {Name: "pc02"}, {Name: "pc03"}},
+		Activations: []domain.PendingActivation{
+			{Name: "pc01", State: domain.ActivationStarted}, {Name: "pc02", State: domain.ActivationFinished}, {Name: "pc03", State: domain.ActivationPlanned},
+		},
+		ApplyReturned: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, deploymentPendingName), content, 0600); err != nil {
+		t.Fatal(err)
+	}
+	lease, blocked, err := acquireClassroomLeaseAt(directory, false, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
+	if len(blocked) != 1 || blocked["pc01"] == "" {
+		t.Fatalf("blocked = %v", blocked)
+	}
+}
+
 func TestClassroomLeaseFailsClosedForUnreadablePendingRecord(t *testing.T) {
 	directory, err := ensureTestCoordinationDirectory(t.TempDir())
 	if err != nil {

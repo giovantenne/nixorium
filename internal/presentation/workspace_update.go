@@ -78,7 +78,10 @@ func workspaceUpdateText(writer io.Writer, impact *domain.WorkspaceUpdateImpact)
 func updateReviewLines(report domain.UpdatePlanReport) []string {
 	var content bytes.Buffer
 	workspaceUpdateText(&content, report.Workspace)
-	if report.Workspace != nil {
+	if migrations := deploymentMigrationLines(report.Migrations); len(migrations) > 0 {
+		fmt.Fprintln(&content, strings.Join(migrations, "\n"))
+		fmt.Fprintln(&content, "\nProposed changes to deployment files:")
+	} else if report.Workspace != nil {
 		fmt.Fprintln(&content, "\nProposed flake.nix/flake.lock changes:")
 	}
 	content.WriteString(report.Diff.Content)

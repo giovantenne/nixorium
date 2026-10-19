@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -116,73 +115,67 @@ func TestGitStatePreservesPorcelainPaths(t *testing.T) {
 	}
 }
 
-func TestDeploymentCommandIsFixedAndUsesArgumentArray(t *testing.T) {
-	tests := []struct {
-		phase domain.DeploymentPhase
-		want  string
-	}{
-		{phase: domain.DeploymentPhaseBuild, want: "build --on pc01,pc02 --verbose --color never"},
-		{phase: domain.DeploymentPhaseApply, want: "apply switch --on pc01,pc02 --verbose --color never"},
+// writeFakeSSH puts an ssh command that runs script in front of the real one.
+func writeFakeSSH(t *testing.T, script string) {
+	t.Helper()
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "ssh"), []byte("#!/bin/sh\n"+script+"\n"), 0700); err != nil {
+		t.Fatal(err)
 	}
-	for _, test := range tests {
-		arguments, err := deploymentCommand(test.phase, "pc01,pc02")
-		if err != nil || strings.Join(arguments, " ") != test.want {
-			t.Errorf("%s command = %q, %v", test.phase, strings.Join(arguments, " "), err)
-		}
-	}
-	if _, err := deploymentCommand(domain.DeploymentPhaseComplete, "pc01"); err == nil {
-		t.Fatal("unsupported deployment phase was accepted")
-	}
-	if _, err := deploymentCommand(domain.DeploymentPhaseBuild, ""); err == nil {
-		t.Fatal("empty deployment selector was accepted")
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestCurrentSystemProbeParsesOnlyStandardOutput(t *testing.T) {
+	system := "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system"
+	revision := strings.Repeat("a", 40)
+	writeFakeSSH(t, "echo 'Warning: noise on stderr' >&2\nprintf '%s\\n%s\\n' '"+system+"' '"+revision+"'")
+	probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil)
+	if probe.SystemPath != system || probe.Revision != revision || probe.Detail != "" {
+		t.Fatalf("probe = %+v", probe)
 	}
 }
 
-func TestConfigureColmenaSSHUsesPrivateSupportedConfig(t *testing.T) {
-	command := exec.Command("true")
-	command.Env = []string{"PATH=/bin", "SSH_CONFIG_FILE=/tmp/untrusted"}
-	cleanup, err := configureColmenaSSH(command, nil)
-	if err != nil {
-		t.Fatal(err)
+func TestCurrentSystemProbeReadsTheIdentityNumber(t *testing.T) {
+	system := "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system"
+	revision := strings.Repeat("a", 40)
+	writeFakeSSH(t, "printf '%s\\n%s\\n7\\n' '"+system+"' '"+revision+"'")
+	if probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil); probe.Number != 7 || probe.Revision != revision {
+		t.Fatalf("probe = %+v", probe)
 	}
-	path := ""
-	pathEnvironmentPreserved := false
-	for _, entry := range command.Env {
-		if entry == "PATH=/bin" {
-			pathEnvironmentPreserved = true
+	for _, third := range []string{"07", "0", "x", "12345"} {
+		writeFakeSSH(t, "printf '%s\\n%s\\n"+third+"\\n' '"+system+"' '"+revision+"'")
+		if probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil); probe.SystemPath != "" {
+			t.Fatalf("third line %q accepted: %+v", third, probe)
 		}
-		if strings.HasPrefix(entry, "SSH_CONFIG_FILE=") {
-			if path != "" {
-				t.Fatalf("duplicate SSH_CONFIG_FILE entries: %q", command.Env)
+	}
+}
+
+func TestCurrentSystemProbeKeepsWhatAnInvalidAnswerSaid(t *testing.T) {
+	const prefix = "authenticated system observation returned invalid state"
+	for _, test := range []struct {
+		name, script, detail string
+	}{
+		{"silent", "exit 0", prefix},
+		{"stdout", "printf 'line one\\nline\\ttwo\\001\\n'", prefix + ` (stdout: "line one\nline\ttwo\x01")`},
+		{"both", "echo out; echo err >&2", prefix + ` (stdout: "out"; stderr: "err")`},
+		{"stderr only", "echo 'Connection reset' >&2", prefix + ` (stderr: "Connection reset")`},
+		{"long", "head -c 1000 /dev/zero | tr '\\0' x", prefix + ` (stdout: "` + strings.Repeat("x", 160) + `")`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			writeFakeSSH(t, test.script)
+			probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil)
+			if probe.Revision != "" || probe.SystemPath != "" || probe.Detail != test.detail {
+				t.Fatalf("probe = %+v, want detail %q", probe, test.detail)
 			}
-			path = strings.TrimPrefix(entry, "SSH_CONFIG_FILE=")
-		}
+		})
 	}
-	if path == "" || path == "/tmp/untrusted" {
-		t.Fatalf("SSH_CONFIG_FILE = %q", path)
-	}
-	if !pathEnvironmentPreserved {
-		t.Fatalf("existing command environment was not preserved: %q", command.Env)
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, expected := range []string{"Host *", "BatchMode yes", "PasswordAuthentication no", "StrictHostKeyChecking accept-new", "KbdInteractiveAuthentication no", "ConnectTimeout 10", "ConnectionAttempts 1", "ServerAliveInterval 10", "ServerAliveCountMax 3"} {
-		if !strings.Contains(string(content), expected) {
-			t.Fatalf("SSH config omits %q:\n%s", expected, content)
-		}
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatalf("SSH config mode = %v, want 0600", info.Mode().Perm())
-	}
-	cleanup()
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatalf("SSH config still exists after cleanup: %v", err)
+}
+
+func TestCurrentSystemProbeFailureDetailComesFromStandardError(t *testing.T) {
+	writeFakeSSH(t, "echo 'partial output'\necho '@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@' >&2\nexit 255")
+	probe := probeCurrentSystemArguments(context.Background(), 5*time.Second, nil)
+	if probe.HostKeyCondition != domain.HostKeyChanged || !strings.HasPrefix(probe.Detail, "authenticated system observation failed: @@@ WARNING") {
+		t.Fatalf("probe = %+v", probe)
 	}
 }
 

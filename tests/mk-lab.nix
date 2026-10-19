@@ -78,24 +78,15 @@ let
     };
     publicKeys = { cache = null; ssh = null; };
   });
-  # Reproduce Colmena 0.4 node evaluation: global specialArgs, then per-node
-  # specialArgs, both overriding any _module.args the node itself declares.
-  colmenaNode = lab: name:
-    let
-      hive = lab.colmena;
-      node = hive.${name};
-    in
-    import "${hive.meta.nixpkgs.path}/nixos/lib/eval-config.nix" {
-      system = "x86_64-linux";
-      modules = [
-        { nixpkgs.pkgs = hive.meta.nixpkgs; }
-        (builtins.removeAttrs node [ "deployment" ])
-      ];
-      specialArgs = (hive.meta.specialArgs or { })
-        // (hive.meta.nodeSpecialArgs.${name} or { })
-        // { inherit name; };
-    };
-  colmenaRoleServices = name: (colmenaNode roleInterfaceLab name).config.systemd.services;
+  # pc03 has its own module, so its own class and system; the others share one.
+  classesLab = mkLab (baseArgs // {
+    hostModules.pc03 = [ ./fixtures/class-only-pc03.nix ];
+  });
+  classesSystem = name: classesLab.nixosConfigurations.${name}.config.system.build.toplevel.drvPath;
+  # A shared configuration cannot know which computer it runs on.
+  hostNameLab = mkLab (baseArgs // {
+    clientModules = [ ./fixtures/class-uses-hostname.nix ];
+  });
   keyboardLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       keyboardLayout = "it";
@@ -246,8 +237,6 @@ let
   clientUsers = subnetLab.nixosConfigurations.pc01.config.users.users;
   clientPolkit = subnetLab.nixosConfigurations.pc01.config.security.polkit;
   clientHomeOwnership = subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumUserHomeOwnership;
-  colmenaBaseGnomeRemoteDesktop = subnetLab.colmena.meta.nixpkgs.gnome-remote-desktop;
-  clientGnomeRemoteDesktop = subnetLab.nixosConfigurations.pc01.pkgs.gnome-remote-desktop;
 in
 assert import ./group-modules.nix { inherit mkLab deploymentSelf labConfig lib; };
 assert hostClassLab.nixoriumHostClasses == [
@@ -274,7 +263,6 @@ assert controllerOnlyLab.labMeta.controller.staticIp == "";
 assert controllerOnlyLab.labMeta.clients.count == 0;
 assert controllerOnlyLab.labMeta.clients.hosts == [];
 assert !(controllerOnlyLab.nixosConfigurations ? pc01);
-assert !(controllerOnlyLab.colmena ? pc01);
 assert !controllerOnlyLab.deploymentStatus.ready;
 assert controllerOnlyLab.deploymentStatus.controller.ready;
 assert !controllerOnlyLab.deploymentStatus.controller.requiresKeys;
@@ -291,7 +279,7 @@ assert subnetLab.labMeta.deploymentMode == "laboratory";
 assert subnetLab.deploymentStatus.controller.ready == subnetLab.deploymentStatus.ready;
 assert subnetLab.deploymentStatus.controller.requiresKeys;
 assert subnetLab.labMeta.network.prefixLength == 25;
-assert map (host: builtins.removeAttrs host [ "ifaceName" "ifaceExplicit" ]) subnetLab.labMeta.clients.hosts == [
+assert map (host: builtins.removeAttrs host [ "ifaceName" "ifaceExplicit" "class" ]) subnetLab.labMeta.clients.hosts == [
   { name = "pc01"; ip = "10.23.4.129"; }
   { name = "pc02"; ip = "10.23.4.130"; }
   { name = "pc03"; ip = "10.23.4.131"; }
@@ -323,7 +311,10 @@ assert roleInterfaceLab.labMeta.network.clientIfaceName == "enp2s0";
 assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 0).ifaceName == "enp2s0";
 assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 1).ifaceName == "enp3s0";
 assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.interfaces ? eno1;
-assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces ? enp2s0;
+# pc01 shares its system with the other enp2s0 clients: the named card gets
+# the NetworkManager profile. pc02 alone has enp3s0 and keeps its own system.
+assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces == {};
+assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection.interface-name == "enp2s0";
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.interfaces ? enp3s0;
 # Clients are configured by name only when an administrator chose one (ADR 0017);
 # the template fallback name never reaches a client's network configuration.
@@ -333,7 +324,13 @@ assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 1).ifaceExplicit;
 assert !(builtins.elemAt hostOnlyInterfaceLab.labMeta.clients.hosts 0).ifaceExplicit;
 assert (builtins.elemAt hostOnlyInterfaceLab.labMeta.clients.hosts 1).ifaceExplicit;
 assert subnetLab.nixosConfigurations.pc01.config.networking.interfaces == {};
-assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "10.23.4.129/25";
+# Identical clients share one system; the address comes from the identity record.
+assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "$NIXORIUM_LAB_ADDRESS/25";
+assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.environmentFiles == [ "/run/nixorium/identity.env" ];
+assert builtins.head subnetLab.nixosConfigurations.pc01._module.specialArgs.labSettings.clientIdentities
+  == { number = 1; name = "pc01"; address = "10.23.4.129"; };
+assert lib.hasInfix "1) name=pc01 address=10.23.4.129 previous= ;;" subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumIdentity.text;
+assert lib.hasInfix "20) name=pc20 address=10.23.4.148 previous= ;;" subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumIdentity.text;
 assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection.type == "ethernet";
 assert !(subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection ? interface-name);
 assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.settings.main.no-auto-default == "*";
@@ -359,8 +356,10 @@ assert builtins.all (name: builtins.elem subnetLab.nixosConfigurations.pc01.pkgs
 assert subnetLab.nixosConfigurations.pc99.config.networking.interfaces ? enp0s3;
 assert subnetLab.nixosConfigurations.pc99.config.networking.networkmanager.ensureProfiles.profiles == {};
 assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.networkmanager.ensureProfiles.profiles == {};
-# An explicit client name keeps the name-based behaviour everywhere.
-assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles == {};
+# An explicit client name keeps the name-based firewall; a shared system
+# binds its profile to that card.
+assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "$NIXORIUM_LAB_ADDRESS/24";
+assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.networkmanager.ensureProfiles.profiles == {};
 assert lib.hasInfix "iifname \"enp2s0\"" roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.interfaces ? enp2s0;
 assert hostOnlyInterfaceLab.nixosConfigurations.pc02.config.networking.interfaces ? enp3s0;
@@ -384,7 +383,7 @@ assert labHttpSubstituters subnetLab.nixosConfigurations.pc01.config == [ "http:
 # Clients use only the controller cache; the controller keeps the public one.
 assert subnetLab.nixosConfigurations.pc01.config.nix.settings.substituters == [ "http://10.23.4.227:5000" ];
 assert transitionClient.nix.settings.substituters == [ "http://10.1.0.99:5000" "http://10.0.0.99:5000" ];
-assert (colmenaNode roleInterfaceLab "pc01").config.nix.settings.substituters == [ "http://10.0.0.99:5000" ];
+assert roleInterfaceLab.nixosConfigurations.pc01.config.nix.settings.substituters == [ "http://10.0.0.99:5000" ];
 assert builtins.elem "https://cache.nixos.org/" subnetLab.nixosConfigurations.pc99.config.nix.settings.substituters;
 assert import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; } == ''
   table inet nixorium_internet {
@@ -433,8 +432,10 @@ assert transitionLab.nixosConfigurations.pc01._module.specialArgs.labSettings.ne
 # Clients take the new address and keep the previous one, accept SSH from
 # both controller addresses and try the new controller cache first; the
 # running card takes the changed profile at once.
-assert transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "10.1.0.1/24";
-assert transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address2 == "10.0.0.1/24";
+assert transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "$NIXORIUM_LAB_ADDRESS/24";
+assert transitionClient.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address2 == "$NIXORIUM_PREVIOUS_ADDRESS/24";
+assert builtins.head transitionLab.nixosConfigurations.pc01._module.specialArgs.labSettings.clientIdentities
+  == { number = 1; name = "pc01"; address = "10.1.0.1"; previousAddress = "10.0.0.1"; };
 assert lib.hasInfix "nmcli device reapply" transitionClient.systemd.services.NetworkManager-ensure-profiles.postStart;
 assert !(lib.hasInfix "nmcli device reapply" movedLab.nixosConfigurations.pc01.config.systemd.services.NetworkManager-ensure-profiles.postStart);
 assert !(movedLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4 ? address2);
@@ -443,8 +444,8 @@ assert transitionClient.networking.firewall.extraInputRules
 assert transitionClient.networking.nftables.tables.nixorium-client-access.content
   == "chain input {\n  type filter hook input priority -10; policy accept;\n  iifname \"lo\" accept\n  ip saddr 10.1.0.99 tcp dport 22 accept\n  ip saddr 10.0.0.99 tcp dport 22 accept\n  tcp dport 22 drop\n  udp dport 5353 drop\n}\n";
 assert labHttpSubstituters transitionClient == [ "http://10.1.0.99:5000" "http://10.0.0.99:5000" ];
-assert plainAddresses transitionNamedLab.nixosConfigurations.pc01.config.networking.interfaces.enp2s0.ipv4.addresses
-  == [ { address = "10.1.0.1"; prefixLength = 24; } { address = "10.0.0.1"; prefixLength = 24; } ];
+assert transitionNamedLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address2 == "$NIXORIUM_PREVIOUS_ADDRESS/24";
+assert transitionNamedLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection.interface-name == "enp2s0";
 assert transitionNamedLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules
   == "iifname \"enp2s0\" ip saddr 10.1.0.99 tcp dport 22 accept\niifname \"enp2s0\" ip saddr 10.0.0.99 tcp dport 22 accept\n";
 # The classroom Internet block keeps both laboratory networks reachable.
@@ -525,22 +526,44 @@ assert lib.hasInfix "/dev/tty1" keyboardLab.nixosConfigurations.netboot.config.p
 assert keyboardLab.nixosConfigurations.netboot.config.services.getty.autologinUser == "nixos";
 assert builtins.elem "network.target"
   roleInterfaceLab.nixosConfigurations.pc99.config.systemd.services."network-addresses-eno1".wantedBy;
+assert !(roleInterfaceLab.nixosConfigurations.pc01.config.systemd.services ? "network-addresses-enp2s0");
 assert !(builtins.elem "network.target"
-  roleInterfaceLab.nixosConfigurations.pc01.config.systemd.services."network-addresses-enp2s0".wantedBy);
+  roleInterfaceLab.nixosConfigurations.pc02.config.systemd.services."network-addresses-enp3s0".wantedBy);
 assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.firewall.interfaces ? eno1;
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.interfaces ? enp2s0;
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.firewall.interfaces ? enp3s0;
-assert subnetLab.colmena.pc01.deployment.targetHost == "10.23.4.129";
-# Deployed clients must keep the role/host interface, not the shared fallback.
-assert (colmenaRoleServices "pc01") ? "network-addresses-enp2s0";
-assert !((colmenaRoleServices "pc01") ? "network-addresses-enp0s3");
-assert (colmenaRoleServices "pc02") ? "network-addresses-enp3s0";
-assert (colmenaRoleServices "pc99") ? "network-addresses-eno1";
-assert (colmenaNode roleInterfaceLab "pc01").config.networking.firewall.interfaces ? enp2s0;
-# Colmena starts from the unmodified package set. Each host's module graph
-# applies the laboratory overlay exactly once while evaluating that node.
-assert !(builtins.elem "-Dvnc=true" (colmenaBaseGnomeRemoteDesktop.mesonFlags or [ ]));
-assert colmenaBaseGnomeRemoteDesktop.drvPath == clientGnomeRemoteDesktop.drvPath;
+# Deployed clients keep the role/host interface, not the shared fallback.
+assert !(roleInterfaceLab.nixosConfigurations.pc01.config.systemd.services ? "network-addresses-enp0s3");
+assert roleInterfaceLab.nixosConfigurations.pc02.config.systemd.services ? "network-addresses-enp3s0";
+assert roleInterfaceLab.nixosConfigurations.pc99.config.systemd.services ? "network-addresses-eno1";
+# No Colmena hive: Nixorium deploys the systems itself (ADR 0031).
+assert !(subnetLab ? colmena);
+# Classes of client computers (ADR 0033).
+assert classesSystem "pc01" == classesSystem "pc02";
+assert classesSystem "pc01" == classesSystem "pc20";
+assert classesSystem "pc03" != classesSystem "pc01";
+assert lib.hasInfix "-nixos-system-nixorium-client-shared-1-" (classesSystem "pc01");
+assert lib.hasInfix "-nixos-system-pc03-" (classesSystem "pc03");
+assert classesLab.labMeta.clients.classes == [
+  { id = "shared-1"; shared = true; members = [ "pc01" "pc02" "pc04" "pc05" "pc06" "pc07" "pc08" "pc09" "pc10"
+      "pc11" "pc12" "pc13" "pc14" "pc15" "pc16" "pc17" "pc18" "pc19" "pc20" ]; }
+  { id = "pc03"; shared = false; members = [ "pc03" ]; }
+];
+assert map (host: host.class) (lib.take 4 classesLab.labMeta.clients.hosts) == [ "shared-1" "shared-1" "pc03" "shared-1" ];
+assert classesLab.nixosConfigurations.pc01.config.networking.hostName == "nixorium-client";
+assert !classesLab.nixosConfigurations.pc01.config.environment.etc.hostname.enable;
+assert classesLab.nixosConfigurations.pc01.config.services.avahi.hostName == "";
+assert classesLab.nixosConfigurations.pc01.config.networking.networkmanager.settings.main.hostname-mode == "none";
+assert classesLab.nixosConfigurations.pc01.config.systemd.services ? nixorium-identity;
+assert classesLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.dad-timeout == "3000";
+# A class of one keeps the per-host system of earlier releases.
+assert classesLab.nixosConfigurations.pc03.config.networking.hostName == "pc03";
+assert classesLab.nixosConfigurations.pc03.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "10.0.0.3/24";
+assert !(classesLab.nixosConfigurations.pc03.config.systemd.services ? nixorium-identity);
+assert lib.hasInfix "printf '{\"schemaVersion\":1,\"number\":%d}\\n' 3" classesLab.nixosConfigurations.pc03.config.system.activationScripts.nixoriumIdentity.text;
+assert classesLab.nixosConfigurations.pc03.config.environment.etc ? "pc03-only";
+assert !(classesLab.nixosConfigurations.pc01.config.environment.etc ? "pc03-only");
+assert !(builtins.tryEval hostNameLab.nixosConfigurations.pc01.config.environment.etc.who.text).success;
 assert subnetLab.apps.x86_64-linux.nixorium.type == "app";
 assert subnetLab.packages.x86_64-linux.nixorium.pname == "nixorium";
 assert subnetLab.packages.x86_64-linux.pxeFirmware.name == "nixorium-ipxe-firmware";

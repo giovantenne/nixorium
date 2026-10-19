@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -123,8 +124,16 @@ func (f *fakeDeploymentSource) RecordSuccessfulDeployments(_ string, records map
 	return nil
 }
 
+// newTestDeploymentManager is a manager that does not wait between the
+// attempts to verify a computer.
+func newTestDeploymentManager(source DeploymentSource) *DeploymentManager {
+	manager := NewDeploymentManager(source)
+	manager.sleep = func(context.Context, time.Duration) error { return nil }
+	return manager
+}
+
 func TestDeploymentPlanSelectsOneSeveralOrAllClients(t *testing.T) {
-	manager := NewDeploymentManager(readyDeploymentSource())
+	manager := newTestDeploymentManager(readyDeploymentSource())
 	for _, test := range []struct {
 		requested string
 		selector  string
@@ -142,7 +151,7 @@ func TestDeploymentPlanSelectsOneSeveralOrAllClients(t *testing.T) {
 }
 
 func TestDeploymentPlanRejectsUnknownDuplicateAndEmptyTargets(t *testing.T) {
-	manager := NewDeploymentManager(readyDeploymentSource())
+	manager := newTestDeploymentManager(readyDeploymentSource())
 	for _, requested := range []string{"pc99", "pc01,pc01", ""} {
 		report := manager.Plan(context.Background(), "/deployment", requested)
 		if !report.HasErrors() || report.State != "blocked" {
@@ -157,7 +166,7 @@ func TestDeploymentPlanFailsClosedOnReadinessGitAndRevision(t *testing.T) {
 	source.git = domain.GitState{Available: true, Dirty: true, Changes: 2}
 	source.revisionErr = errors.New("no HEAD")
 
-	report := NewDeploymentManager(source).Plan(context.Background(), "/deployment", "pc01")
+	report := newTestDeploymentManager(source).Plan(context.Background(), "/deployment", "pc01")
 	if len(report.Issues) != 3 || report.Revision != "" || report.State != "blocked" {
 		t.Fatalf("blocked plan = %+v, want readiness, Git, and revision issues", report)
 	}
@@ -166,7 +175,7 @@ func TestDeploymentPlanFailsClosedOnReadinessGitAndRevision(t *testing.T) {
 func TestDeploymentPlanRequiresControllerDeploymentAddress(t *testing.T) {
 	source := readyDeploymentSource()
 	source.addresses = []string{"192.0.2.10"}
-	report := NewDeploymentManager(source).Plan(context.Background(), "/deployment", "pc01")
+	report := newTestDeploymentManager(source).Plan(context.Background(), "/deployment", "pc01")
 	if !report.HasErrors() || len(report.Issues) != 1 || report.Issues[0].Field != "network" || !strings.Contains(report.Issues[0].Message, "recover PXE") {
 		t.Fatalf("network-blocked plan = %+v", report)
 	}
@@ -176,7 +185,7 @@ func TestDeploymentExecuteBuildsBeforeApplyAndStreamsOutput(t *testing.T) {
 	source := readyDeploymentSource()
 	progress := &bytes.Buffer{}
 	var observed []domain.DeploymentProgress
-	report := NewDeploymentManager(source).ExecuteWithProgress(context.Background(), "/deployment", "pc03,pc01", source.revision, "/state/deploy.log", progress, func(update domain.DeploymentProgress) {
+	report := newTestDeploymentManager(source).ExecuteWithProgress(context.Background(), "/deployment", "pc03,pc01", source.revision, "/state/deploy.log", progress, func(update domain.DeploymentProgress) {
 		observed = append(observed, update)
 	})
 	if report.HasErrors() || report.State != "completed" || !report.BuildCompleted || !report.ApplyCompleted || report.Phase != domain.DeploymentPhaseComplete {
@@ -206,7 +215,7 @@ func TestDeploymentExecuteBuildsBeforeApplyAndStreamsOutput(t *testing.T) {
 
 func TestDeploymentExecuteRejectsStaleReviewBeforeRunning(t *testing.T) {
 	source := readyDeploymentSource()
-	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", "old-revision", "", io.Discard)
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", "old-revision", "", io.Discard)
 	if report.State != "blocked" || len(source.runPhases) != 0 || len(report.Issues) != 1 {
 		t.Fatalf("stale execution = %+v, phases = %v", report, source.runPhases)
 	}
@@ -215,7 +224,7 @@ func TestDeploymentExecuteRejectsStaleReviewBeforeRunning(t *testing.T) {
 func TestDeploymentExecuteRevalidatesAfterBuild(t *testing.T) {
 	source := readyDeploymentSource()
 	source.afterBuild = func() { source.revision = "changed-after-build" }
-	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
 	if report.State != "failed" || !report.BuildCompleted || report.ApplyCompleted || report.Phase != domain.DeploymentPhasePreflight || len(source.runPhases) != 1 {
 		t.Fatalf("changed execution = %+v, phases = %v", report, source.runPhases)
 	}
@@ -232,7 +241,7 @@ func TestDeploymentExecuteReportsBuildAndPartialApplyFailures(t *testing.T) {
 	} {
 		source := readyDeploymentSource()
 		source.runErrors = map[domain.DeploymentPhase]error{test.phase: errors.New("fixture failure")}
-		report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "@lab", source.revision, "", io.Discard)
+		report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "@lab", source.revision, "", io.Discard)
 		if report.State != "failed" || report.Phase != test.phase || report.BuildCompleted != test.buildCompleted || report.ApplyCompleted || !report.RetrySafe || !strings.Contains(report.Message, test.message) {
 			t.Errorf("%s failure report = %+v", test.phase, report)
 		}
@@ -247,7 +256,7 @@ func TestDeploymentExecuteRecordsOnlyAuthenticatedMatchingTargetsAfterPartialApp
 		Revision:   "fedcba9876543210",
 	}
 	delete(source.current, "pc03")
-	manager := NewDeploymentManager(source)
+	manager := newTestDeploymentManager(source)
 	manager.now = func() time.Time { return time.Unix(123, 0) }
 	report := manager.Execute(context.Background(), "/deployment", "@lab", source.revision, "", io.Discard)
 	if report.State != "failed" || report.Phase != domain.DeploymentPhaseApply || report.ApplyCompleted {
@@ -261,11 +270,111 @@ func TestDeploymentExecuteRecordsOnlyAuthenticatedMatchingTargetsAfterPartialApp
 	}
 }
 
+// scriptedProbeSource answers each verification attempt with the next scripted
+// answer, repeating the last one, and records which computers were asked.
+type scriptedProbeSource struct {
+	*fakeDeploymentSource
+	answers []map[string]domain.HostSystemProbe
+	asked   [][]string
+}
+
+func (s *scriptedProbeSource) CurrentSystems(_ context.Context, hosts []domain.HostMeta, _ time.Duration) map[string]domain.HostSystemProbe {
+	answer := s.answers[min(len(s.asked), len(s.answers)-1)]
+	names := []string{}
+	result := map[string]domain.HostSystemProbe{}
+	for _, host := range hosts {
+		names = append(names, host.Name)
+		if probe, found := answer[host.Name]; found {
+			result[host.Name] = probe
+		}
+	}
+	s.asked = append(s.asked, names)
+	return result
+}
+
+func TestDeploymentVerificationRetriesOnlyComputersWithoutState(t *testing.T) {
+	base := readyDeploymentSource()
+	invalid := domain.HostSystemProbe{Detail: "authenticated system observation returned invalid state"}
+	source := &scriptedProbeSource{fakeDeploymentSource: base, answers: []map[string]domain.HostSystemProbe{
+		{"pc01": invalid, "pc02": base.current["pc02"], "pc03": {HostKeyCondition: domain.HostKeyChanged}},
+		{"pc01": base.current["pc01"]},
+	}}
+	var waits []time.Duration
+	manager := newTestDeploymentManager(source)
+	manager.sleep = func(_ context.Context, wait time.Duration) error { waits = append(waits, wait); return nil }
+	report := manager.Execute(context.Background(), "/deployment", "@lab", base.revision, "", io.Discard)
+	if !reflect.DeepEqual(source.asked, [][]string{{"pc01", "pc02", "pc03"}, {"pc01"}}) || !reflect.DeepEqual(waits, []time.Duration{5 * time.Second}) {
+		t.Fatalf("asked = %v, waits = %v", source.asked, waits)
+	}
+	if report.Verification.Verified != 2 || report.Verification.Targets[0].State != "verified" || report.Verification.Targets[2].State != "unverified" {
+		t.Fatalf("verification = %+v", report.Verification)
+	}
+}
+
+func TestDeploymentVerificationGivesUpAfterThreeAttempts(t *testing.T) {
+	base := readyDeploymentSource()
+	invalid := domain.HostSystemProbe{Detail: "authenticated system observation returned invalid state (stdout: \"x\")"}
+	source := &scriptedProbeSource{fakeDeploymentSource: base, answers: []map[string]domain.HostSystemProbe{{"pc01": invalid}}}
+	log := &bytes.Buffer{}
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", base.revision, "", log)
+	if len(source.asked) != 3 || report.Verification.Verified != 0 || report.Verification.Targets[0].State != "unverified" || report.Verification.Targets[0].Detail != invalid.Detail {
+		t.Fatalf("asked = %v, verification = %+v", source.asked, report.Verification)
+	}
+	if !strings.Contains(log.String(), "pc01       unverified: "+invalid.Detail+"\n") {
+		t.Fatalf("log = %s", log.String())
+	}
+}
+
+func TestDeploymentVerificationOfASharedSystemNeedsTheComputersIdentity(t *testing.T) {
+	base := readyDeploymentSource()
+	base.meta.Clients.Hosts[0].Class = "shared-1"
+	base.meta.Clients.Hosts[1].Class = "shared-1"
+	base.meta.Clients.Hosts[2].Class = "pc03"
+	shared := "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-nixorium-client-shared-1"
+	base.current["pc01"] = domain.HostSystemProbe{SystemPath: shared, Revision: base.revision, Number: 1}
+	base.current["pc02"] = domain.HostSystemProbe{SystemPath: shared, Revision: base.revision, Number: 5}
+	source := &scriptedProbeSource{fakeDeploymentSource: base, answers: []map[string]domain.HostSystemProbe{base.current}}
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "@lab", base.revision, "", io.Discard)
+	states := []string{}
+	for _, target := range report.Verification.Targets {
+		states = append(states, target.Name+" "+target.State+" "+target.Detail)
+	}
+	want := []string{
+		"pc01 verified ",
+		"pc02 unverified the computer's identity record names computer number 5",
+		"pc03 verified ",
+	}
+	if !reflect.DeepEqual(states, want) || len(source.asked) != 1 {
+		t.Fatalf("verification = %q, asked = %v", states, source.asked)
+	}
+	if identityMismatchDetail(0) != "the computer reports no identity record; its name and address are not set" {
+		t.Fatal(identityMismatchDetail(0))
+	}
+}
+
+func TestDeploymentVerificationDoesNotRetryRevisionMismatch(t *testing.T) {
+	base := readyDeploymentSource()
+	base.current["pc01"] = domain.HostSystemProbe{SystemPath: base.current["pc01"].SystemPath, Revision: "fedcba9876543210"}
+	source := &scriptedProbeSource{fakeDeploymentSource: base, answers: []map[string]domain.HostSystemProbe{base.current}}
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", base.revision, "", io.Discard)
+	if len(source.asked) != 1 || report.Verification.Targets[0].State != "unverified" {
+		t.Fatalf("asked = %v, verification = %+v", source.asked, report.Verification)
+	}
+}
+
+func TestDeploymentVerificationStopsWaitingWhenCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := sleepContext(ctx, time.Hour); !errors.Is(err, context.Canceled) {
+		t.Fatalf("sleepContext = %v", err)
+	}
+}
+
 func TestDeploymentReportsChangedHostKeyWithoutRecordingSuccess(t *testing.T) {
 	source := readyDeploymentSource()
 	source.runErrors = map[domain.DeploymentPhase]error{domain.DeploymentPhaseApply: errors.New("host-key checking rejected apply")}
 	source.current["pc01"] = domain.HostSystemProbe{HostKeyCondition: domain.HostKeyChanged}
-	r := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
+	r := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
 	if r.State != "failed" || r.Verification.Verified != 0 || r.Verification.Recorded != 0 || len(r.Verification.Targets) != 1 || r.Verification.Targets[0].HostKeyCondition != domain.HostKeyChanged || !strings.Contains(r.Verification.Targets[0].Detail, "physical identity") {
 		t.Fatalf("incorrect trust failure: %+v", r)
 	}
@@ -274,7 +383,7 @@ func TestDeploymentReportsChangedHostKeyWithoutRecordingSuccess(t *testing.T) {
 func TestDeploymentExecuteReportsIncompleteVerificationAfterSuccessfulApply(t *testing.T) {
 	source := readyDeploymentSource()
 	delete(source.current, "pc02")
-	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01,pc02", source.revision, "", io.Discard)
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01,pc02", source.revision, "", io.Discard)
 	if report.State != "partial" || report.Phase != domain.DeploymentPhaseVerify || !report.ApplyCompleted || !report.HasErrors() {
 		t.Fatalf("incomplete verification report = %+v", report)
 	}
@@ -286,7 +395,7 @@ func TestDeploymentExecuteReportsIncompleteVerificationAfterSuccessfulApply(t *t
 func TestDeploymentExecuteReportsHistoryWriteFailureAfterSuccessfulApply(t *testing.T) {
 	source := readyDeploymentSource()
 	source.recordErr = errors.New("read-only state")
-	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
 	if report.State != "failed" || report.Phase != domain.DeploymentPhaseVerify || !report.ApplyCompleted || report.Verification.Verified != 1 || report.Verification.Recorded != 0 || !strings.Contains(report.Message, "recording verification failed") {
 		t.Fatalf("history failure report = %+v", report)
 	}
@@ -304,7 +413,7 @@ func steppingClock() func() time.Time {
 
 func TestDeploymentLogTimesEveryStep(t *testing.T) {
 	source := readyDeploymentSource()
-	manager := NewDeploymentManager(source)
+	manager := newTestDeploymentManager(source)
 	manager.now = steppingClock()
 	log := &bytes.Buffer{}
 	report := manager.Execute(context.Background(), "/deployment", "pc01", source.revision, "", log)
@@ -313,10 +422,10 @@ func TestDeploymentLogTimesEveryStep(t *testing.T) {
 	}
 	for _, want := range []string{
 		"==> Reviewing the selected computers (2026-10-19T08:00:01Z)\n    Reviewing took 1s\n",
-		"==> Building selected configurations with Colmena (2026-10-19T08:00:03Z)\n",
+		"==> Building the systems of the selected computers (2026-10-19T08:00:03Z)\n",
 		"    Building took 1s\n",
 		"\n==> Revalidating the reviewed revision and targets (2026-10-19T08:00:05Z)\n    Revalidating took 1s\n",
-		"\n==> Applying the built configurations with Colmena (2026-10-19T08:00:07Z)\n",
+		"\n==> Copying and activating the built systems (2026-10-19T08:00:07Z)\n",
 		"    Applying took 1s\n",
 		"\n==> Verifying selected computers through authenticated host state (2026-10-19T08:00:09Z)\n",
 		// The verification step also reads the clock once to stamp the record.
@@ -336,7 +445,7 @@ func TestDeploymentLogTimesEveryStep(t *testing.T) {
 func TestDeploymentLogTimesFailedBuildWithoutApply(t *testing.T) {
 	source := readyDeploymentSource()
 	source.runErrors = map[domain.DeploymentPhase]error{domain.DeploymentPhaseBuild: errors.New("fixture failure")}
-	manager := NewDeploymentManager(source)
+	manager := newTestDeploymentManager(source)
 	manager.now = steppingClock()
 	log := &bytes.Buffer{}
 	report := manager.Execute(context.Background(), "/deployment", "pc01", source.revision, "", log)
@@ -344,7 +453,7 @@ func TestDeploymentLogTimesFailedBuildWithoutApply(t *testing.T) {
 		t.Fatalf("report = %+v", report)
 	}
 	for _, want := range []string{
-		"==> Building selected configurations with Colmena (2026-10-19T08:00:03Z)\n",
+		"==> Building the systems of the selected computers (2026-10-19T08:00:03Z)\n",
 		"    Building took 1s\n",
 		"\nTotal time: 4s\n",
 	} {
@@ -366,7 +475,7 @@ func TestDeploymentLeavesOutComputersThatStopAnsweringAfterTheBuild(t *testing.T
 	source.afterBuild = func() {
 		source.ssh = map[string]domain.SSHProbe{"pc01": answer, "pc02": {Reachability: domain.ReachabilityUnreachable}}
 	}
-	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01,pc02", source.revision, "", io.Discard)
+	report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01,pc02", source.revision, "", io.Discard)
 	if len(source.selectors) != 2 || source.selectors[0] != "pc01,pc02" || source.selectors[1] != "pc01" {
 		t.Fatalf("selectors = %v, want the build for both and the apply for pc01 only", source.selectors)
 	}
@@ -381,7 +490,7 @@ func TestDeploymentLeavesOutComputersThatStopAnsweringAfterTheBuild(t *testing.T
 	source = readyDeploymentSource()
 	source.ssh = map[string]domain.SSHProbe{"pc01": answer}
 	source.afterBuild = func() { source.ssh = map[string]domain.SSHProbe{} }
-	report = NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
+	report = newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
 	if len(source.runPhases) != 1 || report.State != "failed" || report.ApplyCompleted || report.RecoveryRequired {
 		t.Fatalf("phases %v, report %+v", source.runPhases, report)
 	}

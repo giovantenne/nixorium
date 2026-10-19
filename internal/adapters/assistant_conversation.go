@@ -194,6 +194,8 @@ type AssistantWorkspaceTools struct {
 	Store       AssistantWorkspaceStore
 	LabStatus   func(context.Context, string) string
 	Diagnostics func(context.Context, string, string, string) string
+	// SystemFiles reads one allowlisted system file of a computer (ADR 0032).
+	SystemFiles func(context.Context, string, string, string) string
 }
 
 func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation domain.AssistantConversation, call domain.AssistantToolCall) string {
@@ -220,10 +222,19 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	}
 	result := ""
 	switch call.Name {
-	case "host_diagnostics", "git_history", "prefetch":
+	case "host_diagnostics", "git_history", "prefetch", "read_system_file":
 		accepted, consentErr := tools.Store.ReadConsent()
 		if consentErr != nil || !accepted {
 			result = `{"ok":false,"error":"consent_required"}`
+		} else if call.Name == "read_system_file" {
+			var args struct{ Host, Path string }
+			// Malformed arguments leave an empty host and path, which the tool rejects.
+			_ = json.Unmarshal(call.Arguments, &args)
+			if tools.SystemFiles == nil {
+				result = `{"ok":false,"error":"system_files_unavailable"}`
+			} else {
+				result = tools.SystemFiles(ctx, workspace.Conversation.Repository, args.Host, args.Path)
+			}
 		} else if call.Name == "git_history" {
 			result = AssistantGitHistory(ctx, workspace, call)
 		} else if call.Name == "prefetch" {

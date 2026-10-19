@@ -185,3 +185,64 @@ func TestDeploymentRecoveryChecksThePreviousAddressAndRecorderStart(t *testing.T
 		}
 	}
 }
+
+func TestInterruptedEngineUpdateClosesItselfOnlyWhenEveryResultIsKnown(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	id := strings.Repeat("c", 32)
+	failed := 2
+	source := &fakeDeploymentRecovery{
+		present: true,
+		running: true,
+		pending: domain.PendingDeployment{SchemaVersion: 1, Repository: "/srv/lab", Revision: revision, StartedAt: time.Now().UTC(), ControllerPID: 7, ApplyReturned: true,
+			Targets: []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}, {Name: "pc02", IP: "10.0.0.2"}, {Name: "pc03", IP: "10.0.0.3"}},
+			Activations: []domain.PendingActivation{
+				{Name: "pc01", State: domain.ActivationStarted, ActivationID: id, Result: domain.ActivationUnknown},
+				{Name: "pc02", State: domain.ActivationPlanned},
+				{Name: "pc03", State: domain.ActivationFinished, Result: domain.ActivationFailed, ExitCode: &failed},
+			}},
+		// pc01 came back, but its own result is not there yet.
+		activity: map[string]domain.DeploymentActivity{"pc01": {Reachable: true, Revision: revision}},
+	}
+	manager := NewDeploymentRecoveryManager(source)
+	if _, closed := manager.AutoClose(context.Background(), "/srv/lab"); closed || source.archived != 0 {
+		t.Fatal("closed by inferring the result from the revision alone")
+	}
+	if len(source.hosts) != 1 || source.hosts[0].Name != "pc01" {
+		t.Fatalf("observed %v; only the started computer needs checking", source.hosts)
+	}
+	// The activation's own result is now on the computer.
+	activated := 4
+	source.activity["pc01"] = domain.DeploymentActivity{Reachable: true, Revision: revision, LastActivationID: id, LastExitCode: &activated}
+	plan := manager.Plan(context.Background(), "/srv/lab", false)
+	if plan.State != "ready" || !plan.Automatic {
+		t.Fatalf("plan = %+v", plan)
+	}
+	states := map[string]string{}
+	for _, target := range plan.Targets {
+		states[target.Name] = target.State
+	}
+	if states["pc01"] != domain.RecoveryTargetReviewed || states["pc02"] != domain.RecoveryTargetNotStarted || states["pc03"] != domain.RecoveryTargetOther {
+		t.Fatalf("states = %v", states)
+	}
+	if result, closed := manager.AutoClose(context.Background(), "/srv/lab"); !closed || source.archived != 1 || result.State != "completed" {
+		t.Fatalf("result = %+v, archived %d", result, source.archived)
+	}
+}
+
+func TestOlderRecordsAreNeverClosedAutomatically(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	source := &fakeDeploymentRecovery{
+		present: true,
+		pending: domain.PendingDeployment{SchemaVersion: 1, Repository: "/srv/lab", Revision: revision, StartedAt: time.Now().UTC(), ControllerPID: 7,
+			Targets: []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}}},
+		activity: map[string]domain.DeploymentActivity{"pc01": {Reachable: true, Revision: revision}},
+	}
+	manager := NewDeploymentRecoveryManager(source)
+	plan := manager.Plan(context.Background(), "/srv/lab", false)
+	if plan.State != "ready" || plan.Automatic {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if _, closed := manager.AutoClose(context.Background(), "/srv/lab"); closed {
+		t.Fatal("a record without the engine's states was closed without review")
+	}
+}

@@ -208,6 +208,43 @@ nixorium_require_unique_target_labels() {
   done < <(lsblk -nrpo PATH,PARTLABEL)
 }
 
+# The name inside a client's system store path: its own name, or the class
+# name when the computer shares one system with its class (ADR 0033).
+nixorium_expected_system_name() {
+  local host_name=$1 class=${2:-}
+  [[ "$host_name" =~ ^pc[0-9]{2,4}$ ]] || { echo "invalid computer name" >&2; return 1; }
+  if [[ -z "$class" || "$class" == "$host_name" ]]; then
+    printf '%s\n' "$host_name"
+  elif [[ "$class" =~ ^shared-[0-9]{1,4}$ ]]; then
+    printf 'nixorium-client-%s\n' "$class"
+  else
+    echo "invalid class of $host_name" >&2
+    return 1
+  fi
+}
+
+# The identity record of the installed computer: a shared system takes the
+# computer's name and address from it; a per-host system writes the same
+# record itself. Written before the first boot and read back.
+nixorium_write_identity_record() {
+  local host_name=$1 install_root=${2:-/mnt} number expected record
+  [[ "$host_name" =~ ^pc0*([1-9][0-9]{0,3})$ ]] || { echo "invalid computer name" >&2; return 1; }
+  number=${BASH_REMATCH[1]}
+  expected="{\"schemaVersion\":1,\"number\":${number}}"
+  record="$install_root/var/lib/nixorium/identity.json"
+  local -a privileged=()
+  (( EUID == 0 )) || privileged=(sudo)
+  "${privileged[@]}" mkdir -p "$install_root/var/lib/nixorium"
+  printf '%s\n' "$expected" | "${privileged[@]}" tee "$record.tmp" >/dev/null
+  "${privileged[@]}" chmod 0644 "$record.tmp"
+  "${privileged[@]}" mv -f "$record.tmp" "$record"
+  sync
+  [[ "$("${privileged[@]}" cat "$record")" == "$expected" ]] || {
+    echo "the identity record was not written" >&2
+    return 1
+  }
+}
+
 nixorium_verify_installed_profile() {
   local expected_system=$1 selected_disk=$2 install_root=${3:-/mnt} profile root_source root_device root_parent
   profile=$(readlink -f "$install_root/nix/var/nix/profiles/system" 2>/dev/null || true)

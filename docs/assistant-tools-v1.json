@@ -217,5 +217,24 @@
       ],
       "type": "object"
     }
+  },
+  {
+    "name": "read_system_file",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "path"
+      ],
+      "type": "object"
+    }
   }
 ]

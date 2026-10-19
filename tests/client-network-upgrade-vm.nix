@@ -28,6 +28,7 @@ in
           hostName = "pc01";
           isController = false;
           hostIp = "10.0.0.1";
+          nixoriumClass = { id = "pc01"; shared = false; members = [ "pc01" ]; representative = "pc01"; };
           labSettings = {
             deploymentMode = "laboratory";
             masterHostName = "pc99";

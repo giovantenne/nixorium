@@ -27,7 +27,7 @@ func (model dashboardModel) deploymentStopView() string {
 		path: []string{"Computers", "Update computers", "Stop waiting"},
 		body: strings.Join([]string{
 			tuiTitle("Stop supervising this deployment?", model.isDark), "",
-			"This stops the local Colmena/SSH processes, not a remote rollback.",
+			"This stops the local copy and SSH processes, not a remote rollback.",
 			"A client activation may continue after the connection closes.",
 			"If apply started, new operations remain blocked until reviewed recovery.",
 			"Nixorium will still attempt bounded, authenticated client observations.",

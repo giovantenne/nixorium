@@ -546,6 +546,8 @@ let
       ${builtins.readFile ../scripts/lib/pxe-build.sh}
 
       mapfile -t CLIENT_NAMES < <(jq -er '.clients.hosts[].name' <<<"$META")
+      # Parallel to the names: computers of a class share one system.
+      mapfile -t CLIENT_CLASSES < <(jq -er '.clients.hosts[] | (.class // .name)' <<<"$META")
       publish_progress running clients \
         "Evaluating shared artifacts and client systems in bounded batches" 0 "''${#CLIENT_NAMES[@]}"
       build_pxe_outputs "$FLAKE_URL" "''${CLIENT_NAMES[@]}"
@@ -760,7 +762,6 @@ in
     environment.systemPackages = [
       nixoriumPackage
       nixoriumLauncher
-      pkgs.colmena
       pkgs.git
     ] ++ lib.optionals (labSettings.classroomView or true) [
       classroomLauncher
@@ -1029,8 +1030,13 @@ in
       description = "Apply queued Nixorium client updates to computers that are back";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
-      unitConfig.ConditionPathExists = "/var/lib/nixorium/coordination/deferred-updates.json";
-      path = [ pkgs.colmena pkgs.git pkgs.nix pkgs.openssh pkgs.util-linux ];
+      # It also runs while an interrupted client update waits, so that the
+      # record closes itself once every computer's result is known.
+      unitConfig.ConditionPathExists = [
+        "|/var/lib/nixorium/coordination/deferred-updates.json"
+        "|/var/lib/nixorium/coordination/deployment-pending.json"
+      ];
+      path = [ pkgs.git pkgs.nix pkgs.openssh pkgs.util-linux ];
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${nixoriumPackage}/bin/nixorium --repo ${lib.escapeShellArg cfg.deploymentPath} deploy queue run";

@@ -82,8 +82,17 @@ func classroomBlockedHostsAt(directoryPath string, managed bool) (map[string]str
 		// An unreadable record cannot say which computers it names.
 		return nil, domain.Blocked("DEPLOY-PENDING", fmt.Errorf("%s: %w", domain.MessageDeploymentPending, err))
 	}
+	// While the update runs, every computer it names may still be started;
+	// once its apply returned, only computers whose result is unknown wait.
 	blocked := map[string]string{}
 	for _, target := range pending.Targets {
+		state := pending.ActivationOf(target.Name).State
+		if pending.ApplyReturned && state != domain.ActivationStarted {
+			continue
+		}
+		if state == domain.ActivationFinished {
+			continue
+		}
 		blocked[target.Name] = domain.ClassroomBusyReason
 	}
 	return blocked, nil

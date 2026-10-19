@@ -9,7 +9,7 @@ broaden that role through developer instructions. Discovery
 links for Codex, OpenCode, Claude Code, and Pi are versioned with the repository.
 
 Nixorium manages a multi-PC NixOS lab using Nix Flakes,
-Disko, and Colmena. A controller PC deploys to student workstations
+Disko, and its own deployment engine (ADR 0031). A controller PC deploys to student workstations
 over a LAN-only deployment network. Clients do not need internet for
 installation or system updates, but may have internet during user sessions.
 
@@ -51,7 +51,7 @@ lib/
   eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
   eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
   eval-workspace-profile.nix # Internal student preference JSON validator
-  mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
+  mk-lab.nix               # Host, class, netboot, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
 pkgs/
@@ -60,6 +60,7 @@ cmd/nixorium/              # Management CLI entrypoint
 cmd/nixorium-remote-worker/ # Controller-owned USB/SSH operation worker
 cmd/nixorium-demo/         # Developer-only deterministic website demo exporter
 internal/                  # Domain, application, adapter, and presentation layers
+  deploymigrate/           # Changes a release makes to deployment files: registry.go (ADR 0034)
 modules/
   common.nix               # Composition point and shared system defaults
   firewall.nix             # Interface-scoped SSH, cache, PXE, and time policy
@@ -70,6 +71,7 @@ modules/
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
   networking.nix           # Hostname + static IP with shared iface name
+  identity.nix             # Client identity record (/var/lib/nixorium/identity.json)
   management.nix           # Controller-only management command installation
   pxe.nix                  # Transactional PXE address state and boot recovery
   users.nix                # User accounts (admin + teacher + student, nixorium-staff group)
@@ -176,6 +178,57 @@ examples using the real argument parser, relative instruction links, and skill
 discovery/distribution. They do not prove that prose describes runtime effects:
 review CLI versus TUI behavior and existing workflow tests explicitly.
 
+## Deployment migrations
+
+A deployment owns the files copied from `templates/site/`, so a change there
+does not reach existing deployments by itself. The changes a release makes to
+them are Go code in `internal/deploymigrate/registry.go` (`Registry`, a list of
+`Migration{ID, Description, Apply(Tree) Outcome}`; ADR 0034). The release
+being installed runs them: Update Nixorium builds the target's `nixorium`
+package, runs `nixorium deployment migrate --root … --contract 1 --json` in a
+bubblewrap sandbox on a copy of the saved deployment, compares the copy with
+the original under fixed rules (`internal/adapters/deployment_migrations.go`),
+shows the difference in the review and saves it with the update. Each
+migration is applied once and recorded by the migrator in the deployment's
+`nixorium-migrations.json`. Whenever a change to `templates/site/**`, or to
+anything else a deployment owns, must reach existing deployments, add a
+migration in the same change:
+
+- Append to `Registry`; never edit or remove a released entry. Its id is
+  already recorded in deployments, and deployments that skip releases still
+  need it. To correct a mistake, add a new entry.
+- `ID` starts with the year and month: `2026-10-short-slug`. `Description` is
+  one sentence an administrator understands.
+- For a text replacement use `ReplaceExact`. Its `from` is the exact text of
+  the previous template: copy it from the file's history in version control
+  (`git log -p -- templates/site/<file>`), not from memory. Every released form
+  of the text that differs needs its own entry; a form with no entry becomes a
+  "Manual change" in the review, so say so in the changelog. Prefer whole-line
+  replacements that end with a newline, and keep each text short. A migration
+  may also create, change or remove files through `Tree.Write` and
+  `Tree.Remove`.
+- `Outcome.Files` must list every file an applied migration changed, created
+  or removed. The installed release refuses the update if a changed file is
+  not declared or a declared file did not change. Only regular files are
+  accepted; never `flake.nix`, `flake.lock`, `keys/`, `admin-ssh/`,
+  `lab-credentials.json`, `secret-key`, hidden paths or symbolic links; at most
+  1 MiB per file, 256 files and 16 MiB in all; the record may be changed but
+  not removed.
+- Add a unit test in `internal/deploymigrate`: the old text is migrated and
+  recorded, an edited file becomes a manual change, a deployment that already
+  has the change is `done`, and the template's own mkLab and template checks
+  still pass with the new text.
+- The contract between the installed release and the migrator (exit status,
+  JSON report, marker file `share/nixorium/deployment-migrate-contract`) is
+  stable. Change it only by adding a contract version, and keep the old
+  version supported for a year of releases. Never change what version 1 means.
+- Mention the change in `CHANGELOG.md`, and review the administrator update
+  guide (`docs/updates.md`, with its template copy) if what the review shows
+  changes. A controller whose installed release has no migrations (3.9.0 or
+  older) cannot run them during the update: for that step the upgrade note
+  gives `nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment
+  migrate --root .` in the deployment folder.
+
 ## Releases
 
 Releases follow Semantic Versioning. `VERSION`, the release tag (`v<version>`),
@@ -189,6 +242,10 @@ the GitHub Release from the matching changelog section. The same workflow runs
 nightly on `master` and on demand, so failures surface before a tag; ordinary
 pushes do not run it. Each job has a 240-minute limit; failure or timeout of
 any shard must block publication.
+
+Before the release commit, check that every change to `templates/site/**` made
+since the previous tag that existing deployments need has its entry in
+`Registry` in `internal/deploymigrate/registry.go`.
 
 Before tagging, the website branch `release/<version>` of `nixorium-website`
 must exist, be built against the commit to release and be green on `staging`.
@@ -240,7 +297,8 @@ that release's notes, so a release is not finished until the site follows it.
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `groupModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
-- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
+- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`, with the controller defined separately.
+- Clients of one class (`nixoriumHostClasses`: same module groups, managed software and interface; the controller, `hostModules` hosts and `updateValidationHosts` are classes of one) share one system (ADR 0033). A class of one keeps the per-host system and is named after its computer; a class with several members is `shared-<n>` (`classIdFor`), and `nixosConfigurations.pcNN` is an alias of it. `labSettings.clientIdentities` carries number, name, address and previous address of every client; `labMeta.clients.hosts[].class` and `labMeta.clients.classes` list the classes; modules receive `nixoriumClass`. In a shared system `hostName` and `hostIp` throw: a private module that needs them must be listed in `hostModules` or `updateValidationHosts`. A computer takes its name and laboratory address from `/var/lib/nixorium/identity.json` (`{"schemaVersion":1,"number":N}`, `modules/identity.nix`); the update and the installers write it, a record naming another computer is never overwritten, and the flake has no `colmena` output.
 - Hostname, static IP, and effective network interface are centralized in
   `lib/mk-lab.nix`. `ifaceName` is the compatibility fallback;
   `controllerIfaceName`, `clientIfaceName`, and `hostIfaceNames` resolve in
@@ -254,7 +312,7 @@ that release's notes, so a release is not finished until the site follows it.
   type (a NetworkManager profile), its Internet-block and SSH nftables rules
   omit interface names, and installers skip the name check. Keep these paths
   consistent (ADR 0017).
-- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
+- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by the deployment engine and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
 - Clients substitute only from the controller's Harmonia cache: `modules/cache.nix`
   replaces the NixOS `cache.nixos.org` default on clients (override priority 90),
   so updates never contact the Internet. The controller keeps the public cache.
@@ -290,10 +348,9 @@ that release's notes, so a release is not finished until the site follows it.
   key revocation as unconfirmed. Consumed review tokens, any remote receipt,
   uncertain dispatch, and reboot evidence forbid this path; never reuse the
   old authorization or accept a replacement identity for recovery.
-- Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
-  Colmena receives them only as per-node `meta.nodeSpecialArgs`: its global
-  `meta.specialArgs` overrides node `_module.args`, so never put host-resolved
-  values (interface, address, software) there.
+- Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`, `nixoriumClass`) to modules that need them.
+  Never put host-resolved values (interface, address, software) in global
+  arguments; `specialArgsForHost` and `specialArgsForClass` resolve them per system.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - Guided software changes use `software catalog`, `software plan`, and
@@ -364,7 +421,7 @@ that release's notes, so a release is not finished until the site follows it.
   starts once local account credentials or laboratory private keys exist.
 - Inventory/package discovery must remain independent of host module evaluation.
   Keep workspace prerequisite guards on readiness, validators, configurations,
-  Colmena and individual app/package entries; Nix probes package namespaces even
+  and individual app/package entries; Nix probes package namespaces even
   when reading top-level metadata. Group a controller preflight into one fresh
   evaluation, never a cached authorization. Repeat live revision, activation
   receipt and system checks before/after apply. Update candidate builds share
@@ -400,7 +457,7 @@ that release's notes, so a release is not finished until the site follows it.
   is never unattended. Both installers use `ERASE` and ask again after a
   mistyped answer; an empty confirmation cancels.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
-- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist fleet-wide pending evidence before apply. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new maintenance operations except controller activation (ADR 0027), makes classroom controls leave the computers it names alone (ADR 0030) and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
+- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with the fixed commands of ADR 0031 (one `nix build` of the systems, `nix-copy-closure --use-substitutes`, one SSH command starting the `nixorium-activate` transient unit, read-only polling), and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. The apply only uses store paths built for that revision in the same update. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist pending evidence before apply, with each computer marked started durably before its activation command. A record whose every computer is known from the engine's own evidence (never started, finished in the record, or this activation's `last.json` on the computer) closes itself (ADR 0031, D7); anything inferred, or older records, still need the reviewed recovery. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new maintenance operations except controller activation (ADR 0027), makes classroom controls leave the computers it names alone (ADR 0030) and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
 - Deployment availability is advisory: probe only selected identities with the
   bounded inventory probe; an open SSH port is not authenticated identity or
   proof of power state. A reachable-only choice creates a fresh explicit-target
@@ -466,6 +523,13 @@ that release's notes, so a release is not finished until the site follows it.
   ancestors of the conversation base, visible safe paths and bounded sanitized
   diffs; it never changes Git or contacts a remote. New observations require
   renewed consent before entering the model transcript.
+  Consent- and capability-gated `read_system_file` (ADR 0032) reads one path
+  of a declared computer through the fixed helper `nixorium-host-diagnostics
+  file`: only the allowlisted system locations of `internal/systemfiles`,
+  never homes, `/root`, secrets, keys, Wi-Fi connections or snapshots, links
+  followed only into the Nix store, secret-bearing lines withheld, and every
+  answer re-validated on the controller. Never widen the allowlist without
+  a new disclosure version.
   Consent- and capability-gated `prefetch` downloads one public https file into
   the controller store: keep public-host and per-redirect checks, the 1 GiB,
   15-minute and one-at-a-time bounds, and return only hash, size and store path.
@@ -629,9 +693,9 @@ that release's notes, so a release is not finished until the site follows it.
   on the new network with the saved configuration, and keeps undo possible
   until then (ADR 0028). During a change labMeta decoding copies each
   client's previous address into `HostMeta.PreviousIP`: every per-computer
-  probe tries the new address first, then the previous one, and Colmena
-  reaches a computer on the previous network through `HostName` entries in
-  its SSH configuration. Trusted host keys are copied from the previous to
+  probe tries the new address first, then the previous one, and the
+  deployment engine copies to and activates a computer at the address that
+  answered. Trusted host keys are copied from the previous to
   the new address in the managed known-hosts file before any contact there;
   never replace a different key or relax checking. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first
@@ -1000,7 +1064,7 @@ Use only the arguments the module actually needs:
 | File names       | kebab-case       | `home-reset.nix`, `install-controller.sh`   |
 | Shell variables  | UPPER_SNAKE_CASE | `PC_NUMBER`, `TEMPLATE_DIR`                 |
 | NixOS options    | Standard dotted  | `services.openssh.enable`                   |
-| Helper functions | `mk` prefix      | `mkHost`, `mkColmenaHost`                   |
+| Helper functions | `mk` prefix      | `mkHost`, `mkLab`                           |
 
 ### Imports
 - Flake uses root-relative: `./modules/networking.nix`, `./modules/cache.nix`
@@ -1086,7 +1150,9 @@ set -euo pipefail
 ## Host Configuration
 
 Hostname + static IP are generated in `lib/mk-lab.nix` from the IPv4 network,
-CIDR prefix, and host offset. Interface resolution uses host, role, then shared
+CIDR prefix, and host offset. In a shared class system they are not evaluated
+into the system: they come from the computer's identity record at activation
+(ADR 0033). Interface resolution uses host, role, then shared
 fallback settings in `lib/mk-lab.nix`; `modules/networking.nix` applies the
 resolved interface.
 

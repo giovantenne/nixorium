@@ -368,7 +368,13 @@ Each group refers only to client PCs. Overlapping groups apply both sets of
 modules in group-name order. Group modules describe common behavior; keep
 individual exceptions in `hostModules` or declare `updateValidationHosts` when
 private modules branch by host name. Grouping preserves differences in managed
-software and network interfaces. An older pinned Nixorium must be updated before
+software and network interfaces. Computers that are identical in groups,
+software and interface share one system, which is built once; each keeps its
+name and address from a small identity record that the update or the installer
+writes. A module that uses `hostName` or `hostIp` needs its computer listed in
+`hostModules` or `updateValidationHosts`; otherwise evaluation stops with a clear
+error. If a computer reports "This computer has no Nixorium identity", see the
+troubleshooting guide. An older pinned Nixorium must be updated before
 using this new argument; do not add it to a pin that does not support it.
 
 <details>
@@ -399,8 +405,10 @@ deploy only that machine:
 ```sh
 git add flake.nix modules/pc05.nix
 nix build .#nixosConfigurations.pc05.config.system.build.toplevel --no-link
-colmena apply --on pc05
 ```
+
+Then save the change and update that computer with **Computers → Update
+computers** (or `nixorium deploy plan --on pc05` and `nixorium deploy apply`).
 
 Additional backgrounds can be passed from `flake.nix`:
 
@@ -555,7 +563,7 @@ step—prepare files, start PXE, boot/install a client, or recover networking—
 shows only controls relevant to the observed mode.
 
 Long PXE, controller, and deployment work displays typed phase progress.
-Press `l` for details, including controller builds started after an update or
+Press `l` for details when there are any, including controller builds started after an update or
 software change. Deployment details include recent private command output;
 `s` reviews stopping local supervision, not remote activation. An uncertain
 apply reserves the fleet until [reviewed recovery](TROUBLESHOOTING.md#interrupted-client-deployment).
@@ -871,8 +879,8 @@ Apply repeats the preflight, asks `Continue? [y/N]` in the CLI (Enter on the rev
 activation, and streams output to a mode-0600 log. In the dashboard, the same
 foreground operation shows elapsed time, named stages and authenticated-computer
 verification counts. `l` expands the progress bar and up to five authored
-activities. Raw Colmena output remains in the private log instead of being rendered
-as terminal UI. Accidental quit stays disabled until the final report appears;
+activities. The build output, each computer's copy and its activation messages
+remain in the private log instead of being rendered as terminal UI. Accidental quit stays disabled until the final report appears;
 that compact result offers direct dashboard, log, and fresh-review actions.
 
 After every attempt, Nixorium authenticates selected hosts and records only

@@ -27,6 +27,13 @@ type DeploymentSource interface {
 
 const deploymentVerificationTimeout = 3 * time.Second
 
+// A computer that has just activated its system may need a few seconds before
+// it answers the host-state check, so a missing answer is asked for again.
+const (
+	deploymentVerificationAttempts  = 3
+	deploymentVerificationRetryWait = 5 * time.Second
+)
+
 func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, expectedRevision, logPath string, progress io.Writer) domain.DeploymentExecutionReport {
 	return m.ExecuteWithProgress(ctx, repository, requested, expectedRevision, logPath, progress, nil)
 }
@@ -60,7 +67,7 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 	timing.heading("==> Reviewing the selected computers", startedAt)
 	timing.took("Reviewing", startedAt, reviewedAt)
 	defer func() { timing.total(startedAt) }()
-	timing.begin("==> Building selected configurations with Colmena")
+	timing.begin("==> Building the systems of the selected computers")
 	err := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4}, output, observe)
 	timing.end("Building")
 	if err != nil {
@@ -111,7 +118,7 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4,
 		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(applyTargets)),
 	})
-	timing.begin("\n==> Applying the built configurations with Colmena")
+	timing.begin("\n==> Copying and activating the built systems")
 	// Apply over the addresses that answered just now: during a change of
 	// laboratory network a computer not yet moved is reached on its
 	// previous address.
@@ -216,6 +223,18 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 	}
 	hosts := targetHosts(targets)
 	observed := m.source.CurrentSystems(ctx, hosts, deploymentVerificationTimeout)
+	if observed == nil {
+		observed = map[string]domain.HostSystemProbe{}
+	}
+	for attempt := 1; attempt < deploymentVerificationAttempts; attempt++ {
+		pending := hostsWithoutState(hosts, observed)
+		if len(pending) == 0 || m.sleep(ctx, deploymentVerificationRetryWait) != nil {
+			break
+		}
+		for name, probe := range m.source.CurrentSystems(ctx, pending, deploymentVerificationTimeout) {
+			observed[name] = probe
+		}
+	}
 	availability := m.source.SSHStatus(ctx, hosts, sshProbeTimeout)
 	updates := map[string]domain.LastSuccessfulDeployment{}
 	verifiedAt := m.now().UTC()
@@ -243,6 +262,8 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 			}
 		case probe.Revision != report.Revision:
 			verification.Detail = "authenticated host revision differs from the reviewed revision"
+		case target.SharedSystem() && probe.Number != expectedNumber(target.Name):
+			verification.Detail = identityMismatchDetail(probe.Number)
 		default:
 			verification.State = "verified"
 			verification.Detail = ""
@@ -325,10 +346,54 @@ func sameDeploymentTargets(left, right []domain.DeploymentTarget) bool {
 type DeploymentManager struct {
 	source DeploymentSource
 	now    func() time.Time
+	sleep  func(context.Context, time.Duration) error
 }
 
 func NewDeploymentManager(source DeploymentSource) *DeploymentManager {
-	return &DeploymentManager{source: source, now: time.Now}
+	return &DeploymentManager{source: source, now: time.Now, sleep: sleepContext}
+}
+
+// sleepContext waits for the duration, or returns the context's error as soon
+// as the context ends.
+func expectedNumber(name string) int {
+	number, _ := domain.ClientNumber(name)
+	return number
+}
+
+// identityMismatchDetail explains why a computer running a shared system is
+// not verified: its identity record names no computer or another one.
+func identityMismatchDetail(recorded int) string {
+	if recorded == 0 {
+		return "the computer reports no identity record; its name and address are not set"
+	}
+	return fmt.Sprintf("the computer's identity record names computer number %d", recorded)
+}
+
+func sleepContext(ctx context.Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+// hostsWithoutState are the hosts whose check returned no result or no system
+// state, except those whose SSH host key changed: asking again cannot fix that.
+func hostsWithoutState(hosts []domain.HostMeta, observed map[string]domain.HostSystemProbe) []domain.HostMeta {
+	var pending []domain.HostMeta
+	for _, host := range hosts {
+		probe, found := observed[host.Name]
+		if probe.HostKeyCondition == domain.HostKeyChanged {
+			continue
+		}
+		if !found || probe.Revision == "" || probe.SystemPath == "" {
+			pending = append(pending, host)
+		}
+	}
+	return pending
 }
 
 func (m *DeploymentManager) Plan(ctx context.Context, repository, requested string) domain.DeploymentPlanReport {
@@ -511,7 +576,7 @@ func selectDeploymentTargets(hosts []domain.HostMeta, requested string) ([]domai
 	targets := make([]domain.DeploymentTarget, 0, len(names))
 	for _, name := range names {
 		host := available[name]
-		targets = append(targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP, PreviousIP: host.PreviousIP})
+		targets = append(targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP, PreviousIP: host.PreviousIP, Class: host.Class})
 	}
 	selector := strings.Join(names, ",")
 	if requested == "@lab" && len(issues) == 0 {

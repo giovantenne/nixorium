@@ -19,7 +19,7 @@ func TestDeploymentPlanAvailabilityAndExplicitSubset(t *testing.T) {
 		"pc03": {Reachability: domain.ReachabilityReachable, SSH: domain.SSHUnavailable},
 		"pc99": {Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable},
 	}
-	manager := NewDeploymentManager(source)
+	manager := newTestDeploymentManager(source)
 	plan := manager.Plan(context.Background(), "/deployment", "pc02,pc01,pc03")
 	if plan.HasErrors() || len(plan.Availability) != 3 || plan.ReachableRequested != "pc01" || plan.ColmenaSelector != "pc02,pc01,pc03" {
 		t.Fatalf("plan: %+v", plan)
@@ -49,7 +49,7 @@ func TestDeploymentPlanAvailabilityAndExplicitSubset(t *testing.T) {
 
 func TestDeploymentSubsetRefusesEmptyUnknownOrMismatchedObservations(t *testing.T) {
 	source := readyDeploymentSource()
-	manager := NewDeploymentManager(source)
+	manager := newTestDeploymentManager(source)
 	for _, probes := range []map[string]domain.SSHProbe{nil, {}, {"pc01": {Reachability: domain.ReachabilityUnreachable}}, {"pc01": {Reachability: domain.ReachabilityReachable, SSH: domain.SSHUnavailable}}} {
 		source.ssh = probes
 		plan := manager.Plan(context.Background(), "/deployment", "@lab")
@@ -84,7 +84,7 @@ func TestDeploymentProbeCancellationAndRepositoryDriftInvalidatePlan(t *testing.
 					source.revision = "changed"
 				}
 			}
-			plan := NewDeploymentManager(source).Plan(ctx, "/deployment", "pc01")
+			plan := newTestDeploymentManager(source).Plan(ctx, "/deployment", "pc01")
 			if !plan.HasErrors() || plan.State != "blocked" || plan.ReachableRequested != "" || len(source.runPhases) != 0 {
 				t.Fatalf("unsafe plan: %+v", plan)
 			}
@@ -124,7 +124,7 @@ func TestDeploymentResultClassificationPreservesEvidence(t *testing.T) {
 			if test.recordError {
 				source.recordErr = errors.New("history unavailable")
 			}
-			report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01,pc02", source.revision, "", io.Discard)
+			report := newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01,pc02", source.revision, "", io.Discard)
 			before := report
 			summary := report.ResultSummary()
 			if summary.Headline != test.headline || len(summary.Computers) != 2 || summary.Computers[1].Outcome != test.outcome {

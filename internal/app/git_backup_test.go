@@ -12,7 +12,7 @@ func (unbackedDeploymentSource) RemoteBackupRequired(string) error {
 }
 func TestDeploymentDoesNotRequireBackup(t *testing.T) {
 	source := unbackedDeploymentSource{readyDeploymentSource()}
-	plan := NewDeploymentManager(source).Plan(t.Context(), "/lab", "@lab")
+	plan := newTestDeploymentManager(source).Plan(t.Context(), "/lab", "@lab")
 	if plan.HasErrors() {
 		t.Fatalf("optional backup blocked deployment: %+v", plan)
 	}

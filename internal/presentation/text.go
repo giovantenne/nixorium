@@ -236,13 +236,16 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 	for _, check := range report.Checks {
 		fmt.Fprintf(writer, "  %-18s %-8s %s\n", check.ID, strings.ToUpper(check.State), check.Message)
 	}
+	for _, line := range deploymentMigrationLines(report.Migrations) {
+		fmt.Fprintln(writer, line)
+	}
 	if report.ReviewToken != "" {
 		fmt.Fprintf(writer, "Review token:     %s\n", report.ReviewToken)
 		confirmationText(writer, "Confirmation:     ", report.Confirmation)
 		fmt.Fprintln(writer, "No branch, commit, push, activation, PXE action, or deployment is part of this plan.")
 	}
 	if report.Diff.Content != "" {
-		fmt.Fprintln(writer, "\nProposed flake.nix/flake.lock changes:")
+		fmt.Fprintln(writer, "\nProposed changes to deployment files:")
 		fmt.Fprint(writer, report.Diff.Content)
 		if !strings.HasSuffix(report.Diff.Content, "\n") {
 			fmt.Fprintln(writer)
@@ -251,6 +254,23 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
 	}
+}
+
+// deploymentMigrationLines describe the release's changes to deployment files
+// (ADR 0034): those the update saves, and those left to the administrator.
+func deploymentMigrationLines(migrations []domain.DeploymentMigrationResult) []string {
+	lines := []string{}
+	for _, result := range migrations {
+		switch result.State {
+		case domain.MigrationApplied:
+			lines = append(lines, fmt.Sprintf("Migration:        %s — %s", safeWorkspaceText(strings.Join(result.Files, ", ")), safeWorkspaceText(result.Description)))
+		case domain.MigrationManual:
+			lines = append(lines,
+				"Manual change:    "+safeWorkspaceText(result.Description),
+				"                  "+safeWorkspaceText(result.Detail))
+		}
+	}
+	return lines
 }
 
 func PackageBaseStatusText(writer io.Writer, report domain.PackageBaseStatus) {
@@ -389,6 +409,12 @@ func HostsText(writer io.Writer, report domain.HostsReport) {
 	}
 }
 
+// deploymentConfigurationsLabel says how many systems an update builds:
+// computers of a class share one (ADR 0033).
+func deploymentConfigurationsLabel(targets []domain.DeploymentTarget) string {
+	return fmt.Sprintf("%s for %s", countNoun(domain.DeploymentConfigurations(targets), "configuration"), countNoun(len(targets), "computer"))
+}
+
 func DeploymentPlanText(writer io.Writer, report domain.DeploymentPlanReport) {
 	fmt.Fprintf(writer, "Deployment plan: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Repository:      %s\n", report.Repository)
@@ -400,10 +426,11 @@ func DeploymentPlanText(writer io.Writer, report domain.DeploymentPlanReport) {
 		for _, target := range report.Targets {
 			fmt.Fprintf(writer, "  %-10s %s  %s\n", target.Name, target.IP, deploymentAvailabilityLabel(report, target.Name, target.IP))
 		}
+		fmt.Fprintf(writer, "Builds:          %s\n", deploymentConfigurationsLabel(report.Targets))
 		if report.ReachableRequested != "" {
 			fmt.Fprintf(writer, "Reachable only:  create a new review with nixorium deploy plan --on %s\n", report.ReachableRequested)
 		}
-		fmt.Fprintln(writer, "Plan:            build selected configurations, then deploy with Colmena")
+		fmt.Fprintln(writer, "Plan:            build each configuration once (identical computers share one), then copy and activate it on each computer")
 		fmt.Fprintln(writer, "Availability:    brief SSH-port check, not authenticated identity or proof of power state")
 		if report.State == "ready" && report.Revision != "" {
 			fmt.Fprintf(writer, "Next:            nixorium deploy apply --on %s --expect %s\n", report.ColmenaSelector, report.Revision)

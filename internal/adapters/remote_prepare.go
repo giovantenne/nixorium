@@ -189,7 +189,7 @@ func (preparer *RemoteInstallPreparer) PrepareArtifacts(ctx context.Context, ope
 	if err != nil {
 		return result, err
 	}
-	if !strings.Contains(systemPath, "-nixos-system-"+hostName+"-") {
+	if !domain.ValidClientClass(hostName, host.Class) || !strings.Contains(systemPath, "-nixos-system-"+domain.ClientSystemName(hostName, host.Class)+"-") {
 		return result, errors.New("built system path does not match selected client")
 	}
 	systemBytes, err := preparer.closureSize(ctx, systemPath)
@@ -204,7 +204,7 @@ func (preparer *RemoteInstallPreparer) PrepareArtifacts(ctx context.Context, ope
 		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID, Repository: preparer.repository,
 		DeploymentRevision: revision, BundlePath: bundlePath, BundleClosureBytes: bundleBytes,
 		SystemPath: systemPath, SystemClosureBytes: systemBytes, HostName: host.Name,
-		HostInterface: host.Interface, HostStaticIP: host.IP, CachePublicKey: cachePublicKey,
+		HostInterface: host.Interface, HostStaticIP: host.IP, HostClass: host.Class, CachePublicKey: cachePublicKey,
 		AdminPublicKey: adminPublicKey, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},
 	}
 	if err := domain.ValidateRemoteInstallArtifacts(result); err != nil {
@@ -305,7 +305,7 @@ func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts d
 		OperationID: artifacts.OperationID, Repository: artifacts.Repository, DeploymentRevision: artifacts.DeploymentRevision,
 		BundlePath: artifacts.BundlePath, BundleClosureBytes: artifacts.BundleClosureBytes,
 		SystemPath: artifacts.SystemPath, SystemClosureBytes: artifacts.SystemClosureBytes,
-		Host:  domain.RemoteInstallHost{Name: host.Name, Interface: hostInterface, LiveIP: session.Address, StaticIP: host.IP},
+		Host:  domain.RemoteInstallHost{Name: host.Name, Interface: hostInterface, LiveIP: session.Address, StaticIP: host.IP, Class: artifacts.HostClass},
 		Cache: cache, AdminPublicKey: artifacts.AdminPublicKey, HostKeyPublic: session.HostPublicKey,
 		HostFingerprint: session.HostFingerprint, KnownHostConflict: knownHostConflict,
 		Facts: facts, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},

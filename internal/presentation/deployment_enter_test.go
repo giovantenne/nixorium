@@ -26,10 +26,16 @@ func TestUpdateComputersReviewIsConfirmedWithEnter(t *testing.T) {
 	model.deployment.plan = plan
 
 	view := demoANSI.ReplaceAllString(model.View().Content, "")
-	for _, want := range []string{"Update these computers?", "Enter updates these computers.", "Enter", "Update computers", "Esc", "Selection"} {
+	for _, want := range []string{"Update these computers?", "Builds   2 configurations for 2 computers", "Enter updates these computers.", "Enter", "Update computers", "Esc", "Selection"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("review lacks %q:\n%s", want, view)
 		}
+	}
+	// Identical computers share one configuration (ADR 0033).
+	shared := model
+	shared.deployment.plan.Targets = []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1", Class: "shared-1"}, {Name: "pc02", IP: "10.0.0.2", Class: "shared-1"}}
+	if view := demoANSI.ReplaceAllString(shared.View().Content, ""); !strings.Contains(view, "Builds   1 configuration for 2 computers") {
+		t.Fatalf("review does not count shared configurations:\n%s", view)
 	}
 	if strings.Contains(view, "Type DEPLOY") || strings.Contains(view, "> _") {
 		t.Fatalf("review still asks for a word:\n%s", view)

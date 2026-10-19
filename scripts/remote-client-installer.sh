@@ -101,12 +101,13 @@ validate_plan() {
     (.operationId | type == "string" and test("^[0-9a-f]{32}$")) and
     (.bootId | type == "string" and test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")) and
     (.deploymentRevision | type == "string" and test("^[0-9a-f]{40,64}$")) and
-    (.systemPath | type == "string" and test("^/nix/store/[0-9a-z]{32}-nixos-system-pc[0-9]{2}-[^/[:space:]]+$")) and
+    (.systemPath | type == "string" and test("^/nix/store/[0-9a-z]{32}-nixos-system-(pc[0-9]{2}|nixorium-client-shared-[0-9]{1,4})-[^/[:space:]]+$")) and
     (.adminPublicKey | type == "string" and length <= 1024 and test("^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$")) and
     (.hostKeyPublic | type == "string" and length <= 1024 and test("^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$")) and
     (.hostKeyRotation | type == "boolean") and
-    (.host | type == "object" and (keys | sort) == (["interface","liveIp","name","staticIp"] | sort)) and
+    (.host | type == "object" and (keys | sort) == (["class","interface","liveIp","name","staticIp"] | sort)) and
     (.host.name | type == "string" and test("^pc[0-9]{2}$")) and
+    (.host.class | type == "string" and test("^(|pc[0-9]{2}|shared-[0-9]{1,4})$")) and
     (.host.interface | type == "string" and test("^[A-Za-z0-9_.:-]{1,64}$")) and
     (.host.liveIp | type == "string" and test("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")) and
     (.host.staticIp | type == "string" and test("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")) and
@@ -123,11 +124,12 @@ validate_plan() {
 }
 
 validate_plan_semantics() {
-  local plan_file=$1 live_ip static_ip cache_url cache_address cache_port host_name system_path
+  local plan_file=$1 live_ip static_ip cache_url cache_address cache_port host_name host_class system_name system_path
   live_ip=$(jq -r .host.liveIp "$plan_file")
   static_ip=$(jq -r .host.staticIp "$plan_file")
   cache_url=$(jq -r .cache.url "$plan_file")
   host_name=$(jq -r .host.name "$plan_file")
+  host_class=$(jq -r .host.class "$plan_file")
   system_path=$(jq -r .systemPath "$plan_file")
   nixorium_valid_unicast_ipv4 "$live_ip" || { echo "invalid live IPv4 address" >&2; return 2; }
   nixorium_valid_unicast_ipv4 "$static_ip" || { echo "invalid static IPv4 address" >&2; return 2; }
@@ -137,7 +139,8 @@ validate_plan_semantics() {
   cache_port=${cache_url##*:}
   nixorium_valid_unicast_ipv4 "$cache_address" || { echo "invalid cache IPv4 address" >&2; return 2; }
   (( cache_port >= 1 && cache_port <= 65535 )) || { echo "invalid cache port" >&2; return 2; }
-  [[ "$system_path" == *"-nixos-system-$host_name-"* ]] || { echo "system path does not match host" >&2; return 2; }
+  system_name=$(nixorium_expected_system_name "$host_name" "$host_class") || { echo "invalid class of host" >&2; return 2; }
+  [[ "$system_path" == *"-nixos-system-$system_name-"* ]] || { echo "system path does not match host" >&2; return 2; }
 }
 
 read_and_validate_plan() {
@@ -344,6 +347,7 @@ run_plan() {
   install -D -o root -g root -m 0644 /etc/ssh/ssh_host_ed25519_key.pub /mnt/etc/ssh/ssh_host_ed25519_key.pub
 
   nixorium_verify_installed_profile "$system_path" "$selected_disk"
+  nixorium_write_identity_record "$host_name"
   admin_key_found=false
   for authorized_keys_path in /mnt/etc/ssh/authorized_keys.d /mnt/root/.ssh/authorized_keys; do
     [[ -e "$authorized_keys_path" ]] || continue

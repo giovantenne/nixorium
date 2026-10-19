@@ -61,7 +61,9 @@ Open Maintenance:
    is supported. Resolution/evaluation/build failures still block.
 4. Review the bounded flake diff and checks. Enter explicitly saves the
    reviewed files and records them in local Git, then activates/verifies the
-   controller through the existing managed controller operation.
+   controller through the existing managed controller operation. The review
+   can also list changes the new release makes to your own files (see
+   [Changes to your own files](#changes-to-your-own-files)).
 5. If saving fails, recover saving first. If controller activation fails after
    saving, the desired configuration is saved but the running controller is
    not verified; retry controller activation, not a new input update.
@@ -119,8 +121,9 @@ nixorium package-base plan --target nixos-26.11 --allow-unverified
 nixorium package-base apply --target nixos-26.11 --allow-unverified --expect <review-token> --yes
 ```
 
-Unlike the ordinary TUI save, CLI apply writes only `flake.nix` and
-`flake.lock`. Review/commit those files locally, then use `controller plan`
+Unlike the ordinary TUI save, CLI apply writes only `flake.nix`,
+`flake.lock` and the files the release changes in your own files, with the migration record (see
+[Changes to your own files](#changes-to-your-own-files)). Review/commit those files locally, then use `controller plan`
 and `controller apply --expect <reviewed-git-revision>`. Use the existing
 `deploy plan --on pc01` / `deploy apply` workflow separately for clients.
 No command above pushes a repository.
@@ -169,8 +172,20 @@ deployment readiness, builds the controller and representative client variants
 (`nixoriumUpdateTargets`): distinct managed-software selections,
 interfaces and every explicit host module. Private modules branching on host
 identity must declare additional `updateValidationHosts = [ "pc03" ];` in
-their `mkLab` arguments; these hosts also enter offline validation. Identical
-client roles reuse a representative rather than rebuilding the entire fleet.
+their `mkLab` arguments, or list that computer under `hostModules`; these hosts
+also enter offline validation. Without it, evaluation stops with an error
+because a system shared by several computers has no `hostName` or `hostIp`.
+Identical client computers share one system (a class), so the update builds it
+once rather than once per computer. The plan and the review show, for example,
+"Builds  2 configurations for 20 computers".
+
+Before it switches a computer to a shared system, the update writes the
+computer's identity record (`/var/lib/nixorium/identity.json`, only its number)
+over SSH and checks the number again afterwards. A record that names another
+computer is never overwritten: that computer stays unchanged and the result says
+"identity record names another computer" (see
+[Troubleshooting](troubleshooting.md#the-update-says-identity-record-names-another-computer)).
+To go back, choose the previous generation in the computer's boot menu.
 The plan also builds netboot, PXE firmware and installer outputs
 when laboratory mode needs them. Controller-only mode builds no client/PXE
 system. `nixoriumOfflineCheck` compares the selected systems' derivation paths
@@ -180,6 +195,64 @@ Neither output should be overridden to bypass failures.
 Build success remains explicitly runtime/hardware-unverified. No
 `--allow-unverified` flag bypasses input integrity, clean-state checks,
 readiness, builds, offline consistency or a stale review token.
+
+## Changes to your own files
+
+Some of your deployment's files, such as `modules/workstation.nix`, are copied
+from a template when the laboratory is created and then belong to you. When a
+release needs a change in one of them, the release being installed brings the
+program that makes it, and **Update Nixorium** runs that program as part of the
+update. You see the result before you save.
+
+How it works, in short: Update Nixorium makes a copy of your saved deployment
+(without passwords or keys), runs the new release's program on the copy in a
+closed sandbox (no network, 2 minutes at most), and compares the copy with your
+files. It accepts only plain changes to your own files: never `flake.nix`,
+`flake.lock`, keys, credentials or hidden files, and at most 256 files of
+1 MiB each. It does this only when the update changes the Nixorium release, not for
+an update of the system and packages alone. The review shows, for each change:
+
+- `Migration:` the files and, in one sentence, why they change. The change is
+  also in the diff, together with any other file the release creates or
+  removes.
+- `Manual change:` the release could not make this change automatically,
+  because you edited that place or the file is missing. Nothing in that file is
+  touched. The line under it says what to do, for a text replacement
+  `Replace "…" with "…".` Make that change yourself in a normal reviewed
+  change, and update again; Assistant can help prepare it as a proposal for you
+  to review.
+
+Saving the update writes the changed files before `flake.lock` and `flake.nix`,
+and only if each file is still exactly as you reviewed it; otherwise the save is
+refused, and files already written are put back if a later step fails. The
+changed files are committed with the update in **Maintenance → Review Git
+changes** (message "chore: update Nixorium and migrate deployment files"). To
+go back, undo the saved change in Git as for any other update.
+
+The file `nixorium-migrations.json` records which changes were applied, so each
+one is made only once, even if the old text appears again later. The new
+release writes it, and it is committed with the rest. Do not edit it by hand. A
+change that your file already contains is recorded as done without touching the
+file.
+
+If the new release's program fails, changes something it did not declare, or
+needs a newer way of migrating than your release knows, the update is refused
+and the current release stays; see
+[the update is refused](troubleshooting.md#the-update-is-refused-because-of-the-new-releases-changes-to-your-files)
+in the troubleshooting guide.
+
+**Updating from a release without this feature** (3.9.0 or older). Such a
+release cannot run the new program during the update. Once, in the deployment
+folder, run the new release's program yourself:
+
+```sh
+nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment migrate --root .
+```
+
+It prints what it applied and what you must do by hand. Review the result with
+`git diff`, save it in **Maintenance → Review Git changes**, and then run
+**Update Nixorium**. The release notes of that release say which of your files
+it changes, in case you prefer to edit them by hand.
 
 ## Updating one application independently
 

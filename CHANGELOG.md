@@ -6,6 +6,92 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Assistant can read system configuration files of the controller and the
+  computers, such as the boot menu or the settings in `/etc`, so it can, for
+  example, make Windows the default boot entry without asking you to look
+  anything up. It never reads home folders, passwords, keys or Wi-Fi
+  credentials. Assistant asks once more for consent because of this.
+- **Update Nixorium** can now change your own deployment files when a release
+  needs it, instead of asking you to edit them by hand. The new release brings
+  the program that makes the change and runs it on a copy of your saved
+  deployment in a closed sandbox (no network, no passwords, no keys); the update
+  checks what changed and refuses anything unexpected. The review shows each
+  change with a one-line reason, and a "Manual change" saying what to replace
+  when you have edited that place yourself. Saving the update writes and
+  commits the changed files with it, you can undo it with Git like any update,
+  and the new file `nixorium-migrations.json` records which changes were made so
+  each is made only once. `nixorium deployment migrate --root <folder>` runs the
+  same program by hand. See
+  [Updating](docs/updates.md#changes-to-your-own-files).
+
+### Changed
+
+- **Update computers** no longer uses Colmena. Nixorium builds each selected
+  computer's system once (instead of twice), copies it, and activates it in a
+  service on the computer that keeps running if the connection drops. A
+  computer that fails or is off no longer blocks the others: only a computer
+  whose result is truly unknown still needs a review, and that review closes
+  itself as soon as the computer reports how its update ended. The log shows
+  each computer's progress and its activation messages.
+- Identical computers now share one configuration. An update, and network
+  installation, builds it once instead of once for every computer. Each
+  computer keeps its own name and laboratory address from a small identity
+  record, `/var/lib/nixorium/identity.json`, that the update or the installer
+  writes before the computer starts its new system. A computer without a
+  valid record shows "This computer has no Nixorium identity"; updating it from
+  the controller writes the record again, and an update never overwrites a
+  record that names another computer.
+- A private module that uses a computer's name or address (`hostName` or
+  `hostIp`) now needs that computer listed in `hostModules` or
+  `updateValidationHosts`; otherwise the evaluation stops with a message that
+  says so. The flake no longer has a `colmena` output, because Nixorium has
+  its own update engine.
+- The `l` key for progress details appears only when there are details to
+  show, instead of on every progress screen.
+- The readiness check of the laboratory configuration, which takes about 20
+  seconds, is done once per saved configuration and then reused: updating
+  computers no longer repeats it when it reviews and again after the build.
+
+### Fixed
+
+- The check after an update now tries up to three times, a few seconds apart,
+  before reporting a computer as unverified, because a computer that has just
+  switched to its new system can take a moment to answer. When the answer is
+  still unexpected, the report says what the computer replied.
+- An update that changes NetworkManager's settings on computers configured
+  by network card type no longer can fail to write their laboratory network
+  profile: the profile writer waits for NetworkManager to answer.
+- In the classroom view the **Power** menu opens towards the left, so it
+  stays readable when the window is maximised.
+- While an update of the student computers is still running, the Overview
+  shows it as a running operation instead of also listing it as an
+  interrupted update.
+- When a queued update needs a new review, because the configuration changed
+  after it was queued or it kept failing, the Overview now says so and points
+  to **Computers → Queued updates**, instead of saying that nothing needs to
+  be done. Update plans, the troubleshooting guide and the interrupted-update
+  message also use plainer words and no longer mention the old deployment tool.
+
+### Upgrade notes
+
+- Deployments created before 3.9.0 have a `modules/workstation.nix` that
+  finds the controller by comparing `hostName`. Computers that share a
+  configuration have no single name, so that test now stops the evaluation
+  with a message that says what to do. From this release on, Update Nixorium
+  makes this change for you: the review shows it as a change to
+  `modules/workstation.nix`, or as a "Manual change" if you edited that line.
+  A controller that runs 3.9.0 or older cannot do it during the update to this
+  release. Once, in your deployment folder, run
+  `nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment migrate --root .`,
+  review the result with `git diff`, save it in **Maintenance → Review Git
+  changes**, then run Update Nixorium. If you prefer to edit by hand, replace
+  the line
+  `isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);`
+  with `isController = args.isController or false;`, save, then update
+  Nixorium.
+
 ## [3.9.0] - 2026-10-19
 
 ### Added

@@ -64,12 +64,18 @@ func TestReadyDeploymentPlanShowsRevisionBoundNextCommand(t *testing.T) {
 		State:           "ready",
 		Revision:        "0123456789abcdef",
 		ColmenaSelector: "@lab",
-		Targets:         []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}},
+		Targets:         []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1", Class: "shared-1"}, {Name: "pc02", IP: "10.0.0.2", Class: "shared-1"}},
 	}
 	output := &bytes.Buffer{}
 	DeploymentPlanText(output, report)
+	if !strings.Contains(output.String(), "Builds:          1 configuration for 2 computers\n") {
+		t.Fatalf("ready plan does not count configurations:\n%s", output.String())
+	}
 	if !strings.Contains(output.String(), "nixorium deploy apply --on @lab --expect 0123456789abcdef") {
 		t.Fatalf("ready plan does not show exact next command:\n%s", output.String())
+	}
+	if !strings.Contains(output.String(), "build each configuration once (identical computers share one), then copy and activate it on each computer") || strings.Contains(strings.ToLower(output.String()), "colmena") {
+		t.Fatalf("ready plan does not describe the update engine in plain words:\n%s", output.String())
 	}
 }
 
@@ -231,10 +237,17 @@ func TestUpdateTextShowsValidatedPlanAndReviewableResult(t *testing.T) {
 		ReviewToken: "sha256:review",
 		Checks:      []domain.UpdateCheck{{ID: "client", State: "passed", Message: "built"}},
 		Diff:        domain.GitDiff{Content: "+github:owner/repo/v2.1.0-beta.1\n"},
+		Migrations: []domain.DeploymentMigrationResult{
+			{ID: "2026-10-a", Description: "Find the controller with isController.", State: domain.MigrationApplied, Files: []string{"modules/workstation.nix"}},
+			{ID: "2026-10-b", Description: "Import the new module.", State: domain.MigrationManual, Detail: "modules/shared.nix was changed by hand. Replace \"a\" with \"b\"."},
+			{ID: "2026-10-c", Description: "Already done.", State: domain.MigrationDone},
+		},
 	}
 	var output bytes.Buffer
 	UpdatePlanText(&output, plan)
-	for _, expected := range []string{"update plan: READY", "v2.0.0", "prerelease", "client", "PASSED", "sha256:review", plan.Confirmation, "No branch, commit, push", "flake.nix/flake.lock"} {
+	for _, expected := range []string{"update plan: READY", "v2.0.0", "prerelease", "client", "PASSED", "sha256:review", plan.Confirmation, "No branch, commit, push", "Proposed changes to deployment files",
+		"Migration:        modules/workstation.nix — Find the controller with isController.",
+		"Manual change:    Import the new module.", "modules/shared.nix was changed by hand. Replace \"a\" with \"b\"."} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("update plan output omits %q:\n%s", expected, output.String())
 		}

@@ -14,7 +14,7 @@ let
   cacheSecretKey = pkgs.writeText "network-transition-cache-secret"
     "nixorium-remote-vm-1:LyFjyE1IpGYQenMUqGQKq0fZSXr5uaoqIldXReT6v1wsQKHQIF/ewV58htcET9bsFyS9r9jMjxsRZVnv3sSXfA==";
   hostArgs = name: {
-    inherit (transitionLab.nixosConfigurations.${name}._module.specialArgs) hostName hostIp isController labSettings;
+    inherit (transitionLab.nixosConfigurations.${name}._module.specialArgs) hostName hostIp isController labSettings nixoriumClass;
   };
   laboratoryModules = [
     ../modules/networking.nix

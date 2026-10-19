@@ -34,10 +34,12 @@ that turn.
 
 Step requests may carry the optional `X-Nixorium-Capabilities` HTTP header, a
 comma-separated list drawn from `prepare_npm_v1`, `host_diagnostics_v1`,
-`git_history_v1`, `prefetch_v1`, `settings_v1` and `home_files_v1`. The request
+`git_history_v1`, `prefetch_v1`, `settings_v1`, `home_files_v1` and
+`system_files_v1`. The request
 JSON is unchanged and sharing routes never carry the header. The service offers
 a capability-gated tool only to a controller that lists its capability:
-`prefetch` requires `prefetch_v1`. `settings_v1` adds no tool: it tells the
+`prefetch` requires `prefetch_v1` and `read_system_file` requires
+`system_files_v1`. `settings_v1` adds no tool: it tells the
 service that `write_file` of `lab-settings.json` accepts changes to the
 writable settings listed in the [Assistant guide](assistant.md#laboratory-settings)
 and refuses any other with `settings_field_read_only` or `settings_invalid`.

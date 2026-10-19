@@ -208,6 +208,11 @@ func (m *DeferredUpdateManager) Run(ctx context.Context, repository string) doma
 			case observation.State == "verified" && result.ApplyCompleted && !result.RecoveryRequired:
 				outcome.State = "updated"
 				removals[host] = true
+			case result.RecoveryRequired:
+				// Not a failure: the result is unknown until the interrupted
+				// update closes itself, and the next pass then finds the
+				// computer up to date or updates it.
+				outcome.State, outcome.Detail = "waiting", "its result is not known yet; trying again once the interrupted update closes"
 			default:
 				outcome.State = "failed"
 				outcome.Detail = deferredFailure(result)
@@ -244,7 +249,7 @@ func (m *DeferredUpdateManager) Run(ctx context.Context, repository string) doma
 	if recovery {
 		// An unconfirmed activation blocks every operation until reviewed.
 		report.State = "failed"
-		report.Message = "an update could not be confirmed; open Nixorium to recover before queued updates continue"
+		report.Message = "an update is not confirmed yet; queued updates continue once it closes itself or is reviewed in Nixorium"
 		return report
 	}
 	report.Message = deferredRunSummary(report.Results)

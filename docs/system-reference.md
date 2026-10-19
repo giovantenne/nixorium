@@ -194,6 +194,47 @@ computer's firmware must also allow it (BIOS/UEFI options often called "Wake
 on LAN" or "Power on by PCI-E"), and the computer must keep standby power: a
 switched-off power strip or a power cut disarms it.
 
+## Client classes and identity
+
+Computers with the same module groups, managed software and network interface
+form a class and share one system, so an update or a network installation
+builds it once instead of once per computer. The controller, every host in
+`hostModules` and every host in `updateValidationHosts` is a class of one and
+keeps its own system. A class of one is named after its computer (`pc03`); a
+class with several computers is `shared-1`, `shared-2` and so on, numbered by
+its first computer. `nixosConfigurations.pc01` and the other computers of a
+shared class are aliases of that one system. `labMeta.clients.classes` lists
+the classes and `labMeta.clients.hosts[].class` names the class of each
+computer.
+
+Each computer keeps its name and address in `/var/lib/nixorium/identity.json`,
+which holds only its number, for example `{"schemaVersion":1,"number":3}`.
+The system of a class carries the inventory (number, name, address and
+previous address of every computer, `labSettings.clientIdentities`). At
+activation a shared system reads the record, writes
+`/run/nixorium/identity.env` with the name, number and addresses, and sets the
+running host name. The `nixorium-lab` network profile takes the address from
+that file, so every computer of the class uses the same profile. DHCP never
+renames a computer. A duplicated number is refused by address conflict
+detection and retried only a few times.
+
+The update writes the record over SSH before it switches a computer to a
+shared system, and the installers (network and USB/SSH) write it before the
+first start. A record that names another computer is never overwritten: the
+update leaves that computer unchanged and reports "identity record names
+another computer". A computer without a valid record gets no laboratory
+address, and `nixorium-identity.service` fails with the message "This computer
+has no Nixorium identity". See [Troubleshooting](troubleshooting.md#this-computer-has-no-nixorium-identity).
+`nixorium-host-state` reports the number of a valid record on a third line,
+and the update verifies a shared system by it.
+
+A private module that needs a computer's name or address (`hostName`,
+`hostIp`) cannot run in a shared system. List that computer in `hostModules`
+or `updateValidationHosts` to give it its own system. To roll back, choose the
+previous generation in the boot menu: a per-host system from before the change
+starts with its own name and address and ignores the record. The decision is
+recorded in [ADR 0033](adr/0033-client-classes.md).
+
 ### Laboratory network transition
 
 While computers move from one laboratory network to another, the settings
@@ -804,14 +845,18 @@ Every module of a deployment receives these special arguments:
 |---|---|
 | `isController` | `true` on the controller, `false` on every client computer |
 | `nixoriumRole` | `"controller"` or `"client"` |
-| `hostName` | The generated host name, for example `pc01` |
-| `hostIp` | The host's static address on the laboratory network |
+| `hostName` | The generated host name, for example `pc01`; an error in a system shared by several computers |
+| `hostIp` | The host's static address on the laboratory network; an error in a shared system |
+| `nixoriumClass` | `{ id, shared, members, representative }` of the system's class of computers |
 | `hostSoftwarePackages` | The host's effective managed package IDs |
 
 Test the computer's role with `isController` or `nixoriumRole`, not by comparing
 `hostName` with `labSettings.masterHostName`; the built-in modules do the same.
 Use `hostName` only for a real per-host difference, and declare it through
-`hostModules` or `updateValidationHosts`.
+`hostModules` or `updateValidationHosts`: a computer listed there has its own
+system, where `hostName` and `hostIp` have their values. In a system shared by
+a class of computers they stop the evaluation with an error naming the
+computers and this remedy. See [Client classes and identity](#client-classes-and-identity).
 
 `groupModules` defaults to `{}` and refers to existing `clientGroups`:
 
@@ -1058,8 +1103,11 @@ subscription, consent, confined tools and reviewed local-save workflow.
 `nixoriumHostClasses` is a cheap `mkLab` output: sorted records with
 `representative` and `members`, covering every host exactly once. The controller,
 `hostModules` hosts and `updateValidationHosts` are singleton classes; remaining
-clients group by applicable software, interface and non-empty module groups. Private modules branching
-on `networking.hostName` must declare exceptional hosts through those inputs.
+clients group by applicable software, interface and non-empty module groups.
+The same classes decide which computers share a system (see
+[Client classes and identity](#client-classes-and-identity)). Private modules
+branching on `networking.hostName` must declare exceptional hosts through those
+inputs.
 Assistant evaluates representatives and conservatively includes hosts whose
 assigned representative changes, even when their own system is unchanged.
 
@@ -1069,8 +1117,9 @@ The upstream keeps its standalone example evaluable while private deployments
 consume `lib.mkLab`. Important generated outputs include:
 
 - `nixosConfigurations.<host>` for the controller, clients, and netboot system;
-- Colmena deployment metadata and target groups;
-- `labMeta` for non-sensitive operational identity and network data;
+  the clients of a shared class are aliases of one system;
+- `labMeta` for non-sensitive operational identity, network and class data
+  (`clients.hosts[].class`, `clients.classes`);
 - `deploymentStatus` for readiness blockers;
 - `nixoriumSoftware` for the supported pinned catalog, evaluated scopes, and managed declarations;
 - `nixoriumSoftwarePresets` for the normalized optional profile catalog, or `null` when a deployment does not provide one;

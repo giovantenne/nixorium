@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/giovantenne/nixorium/internal/deploymigrate"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -286,8 +287,97 @@ esac
 	if strings.Contains(string(log), repository+"/secret-key") {
 		t.Fatalf("private path entered Nix arguments:\n%s", log)
 	}
-	if len(progress) != 7 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Detail != "Checking that the candidate flake.lock matches flake.nix" || progress[2].Phase != domain.UpdatePlanPhaseEvaluate || progress[3].Detail != "Evaluating candidate deployment readiness" || progress[4].Detail != "Comparing pinned student workspace dependencies" || progress[5].Phase != domain.UpdatePlanPhaseBuild || progress[5].Current != 0 || progress[5].Total != 5 || progress[6].Phase != domain.UpdatePlanPhaseReview {
+	if len(progress) != 8 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Detail != "Running the target release's changes to deployment files" || progress[2].Detail != "Checking that the candidate flake.lock matches flake.nix" || progress[3].Phase != domain.UpdatePlanPhaseEvaluate || progress[4].Detail != "Evaluating candidate deployment readiness" || progress[5].Detail != "Comparing pinned student workspace dependencies" || progress[6].Phase != domain.UpdatePlanPhaseBuild || progress[6].Current != 0 || progress[6].Total != 5 || progress[7].Phase != domain.UpdatePlanPhaseReview {
 		t.Fatalf("candidate progress = %+v", progress)
+	}
+}
+
+func gitRevisionOf(t *testing.T, repository string) string {
+	t.Helper()
+	revision, err := run(context.Background(), "git", "-C", repository, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return revision
+}
+
+// The target release migrates a copy of the deployment; the candidate is
+// evaluated and built with the result, the review shows it and saving the
+// update writes it (ADR 0034).
+func TestUpdateRunsTheTargetReleaseMigrations(t *testing.T) {
+	repository := newGitReviewRepository(t)
+	writeGitReviewFile(t, repository, "flake.nix", "{\n  inputs.nixorium.url = \"github:owner/project/v1.0.0\";\n}\n")
+	writeGitReviewFile(t, repository, "flake.lock", `{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`+"\n")
+	writeGitReviewFile(t, repository, "modules/workstation.nix", "args@{ ... }:\nlet\n"+oldControllerTest+"in { }\n")
+	if _, err := run(context.Background(), "git", "-C", repository, "add", "flake.nix", "flake.lock", "modules/workstation.nix"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", repository, "commit", "-qm", "deployment"); err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "nix.log")
+	script := `#!/bin/sh
+set -eu
+printf '%s\n' "$*" >> "$NIXORIUM_TEST_NIX_LOG"
+case " $* " in
+` + fakeCandidateStoreCases + `
+  *" flake lock "*)
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = --output-lock-file ]; then
+        printf '%s\n' '{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"2222222222222222222222222222222222222222"}}}}' > "$2"
+        exit 0
+      fi
+      shift
+    done
+    exit 2
+    ;;
+  *"#labMeta "*)
+    printf '%s\n' '{"schemaVersion":2,"deploymentMode":"controller","controller":{"name":"pc99"},"clients":{"count":0,"hosts":[]}}'
+    ;;
+  *"#deploymentStatus "*)
+    printf '%s\n' '{"ready":false,"issues":["Client installation is not configured"],"controller":{"ready":true,"issues":[],"requiresKeys":false}}'
+    ;;
+  *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
+  *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
+  *" build "*) exit 0 ;;
+  *) exit 3 ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(bin, "nix"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("NIXORIUM_TEST_NIX_LOG", logPath)
+	stages := t.TempDir()
+	t.Setenv("NIXORIUM_TEST_STAGES", stages)
+	useMigrator(t, deploymigrate.Registry, nil)
+	snapshot, err := (Local{}).InspectUpdateInput(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := (Local{}).PrepareUpdate(context.Background(), repository, "v1.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(proposal.Migrations) != 1 || proposal.Migrations[0].State != domain.MigrationApplied || len(proposal.MigratedFiles) != 2 || proposal.Migrator == "" || len(proposal.MigrationReport) == 0 {
+		t.Fatalf("migrations = %+v, files = %d", proposal.Migrations, len(proposal.MigratedFiles))
+	}
+	// The second candidate source, evaluated and built, carries the change.
+	if candidate := readGitReviewFile(t, filepath.Join(stages, "2"), "modules/workstation.nix"); !strings.Contains(candidate, "args.isController or false") {
+		t.Fatalf("candidate workstation.nix = %q", candidate)
+	}
+	if !strings.Contains(proposal.Diff.Content, "a/modules/workstation.nix") || !strings.Contains(proposal.Diff.Content, "+  isController = args.isController or false;") || !strings.Contains(proposal.Diff.Content, "b/nixorium-migrations.json") {
+		t.Fatalf("diff:\n%s", proposal.Diff.Content)
+	}
+	if _, err := (Local{}).ApplyPreparedUpdate(context.Background(), repository, strings.TrimSpace(gitRevisionOf(t, repository)), snapshot, proposal); err != nil {
+		t.Fatal(err)
+	}
+	if content := readGitReviewFile(t, repository, "modules/workstation.nix"); !strings.Contains(content, "args.isController or false") {
+		t.Fatalf("saved workstation.nix = %q", content)
+	}
+	if content := readGitReviewFile(t, repository, "nixorium-migrations.json"); !strings.Contains(content, "2026-10-workstation-is-controller") {
+		t.Fatalf("saved record = %q", content)
 	}
 }
 

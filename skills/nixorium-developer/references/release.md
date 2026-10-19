@@ -12,7 +12,10 @@ Before release:
 
 1. Start from a clean `master` synchronized with `origin/master`.
 2. Select the version from its compatibility impact.
-3. Update `VERSION`, `DEFAULT_RELEASE` in `install.sh`, and the released tag in
+3. Check that `Registry` in `internal/deploymigrate/registry.go` has an entry for every change to
+   `templates/site/**` since the previous tag that existing deployments need
+   (released entries are never edited), and that the changelog mentions them.
+   Update `VERSION`, `DEFAULT_RELEASE` in `install.sh`, and the released tag in
    `templates/site/flake.nix`.
 4. Move Unreleased notes into a dated changelog section and update links.
 5. Run the focused local checks; use `./scripts/validate.sh --full` locally

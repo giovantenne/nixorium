@@ -69,6 +69,53 @@ type UpdateProposal struct {
 	Checks       []UpdateCheck
 	PackageBase  *PackageBaseChange
 	Workspace    *WorkspaceUpdateImpact
+	// Migrations are the target release's changes to the deployment's own
+	// files (ADR 0034), with their outcome on this deployment; MigratedFiles
+	// are the files the applied ones change, written when the update is saved.
+	Migrations    []DeploymentMigrationResult
+	MigratedFiles []MigratedFile
+	// MigrationReport and Migrator are the raw report and the store path of
+	// the migrator that produced them; the review token binds both.
+	MigrationReport []byte
+	Migrator        string
+}
+
+// MigratedFile is a deployment file before and after the migrations: Create
+// marks a new file, Delete a removed one.
+type MigratedFile struct {
+	Path   string
+	Before []byte
+	After  []byte
+	Mode   uint32
+	Create bool
+	Delete bool
+}
+
+// DeploymentMigrationsFile records, in the deployment, the migrations already
+// applied or found done, so each runs once (like Omarchy's migration markers,
+// but saved and reviewed with the configuration).
+const DeploymentMigrationsFile = "nixorium-migrations.json"
+
+// Outcomes of a deployment migration, as the migrator of the release being
+// installed reports them (ADR 0034).
+const (
+	// MigrationApplied: the migration changed the files it lists; saving
+	// the update writes them.
+	MigrationApplied = "applied"
+	// MigrationDone: the deployment already has the change.
+	MigrationDone = "done"
+	// MigrationManual: the files were changed by hand; nothing is touched
+	// and Detail says what to change.
+	MigrationManual = "manual"
+)
+
+// DeploymentMigrationResult is one migration of the release being installed.
+type DeploymentMigrationResult struct {
+	ID          string   `json:"id"`
+	Description string   `json:"description"`
+	State       string   `json:"state"`
+	Detail      string   `json:"detail,omitempty"`
+	Files       []string `json:"files,omitempty"`
 }
 
 // WorkspaceUpdateImpact compares pinned declarations, not live home state,
@@ -126,25 +173,28 @@ type UpdatePlanReport struct {
 	AllowUnverified bool                   `json:"allowUnverified,omitempty"`
 	PackageBase     *PackageBaseChange     `json:"packageBase,omitempty"`
 	Workspace       *WorkspaceUpdateImpact `json:"workspace,omitempty"`
-	SchemaVersion   int                    `json:"schemaVersion"`
-	Operation       string                 `json:"operation"`
-	GeneratedAt     time.Time              `json:"generatedAt"`
-	State           string                 `json:"state"`
-	Repository      string                 `json:"repository"`
-	Revision        string                 `json:"revision,omitempty"`
-	CurrentRef      string                 `json:"currentRef,omitempty"`
-	CurrentRev      string                 `json:"currentRevision,omitempty"`
-	CurrentChannel  UpdateChannel          `json:"currentChannel,omitempty"`
-	Target          string                 `json:"target,omitempty"`
-	TargetChannel   UpdateChannel          `json:"targetChannel,omitempty"`
-	Downgrade       bool                   `json:"downgrade"`
-	ReviewToken     string                 `json:"reviewToken,omitempty"`
-	Confirmation    string                 `json:"confirmation,omitempty"`
-	Diff            GitDiff                `json:"diff"`
-	Checks          []UpdateCheck          `json:"checks"`
-	Issues          []ValidationIssue      `json:"issues"`
-	Snapshot        UpdateInputSnapshot    `json:"-"`
-	Proposal        UpdateProposal         `json:"-"`
+	// Migrations are the target release's changes to deployment files
+	// (ADR 0034), shown in the review and saved with the update.
+	Migrations     []DeploymentMigrationResult `json:"migrations,omitempty"`
+	SchemaVersion  int                         `json:"schemaVersion"`
+	Operation      string                      `json:"operation"`
+	GeneratedAt    time.Time                   `json:"generatedAt"`
+	State          string                      `json:"state"`
+	Repository     string                      `json:"repository"`
+	Revision       string                      `json:"revision,omitempty"`
+	CurrentRef     string                      `json:"currentRef,omitempty"`
+	CurrentRev     string                      `json:"currentRevision,omitempty"`
+	CurrentChannel UpdateChannel               `json:"currentChannel,omitempty"`
+	Target         string                      `json:"target,omitempty"`
+	TargetChannel  UpdateChannel               `json:"targetChannel,omitempty"`
+	Downgrade      bool                        `json:"downgrade"`
+	ReviewToken    string                      `json:"reviewToken,omitempty"`
+	Confirmation   string                      `json:"confirmation,omitempty"`
+	Diff           GitDiff                     `json:"diff"`
+	Checks         []UpdateCheck               `json:"checks"`
+	Issues         []ValidationIssue           `json:"issues"`
+	Snapshot       UpdateInputSnapshot         `json:"-"`
+	Proposal       UpdateProposal              `json:"-"`
 }
 
 func (r UpdatePlanReport) HasErrors() bool {

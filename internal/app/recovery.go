@@ -22,6 +22,23 @@ type RecoverySource interface {
 	ServiceState(context.Context, string) domain.ServiceState
 }
 
+// recorderSource tells whether the process that wrote the pending record is
+// still alive (the same PID and start time).
+type recorderSource interface {
+	ProcessRunning(pid int, start string) bool
+}
+
+// updateRunning reports a pending record whose update is still under way:
+// its recorder is alive, has not returned from its apply, and is the
+// confirmed holder of the operation lock. The Overview then shows the
+// running operation, not an interrupted update. A recorder that is alive but
+// does not hold the lock left its record behind, so the record is reported.
+func (inspector *RecoveryInspector) updateRunning(pending domain.PendingDeployment, err error, holder domain.OperationHolder, busy bool) bool {
+	recorder, ok := inspector.source.(recorderSource)
+	return ok && err == nil && busy && holder.Known && holder.PID == pending.ControllerPID && !pending.ApplyReturned && pending.ControllerPID > 0 &&
+		recorder.ProcessRunning(pending.ControllerPID, pending.ControllerPIDStart)
+}
+
 type backupDueSource interface {
 	BackupDue(string) (string, bool)
 }
@@ -61,7 +78,8 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 		root = repository
 	}
 
-	if pending, present, pendingErr := inspector.source.PendingDeployment(); present {
+	holder, busy := inspector.source.OperationLockHolder()
+	if pending, present, pendingErr := inspector.source.PendingDeployment(); present && !inspector.updateRunning(pending, pendingErr, holder, busy) {
 		detail := ""
 		var since *time.Time
 		var affects []string
@@ -73,7 +91,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 			for _, target := range pending.Targets {
 				affects = append(affects, target.Name)
 			}
-			detail = fmt.Sprintf("Update of %s to %s; how it ended is unknown.", started.Local().Format("2006-01-02 15:04"), computerList(affects))
+			detail = fmt.Sprintf("Update of %s started %s; how it ended is unknown.", computerList(affects), started.Local().Format("2006-01-02 15:04"))
 		}
 		add(domain.RecoveryDeploymentPending, "DEPLOY-PENDING", detail, "Every other maintenance operation, and classroom controls on the computers it names. Update Nixorium and Apply to controller stay available.", since, affects)
 	}
@@ -89,7 +107,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	case "degraded", "recovery-required":
 		add(domain.RecoveryPXE, "PXE-ACTIVE", pxeRecoveryDetail(mode), "Client operations and a new network installation.", nil, nil)
 	}
-	if holder, busy := inspector.source.OperationLockHolder(); busy {
+	if busy {
 		detail := "Other operations wait until it finishes."
 		if holder.Known {
 			detail = upperFirst(holder.Description()) + ". " + detail
@@ -113,11 +131,18 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	}
 	if queued, ok := inspector.source.(deferredUpdatesSource); ok {
 		if waiting, attention := queued.DeferredUpdateSummary(ctx, root); waiting+attention > 0 {
-			detail := fmt.Sprintf("%s will update when switched on.", countLabel(waiting, "computer"))
+			// One condition: an entry that needs a review must not be
+			// presented as "nothing to do", whatever else is still waiting.
+			code, detail := "UPDATES-QUEUED", fmt.Sprintf("%s will update when switched on.", countLabel(waiting, "computer"))
 			if attention > 0 {
-				detail = fmt.Sprintf("Queued updates: %s. Their configuration changed after queueing, or the last attempt failed; open the queue to review them.", attentionLabel(attention))
+				code = "UPDATES-NEED-REVIEW"
+				detail = "Queued updates: " + attentionLabel(attention)
+				if waiting > 0 {
+					detail += fmt.Sprintf(", %s will update when switched on", countLabel(waiting, "computer"))
+				}
+				detail += ". Open the queue to review: a configuration changed after queueing, or an update kept failing."
 			}
-			add(domain.RecoveryDeferredUpdates, "UPDATES-QUEUED", detail, "", nil, nil)
+			add(domain.RecoveryDeferredUpdates, code, detail, "", nil, nil)
 		}
 	}
 	if changes, ok := inspector.source.(networkChangeSource); ok {
