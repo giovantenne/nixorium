@@ -568,18 +568,26 @@ and `systemctl status nixorium-identity.service` shows a failed unit with the
 message "This computer has no Nixorium identity". In the inventory the computer
 is offline or unknown, and it cannot be reached from the controller.
 
-Typical causes are a disk restored or copied from another computer, a record
-edited by hand, or a computer that was installed with an older installer.
+Typical causes are a disk restored or copied from another computer, or a
+record removed or edited by hand. Without its laboratory address the
+controller cannot update the computer, so the fix starts at the computer:
 
-1. Connect a keyboard and screen to the computer, or reach it at its address
-   on the institutional network if it has one.
-2. If the computer can still be reached, **update it from the controller**
-   (Computers → Update): the update writes the record before it switches the
-   computer, then verifies the number.
-3. If it cannot be reached, reinstall it from the controller (network
-   installation or USB). The installer writes the record before the first
-   start. A reinstall erases the disk, so use it when the update cannot reach
-   the computer.
+1. If the computer was moved to the shared system by an update, restart it
+   and choose the previous generation in the boot menu. That system knows the
+   computer's number: it writes the record and starts with the laboratory
+   address. Then update the computer from the controller (Computers → Update
+   computers).
+2. Otherwise, as administrator at the computer, write its number in the
+   record and restart. For computer number 3 the file
+   `/var/lib/nixorium/identity.json` must contain exactly this line:
+
+   ```text
+   {"schemaVersion":1,"number":3}
+   ```
+
+3. If neither is possible, reinstall the computer from the controller
+   (network installation or USB). The installer writes the record before the
+   first start. A reinstall erases the disk.
 
 Do not copy the record from another computer. Two computers with the same
 number refuse each other's address and neither works reliably.
