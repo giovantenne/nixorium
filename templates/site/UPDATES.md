@@ -122,7 +122,7 @@ nixorium package-base apply --target nixos-26.11 --allow-unverified --expect <re
 ```
 
 Unlike the ordinary TUI save, CLI apply writes only `flake.nix`,
-`flake.lock` and the files and record of the migrations of your own files (see
+`flake.lock` and the files the release changes in your own files, with the migration record (see
 [Changes to your own files](#changes-to-your-own-files)). Review/commit those files locally, then use `controller plan`
 and `controller apply --expect <reviewed-git-revision>`. Use the existing
 `deploy plan --on pc01` / `deploy apply` workflow separately for clients.
@@ -200,36 +200,59 @@ readiness, builds, offline consistency or a stale review token.
 
 Some of your deployment's files, such as `modules/workstation.nix`, are copied
 from a template when the laboratory is created and then belong to you. When a
-release needs a change in one of them, the release lists that change exactly,
-and **Update Nixorium** applies it as part of the update. You see it before you
-save. The review shows, for each change:
+release needs a change in one of them, the release being installed brings the
+program that makes it, and **Update Nixorium** runs that program as part of the
+update. You see the result before you save.
 
-- `Migration:` the file and, in one sentence, why it changes. The change is
-  also in the diff. It is made only when the old text is found exactly once.
-- `Manual change:` the file could not be changed automatically, because you
-  edited it (the old text is missing or appears several times) or it is not a
-  saved file of the deployment. Nothing in that file is touched. The review
-  shows the text to replace (`Replace:`) and the text to put instead
-  (`With:`). Make that change yourself in a normal reviewed change, and update
-  again; Assistant can help prepare it as a proposal for you to review.
+How it works, in short: Update Nixorium makes a copy of your saved deployment
+(without passwords or keys), runs the new release's program on the copy in a
+closed sandbox (no network, 2 minutes at most), and compares the copy with your
+files. It accepts only plain changes to your own files: never `flake.nix`,
+`flake.lock`, keys, credentials or hidden files, and never more than a few
+files. It does this only when the update changes the Nixorium release, not for
+an update of the system and packages alone. The review shows, for each change:
+
+- `Migration:` the files and, in one sentence, why they change. The change is
+  also in the diff, together with any other file the release creates or
+  removes.
+- `Manual change:` the release could not make this change automatically,
+  because you edited that place or the file is missing. Nothing in that file is
+  touched. The line under it says what to do, for a text replacement
+  `Replace "…" with "…".` Make that change yourself in a normal reviewed
+  change, and update again; Assistant can help prepare it as a proposal for you
+  to review.
 
 Saving the update writes the changed files before `flake.lock` and `flake.nix`,
 and only if each file is still exactly as you reviewed it; otherwise the save is
-refused. The changed files are committed with the update in
-**Maintenance → Review Git changes** (message "chore: update Nixorium and
-migrate deployment files"). To go back, undo the saved change in Git as for any
-other update.
+refused, and files already written are put back if a later step fails. The
+changed files are committed with the update in **Maintenance → Review Git
+changes** (message "chore: update Nixorium and migrate deployment files"). To
+go back, undo the saved change in Git as for any other update.
 
 The file `nixorium-migrations.json` records which changes were applied, so each
-one is made only once, even if the old text appears again later. It is created
-or updated in the same save and is committed with the rest. Do not edit it by
-hand. A change that your file already contains is recorded as done without
-touching the file. This feature never changes `flake.nix`, `flake.lock`,
-passwords, keys or hidden files.
+one is made only once, even if the old text appears again later. The new
+release writes it, and it is committed with the rest. Do not edit it by hand. A
+change that your file already contains is recorded as done without touching the
+file.
 
-Changes to your own files are applied only when the controller already runs a
-release that has this feature (the release after 3.9.0). When you update from
-3.9.0 or older, the release notes list the steps to do by hand once.
+If the new release's program fails, changes something it did not declare, or
+needs a newer way of migrating than your release knows, the update is refused
+and the current release stays; see
+[the update is refused](troubleshooting.md#the-update-is-refused-because-of-the-new-releases-changes-to-your-files)
+in the troubleshooting guide.
+
+**Updating from a release without this feature** (3.9.0 or older). Such a
+release cannot run the new program during the update. Once, in the deployment
+folder, run the new release's program yourself:
+
+```sh
+nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment migrate --root .
+```
+
+It prints what it applied and what you must do by hand. Review the result with
+`git diff`, save it in **Maintenance → Review Git changes**, and then run
+**Update Nixorium**. The release notes of that release say which of your files
+it changes, in case you prefer to edit them by hand.
 
 ## Updating one application independently
 

@@ -14,12 +14,16 @@ The project follows [Semantic Versioning](https://semver.org/).
   anything up. It never reads home folders, passwords, keys or Wi-Fi
   credentials. Assistant asks once more for consent because of this.
 - **Update Nixorium** can now change your own deployment files when a release
-  needs it, instead of asking you to edit them by hand. The review shows each
-  change with a one-line reason, and a "Manual change" with the text to replace
-  and the text to put instead when you have edited that file yourself. Saving
-  the update writes and commits the changed files with it, you can undo it with
-  Git like any update, and the new file `nixorium-migrations.json` records which
-  changes were made so each is made only once. See
+  needs it, instead of asking you to edit them by hand. The new release brings
+  the program that makes the change and runs it on a copy of your saved
+  deployment in a closed sandbox (no network, no passwords, no keys); the update
+  checks what changed and refuses anything unexpected. The review shows each
+  change with a one-line reason, and a "Manual change" saying what to replace
+  when you have edited that place yourself. Saving the update writes and
+  commits the changed files with it, you can undo it with Git like any update,
+  and the new file `nixorium-migrations.json` records which changes were made so
+  each is made only once. `nixorium deployment migrate --root <folder>` runs the
+  same program by hand. See
   [Updating](docs/updates.md#changes-to-your-own-files).
 
 ### Changed
@@ -78,11 +82,15 @@ The project follows [Semantic Versioning](https://semver.org/).
   with a message that says what to do. From this release on, Update Nixorium
   makes this change for you: the review shows it as a change to
   `modules/workstation.nix`, or as a "Manual change" if you edited that line.
-  Only when you update from 3.9.0 or older to this release, which cannot apply
-  it yet, do it by hand once: replace the line
+  A controller that runs 3.9.0 or older cannot do it during the update to this
+  release. Once, in your deployment folder, run
+  `nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment migrate --root .`,
+  review the result with `git diff`, save it in **Maintenance → Review Git
+  changes**, then run Update Nixorium. If you prefer to edit by hand, replace
+  the line
   `isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);`
   with `isController = args.isController or false;`, save, then update
-  Nixorium again.
+  Nixorium.
 
 ## [3.9.0] - 2026-10-19
 

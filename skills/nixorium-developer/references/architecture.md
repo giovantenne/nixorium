@@ -34,25 +34,41 @@ computer. The flake has no `colmena` output.
 ## Deployment migrations
 
 Files copied from the site template belong to the deployment, so later releases
-cannot simply overwrite them. `lib/deployment-migrations.nix` (exported as
-`lib.deploymentMigrations`, ADR 0034) lists exact text replacements: `id`
-(date-prefixed), `file`, `description`, `from`, `to`. During Update Nixorium the
-installed controller evaluates the target release's list, applies each entry to
-a staged copy of the committed deployment, and builds the candidate with the
-result. An entry is `applied` (`from` found exactly once), `done` (`to` already
-there) or `manual` (the administrator changed the file; the review shows the
-Replace/With text). Applied and done ids go to the deployment's tracked
-`nixorium-migrations.json`, so each runs once. Saving writes the migrated files
-first, only if each is unchanged since the review, and commits them with the
-update. The review token binds them.
+cannot simply overwrite them. The changes are Go code in the release:
+`Registry` in `internal/deploymigrate/registry.go` (ADR 0034), a list of
+`Migration{ID, Description, Apply(Tree) Outcome}` with the helper
+`ReplaceExact` and `Tree.Read`/`Write`/`Remove`, so a migration may change,
+create or remove files. The release being installed runs them. During Update
+Nixorium the installed controller builds the target's `nixorium` package from
+the candidate, checks its marker `share/nixorium/deployment-migrate-contract`
+(absent: a release before migrations, nothing to run; it lists the contract
+versions, now `1`), and runs `nixorium deployment migrate --root /work
+--contract 1 --json` in a bubblewrap sandbox (no network, store read-only, only
+the copy writable, 120 s) on a copy made from the committed deployment. It
+runs only when the update changes the Nixorium revision.
 
-Rules for the developer: add an entry in the same change as the template change;
-copy `from` from the previous template text in Git history, one entry for each
-released form that differs; never edit or remove a released entry; never name
-protected files (`flake.nix`, `flake.lock`, credentials, keys, hidden paths, the
-record file); test it with `internal/adapters/deployment_migrations_test.go` as
-the model. The mechanism runs only on a controller whose release already has it,
-so an update from an older release still needs a changelog note.
+The stable contract is the exit status (0 ran, 2 unsupported contract, 3 the
+migrator refuses this deployment, anything else refuses the update) and the
+JSON report. The file difference is the truth, the report only labels it:
+`internal/adapters/deployment_migrations.go` accepts only regular files outside
+`flake.nix`, `flake.lock`, `keys/`, `admin-ssh/`, credentials, `secret-key`,
+hidden paths and links, within 1 MiB per file, 256 files and 16 MiB, requires
+every changed file to be declared by an applied migration and every declared
+file to have changed, and allows the record `nixorium-migrations.json` to be
+created or changed but not removed. The record is written by the target's
+migrator, append-only, keeping unknown ids. The review shows "Migration" and
+"Manual change" lines and the diff; the review token binds the files, the raw
+report and the migrator's store path. Saving writes the files first, each only
+if unchanged since the review, restores them if a later step fails, and
+commits them with the update.
+
+Rules for the developer: append to `Registry` in the same change as the template
+change; copy `from` from every released form of the template text; `Files` must
+list every file an applied migration changed; never edit or remove a released
+entry; test it in `internal/deploymigrate`; change the contract only by adding
+a version and keeping the old one for a year of releases. The mechanism runs
+only for a controller whose release already has it; for an older one the
+upgrade note gives `nixorium deployment migrate --root .` through `nix run`.
 
 `deploymentStatus` reports whether placeholders, missing public keys, or
 public default passwords remain. Keep the standalone example evaluable even

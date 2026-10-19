@@ -51,7 +51,6 @@ lib/
   eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
   eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
   eval-workspace-profile.nix # Internal student preference JSON validator
-  deployment-migrations.nix # Changes a release makes to a deployment's files (ADR 0034)
   mk-lab.nix               # Host, class, netboot, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
@@ -61,6 +60,7 @@ cmd/nixorium/              # Management CLI entrypoint
 cmd/nixorium-remote-worker/ # Controller-owned USB/SSH operation worker
 cmd/nixorium-demo/         # Developer-only deterministic website demo exporter
 internal/                  # Domain, application, adapter, and presentation layers
+  deploymigrate/           # Changes a release makes to deployment files: registry.go (ADR 0034)
 modules/
   common.nix               # Composition point and shared system defaults
   firewall.nix             # Interface-scoped SSH, cache, PXE, and time policy
@@ -181,37 +181,53 @@ review CLI versus TUI behavior and existing workflow tests explicitly.
 ## Deployment migrations
 
 A deployment owns the files copied from `templates/site/`, so a change there
-does not reach existing deployments by itself. Update Nixorium applies the
-exact changes listed in `lib/deployment-migrations.nix` to the deployment,
-shows them in the review and saves them with the update (ADR 0034; each entry
-is applied once and recorded in the deployment's `nixorium-migrations.json`).
-Whenever a change to `templates/site/**`, or to anything else a deployment
-owns, must reach existing deployments, add an entry in the same change:
+does not reach existing deployments by itself. The changes a release makes to
+them are Go code in `internal/deploymigrate/registry.go` (`Registry`, a list of
+`Migration{ID, Description, Apply(Tree) Outcome}`; ADR 0034). The release
+being installed runs them: Update Nixorium builds the target's `nixorium`
+package, runs `nixorium deployment migrate --root … --contract 1 --json` in a
+bubblewrap sandbox on a copy of the saved deployment, compares the copy with
+the original under fixed rules (`internal/adapters/deployment_migrations.go`),
+shows the difference in the review and saves it with the update. Each
+migration is applied once and recorded by the migrator in the deployment's
+`nixorium-migrations.json`. Whenever a change to `templates/site/**`, or to
+anything else a deployment owns, must reach existing deployments, add a
+migration in the same change:
 
-- `id` starts with the year and month: `2026-10-short-slug`. `file` is the
-  path inside the deployment. `description` is one sentence an administrator
-  understands.
-- `from` is the exact text of the previous template. Copy it from the file's
-  Git history (`git log -p -- templates/site/<file>`), not from memory. Every
-  released form of the text that differs needs its own entry; a form with no
-  entry becomes a "Manual change" in the review, so say so in the changelog.
-  `to` is exactly the new template text.
-- Prefer whole-line replacements that end with a newline, so `from` is unlikely
-  to match inside a longer line, and keep each text short.
-- Never edit or remove a released entry: its id is already recorded in
-  deployments, and deployments that skip releases still need it. To correct a
-  mistake, add a new entry.
-- Never name a protected file (`flake.nix`, `flake.lock`, credentials, keys,
-  hidden paths) or the record file. Limits: 64 migrations, 64 KiB per text,
-  1 MiB per file. Only replacement of one exact text exists; a new kind (add a
-  file, rename) needs a change to the mechanism and its ADR first.
-- Test it as in `internal/adapters/deployment_migrations_test.go`: the old text
-  is replaced once and recorded, an edited file becomes a manual change, and
-  the template's own mkLab and template checks still pass with the new text.
+- Append to `Registry`; never edit or remove a released entry. Its id is
+  already recorded in deployments, and deployments that skip releases still
+  need it. To correct a mistake, add a new entry.
+- `ID` starts with the year and month: `2026-10-short-slug`. `Description` is
+  one sentence an administrator understands.
+- For a text replacement use `ReplaceExact`. Its `from` is the exact text of
+  the previous template: copy it from the file's history in version control
+  (`git log -p -- templates/site/<file>`), not from memory. Every released form
+  of the text that differs needs its own entry; a form with no entry becomes a
+  "Manual change" in the review, so say so in the changelog. Prefer whole-line
+  replacements that end with a newline, and keep each text short. A migration
+  may also create, change or remove files through `Tree.Write` and
+  `Tree.Remove`.
+- `Outcome.Files` must list every file an applied migration changed, created
+  or removed. The installed release refuses the update if a changed file is
+  not declared or a declared file did not change. Only regular files are
+  accepted; never `flake.nix`, `flake.lock`, `keys/`, `admin-ssh/`,
+  `lab-credentials.json`, `secret-key`, hidden paths or symbolic links; at most
+  1 MiB per file, 256 files and 16 MiB in all; the record may be changed but
+  not removed.
+- Add a unit test in `internal/deploymigrate`: the old text is migrated and
+  recorded, an edited file becomes a manual change, a deployment that already
+  has the change is `done`, and the template's own mkLab and template checks
+  still pass with the new text.
+- The contract between the installed release and the migrator (exit status,
+  JSON report, marker file `share/nixorium/deployment-migrate-contract`) is
+  stable. Change it only by adding a contract version, and keep the old
+  version supported for a year of releases. Never change what version 1 means.
 - Mention the change in `CHANGELOG.md`, and review the administrator update
   guide (`docs/updates.md`, with its template copy) if what the review shows
-  changes. A migration reaches a controller only once it runs a release that has
-  the mechanism, so an update from an older release still needs a manual note.
+  changes. A controller whose installed release has no migrations (3.9.0 or
+  older) cannot run them during the update: for that step the upgrade note
+  gives `nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment
+  migrate --root .` in the deployment folder.
 
 ## Releases
 
@@ -229,7 +245,7 @@ any shard must block publication.
 
 Before the release commit, check that every change to `templates/site/**` made
 since the previous tag that existing deployments need has its entry in
-`lib/deployment-migrations.nix`.
+`Registry` in `internal/deploymigrate/registry.go`.
 
 Before tagging, the website branch `release/<version>` of `nixorium-website`
 must exist, be built against the commit to release and be green on `staging`.

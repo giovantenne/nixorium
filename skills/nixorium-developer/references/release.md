@@ -12,7 +12,7 @@ Before release:
 
 1. Start from a clean `master` synchronized with `origin/master`.
 2. Select the version from its compatibility impact.
-3. Check that `lib/deployment-migrations.nix` has an entry for every change to
+3. Check that `Registry` in `internal/deploymigrate/registry.go` has an entry for every change to
    `templates/site/**` since the previous tag that existing deployments need
    (released entries are never edited), and that the changelog mentions them.
    Update `VERSION`, `DEFAULT_RELEASE` in `install.sh`, and the released tag in

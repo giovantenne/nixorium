@@ -60,12 +60,17 @@ modules make it materially different.
 
 A deployment owns the files copied from `templates/site/`. When a template
 change must reach existing deployments, add an entry to
-`lib/deployment-migrations.nix` in the same change, with an exact `from` taken
-from the previous template text, a `to` equal to the new text and a one-sentence
-description. Never edit or remove a released entry. Follow the "Deployment
-migrations" section of `AGENTS.md` and the migration paragraph in
-[references/architecture.md](references/architecture.md); a release is not ready
-until the list covers every such template change since the previous tag.
+`Registry` in `internal/deploymigrate/registry.go` in the same change, with a
+date-prefixed id, a one-sentence description and an `Apply` function (use
+`ReplaceExact`, with a `from` copied from every released form of the template
+text, for a text replacement). `Files` must list every file an applied
+migration changed, and a unit test in `internal/deploymigrate` is required.
+Never edit or remove a released entry. Change the contract with the installed
+release only by adding a version and keeping the old one for a year of
+releases. Follow the "Deployment migrations" section of `AGENTS.md` and the
+migration paragraph in [references/architecture.md](references/architecture.md);
+a release is not ready until the registry covers every such template change
+since the previous tag.
 
 ## Keep distribution coherent
 

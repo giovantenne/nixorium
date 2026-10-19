@@ -912,16 +912,14 @@ above.
 
 The review of **Update Nixorium** lists the changes the new release makes to
 your own files. "Manual change" means the release could not make one of them
-because the file is not as the release expects: you edited that place, the text
-appears more than once, or the file is not a saved file of the deployment. No
-file is touched for that change.
+because the file is not as the release expects: you edited that place, or the
+file is missing. No file is touched for that change.
 
-1. Read the two texts in the review: `Replace:` is the text the release expects
-   to find and `With:` the text it wants.
+1. Read the line under "Manual change" in the review. For a text replacement it
+   names the file and says what to do: `Replace "…" with "…".`
 2. Open the file named in the review and make that change yourself: replace
-   the `Replace:` text with the `With:` text, keeping any other edit you made on
-   purpose. If the file already says what the `With:` text says, nothing needs
-   to change.
+   the first text with the second, keeping any other edit you made on purpose.
+   If the file already says what the second text says, nothing needs to change.
 3. Save it as a normal reviewed change (**Maintenance → Review Git changes**),
    then run **Update Nixorium** again. Assistant can prepare this change as a
    proposal for you to review.
@@ -939,6 +937,40 @@ Git. A valid file has this form:
 
 If there is no earlier version, remove the file in a reviewed change: the update
 then checks each change again, and records those your files already contain.
+
+## The update is refused because of the new release's changes to your files
+
+The new release brings its own program that changes your deployment's files. It
+runs on a copy, without network, and **Update Nixorium** accepts only the
+changes it can show you in the review. The update is refused, and nothing is
+saved, when:
+
+- the new release's migrations fail, do not finish in 2 minutes, or say they
+  cannot migrate this deployment (the message gives the reason, for example
+  that `nixorium-migrations.json` is not valid);
+- they change something they did not declare, or a file they must not touch
+  (`flake.nix`, `flake.lock`, keys, credentials, hidden files), or too much;
+- the sandbox that runs them cannot start on the controller (the message says
+  so).
+
+The current release keeps working. Do not try to work around it:
+
+1. Fix what the message names, if it is on your side (for example restore
+   `nixorium-migrations.json` from Git), and update again.
+2. Otherwise stay on the current release and collect a support report
+   (`nixorium support export`) to send with the message. This is a problem of
+   the new release, not of your laboratory.
+
+If the message says **update to an intermediate release first**, the new
+release migrates files in a newer way than the release you run knows. Update
+to the release that the message or the release notes name as intermediate, then
+update again.
+
+If you run a release from before deployment migrations existed, the update
+cannot run them. In the deployment folder run
+`nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment migrate --root .`,
+review the result with `git diff` (or **Maintenance → Review Git changes**),
+save it, and then run **Update Nixorium**.
 
 ## An upstream update failed
 
