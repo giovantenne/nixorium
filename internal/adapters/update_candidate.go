@@ -28,7 +28,7 @@ const maximumCandidateSourceBytes = 512 * 1024 * 1024
 // and ignored files are never copied.
 func candidateFlakeSource(ctx context.Context, repository string, replacements map[string][]byte) (string, error) {
 	for name := range replacements {
-		if name != "flake.nix" && name != "flake.lock" {
+		if name != "flake.nix" && name != "flake.lock" && !validMigrationFile(name) {
 			return "", fmt.Errorf("candidate source cannot replace %s", name)
 		}
 	}

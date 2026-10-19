@@ -208,6 +208,8 @@
         evalLabSettings = import ./lib/eval-lab-settings.nix {
           inherit (nixpkgs) lib;
         };
+        # Read by Update Nixorium from the release it updates to (ADR 0034).
+        deploymentMigrations = import ./lib/deployment-migrations.nix;
       };
       checks.${system} = {
         home-files-adoption = import ./tests/home-files-adoption.nix { inherit pkgs mkWorkspaceLab; };

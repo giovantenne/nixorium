@@ -287,9 +287,29 @@ func validateUpdateCandidate(ctx context.Context, repository, currentFlake strin
 	if mismatches, err := flakeLockOriginalMismatches(proposedFlake, proposedLock); err != nil || len(mismatches) > 0 {
 		return domain.UpdateProposal{}, fmt.Errorf("%s: %s", candidateLockMismatch, strings.Join(mismatches, "; "))
 	}
-	flake, err := candidateFlakeSource(ctx, repository, map[string][]byte{"flake.nix": proposedFlake, "flake.lock": proposedLock})
+	replacements := map[string][]byte{"flake.nix": proposedFlake, "flake.lock": proposedLock}
+	flake, err := candidateFlakeSource(ctx, repository, replacements)
 	if err != nil {
 		return domain.UpdateProposal{}, err
+	}
+	// The target release's changes to the deployment's own files: the
+	// candidate is evaluated and built with them (ADR 0034).
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Reading the target release's changes to deployment files", 0, 0)
+	migrationList, err := candidateDeploymentMigrations(ctx, flake)
+	if err != nil {
+		return domain.UpdateProposal{}, err
+	}
+	migrations, migratedFiles, err := planDeploymentMigrations(ctx, repository, migrationList)
+	if err != nil {
+		return domain.UpdateProposal{}, err
+	}
+	if len(migratedFiles) > 0 {
+		for _, file := range migratedFiles {
+			replacements[file.Path] = file.After
+		}
+		if flake, err = candidateFlakeSource(ctx, repository, replacements); err != nil {
+			return domain.UpdateProposal{}, err
+		}
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Checking that the candidate flake.lock matches flake.nix", 0, 0)
 	if _, err := runBoundedNix(ctx, 64*1024, "flake", "lock", "--no-update-lock-file", flake); err != nil {
@@ -371,16 +391,18 @@ func validateUpdateCandidate(ctx context.Context, repository, currentFlake strin
 		checks = append(checks, domain.UpdateCheck{ID: build.id, State: "passed", Message: "candidate output built without a result link"})
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseReview, "Preparing the bounded flake.nix and flake.lock review", 0, 0)
-	diff, err := updateProposalDiff(ctx, snapshot.FlakeContent, proposedFlake, snapshot.LockContent, proposedLock)
+	diff, err := updateProposalDiff(ctx, snapshot.FlakeContent, proposedFlake, snapshot.LockContent, proposedLock, migratedFiles...)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
 	return domain.UpdateProposal{
-		FlakeContent: proposedFlake,
-		LockContent:  proposedLock,
-		Diff:         domain.GitDiff{Scope: "nixorium-update", Content: diff},
-		Checks:       checks,
-		Workspace:    workspace,
+		FlakeContent:  proposedFlake,
+		LockContent:   proposedLock,
+		Diff:          domain.GitDiff{Scope: "nixorium-update", Content: diff},
+		Checks:        checks,
+		Workspace:     workspace,
+		Migrations:    migrations,
+		MigratedFiles: migratedFiles,
 	}, nil
 }
 
@@ -546,20 +568,25 @@ func runBoundedNix(ctx context.Context, limit int, arguments ...string) (string,
 	return stdout.buffer.String(), nil
 }
 
-func updateProposalDiff(ctx context.Context, oldFlake, newFlake, oldLock, newLock []byte) (string, error) {
+func updateProposalDiff(ctx context.Context, oldFlake, newFlake, oldLock, newLock []byte, migrated ...domain.MigratedFile) (string, error) {
 	temporary, err := os.MkdirTemp("", "nixorium-update-diff-*")
 	if err != nil {
 		return "", fmt.Errorf("create update diff directory: %w", err)
 	}
 	defer os.RemoveAll(temporary)
 	var combined bytes.Buffer
-	for _, file := range []struct {
+	type diffFile struct {
 		name       string
 		oldContent []byte
 		newContent []byte
-	}{{"flake.nix", oldFlake, newFlake}, {"flake.lock", oldLock, newLock}} {
-		oldPath := filepath.Join(temporary, "old-"+file.name)
-		newPath := filepath.Join(temporary, "new-"+file.name)
+	}
+	files := []diffFile{{"flake.nix", oldFlake, newFlake}, {"flake.lock", oldLock, newLock}}
+	for _, file := range migrated {
+		files = append(files, diffFile{file.Path, file.Before, file.After})
+	}
+	for index, file := range files {
+		oldPath := filepath.Join(temporary, fmt.Sprintf("old-%d", index))
+		newPath := filepath.Join(temporary, fmt.Sprintf("new-%d", index))
 		if err := os.WriteFile(oldPath, file.oldContent, 0600); err != nil {
 			return "", fmt.Errorf("write old %s diff input: %w", file.name, err)
 		}
@@ -623,6 +650,12 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 	if len(proposal.FlakeContent) == 0 || len(proposal.LockContent) == 0 {
 		return false, errors.New("validated update proposal is incomplete")
 	}
+	// The release's changes to the deployment's own files go first: they
+	// work with the current release too, and a failure leaves the update
+	// input untouched (ADR 0034).
+	if err := applyMigratedFiles(repository, proposal.MigratedFiles); err != nil {
+		return false, err
+	}
 	lockMode := os.FileMode(expected.LockMode)
 	if !expected.HasLock {
 		lockMode = 0644
@@ -653,6 +686,60 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 		return true, fmt.Errorf("sync deployment root after update: %w", err)
 	}
 	return false, nil
+}
+
+// applyMigratedFiles writes the reviewed migrations, each only if the file
+// is still exactly as reviewed.
+func applyMigratedFiles(repository string, files []domain.MigratedFile) error {
+	for _, file := range files {
+		if !validMigrationFile(file.Path) {
+			return fmt.Errorf("deployment migration names a file it may not change: %s", file.Path)
+		}
+		path := filepath.Join(repository, file.Path)
+		info, err := os.Lstat(path)
+		if file.Create {
+			if !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("%s appeared after update review", file.Path)
+			}
+			continue
+		}
+		if err != nil || !info.Mode().IsRegular() {
+			return fmt.Errorf("%s changed after update review", file.Path)
+		}
+		current, err := os.ReadFile(path)
+		if err != nil || !bytes.Equal(current, file.Before) {
+			return fmt.Errorf("%s changed after update review", file.Path)
+		}
+	}
+	for index, file := range files {
+		temporary, err := writeUpdateTemporary(filepath.Join(repository, filepath.Dir(file.Path)), filepath.Base(file.Path), file.After, os.FileMode(file.Mode))
+		if err != nil {
+			return migrationWriteError(repository, files[:index], err)
+		}
+		if err := os.Rename(temporary, filepath.Join(repository, file.Path)); err != nil {
+			_ = os.Remove(temporary)
+			return migrationWriteError(repository, files[:index], err)
+		}
+	}
+	return nil
+}
+
+// migrationWriteError restores the files already migrated, so a failed save
+// leaves the deployment as reviewed.
+func migrationWriteError(repository string, written []domain.MigratedFile, cause error) error {
+	for _, file := range written {
+		if file.Create {
+			_ = os.Remove(filepath.Join(repository, file.Path))
+			continue
+		}
+		directory := filepath.Join(repository, filepath.Dir(file.Path))
+		if temporary, err := writeUpdateTemporary(directory, filepath.Base(file.Path), file.Before, os.FileMode(file.Mode)); err == nil {
+			if os.Rename(temporary, filepath.Join(repository, file.Path)) != nil {
+				_ = os.Remove(temporary)
+			}
+		}
+	}
+	return fmt.Errorf("write deployment migration: %w", cause)
 }
 
 func writeUpdateTemporary(repository, name string, content []byte, mode os.FileMode) (string, error) {

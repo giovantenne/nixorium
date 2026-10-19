@@ -236,13 +236,16 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 	for _, check := range report.Checks {
 		fmt.Fprintf(writer, "  %-18s %-8s %s\n", check.ID, strings.ToUpper(check.State), check.Message)
 	}
+	for _, line := range deploymentMigrationLines(report.Migrations) {
+		fmt.Fprintln(writer, line)
+	}
 	if report.ReviewToken != "" {
 		fmt.Fprintf(writer, "Review token:     %s\n", report.ReviewToken)
 		confirmationText(writer, "Confirmation:     ", report.Confirmation)
 		fmt.Fprintln(writer, "No branch, commit, push, activation, PXE action, or deployment is part of this plan.")
 	}
 	if report.Diff.Content != "" {
-		fmt.Fprintln(writer, "\nProposed flake.nix/flake.lock changes:")
+		fmt.Fprintln(writer, "\nProposed changes to deployment files:")
 		fmt.Fprint(writer, report.Diff.Content)
 		if !strings.HasSuffix(report.Diff.Content, "\n") {
 			fmt.Fprintln(writer)
@@ -251,6 +254,26 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
 	}
+}
+
+// deploymentMigrationLines describe the release's changes to deployment files
+// (ADR 0034): those the update saves, and those left to the administrator.
+func deploymentMigrationLines(migrations []domain.DeploymentMigrationResult) []string {
+	lines := []string{}
+	for _, result := range migrations {
+		migration := result.Migration
+		switch result.State {
+		case domain.MigrationApplied:
+			lines = append(lines, fmt.Sprintf("Migration:        %s — %s", migration.File, safeWorkspaceText(migration.Description)))
+		case domain.MigrationManual:
+			lines = append(lines,
+				fmt.Sprintf("Manual change:    %s — %s", migration.File, safeWorkspaceText(migration.Description)),
+				fmt.Sprintf("                  Not changed automatically: %s.", safeWorkspaceText(result.Detail)),
+				"                  Replace:  "+safeWorkspaceText(strings.TrimRight(migration.From, "\n")),
+				"                  With:     "+safeWorkspaceText(strings.TrimRight(migration.To, "\n")))
+		}
+	}
+	return lines
 }
 
 func PackageBaseStatusText(writer io.Writer, report domain.PackageBaseStatus) {

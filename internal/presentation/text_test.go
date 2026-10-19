@@ -237,10 +237,17 @@ func TestUpdateTextShowsValidatedPlanAndReviewableResult(t *testing.T) {
 		ReviewToken: "sha256:review",
 		Checks:      []domain.UpdateCheck{{ID: "client", State: "passed", Message: "built"}},
 		Diff:        domain.GitDiff{Content: "+github:owner/repo/v2.1.0-beta.1\n"},
+		Migrations: []domain.DeploymentMigrationResult{
+			{Migration: domain.DeploymentMigration{File: "modules/workstation.nix", Description: "Find the controller with isController.", From: "old line\n", To: "new line\n"}, State: domain.MigrationApplied},
+			{Migration: domain.DeploymentMigration{File: "modules/shared.nix", Description: "Import the new module.", From: "a\n", To: "b\n"}, State: domain.MigrationManual, Detail: "the file was changed"},
+			{Migration: domain.DeploymentMigration{File: "modules/other.nix", Description: "Already done."}, State: domain.MigrationDone},
+		},
 	}
 	var output bytes.Buffer
 	UpdatePlanText(&output, plan)
-	for _, expected := range []string{"update plan: READY", "v2.0.0", "prerelease", "client", "PASSED", "sha256:review", plan.Confirmation, "No branch, commit, push", "flake.nix/flake.lock"} {
+	for _, expected := range []string{"update plan: READY", "v2.0.0", "prerelease", "client", "PASSED", "sha256:review", plan.Confirmation, "No branch, commit, push", "Proposed changes to deployment files",
+		"Migration:        modules/workstation.nix — Find the controller with isController.",
+		"Manual change:    modules/shared.nix — Import the new module.", "Not changed automatically: the file was changed.", "Replace:  a", "With:     b"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("update plan output omits %q:\n%s", expected, output.String())
 		}
