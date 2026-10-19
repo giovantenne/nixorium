@@ -50,7 +50,7 @@ type DeploymentRecoveryPlan struct {
 	// PXEMode is the network installation mode when a session is still open
 	// (active, degraded or recovery-required): a computer installed through
 	// it may never have finished. It is advisory and not bound by the token.
-	PXEMode      string            `json:"pxeMode,omitempty"`
+	PXEMode string `json:"pxeMode,omitempty"`
 	// Automatic: every computer's outcome is known from the engine's own
 	// records (ADR 0031), so the record may be archived without asking.
 	Automatic    bool              `json:"automatic,omitempty"`

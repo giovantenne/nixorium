@@ -22,6 +22,14 @@ type fakeRecoverySource struct {
 	pxeMode      string
 }
 
+// fakeRecorderSource also answers whether the pending record's writer lives.
+type fakeRecorderSource struct {
+	fakeRecoverySource
+	running bool
+}
+
+func (s fakeRecorderSource) ProcessRunning(int, string) bool { return s.running }
+
 func (s fakeRecoverySource) PendingDeployment() (domain.PendingDeployment, bool, error) {
 	return s.pending, s.pendingFound, s.pendingErr
 }
@@ -100,5 +108,35 @@ func TestDoctorStillReportsWhenTheLaboratoryCannotBeRead(t *testing.T) {
 	first := report.Findings[0]
 	if first.ID != "CONFIG-EVAL" || first.Level != domain.LevelError || strings.Contains(first.Evidence, "long trace") || first.Remediation == "" {
 		t.Fatalf("CONFIG-EVAL = %+v", first)
+	}
+}
+
+func TestRecoveryShowsARunningUpdateAsBusyNotInterrupted(t *testing.T) {
+	pending := domain.PendingDeployment{SchemaVersion: 1, Revision: strings.Repeat("a", 40), Targets: []domain.DeploymentTarget{{Name: "pc01"}}, StartedAt: time.Now(), ControllerPID: 4242, ControllerPIDStart: "77"}
+	holder := domain.OperationHolder{Operation: "Update computers", User: "admin", Known: true}
+	for _, test := range []struct {
+		name        string
+		source      fakeRecorderSource
+		interrupted bool
+	}{
+		{"recorder updating", fakeRecorderSource{fakeRecoverySource{pending: pending, pendingFound: true, holder: holder, busy: true}, true}, false},
+		{"recorder gone", fakeRecorderSource{fakeRecoverySource{pending: pending, pendingFound: true}, false}, true},
+		{"recorder alive without the lock", fakeRecorderSource{fakeRecoverySource{pending: pending, pendingFound: true}, true}, true},
+		{"apply returned with unknown results", fakeRecorderSource{fakeRecoverySource{pending: func() domain.PendingDeployment {
+			returned := pending
+			returned.ApplyReturned = true
+			return returned
+		}(), pendingFound: true, holder: holder, busy: true}, true}, true},
+		{"recorder unknown", fakeRecorderSource{fakeRecoverySource{pending: domain.PendingDeployment{Targets: pending.Targets}, pendingFound: true, holder: holder, busy: true}, true}, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			report := NewRecoveryInspector(test.source).Observe(context.Background(), "/srv/lab")
+			if _, found := report.Condition(domain.RecoveryDeploymentPending); found != test.interrupted {
+				t.Fatalf("interrupted = %v, want %v: %+v", found, test.interrupted, report.Conditions)
+			}
+			if _, found := report.Condition(domain.RecoveryOperationBusy); found != test.source.busy {
+				t.Fatalf("busy = %v, want %v", found, test.source.busy)
+			}
+		})
 	}
 }

@@ -30,6 +30,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 - In the classroom view the **Power** menu opens towards the left, so it
   stays readable when the window is maximised.
+- While an update of the student computers is still running, the Overview
+  shows it as a running operation instead of also listing it as an
+  interrupted update.
 
 ## [3.9.0] - 2026-10-19
 

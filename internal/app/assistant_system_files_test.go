@@ -18,7 +18,9 @@ type fakeSystemFiles struct {
 	calls      int
 }
 
-func (f *fakeSystemFiles) LabMeta(context.Context, string) (domain.LabMeta, error) { return f.meta, nil }
+func (f *fakeSystemFiles) LabMeta(context.Context, string) (domain.LabMeta, error) {
+	return f.meta, nil
+}
 func (f *fakeSystemFiles) ReadSystemFile(_ context.Context, host domain.HostMeta, controller bool, path string) (systemfiles.Result, error) {
 	f.calls++
 	f.host, f.controller = host, controller

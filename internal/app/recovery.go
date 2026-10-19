@@ -22,6 +22,23 @@ type RecoverySource interface {
 	ServiceState(context.Context, string) domain.ServiceState
 }
 
+// recorderSource tells whether the process that wrote the pending record is
+// still alive (the same PID and start time).
+type recorderSource interface {
+	ProcessRunning(pid int, start string) bool
+}
+
+// updateRunning reports a pending record whose update is still under way:
+// its recorder is alive, has not returned from its apply, and holds the
+// operation lock. The Overview then shows the running operation, not an
+// interrupted update. A recorder that is alive but no longer holds the lock
+// left its record behind, so the record is reported.
+func (inspector *RecoveryInspector) updateRunning(pending domain.PendingDeployment, err error, busy bool) bool {
+	recorder, ok := inspector.source.(recorderSource)
+	return ok && err == nil && busy && !pending.ApplyReturned && pending.ControllerPID > 0 &&
+		recorder.ProcessRunning(pending.ControllerPID, pending.ControllerPIDStart)
+}
+
 type backupDueSource interface {
 	BackupDue(string) (string, bool)
 }
@@ -61,7 +78,8 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 		root = repository
 	}
 
-	if pending, present, pendingErr := inspector.source.PendingDeployment(); present {
+	holder, busy := inspector.source.OperationLockHolder()
+	if pending, present, pendingErr := inspector.source.PendingDeployment(); present && !inspector.updateRunning(pending, pendingErr, busy) {
 		detail := ""
 		var since *time.Time
 		var affects []string
@@ -89,7 +107,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	case "degraded", "recovery-required":
 		add(domain.RecoveryPXE, "PXE-ACTIVE", pxeRecoveryDetail(mode), "Client operations and a new network installation.", nil, nil)
 	}
-	if holder, busy := inspector.source.OperationLockHolder(); busy {
+	if busy {
 		detail := "Other operations wait until it finishes."
 		if holder.Known {
 			detail = upperFirst(holder.Description()) + ". " + detail
