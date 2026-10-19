@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -27,6 +28,13 @@ type fakeUpdateSource struct {
 	commitPlan  domain.GitCommitProposal
 	commits     int
 	lastTarget  string
+	committed   []string
+	// migratedOK answers MigratedFilesSaved for a retried save.
+	migratedOK bool
+}
+
+func (source *fakeUpdateSource) MigratedFilesSaved(string, []domain.MigratedFile) bool {
+	return source.migratedOK
 }
 
 func (source *fakeUpdateSource) DiscoverUpdateReleases(context.Context, string) ([]domain.UpdateReleaseRef, error) {
@@ -63,6 +71,9 @@ func (source *fakeUpdateSource) ApplyPreparedUpdate(context.Context, string, str
 			{Path: "flake.lock", Unstaged: "modified", Managed: true},
 			{Path: "flake.nix", Unstaged: "modified", Managed: true},
 		}}
+		for _, file := range source.proposal.MigratedFiles {
+			source.review.Changes = append(source.review.Changes, domain.GitChange{Path: file.Path, Unstaged: "modified"})
+		}
 	}
 	return source.partial, source.applyErr
 }
@@ -75,8 +86,9 @@ func (source *fakeUpdateSource) GitCommitProposal(context.Context, string, []str
 	return source.commitPlan, nil
 }
 
-func (source *fakeUpdateSource) CommitGitPaths(context.Context, string, []string, string, string, string) (string, error) {
+func (source *fakeUpdateSource) CommitGitPaths(_ context.Context, _ string, paths []string, _, _, _ string) (string, error) {
 	source.commits++
+	source.committed = append([]string(nil), paths...)
 	source.revision = strings.Repeat("b", 40)
 	source.dirty = false
 	source.review = domain.GitReviewSnapshot{}
@@ -402,6 +414,49 @@ func TestUpdateSaveRecoversFilesWrittenBeforeLocalRecord(t *testing.T) {
 	report := manager.Save(context.Background(), plan)
 	if report.State != "saved" || report.HasErrors() || source.applied != 0 || source.commits != 1 {
 		t.Fatalf("recovered save = %+v, applied=%d commits=%d", report, source.applied, source.commits)
+	}
+}
+
+// The files the target release's migrations change are saved in the same
+// commit as the update (ADR 0034), also when a save is retried.
+func TestUpdateSaveCommitsMigratedFilesWithTheUpdate(t *testing.T) {
+	source := updateSaveSource()
+	source.proposal.MigratedFiles = []domain.MigratedFile{
+		{Path: "modules/workstation.nix", Before: []byte("old"), After: []byte("new"), Mode: 0o644},
+		{Path: domain.DeploymentMigrationsFile, After: []byte("{}\n"), Mode: 0o644, Create: true},
+	}
+	update := NewUpdateManager(source)
+	plan := update.Plan(context.Background(), ".", "v1.1.0", false, false)
+	source.mutate = true
+	review := NewGitReviewManager(source)
+	manager := NewUpdateSaveManager(update, source, review, NewManagedConfigurationSaveManager(review, NewGitCommitManager(source)))
+	report := manager.Save(context.Background(), plan)
+	want := []string{"flake.lock", "flake.nix", "modules/workstation.nix", domain.DeploymentMigrationsFile}
+	slices.Sort(want)
+	got := slices.Clone(source.committed)
+	slices.Sort(got)
+	if report.State != "saved" || !slices.Equal(got, want) {
+		t.Fatalf("save = %+v, committed = %v", report, source.committed)
+	}
+
+	// A retried save accepts the migrated files only as reviewed.
+	for _, saved := range []bool{true, false} {
+		retry := updateSaveSource()
+		retry.proposal.MigratedFiles = source.proposal.MigratedFiles
+		retryUpdate := NewUpdateManager(retry)
+		retryPlan := retryUpdate.Plan(context.Background(), ".", "v1.1.0", false, false)
+		retry.snapshot.FlakeContent = append([]byte(nil), retry.proposal.FlakeContent...)
+		retry.snapshot.LockContent = append([]byte(nil), retry.proposal.LockContent...)
+		retry.dirty, retry.migratedOK = true, saved
+		retry.review = domain.GitReviewSnapshot{Changes: []domain.GitChange{
+			{Path: "flake.lock", Unstaged: "modified", Managed: true}, {Path: "flake.nix", Unstaged: "modified", Managed: true},
+			{Path: "modules/workstation.nix", Unstaged: "modified"}, {Path: domain.DeploymentMigrationsFile, Untracked: true},
+		}}
+		retryReview := NewGitReviewManager(retry)
+		result := NewUpdateSaveManager(retryUpdate, retry, retryReview, NewManagedConfigurationSaveManager(retryReview, NewGitCommitManager(retry))).Save(context.Background(), retryPlan)
+		if saved != (result.State == "saved") || retry.applied != 0 {
+			t.Fatalf("retry with migrated files saved=%v: %+v", saved, result)
+		}
 	}
 }
 

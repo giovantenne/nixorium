@@ -723,6 +723,18 @@ func applyMigratedFiles(repository string, files []domain.MigratedFile) error {
 	return nil
 }
 
+// MigratedFilesSaved reports whether every migrated file on disk is exactly
+// the reviewed result (present with its new content, or removed).
+func (Local) MigratedFilesSaved(repository string, files []domain.MigratedFile) bool {
+	for _, file := range files {
+		current, exists, err := readMigratedFile(repository, file.Path)
+		if err != nil || exists == file.Delete || (!file.Delete && !bytes.Equal(current, file.After)) {
+			return false
+		}
+	}
+	return true
+}
+
 // restoreMigratedFiles puts back the reviewed originals of migrated files.
 func restoreMigratedFiles(repository string, files []domain.MigratedFile) error {
 	var problems []error
