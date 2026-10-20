@@ -334,6 +334,9 @@ run_plan() {
   (umask 022; nixorium_run_disko "$NIXORIUM_DISKO_SCRIPT" "$selected_disk")
 
   RUN_PHASE=install
+  # The installation activates the system once; a shared class system reads
+  # the computer's number from this record then (ADR 0033).
+  nixorium_write_identity_record "$host_name"
   nixos-install --system "$system_path" \
     --option substituters "$cache_url" \
     --option trusted-public-keys "$cache_key" \

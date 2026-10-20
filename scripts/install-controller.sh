@@ -150,6 +150,11 @@ cleanup() {
     sudo swapoff "$BOOTSTRAP_SWAP" >/dev/null 2>&1 || true
     sudo rm -f -- "$BOOTSTRAP_SWAP" >/dev/null 2>&1 || true
   fi
+  # A failed run releases the new disk, or the next run finds it mounted and
+  # offers no disk to install on.
+  if (( STATUS != 0 && DISK_CHANGE_STARTED == 1 )) && findmnt -rn --mountpoint "$TARGET_ROOT" >/dev/null 2>&1; then
+    sudo umount -R "$TARGET_ROOT" >/dev/null 2>&1 || true
+  fi
   rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"
   if [[ -n "$EVALUATION_SOURCE" ]]; then rm -rf -- "$EVALUATION_SOURCE"; fi
 }

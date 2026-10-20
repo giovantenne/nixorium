@@ -408,6 +408,9 @@ resolve_system() {
 }
 
 install_system() {
+  # The installation activates the system once; a shared class system reads
+  # the computer's number from this record then (ADR 0033).
+  nixorium_write_identity_record "$SELECTED_HOST" || return 1
   sudo nixos-install --system "$SELECTED_SYSTEM_PATH" \
     --option substituters "http://${LAB_CONTROLLER_DHCP_IP}:${LAB_CACHE_PORT}" \
     --option trusted-public-keys "$CACHE_KEY" \

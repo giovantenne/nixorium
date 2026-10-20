@@ -342,9 +342,12 @@ test_offline_system_resolution_precedes_system_install() (
     fi
   }
   sudo() { printf '%s\n' "$@" > "$ACTION_LOG"; }
+  nixorium_write_identity_record() { printf '%s\n' "$1" > "${FIXTURE_DIR}/identity-record"; }
 
   resolve_system
   install_system
+  # The record exists before the installation activates the system.
+  test "$(cat "${FIXTURE_DIR}/identity-record")" = pc01
   grep -Fxq 'eval' "${FIXTURE_DIR}/nix-eval-arguments"
   grep -Fxq "${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel.outPath" "${FIXTURE_DIR}/nix-eval-arguments"
   grep -Fxq -- '--offline' "${FIXTURE_DIR}/nix-eval-arguments"
