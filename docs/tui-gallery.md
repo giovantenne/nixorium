@@ -677,7 +677,7 @@ Nixorium  /  Computers  /  Update computers
 
 Update these computers?
 
-Affects  pc01,pc02,pc03,pc04,pc05 · 5 computers
+Affects  pc01, pc02, pc03, pc04, pc05 · 5 computers
 Builds   5 configurations for 5 computers
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
@@ -736,7 +736,7 @@ Nixorium  /  Computers  /  Update computers
 
 Update these computers?
 
-Affects  pc01,pc02 · 2 computers
+Affects  pc01, pc02 · 2 computers
 Builds   2 configurations for 2 computers
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
@@ -853,11 +853,12 @@ Nixorium  /  Installation  /  Network boot  /  Saved settings
 
 Use the saved installation settings?
 
-Laboratory network  10.42.0.0/24
-Controller DHCP     192.168.1.123
-Client interface    automatic (wired network card)
-Client computers    5
-Accounts            admin / teacher / student
+Laboratory network    10.42.0.0/24
+Controller interface  enp1s0
+Controller DHCP       192.168.1.123
+Client interface      automatic (wired network card)
+Client computers      5
+Accounts              admin / teacher / student
 
 Continue the guided preparation using these saved values.
 Keys, configuration, controller and installation files are checked next.
