@@ -2287,3 +2287,13 @@ func TestFinishedNetworkInstallationPointsToTheInstalledComputers(t *testing.T) 
 		t.Fatalf("h opened %v", next.screen)
 	}
 }
+
+func TestPXEScreenNeverShowsTheAddressPlaceholder(t *testing.T) {
+	report := testDashboardReport("ready")
+	report.Meta.Controller.DHCPIP = domain.MasterDHCPPlaceholder
+	report.PXEPreparation = domain.PXEPreparationState{}
+	view := (dashboardModel{report: report, screen: dashboardPXE}).View().Content
+	if strings.Contains(view, domain.MasterDHCPPlaceholder) || !strings.Contains(view, "not set yet") {
+		t.Fatalf("placeholder shown:\n%s", view)
+	}
+}

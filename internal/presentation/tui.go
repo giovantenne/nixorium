@@ -2906,6 +2906,9 @@ func (model dashboardModel) pxeView() string {
 	if model.report.PXEPreparation.Ready && model.report.PXEPreparation.DHCPAddress != "" {
 		address = model.report.PXEPreparation.DHCPAddress
 	}
+	if address == domain.MasterDHCPPlaceholder {
+		address = "not set yet; laboratory settings ask for it"
+	}
 	if address != "" {
 		fields = append(fields, [2]string{"Controller address", address})
 	}
