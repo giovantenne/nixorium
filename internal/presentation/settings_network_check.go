@@ -30,6 +30,44 @@ func (model dashboardModel) newSettingsEditor(settings domain.LabSettingsFile, f
 	return editor
 }
 
+// staleDHCPAddress reports a saved controller DHCP address that the
+// controller no longer has, when its addresses could be read.
+func staleDHCPAddress(saved string, addresses domain.ControllerAddresses) bool {
+	if !addresses.Detected || saved == "" || saved == domain.MasterDHCPPlaceholder {
+		return false
+	}
+	for _, choice := range addresses.Choices {
+		if choice.Address == saved {
+			return false
+		}
+	}
+	return true
+}
+
+// withChangedDHCPAddress opens the installation form after the controller's
+// DHCP address changed: it says so and, when the controller has exactly one
+// candidate address, proposes it; everything is still reviewed before saving.
+func (editor settingsWizardModel) withChangedDHCPAddress(addresses domain.ControllerAddresses) settingsWizardModel {
+	saved := editor.settings.Lab.MasterDHCPIP
+	found := "none"
+	if len(addresses.Choices) > 0 {
+		current := []string{}
+		for _, choice := range addresses.Choices {
+			current = append(current, choice.Address)
+		}
+		found = strings.Join(current, ", ")
+	}
+	editor.warning = fmt.Sprintf("The controller no longer has its saved DHCP address %s (it has: %s). Review the settings before preparing again.", saved, found)
+	if len(addresses.Choices) == 1 {
+		for index, field := range editor.fields {
+			if field.id == "lab.masterDhcpIp" {
+				editor.drafts[index] = addresses.Choices[0].Address
+			}
+		}
+	}
+	return editor
+}
+
 func withDetectedDHCPChoices(fields []settingsField, addresses domain.ControllerAddresses) []settingsField {
 	if !addresses.Detected {
 		return fields
