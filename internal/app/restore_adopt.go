@@ -51,7 +51,7 @@ func (r RestoredLab) Use(ctx context.Context, repository, adminKey, backupFile s
 	r.Source.RecordRestoredBackup(repository, backupFile, restored)
 	if install := r.InstallSecrets(ctx); install.HasErrors() {
 		report.State = "partial"
-		report.Message = "The restored lab is now the one this controller manages, but its keys could not be installed on the controller (" + install.Message + "). Installation → Network boot installs them again when it prepares the controller."
+		report.Message = "The restored lab is now the one this controller manages, but its keys could not be installed on the controller (" + install.Message + "). Install them again before applying the controller: Enter here, or the command nixorium setup install-secrets."
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "keys", Message: install.Message})
 		return report
 	}

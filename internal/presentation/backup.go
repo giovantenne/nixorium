@@ -30,6 +30,7 @@ type backupModel struct {
 }
 type backupResultMsg struct{ report domain.BackupReport }
 type backupAdoptMsg struct{ report domain.BackupReport }
+type backupKeysMsg struct{ report domain.ActionReport }
 type gitBackupPlanMsg struct {
 	plan domain.GitBackupPlan
 	err  error
@@ -183,6 +184,17 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 	if b.adopted && key.String() == "enter" && !b.adoptResult.HasErrors() && model.actions.PlanController != nil {
 		model.backup = backupModel{}
 		return model.openControllerReview()
+	}
+	if b.adopted && key.String() == "enter" && b.adoptResult.State == "partial" && model.actions.InstallSetupSecrets != nil {
+		install := model.actions.InstallSetupSecrets
+		model.busy = "Installing the restored lab's keys on this controller"
+		model.message = ""
+		return model, func() tea.Msg { return backupKeysMsg{install()} }
+	}
+	if b.adopted && key.String() == "esc" {
+		model.backup = backupModel{}
+		model.screen = dashboardHome
+		return model.refreshOverview()
 	}
 	if key.String() == "esc" || (b.done && key.String() == "enter") {
 		done := b.done
@@ -447,6 +459,9 @@ func (model dashboardModel) backupView() string {
 			lines = append(lines, "Previous lab folder, kept unchanged: "+b.adoptResult.Previous)
 		}
 		actions = []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+		if b.adoptResult.State == "partial" && model.actions.InstallSetupSecrets != nil {
+			actions = []tuiAction{{key: "Enter", label: "Install the keys again"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+		}
 		if !b.adoptResult.HasErrors() {
 			lines = append(lines, "", tuiSection("Next: apply the restored lab to this controller", model.isDark),
 				"  The review shows what changes on this controller; nothing changes until you confirm it.",
@@ -486,6 +501,8 @@ func (model dashboardModel) backupView() string {
 				notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: fmt.Sprintf("This controller already manages %s.", countNoun(model.report.Meta.Clients.Count, "computer")), detail: "Use the restored lab only if it replaces the lab of this controller."})
 			}
 			actions = []tuiAction{{key: "Enter", label: "Use this lab on this controller"}, {key: "Esc", label: "Not now"}, {key: "F1", label: "Help"}}
+			// It replaces the lab this controller manages: drawn in red.
+			shell.primaryDanger = true
 		case b.restore && !b.result.HasErrors():
 			lines = append(lines, "", "To make this controller use it, follow \"Replacing the controller\" in the troubleshooting guide.")
 		}

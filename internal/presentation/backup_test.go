@@ -462,3 +462,33 @@ func TestFreshLabOverviewOffersRestore(t *testing.T) {
 		}
 	}
 }
+
+func TestPartialAdoptRetriesTheKeysAndEscOpensTheOverview(t *testing.T) {
+	installs := 0
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		InstallSetupSecrets: func() domain.ActionReport { installs++; return domain.ActionReport{State: "completed"} },
+		LoadInitial: func(context.Context) (domain.StatusReport, domain.SetupReport, error) {
+			return domain.StatusReport{}, domain.SetupReport{}, nil
+		},
+	}, false)
+	m.screen = dashboardBackup
+	m.backup = backupModel{restore: true, done: true, adopted: true, adoptResult: domain.BackupReport{State: "partial", Message: "keys could not be installed"}}
+	if view := m.View().Content; !strings.Contains(view, "Install the keys again") {
+		t.Fatalf("partial result offers no retry:\n%s", view)
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	if cmd == nil {
+		t.Fatal("retry did not start")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	if installs != 1 || m.backup.adoptResult.State != "completed" {
+		t.Fatalf("retry result: installs=%d %+v", installs, m.backup.adoptResult)
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = next.(dashboardModel)
+	if m.screen != dashboardHome {
+		t.Fatalf("Esc after using the restored lab went to %d", m.screen)
+	}
+}

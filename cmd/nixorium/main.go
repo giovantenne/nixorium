@@ -800,6 +800,12 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return adapters.FindBackupFiles(home, name)
 		},
 		UseRestoredLab: func(restored domain.BackupReport, backupFile string) domain.BackupReport {
+			// The controller installs the keys of its configured deployment;
+			// using a restored lab elsewhere would install other keys.
+			if fixed, err := os.ReadFile(remoteInstallDeploymentPathFile); err == nil && strings.TrimSpace(string(fixed)) != repository {
+				message := "Nixorium is open on " + repository + ", but this controller manages " + strings.TrimSpace(string(fixed)) + ". Open Nixorium without --repo, then use the restored lab."
+				return domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-use-restored", State: "blocked", Message: message, PrivateKeys: []string{}, Issues: []domain.ValidationIssue{{Field: "repository", Message: message}}}
+			}
 			adminKey := ""
 			if home, err := os.UserHomeDir(); err == nil {
 				adminKey = filepath.Join(home, ".ssh", "id_ed25519")

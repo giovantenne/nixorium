@@ -1160,7 +1160,16 @@ takes its place and its keys are installed on the controller. Nothing is
 deleted or activated. Then **Review controller** applies it to the controller
 after the usual review. Computers reinstalled after the backup was made show
 "SSH key changed": compare the fingerprint on their screen before trusting
-them. The step refuses a controller that already uses different lab keys.
+them. Do it before **Install computers** on the new controller: the step
+refuses a controller that already has the keys of another lab, which the
+installation guide creates.
+
+If that happened (the refusal names `/home/admin/.ssh/id_ed25519`), the new
+controller's own keys must go before the restored ones can be installed. They
+belong to the lab created on this controller, never to the restored one. As
+root, remove `/home/admin/.ssh/id_ed25519`, `/home/admin/.ssh/id_ed25519.pub`
+and `/var/lib/nixorium/keys/harmonia-secret-key`, then open **Restore lab**
+again and choose **Use this lab on this controller**.
 
 Without the TUI, use the restored repository at the configured deployment
 path. Keep any newly created deployment aside until recovery is verified. Run

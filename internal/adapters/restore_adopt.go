@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -120,12 +121,20 @@ func (Local) AdoptRestoredLab(repository, restored, adminKey string, now time.Ti
 		if err == nil {
 			restoredKey, _, readErr := readRecoveryFile(filepath.Join(restored, "admin-ssh"), maximumKeyMaterialBytes)
 			if readErr != nil || !bytes.Equal(bytes.TrimSpace(installed), bytes.TrimSpace(restoredKey)) {
-				return "", errors.New("this controller already uses its own lab keys, so the restored lab cannot take over automatically; follow \"Replacing the controller\" in the troubleshooting guide")
+				return "", errors.New("this controller already has the SSH key of another lab (" + adminKey + "), created when its own lab was prepared, so the restored lab cannot take over automatically; follow \"Replacing the controller\" in the troubleshooting guide")
 			}
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return "", fmt.Errorf("read the controller's SSH key: %w", err)
 		}
 	}
+	// Like every change to the deployment, it waits for no other operation
+	// and no held computers; the lock is released before the keys are
+	// installed, which takes it again.
+	gate, err := adoptOperationGate()
+	if err != nil {
+		return "", err
+	}
+	defer gate.Close()
 	parent, err := openWorkspaceRoot(filepath.Dir(repository), unix.LOCK_EX)
 	if err != nil {
 		return "", err
@@ -169,6 +178,16 @@ func (Local) RecordRestoredBackup(repository, source string, from domain.BackupR
 		return
 	}
 	recordBackup(domain.BackupRecord{Repository: root, CreatedAt: from.CreatedAt, Path: source, Revision: from.Revision, KeysDigest: backupKeysDigest(root), SettingsHash: backupSettingsHash(root)})
+}
+
+// adoptOperationGate takes the managed operation lock; tests replace it.
+var adoptOperationGate = func() (io.Closer, error) {
+	gate, err := acquireManagedOperationGate()
+	if err != nil {
+		return nil, err
+	}
+	gate.describe("Use restored lab")
+	return gate, nil
 }
 
 // renameNew moves a folder without ever replacing an existing one.

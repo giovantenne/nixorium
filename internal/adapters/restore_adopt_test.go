@@ -1,6 +1,8 @@
 package adapters
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +22,14 @@ func restoredLabFixture(t *testing.T, path, adminKey string) {
 	}
 }
 
+type adoptGateFake struct{}
+
+func (adoptGateFake) Close() error { return nil }
+
 func TestAdoptRestoredLabKeepsThePreviousLab(t *testing.T) {
+	original := adoptOperationGate
+	t.Cleanup(func() { adoptOperationGate = original })
+	adoptOperationGate = func() (io.Closer, error) { return adoptGateFake{}, nil }
 	root := t.TempDir()
 	repository := filepath.Join(root, "nixorium-deployment")
 	restored := filepath.Join(root, "nixorium-restored")
@@ -30,7 +39,7 @@ func TestAdoptRestoredLabKeepsThePreviousLab(t *testing.T) {
 	if err := os.WriteFile(installed, []byte("other key\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Local{}).AdoptRestoredLab(repository, restored, installed, time.Now()); err == nil || !strings.Contains(err.Error(), "own lab keys") {
+	if _, err := (Local{}).AdoptRestoredLab(repository, restored, installed, time.Now()); err == nil || !strings.Contains(err.Error(), "SSH key of another lab") {
 		t.Fatalf("different installed key accepted: %v", err)
 	}
 	if err := os.WriteFile(installed, []byte("original key\n"), 0o600); err != nil {
@@ -78,5 +87,22 @@ func TestRestoreFolderAndBackupFiles(t *testing.T) {
 	files := FindBackupFiles(root, "")
 	if len(files) != 2 || filepath.Base(files[0]) != "nixorium-backup-20261020-153344.age" {
 		t.Fatalf("backup files = %v", files)
+	}
+}
+
+func TestAdoptRestoredLabWaitsForOtherOperations(t *testing.T) {
+	original := adoptOperationGate
+	t.Cleanup(func() { adoptOperationGate = original })
+	adoptOperationGate = func() (io.Closer, error) { return nil, errors.New("another Nixorium operation is running") }
+	root := t.TempDir()
+	repository := filepath.Join(root, "nixorium-deployment")
+	restored := filepath.Join(root, "nixorium-restored")
+	restoredLabFixture(t, repository, "fresh key")
+	restoredLabFixture(t, restored, "original key")
+	if _, err := (Local{}).AdoptRestoredLab(repository, restored, "", time.Now()); err == nil {
+		t.Fatal("adopted while another operation held the lock")
+	}
+	if key, _ := os.ReadFile(filepath.Join(repository, "admin-ssh")); string(key) != "fresh key" {
+		t.Fatal("lab moved while another operation held the lock")
 	}
 }

@@ -59,3 +59,18 @@ func TestReopenedInterfaceShowsTheUpdateOutcome(t *testing.T) {
 		t.Fatalf("outcome = %q", outcome)
 	}
 }
+
+func TestLateControllerStatusIsDroppedAfterAnotherOperation(t *testing.T) {
+	m := newDashboardModel(domain.StatusReport{Repository: "fresh"}, domain.SetupReport{}, DashboardActions{}, false)
+	m.screen = dashboardController
+	m.controller.progressID = 7
+	next, _ := m.Update(controllerStatusRefreshMsg{status: domain.StatusReport{Repository: "late"}, id: 6})
+	if next.(dashboardModel).report.Repository != "fresh" {
+		t.Fatal("stale controller status replaced a newer one")
+	}
+	m.screen = dashboardPXE
+	next, _ = m.Update(controllerStatusRefreshMsg{status: domain.StatusReport{Repository: "late"}, id: 7})
+	if next.(dashboardModel).report.Repository != "fresh" {
+		t.Fatal("controller status replaced the installation's state")
+	}
+}

@@ -1544,7 +1544,7 @@ func (model dashboardModel) startReviewedControllerApply() (tea.Model, tea.Cmd) 
 	model.controller.progressID++
 	model.message = ""
 	plan := model.controller.plan
-	refresh := model.actions.Refresh
+	refresh, id := model.actions.Refresh, model.controller.progressID
 	operation := func() tea.Msg {
 		report := model.actions.ApplyController(plan)
 		recovery := model.recoveryAfterControllerApply()
@@ -1560,7 +1560,7 @@ func (model dashboardModel) startReviewedControllerApply() (tea.Model, tea.Cmd) 
 				ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
 				defer cancel()
 				status, err := refresh(ctx)
-				return controllerStatusRefreshMsg{status: status, err: err}
+				return controllerStatusRefreshMsg{status: status, err: err, id: id}
 			},
 		}
 	}

@@ -152,8 +152,11 @@ representative client and the controller when needed; add another client only
 for materially different host-specific modules. See
 [development validation](docs/development-validation.md) for the complete policy.
 
-The packaged Go check must run `go test ./...`; `subPackages` selects installed
-commands and must not restrict tests to `cmd/`.
+The packaged Go check must run `go test ./...` in CI (tests/source-checks.nix
+builds the package with its tests); `subPackages` selects installed commands and
+must not restrict tests to `cmd/`. Laboratories build the controller's Nixorium
+without the tests (`doCheck = false` in lib/mk-lab.nix): on a busy controller
+they only add minutes, and a timing-sensitive test once failed an installation.
 
 Validation reuses a persistent evaluation cache, creates no persistent result
 roots, and must never garbage-collect the shared Nix store automatically.
@@ -619,6 +622,15 @@ that release's notes, so a release is not finished until the site follows it.
   Restore fetches into a new private directory, disables Git hooks/filters and never evaluates or applies the fetched configuration.
   Preserve original key pairs, trusted hosts and the encrypted recovery file
   across template reset. See docs/troubleshooting.md and ADR 0025.
+  After a TUI restore, **Use this lab on this controller** (for a new or
+  replaced controller) takes the managed operation lock, keeps the current
+  deployment folder as `<deployment>-before-restore-DATE` (never deletes it),
+  moves the restored folder into the configured deployment path only after its
+  keys verify, and then installs its keys with `nixorium-install-secrets`
+  (outside the lock, which that unit takes); it refuses a controller whose
+  installed SSH key differs (a lab already prepared there) and a `--repo`
+  other than the configured deployment. Nothing is built or activated: the
+  next step is the reviewed controller apply.
 - Git review is read-only and typed: preserve the staged/unstaged/untracked
   distinction, managed-versus-unexpected classification, bounded patch output,
   password-hash redaction, no automatic untracked-file reads, and refusal before

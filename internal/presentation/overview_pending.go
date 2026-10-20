@@ -112,6 +112,7 @@ func (model dashboardModel) refreshOverview() (tea.Model, tea.Cmd) {
 		model.message = "Local refresh is unavailable in this session."
 		return model, nil
 	}
+	model.overviewReads++
 	model.busy = "Refreshing local configuration and service observations"
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		report, setup, err := model.actions.LoadInitial(ctx)
@@ -130,6 +131,7 @@ type overviewQuietRefreshMsg struct {
 	jobs        []domain.ManagedJob
 	jobsErr     error
 	jobsID      uint64
+	read        uint64
 }
 
 // withQuietOverviewRefresh re-reads, in the background, what the Overview
@@ -139,18 +141,19 @@ func (model dashboardModel) withQuietOverviewRefresh(command tea.Cmd) (dashboard
 		return model, command
 	}
 	model.jobs.id++
-	id := model.jobs.id
+	model.overviewReads++
+	id, read := model.jobs.id, model.overviewReads
 	return model, tea.Batch(command, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
 		defer cancel()
 		jobs, jobsErr := model.observeManagedJobs(ctx)
 		report, setup, err := model.actions.LoadInitial(ctx)
-		return overviewQuietRefreshMsg{report: report, setup: setup, err: err, usbReserved: model.usbReservationPresent(), recovery: model.observeRecovery(ctx), jobs: jobs, jobsErr: jobsErr, jobsID: id}
+		return overviewQuietRefreshMsg{report: report, setup: setup, err: err, usbReserved: model.usbReservationPresent(), recovery: model.observeRecovery(ctx), jobs: jobs, jobsErr: jobsErr, jobsID: id, read: read}
 	})
 }
 
 func (model dashboardModel) finishQuietOverviewRefresh(message overviewQuietRefreshMsg) (tea.Model, tea.Cmd) {
-	if message.err != nil || model.busy != "" {
+	if message.err != nil || model.busy != "" || message.read != model.overviewReads {
 		return model, nil
 	}
 	if message.jobsID == model.jobs.id {

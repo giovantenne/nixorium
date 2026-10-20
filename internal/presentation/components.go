@@ -202,6 +202,9 @@ type tuiShell struct {
 	// footer instead, for short terminals.
 	primary        string
 	compactPrimary bool
+	// primaryDanger draws the next step in red: it erases or replaces data
+	// although its label does not say so.
+	primaryDanger bool
 	// jump: Enter opens the screen of the situation shown in a notice.
 	jump bool
 	// detailsKey: d toggles the technical text of a situation notice;
@@ -247,6 +250,10 @@ func destructiveAction(label string) bool {
 // tuiPrimaryAction renders the next step of a screen: an arrow, then the key
 // and its label on the selection colour, so it stays visible without colour.
 func tuiPrimaryAction(action tuiAction, darkBackground, compact bool) string {
+	return tuiPrimaryActionStyled(action, darkBackground, compact, destructiveAction(action.label))
+}
+
+func tuiPrimaryActionStyled(action tuiAction, darkBackground, compact, danger bool) string {
 	theme := newTUITheme(darkBackground)
 	arrow := lipgloss.NewStyle().Bold(true).Foreground(theme.accent).Render("▶ ")
 	if compact {
@@ -254,7 +261,7 @@ func tuiPrimaryAction(action tuiAction, darkBackground, compact bool) string {
 		arrow = ""
 	}
 	background := theme.selectionBackground
-	if destructiveAction(action.label) {
+	if danger {
 		// Red marks what erases or replaces data; its typed word stays.
 		background = lipgloss.LightDark(darkBackground)(lipgloss.Color("#B91C1C"), lipgloss.Color("#9F1239"))
 	}
@@ -307,14 +314,14 @@ func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShe
 	}
 	primary := ""
 	if shell.primary != "" && shell.compactPrimary {
-		regions.actions = tuiActionItems(width, darkBackground, shell.primary, actions...)
+		regions.actions = tuiActionItems(width, darkBackground, shell.primary, shell.primaryDanger, actions...)
 		return regions
 	}
 	if shell.primary != "" {
 		rest := make([]tuiAction, 0, len(actions))
 		for _, action := range actions {
 			if action.key == shell.primary && primary == "" {
-				primary = tuiPrimaryAction(action, darkBackground, false)
+				primary = tuiPrimaryActionStyled(action, darkBackground, false, shell.primaryDanger || destructiveAction(action.label))
 				continue
 			}
 			rest = append(rest, action)
@@ -344,18 +351,18 @@ func renderTUIShell(shell tuiShell, width int, darkBackground bool) string {
 }
 
 func tuiActionBar(width int, darkBackground bool, actions ...tuiAction) string {
-	return tuiActionItems(width, darkBackground, "", actions...)
+	return tuiActionItems(width, darkBackground, "", false, actions...)
 }
 
 // tuiActionItems lays out the key footer; the action whose key is primary
 // keeps its place but is drawn as the next step (short terminals).
-func tuiActionItems(width int, darkBackground bool, primary string, actions ...tuiAction) string {
+func tuiActionItems(width int, darkBackground bool, primary string, danger bool, actions ...tuiAction) string {
 	theme := newTUITheme(darkBackground)
 	labelStyle := lipgloss.NewStyle().Foreground(theme.muted)
 	items := make([]string, 0, len(actions))
 	for _, action := range actions {
 		if primary != "" && action.key == primary {
-			items = append(items, tuiPrimaryAction(action, darkBackground, true))
+			items = append(items, tuiPrimaryActionStyled(action, darkBackground, true, danger || destructiveAction(action.label)))
 			primary = ""
 			continue
 		}

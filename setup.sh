@@ -651,7 +651,11 @@ main() {
   ui_note "Do not switch off this computer until the end."
   ui_note "${UI_MUTED}Technical details are saved in ${INSTALL_LOG}.${UI_RESET}"
   echo
-  : > "$INSTALL_LOG"
+  if ! : > "$INSTALL_LOG" 2>/dev/null; then
+    ui_error "Cannot write the installation log ${INSTALL_LOG}." \
+      "Run the installer as it was started (sudo /installer/setup.sh) or set NIXORIUM_INSTALL_LOG to a writable file."
+    return 1
+  fi
   MUTATION_STARTED=1
   CURRENT_STEP="disk partitioning"
   ui_log "Partitioning ${SELECTED_DISK}..."

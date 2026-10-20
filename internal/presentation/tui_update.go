@@ -249,6 +249,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.backup.result, model.backup.done = message.report, true
 		return model, nil
+	case backupKeysMsg:
+		model.busy = ""
+		if message.report.HasErrors() {
+			model.message = "The keys could not be installed: " + message.report.Message + ". Try again, or run nixorium setup install-secrets."
+			return model, nil
+		}
+		model.backup.adoptResult.State = "completed"
+		model.backup.adoptResult.Issues = nil
+		model.backup.adoptResult.Message = "This controller now manages the restored lab and has its keys."
+		return model, nil
 	case backupAdoptMsg:
 		model.busy = ""
 		model.backup.adopted, model.backup.adoptResult = true, message.report
@@ -724,9 +734,19 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return model, reload
 	case controllerStatusRefreshMsg:
-		if message.err == nil {
-			model.report = message.status
+		// Another operation or read started since: its own result is newer.
+		if message.id != model.controller.progressID || model.busy != "" || model.controller.applying ||
+			(model.screen != dashboardController && model.screen != dashboardControllerReview) {
+			// Other screens (installation, Overview) read their own state.
+			return model, nil
 		}
+		if message.err != nil {
+			if model.screen == dashboardController && model.message != "" {
+				model.message += "; the dashboard could not be refreshed: " + message.err.Error()
+			}
+			return model, nil
+		}
+		model.report = message.status
 		return model, nil
 	case dashboardControllerProgressTickMsg:
 		if !model.controller.applying || message.id != model.controller.progressID || model.actions.LoadControllerProgress == nil {

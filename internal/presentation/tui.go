@@ -514,6 +514,9 @@ type dashboardModel struct {
 	networkChange          networkChangeModel
 	controller             controllerModel
 	reload                 interfaceReloadModel
+	// overviewReads numbers Overview reads; a background result older than
+	// the last read is dropped.
+	overviewReads uint64
 	// reopenNotice is the outcome of the update that reopened this
 	// interface, shown on the first screen.
 	reopenNotice       string
@@ -687,6 +690,9 @@ type dashboardControllerResultMsg struct {
 type controllerStatusRefreshMsg struct {
 	status domain.StatusReport
 	err    error
+	// id is the controller apply it follows; a later operation makes it
+	// stale.
+	id uint64
 }
 
 type dashboardControllerProgressTickMsg struct {
