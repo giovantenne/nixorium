@@ -247,11 +247,14 @@ const (
 // deploymentModel owns target selection and the lifecycle of one reviewed
 // client deployment. The dashboard root only routes its messages and effects.
 type deploymentModel struct {
-	cursor        int
-	chosen        map[string]bool
-	plan          domain.DeploymentPlanReport
-	result        domain.DeploymentExecutionReport
-	context       string
+	cursor  int
+	chosen  map[string]bool
+	plan    domain.DeploymentPlanReport
+	result  domain.DeploymentExecutionReport
+	context string
+	// origin is the screen a saved change opened this selection from; Esc
+	// returns there. Without one, Esc returns to Computers.
+	origin        dashboardScreen
 	applying      bool
 	progress      domain.DeploymentProgress
 	recent        []string
@@ -2765,7 +2768,7 @@ func (model dashboardModel) deployView() string {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
 	shell.body = strings.Join(lines, "\n")
-	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "n", label: "Those needing update"}, {key: "r", label: "Check computers"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
+	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "n", label: "Those needing update"}, {key: "r", label: "Check computers"}, {key: "Enter", label: "Review"}, {key: "Esc", label: model.deployment.escLabel()}, {key: "F1", label: "Help"}}
 	return model.renderShell(shell)
 }
 

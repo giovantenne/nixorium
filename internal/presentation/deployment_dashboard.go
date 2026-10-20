@@ -50,11 +50,8 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 	case dashboardDeploy:
 		switch key.String() {
 		case "esc", "left":
-			destination := dashboardHome
-			if model.context != "" {
-				destination = dashboardSoftware
-				model.context = ""
-			}
+			destination := model.escDestination()
+			model.context, model.origin = "", dashboardHome
 			return model, deploymentIntent{kind: deploymentCloseIntent, destination: destination}
 		case "up", "k":
 			model.cursor = max(0, model.cursor-1)
@@ -218,4 +215,24 @@ func deploymentSelectionLabel(plan domain.DeploymentPlanReport, host domain.Host
 		}
 	}
 	return deploymentStateLabel(observed, found)
+}
+
+// escDestination is where Esc leaves the computer selection: the screen of
+// the saved change that opened it, or Computers.
+func (model deploymentModel) escDestination() dashboardScreen {
+	if model.context != "" && model.origin != dashboardHome {
+		return model.origin
+	}
+	return dashboardComputersArea
+}
+
+// escLabel names that destination in the key footer.
+func (model deploymentModel) escLabel() string {
+	switch model.escDestination() {
+	case dashboardComputersArea:
+		return "Computers"
+	case dashboardSoftware:
+		return "Software"
+	}
+	return "Back"
 }

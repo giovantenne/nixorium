@@ -595,6 +595,7 @@ func (model dashboardModel) openSoftwareDeployment() (tea.Model, tea.Cmd) {
 	model.deployment.chosen = chosen
 	model.deployment.cursor = 0
 	model.deployment.context = "Opened from a saved software change. The review deploys the complete current system configuration, not only that package."
+	model.deployment.origin = dashboardSoftware
 	model.message = ""
 	if len(missing) > 0 {
 		model.message = "Affected computers no longer in the current inventory were not selected: " + strings.Join(missing, ", ") + ". Review the remaining selection."

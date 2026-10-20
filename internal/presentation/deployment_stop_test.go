@@ -71,3 +71,22 @@ func TestDeploymentDetailsShowCommandOutputWithoutLosingPhaseActivity(t *testing
 		t.Fatal("output-only update replaced phase history")
 	}
 }
+
+func TestDeploymentSelectionEscReturnsWhereItCameFrom(t *testing.T) {
+	selection := deploymentModel{context: "Saved configuration", origin: dashboardUpdate}
+	if selection.escLabel() != "Back" {
+		t.Fatalf("label = %q", selection.escLabel())
+	}
+	_, intent := selection.update(dashboardDeploy, keyPress("esc"), nil)
+	if intent.destination != dashboardUpdate {
+		t.Fatalf("Esc from a saved update went to %d", intent.destination)
+	}
+	plain := deploymentModel{}
+	if _, intent := plain.update(dashboardDeploy, keyPress("esc"), nil); intent.destination != dashboardComputersArea || plain.escLabel() != "Computers" {
+		t.Fatalf("Esc without origin went to %d", intent.destination)
+	}
+	software := deploymentModel{context: "Opened from a saved software change.", origin: dashboardSoftware}
+	if software.escLabel() != "Software" {
+		t.Fatalf("software label = %q", software.escLabel())
+	}
+}

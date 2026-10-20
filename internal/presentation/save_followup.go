@@ -129,13 +129,14 @@ func (model dashboardModel) openSavedDeployment(auto bool) (tea.Model, tea.Cmd) 
 		model.message = "Computer deployment is unavailable in this session."
 		return model, nil
 	}
+	origin := model.screen
 	return model.loadInventoryThen(func(ready dashboardModel) (tea.Model, tea.Cmd) {
 		if len(ready.report.Meta.Clients.Hosts) == 0 {
 			ready.message = "No client computers are configured."
 			return ready, nil
 		}
 		ready.screen = dashboardDeploy
-		ready.deployment = deploymentModel{chosen: map[string]bool{}, context: "Saved configuration: select computers, review again and confirm. Student-home and keyboard changes may require the next computer start."}
+		ready.deployment = deploymentModel{chosen: map[string]bool{}, origin: origin, context: "Saved configuration: select computers, review again and confirm. Student-home and keyboard changes may require the next computer start."}
 		ready.confirmation, ready.message, ready.pageScroll = "", "", 0
 		if !auto {
 			return ready, nil

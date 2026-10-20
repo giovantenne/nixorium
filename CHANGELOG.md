@@ -27,6 +27,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Esc on the computer selection opened after a saved change returns to the
+  screen that opened it (for example the Update Nixorium result), not always
+  to Software, and otherwise to Computers, as its label says.
 - In Internet access and Lock screens, **New review** starts with no computer
   selected, so the first **a All** selects them all instead of clearing the
   previous selection.
