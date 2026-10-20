@@ -1442,6 +1442,17 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			if model.installation.pxeResult.HasErrors() {
 				model.noticeDetails = !model.noticeDetails
 			}
+		case "h":
+			if !model.pxeJustFinished() || model.actions.LoadHosts == nil {
+				return model, nil
+			}
+			model.computers.hostDetail = false
+			model.computers.hostTechnical = false
+			model.computers.configurationState = domain.ConfigurationStateReport{}
+			model.screen = dashboardHosts
+			model.busy = "Checking configured computers"
+			model.message = ""
+			return model.loadHosts()
 		}
 	case dashboardDiagnostics:
 		switch key.String() {

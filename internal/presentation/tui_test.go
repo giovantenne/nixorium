@@ -2269,3 +2269,21 @@ func TestOperationHistoryShowsWhyAnOperationFailed(t *testing.T) {
 		t.Fatalf("a completed operation's summary is shown:\n%s", view)
 	}
 }
+
+func TestFinishedNetworkInstallationPointsToTheInstalledComputers(t *testing.T) {
+	report := testDashboardReport("stopped")
+	loads := 0
+	model := dashboardModel{report: report, screen: dashboardPXE, width: 120, height: 40, actions: DashboardActions{LoadHosts: func(context.Context) (domain.HostsReport, error) {
+		loads++
+		return domain.HostsReport{}, nil
+	}}}
+	model.installation.pxeResult = domain.PXELifecycleReport{Operation: "pxe-stop", State: "completed"}
+	view := model.View().Content
+	if !strings.Contains(view, "Next: check the installed computers") || !strings.Contains(view, "Check computers") || strings.Contains(view, "Next: start network installation") {
+		t.Fatalf("finished installation guidance:\n%s", view)
+	}
+	updated, read := model.Update(demoText("h"))
+	if next := updated.(dashboardModel); next.screen != dashboardHosts || read == nil {
+		t.Fatalf("h opened %v", next.screen)
+	}
+}

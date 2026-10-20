@@ -3063,6 +3063,9 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	if model.report.PXE.Mode == "active" {
 		add(tuiAction{key: "x", label: "Stop"})
 	}
+	if model.pxeJustFinished() && model.actions.LoadHosts != nil {
+		add(tuiAction{key: "h", label: "Check computers"})
+	}
 	if recovery {
 		add(tuiAction{key: "x", label: "Stop the network installation"})
 	}
@@ -3094,6 +3097,13 @@ func (model dashboardModel) pxeNextStepView() []string {
 	case "degraded", "recovery-required":
 		return model.pxeRecoveryLines()
 	}
+	if model.pxeJustFinished() {
+		return []string{
+			tuiSection("Next: check the installed computers", model.isDark),
+			"  Press h to open the computer inventory: each installed computer should answer and be up to date.",
+			"  A computer installed again offers a new SSH key; review it there before updating it.",
+		}
+	}
 	if !model.report.PXEPreparation.Ready {
 		return []string{
 			tuiSection("Next: prepare the installation files", model.isDark),
@@ -3104,6 +3114,13 @@ func (model dashboardModel) pxeNextStepView() []string {
 		tuiSection("Next: start network installation", model.isDark),
 		"  Press Enter to review the temporary network change and start.",
 	}
+}
+
+// pxeJustFinished reports that this session has just stopped network
+// installation without error, so the installed computers are the next step.
+func (model dashboardModel) pxeJustFinished() bool {
+	result := model.installation.pxeResult
+	return result.Operation == "pxe-stop" && !result.HasErrors() && model.report.PXE.Mode != "active"
 }
 
 // pxeModeLabel names the network installation state in plain words.
