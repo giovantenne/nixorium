@@ -2838,8 +2838,15 @@ func (model dashboardModel) pxeView() string {
 	if model.report.Meta.Network.Interface != "" {
 		fields = append(fields, [2]string{"Network interface", model.report.Meta.Network.Interface})
 	}
-	if model.report.Meta.Controller.DHCPIP != "" {
-		fields = append(fields, [2]string{"Controller address", model.report.Meta.Controller.DHCPIP})
+	// Prepared files carry the address the controller had when they were
+	// built (preparation captures a changed DHCP lease); show the one PXE
+	// serves rather than the saved hint.
+	address := model.report.Meta.Controller.DHCPIP
+	if model.report.PXEPreparation.Ready && model.report.PXEPreparation.DHCPAddress != "" {
+		address = model.report.PXEPreparation.DHCPAddress
+	}
+	if address != "" {
+		fields = append(fields, [2]string{"Controller address", address})
 	}
 	lines = append(lines, tuiFields(model.isDark, fields...)...)
 	if model.installation.flow {

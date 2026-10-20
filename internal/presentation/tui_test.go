@@ -2242,3 +2242,13 @@ func TestDashboardPXEProgressIgnoresRecordFromPreviousRun(t *testing.T) {
 		t.Fatal("stale progress stopped polling for the current run")
 	}
 }
+
+func TestPXEScreenShowsTheAddressItServes(t *testing.T) {
+	report := testDashboardReport("active")
+	report.Meta.Controller.DHCPIP = "192.168.56.99"
+	report.PXEPreparation.Ready, report.PXEPreparation.DHCPAddress = true, "192.168.57.99"
+	view := (dashboardModel{report: report, screen: dashboardPXE}).View().Content
+	if !strings.Contains(view, "192.168.57.99") || strings.Contains(view, "192.168.56.99") {
+		t.Fatalf("PXE header shows the saved hint instead of the served address:\n%s", view)
+	}
+}
