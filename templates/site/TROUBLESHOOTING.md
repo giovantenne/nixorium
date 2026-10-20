@@ -85,6 +85,7 @@ and JSON issues carry a `next` object with the same code and texts; the JSON
 | `UPDATES-QUEUED` | Some computers will update when they are switched on | Nothing to do (Computers → Queued updates shows them; review again those marked as changed) |
 | `UPDATES-NEED-REVIEW` | A queued update needs a new review | Review the queued updates (Computers → Queued updates; `nixorium deploy queue status`): the configuration changed after queueing, or the update kept failing |
 | `BACKUP-DUE` | A backup of this laboratory is due | Back up the lab ([Backups and restoration](#backups-and-restoration)) |
+| `BACKUP-NONE` | This laboratory has no backup yet | Back up the lab when its setup is done ([Backups and restoration](#backups-and-restoration)) |
 | `EVAL-FAILED` | The configuration has an error | Open Diagnostics and fix the first reported error (`nixorium doctor`; do not retry other operations) |
 | `PIN-OUTDATED` | The saved Nixorium version is recorded inconsistently | Repeat the update for the configured Nixorium version ([Updating the computers fails with a read-only flake.lock](#updating-the-computers-fails-with-a-read-only-flakelock)) |
 

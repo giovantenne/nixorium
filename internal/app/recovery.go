@@ -126,7 +126,11 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	}
 	if backups, ok := inspector.source.(backupDueSource); ok {
 		if reason, due := backups.BackupDue(root); due {
-			add(domain.RecoveryBackupDue, "BACKUP-DUE", reason, "", nil, nil)
+			code := "BACKUP-DUE"
+			if reason == domain.BackupNeverMadeReason {
+				code = "BACKUP-NONE"
+			}
+			add(domain.RecoveryBackupDue, code, reason, "", nil, nil)
 		}
 	}
 	if queued, ok := inspector.source.(deferredUpdatesSource); ok {

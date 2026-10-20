@@ -615,5 +615,5 @@ func (local Local) BackupDue(repository string) (string, bool) {
 		}
 		return "", false
 	}
-	return "No backup is recorded. Backup is optional: Maintenance → Back up lab saves an encrypted file (for example on a USB drive) or pushes to a private Git repository.", true
+	return domain.BackupNeverMadeReason, true
 }

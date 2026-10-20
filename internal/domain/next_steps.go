@@ -141,6 +141,13 @@ var nextSteps = map[string]NextStep{
 		Action: "Back up the lab",
 		TUI:    "Maintenance → Back up lab", Command: "nixorium backup plan --remote git@github.com:OWNER/REPOSITORY.git --branch main", Screen: RecoveryBackupDue,
 	},
+	"BACKUP-NONE": {
+		Code:   "BACKUP-NONE",
+		Title:  "This laboratory has no backup yet",
+		Why:    "Its keys and settings exist only on this controller.",
+		Action: "Back up the lab",
+		TUI:    "Maintenance → Back up lab", Command: "nixorium backup plan --remote git@github.com:OWNER/REPOSITORY.git --branch main", Screen: RecoveryBackupDue,
+	},
 	"NETWORK-LOCKED": {
 		Code:   "NETWORK-LOCKED",
 		Title:  "The laboratory network cannot be changed while computers are configured",

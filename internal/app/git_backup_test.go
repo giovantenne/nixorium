@@ -3,6 +3,8 @@ package app
 import (
 	"errors"
 	"testing"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 type unbackedDeploymentSource struct{ *fakeDeploymentSource }
@@ -45,5 +47,23 @@ func TestBackupReminderDoesNotBlockOperations(t *testing.T) {
 	condition, found := report.Condition("backup-due")
 	if !found || condition.Blocks != "" {
 		t.Fatalf("backup must be advisory: %+v", report)
+	}
+}
+
+type neverBackedUpRecoverySource struct{ fakeRecoverySource }
+
+func (neverBackedUpRecoverySource) BackupDue(string) (string, bool) {
+	return domain.BackupNeverMadeReason, true
+}
+
+func TestNeverBackedUpLabIsNotCalledOverdue(t *testing.T) {
+	report := NewRecoveryInspector(neverBackedUpRecoverySource{}).Observe(t.Context(), "/lab")
+	condition, found := report.Condition("backup-due")
+	if !found || condition.Next.Code != "BACKUP-NONE" || condition.Next.Title != "This laboratory has no backup yet" {
+		t.Fatalf("never-made backup reported as %+v", condition)
+	}
+	overdue, _ := NewRecoveryInspector(unbackedRecoverySource{}).Observe(t.Context(), "/lab").Condition("backup-due")
+	if overdue.Next.Code != "BACKUP-DUE" {
+		t.Fatalf("outdated backup reported as %+v", overdue)
 	}
 }
