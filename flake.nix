@@ -279,7 +279,7 @@
           touch "$out"
         '';
         client-installer = pkgs.runCommand "nixorium-client-installer-test" {
-          nativeBuildInputs = [ pkgs.bash pkgs.coreutils pkgs.gnugrep pkgs.jq ];
+          nativeBuildInputs = [ pkgs.bash pkgs.coreutils pkgs.gnugrep pkgs.jq pkgs.openssh ];
         } ''
           NIXORIUM_TEST_REPO_ROOT=${self} bash ${./tests/client-installer.sh}
           NIXORIUM_TEST_REPO_ROOT=${self} bash ${./tests/client-installer-library.sh}
