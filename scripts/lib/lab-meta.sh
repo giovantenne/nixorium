@@ -6,6 +6,21 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   exit 1
 fi
 
+# nixorium_flake_eval runs `nix eval` on the deployment flake and shows its
+# messages only when it fails: an installer's read-only flake always reports
+# the lock file it does not write, with every input, which buries the
+# questions on a client's screen.
+nixorium_flake_eval() {
+  local messages status=0
+  messages=$(mktemp)
+  nix --extra-experimental-features "nix-command flakes" eval "$@" 2>"$messages" || status=$?
+  if (( status != 0 )); then
+    cat "$messages" >&2
+  fi
+  rm -f "$messages"
+  return "$status"
+}
+
 load_lab_meta() {
   if [[ $# -ne 1 ]]; then
     echo "Usage: load_lab_meta <repo-root>" >&2
@@ -32,12 +47,7 @@ load_lab_meta() {
       echo "Error: nix is required to evaluate lab metadata." >&2
       return 1
     fi
-    LAB_META_JSON=$(
-      nix --extra-experimental-features "nix-command flakes" \
-        eval "${REPO_ROOT}#labMeta" \
-        --json \
-        --no-write-lock-file
-    )
+    LAB_META_JSON=$(nixorium_flake_eval "${REPO_ROOT}#labMeta" --json --no-write-lock-file)
   fi
 
   IFS=$'\x1f' read -r \
@@ -111,12 +121,7 @@ require_deployment_ready() {
   local REPO_ROOT="$1"
   local DEPLOYMENT_STATUS_JSON
 
-  DEPLOYMENT_STATUS_JSON=$(
-    nix --extra-experimental-features "nix-command flakes" \
-      eval "${REPO_ROOT}#deploymentStatus" \
-      --json \
-      --no-write-lock-file
-  )
+  DEPLOYMENT_STATUS_JSON=$(nixorium_flake_eval "${REPO_ROOT}#deploymentStatus" --json --no-write-lock-file)
 
   if [[ "$(printf '%s' "$DEPLOYMENT_STATUS_JSON" | jq -r '.ready')" == "true" ]]; then
     return 0

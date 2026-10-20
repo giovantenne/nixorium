@@ -359,8 +359,7 @@ partition_disk() {
 resolve_system() {
   local PATH_INFO REPORTED_PATH CACHE_URL CLASS SYSTEM_NAME
   SELECTED_SYSTEM_PATH=$(
-    nix --extra-experimental-features "nix-command flakes" \
-      eval "${REPO_ROOT}#nixosConfigurations.${SELECTED_HOST}.config.system.build.toplevel.outPath" \
+    nixorium_flake_eval "${REPO_ROOT}#nixosConfigurations.${SELECTED_HOST}.config.system.build.toplevel.outPath" \
       --raw \
       --offline \
       --no-write-lock-file
