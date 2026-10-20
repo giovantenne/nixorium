@@ -1828,7 +1828,7 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardLogs || !strings.Contains(model.View().Content, "Recent actions") || !strings.Contains(model.View().Content, "pxe-start") || !strings.Contains(model.View().Content, id) || !strings.Contains(model.View().Content, "partial") {
+	if model.screen != dashboardLogs || !strings.Contains(model.View().Content, "Recent actions") || !strings.Contains(model.View().Content, "Start network installation") || !strings.Contains(model.View().Content, id) || !strings.Contains(model.View().Content, "partial") {
 		t.Fatalf("operation log list missing:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -2250,5 +2250,22 @@ func TestPXEScreenShowsTheAddressItServes(t *testing.T) {
 	view := (dashboardModel{report: report, screen: dashboardPXE}).View().Content
 	if !strings.Contains(view, "192.168.57.99") || strings.Contains(view, "192.168.56.99") {
 		t.Fatalf("PXE header shows the saved hint instead of the served address:\n%s", view)
+	}
+}
+
+func TestOperationHistoryShowsWhyAnOperationFailed(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready"), screen: dashboardLogs, width: 120, height: 40}
+	model.maintenance.logs = domain.OperationLogsReport{Records: []domain.OperationRecord{
+		{RecordedAt: time.Date(2026, 10, 20, 11, 58, 0, 0, time.UTC), Operation: "controller-apply", State: "failed", Subject: "pc99", Summary: "the controller cannot reach the Internet: it could not find cache.nixos.org"},
+		{RecordedAt: time.Date(2026, 10, 20, 10, 3, 0, 0, time.UTC), Operation: "pxe-stop", State: "completed", Subject: "stopped", Summary: "network installation stopped"},
+	}}
+	view := model.View().Content
+	for _, want := range []string{"Apply to controller", "could not find cache.nixos.org", "Finish network installation"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "network installation stopped") {
+		t.Fatalf("a completed operation's summary is shown:\n%s", view)
 	}
 }

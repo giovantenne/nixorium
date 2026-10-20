@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -2424,6 +2425,24 @@ func (model dashboardModel) serviceRestartAvailable() bool {
 	return len(model.maintenance.services.Services) > 0 && model.maintenance.services.Services[0].ID == "cache" && len(model.maintenance.services.Services[0].Units) > 0 && model.maintenance.services.Services[0].Units[0].Loaded
 }
 
+// operationLabel names a recorded operation the way the menus do.
+func operationLabel(operation string) string {
+	labels := map[string]string{
+		"controller-apply": "Apply to controller", "setup-apply-controller": "Apply to controller",
+		"deploy-apply": "Update computers", "update-apply": "Update Nixorium",
+		"pxe-start": "Start network installation", "pxe-stop": "Finish network installation",
+		"pxe-prepare": "Prepare installation files", "pxe-recover": "Recover network installation",
+		"software-change-apply": "Software change", "software-preset-apply": "Software profile",
+		"config-apply": "Save settings", "configuration-save": "Save settings",
+		"usb-install-apply": "USB installation", "shutdown-apply": "Power action", "wake-apply": "Switch on",
+		"workspace-apply": "Student workspace", "template-reset-recover": "Template reset recovery",
+	}
+	if label, found := labels[operation]; found {
+		return label
+	}
+	return operation
+}
+
 func (model dashboardModel) logsView() string {
 	path := []string{"Maintenance", "History"}
 	lines := []string{tuiTitle("Operation history", model.isDark), ""}
@@ -2433,14 +2452,21 @@ func (model dashboardModel) logsView() string {
 	}
 	lines = append(lines, tuiSection("Recent actions", model.isDark))
 	recordLimit := len(model.maintenance.logs.Records)
-	if recordLimit > 3 {
-		recordLimit = 3
+	if recordLimit > 5 {
+		recordLimit = 5
 	}
 	if recordLimit == 0 {
 		lines = append(lines, "  No recorded operation outcomes.")
 	}
 	for _, record := range model.maintenance.logs.Records[:recordLimit] {
-		lines = append(lines, fmt.Sprintf("  %s  %-18s %-10s %s", record.RecordedAt.UTC().Format("2006-01-02 15:04Z"), record.Operation, record.State, record.Subject))
+		lines = append(lines, fmt.Sprintf("  %s  %-30s %-10s %s", record.RecordedAt.Local().Format("2006-01-02 15:04"), operationLabel(record.Operation), record.State, record.Subject))
+		// A failure says why, so the cause is not lost once its screen is gone.
+		if record.State != "completed" && record.State != "saved" && strings.TrimSpace(record.Summary) != "" {
+			summary := lipgloss.NewStyle().Width(max(20, model.width-12)).Render(sanitizeRemoteInstallText(record.Summary))
+			for _, line := range strings.Split(summary, "\n") {
+				lines = append(lines, "      "+tuiMuted(line, model.isDark))
+			}
+		}
 	}
 	lines = append(lines, "", tuiSection("Deployment logs", model.isDark))
 	if len(model.maintenance.logs.Logs) == 0 {
