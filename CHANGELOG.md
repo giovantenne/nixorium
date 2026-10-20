@@ -22,6 +22,20 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The client installer started by network boot or USB looks like the controller
+  bootstrap: three numbered steps, colours, aligned details and a final "Next"
+  block with the computer's SSH key. The list of copied files, boot loader
+  warnings and disk tool traces go to `/tmp/nixorium-install.log`; on a
+  failure the screen shows the last lines and the log path. Sizes are in GB,
+  and the duplicate-name check says plainly what to watch for.
+- The controller bootstrap shows the keyboard by name ("Italian (it)"), keeps
+  disk tool traces and Nix warnings in its log, and its final steps mention
+  Restore lab for a technician replacing a controller.
+- Plainer wording across the TUI: diagnostics titles, the Internet block
+  message (the block lasts until it is lifted or the computer restarts), a
+  cancelled USB installation shown as success, disk models without escape
+  codes, the settings review, help, and "SSH key changed" in Update computers
+  as in the inventory. Backup results show the local time.
 - After applying the controller, the result appears as soon as the controller
   is verified instead of 1-2 minutes later; the status refresh continues in the
   background. A short gap in the progress is no longer reported as "could not
