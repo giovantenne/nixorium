@@ -269,6 +269,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.observeRecoveryController(message.report)
 		model.recoveryCursor = min(model.recoveryCursor, max(0, len(message.report.Conditions)-1))
 		return model, nil
+	case overviewQuietRefreshMsg:
+		return model.finishQuietOverviewRefresh(message)
 	case overviewRefreshMsg:
 		model.busy = ""
 		if message.err != nil {

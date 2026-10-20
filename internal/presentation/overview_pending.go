@@ -119,6 +119,55 @@ func (model dashboardModel) refreshOverview() (tea.Model, tea.Cmd) {
 	})
 }
 
+// overviewQuietRefreshMsg re-reads the local observations the Overview lists
+// when the administrator returns to it, without a busy screen or a message.
+type overviewQuietRefreshMsg struct {
+	report      domain.StatusReport
+	setup       domain.SetupReport
+	err         error
+	usbReserved bool
+	recovery    domain.RecoveryReport
+	jobs        []domain.ManagedJob
+	jobsErr     error
+	jobsID      uint64
+}
+
+// withQuietOverviewRefresh re-reads, in the background, what the Overview
+// lists, so items about finished work disappear without pressing r.
+func (model dashboardModel) withQuietOverviewRefresh(command tea.Cmd) (dashboardModel, tea.Cmd) {
+	if model.actions.LoadInitial == nil || model.actions.ClassroomMode || model.busy != "" {
+		return model, command
+	}
+	model.jobs.id++
+	id := model.jobs.id
+	return model, tea.Batch(command, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+		defer cancel()
+		jobs, jobsErr := model.observeManagedJobs(ctx)
+		report, setup, err := model.actions.LoadInitial(ctx)
+		return overviewQuietRefreshMsg{report: report, setup: setup, err: err, usbReserved: model.usbReservationPresent(), recovery: model.observeRecovery(ctx), jobs: jobs, jobsErr: jobsErr, jobsID: id}
+	})
+}
+
+func (model dashboardModel) finishQuietOverviewRefresh(message overviewQuietRefreshMsg) (tea.Model, tea.Cmd) {
+	if message.err != nil || model.busy != "" {
+		return model, nil
+	}
+	if message.jobsID == model.jobs.id {
+		model.jobs.items, model.jobs.err = message.jobs, message.jobsErr
+	}
+	message.report.PXEPreparation = model.report.PXEPreparation
+	message.report.Meta = model.report.Meta
+	model.report, model.setup = message.report, message.setup
+	model.usbReserved = message.usbReserved
+	model.observeSetupController(message.setup)
+	model.observeRecoveryController(message.recovery)
+	if model.screen == dashboardHome {
+		model.syncHomeTasks()
+	}
+	return model, nil
+}
+
 func (model *dashboardModel) syncHomeTasks() {
 	model.ensureHomeMenu()
 	selected, hadSelection := model.homeMenu.selected()

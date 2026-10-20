@@ -907,6 +907,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			if model.screen != dashboardHome {
 				next, command = next.withBackupSync(command)
+				next, command = next.withQuietOverviewRefresh(command)
 			}
 		}
 	}
