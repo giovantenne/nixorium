@@ -63,6 +63,11 @@ in
   };
 
   services.gnome.gnome-keyring.enable = lib.mkForce false;
+  # Without a secret service MySQL Workbench fails every connection ("The
+  # name is not activatable"); this makes it skip the keychain. Set here, not
+  # only in the site's development module, so laboratories created before
+  # 3.8.0 get it too; it has no effect where Workbench is not installed.
+  environment.sessionVariables.WB_NO_KEYRING = "1";
   # No GNOME remote desktop server: the classroom view reaches sessions only
   # through the controller's SSH access.
   systemd.user.services.gnome-remote-desktop.enable = false;

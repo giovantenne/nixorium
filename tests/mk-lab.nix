@@ -249,6 +249,10 @@ assert hostClassLab.nixoriumHostClasses == [
 assert lib.sort builtins.lessThan (lib.concatMap (class: class.members) hostClassLab.nixoriumHostClasses)
   == [ "pc01" "pc02" "pc03" "pc04" "pc05" "pc06" "pc99" ];
 assert controllerOnlyLab.nixoriumHostClasses == [ { representative = "pc99"; members = [ "pc99" ]; } ];
+# MySQL Workbench skips the missing keychain on every lab desktop, whatever
+# the site's development module says (labs created before 3.8.0 lack it).
+assert subnetLab.nixosConfigurations.pc01.config.environment.sessionVariables.WB_NO_KEYRING == "1";
+assert controllerOnly.environment.sessionVariables.WB_NO_KEYRING == "1";
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
 assert controllerOnly.virtualisation.virtualbox.guest.enable;
 assert subnetLab.nixosConfigurations.pc99.config.virtualisation.virtualbox.guest.enable;

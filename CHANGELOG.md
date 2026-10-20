@@ -15,6 +15,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- MySQL Workbench could not connect in laboratories created before 3.8.0:
+  the setting that lets it work without a desktop keyring was only in the
+  development module copied at creation. Every laboratory desktop now gets
+  it from Nixorium itself.
 - Installation from a USB stick refused every computer with 4 GB of memory
   ("live installer needs at least … bytes free"): the check counted the
   installer twice, once already in the live system's memory and once more as
