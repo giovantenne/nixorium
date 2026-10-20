@@ -2934,6 +2934,9 @@ func (model dashboardModel) pxeView() string {
 	address := model.report.Meta.Controller.DHCPIP
 	if model.report.PXEPreparation.Ready && model.report.PXEPreparation.DHCPAddress != "" {
 		address = model.report.PXEPreparation.DHCPAddress
+	} else if address != "" && address != domain.MasterDHCPPlaceholder {
+		// Not prepared yet: the saved value; preparation reads the current one.
+		address += " (saved; checked when files are prepared)"
 	}
 	if address == domain.MasterDHCPPlaceholder {
 		address = "not set yet; laboratory settings ask for it"

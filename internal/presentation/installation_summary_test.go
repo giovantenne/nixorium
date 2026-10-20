@@ -70,3 +70,16 @@ func TestSavedInstallationSummaryAlsoServesUSBInstallation(t *testing.T) {
 		t.Fatal("preflight skipped")
 	}
 }
+
+func TestSummaryShowsTheDHCPAddressTheControllerHasNow(t *testing.T) {
+	addresses := domain.ControllerAddresses{Detected: true, Choices: []domain.DHCPAddressChoice{{Address: "10.0.2.15", Device: "enp0s8"}, {Address: "192.168.57.99", Device: "enp0s3"}}}
+	if got := summaryDHCPAddress("192.168.57.99", "enp0s3", addresses); got != "192.168.57.99" {
+		t.Fatalf("present address = %q", got)
+	}
+	if got := summaryDHCPAddress("192.168.56.99", "enp0s3", addresses); got != "192.168.57.99 (detected now; the saved 192.168.56.99 is no longer on this controller)" {
+		t.Fatalf("stale address = %q", got)
+	}
+	if got := summaryDHCPAddress("192.168.56.99", "enp0s3", domain.ControllerAddresses{}); got != "192.168.56.99" {
+		t.Fatalf("undetected = %q", got)
+	}
+}

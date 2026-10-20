@@ -27,6 +27,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The installation summary no longer shows a saved controller DHCP address
+  the controller does not have any more (a changed lease, a restored lab): it
+  shows the current one, which preparation uses, and names the old one. Before
+  preparation the network installation screen marks the address as saved.
 - The client installer started by network boot or USB looks like the controller
   bootstrap: three numbered steps, colours, aligned details and a final "Next"
   block with the computer's SSH key. The list of copied files, boot loader

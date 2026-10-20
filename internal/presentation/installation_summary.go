@@ -18,7 +18,7 @@ func (model dashboardModel) installationSummaryView() string {
 		tuiTitle("Use the saved installation settings?", model.isDark), "",
 		fmt.Sprintf("Laboratory network    %s/%d", lab.NetworkBase, lab.NetworkPrefix),
 		"Controller interface  " + lab.ControllerInterface(),
-		"Controller DHCP       " + lab.MasterDHCPIP,
+		"Controller DHCP       " + summaryDHCPAddress(lab.MasterDHCPIP, lab.ControllerInterface(), model.settings.addresses),
 		"Client interface      " + clientInterface,
 		fmt.Sprintf("Client computers      %d", lab.PCCount),
 		"Accounts              admin / " + lab.TeacherUser + " / " + lab.StudentUser,
@@ -63,4 +63,29 @@ func (model dashboardModel) updateInstallationSummary(key tea.KeyPressMsg) (tea.
 		return model.loadSetup()
 	}
 	return model, nil
+}
+
+// summaryDHCPAddress shows the address the controller has now when the saved
+// one is gone (a changed lease, a restored lab): preparation uses the
+// current address, so the saved one would only mislead.
+func summaryDHCPAddress(saved, device string, addresses domain.ControllerAddresses) string {
+	if !addresses.Detected || len(addresses.Choices) == 0 {
+		return saved
+	}
+	for _, choice := range addresses.Choices {
+		if choice.Address == saved {
+			return saved
+		}
+	}
+	current := addresses.Choices[0].Address
+	for _, choice := range addresses.Choices {
+		if choice.Device == device {
+			current = choice.Address
+			break
+		}
+	}
+	if saved == "" || saved == domain.MasterDHCPPlaceholder {
+		return current + " (detected now)"
+	}
+	return current + " (detected now; the saved " + saved + " is no longer on this controller)"
 }

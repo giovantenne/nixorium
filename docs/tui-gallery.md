@@ -1619,10 +1619,11 @@ Nixorium  /  Overview  /  Background work
 Managed background work
 Read-only attachment. Leaving this view does not stop the job.
 
-Controller configuration — interrupted
-Progress was left running, but no managed unit is running. Inspect the journal before a fresh review.
+Controller configuration — running
+Managed work is still running; viewing it does not start another operation.
 
-Last recorded phase: build
+● Building system · Running
+1/4 steps complete
 Building the reviewed controller system
 
 Journal unit: nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service
