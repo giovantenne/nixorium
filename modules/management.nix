@@ -347,13 +347,19 @@ let
         CONTROLLER_STATIC_CIDR="$CONTROLLER_STATIC_IP/$CONTROLLER_PREFIX_LENGTH"
         ip link show dev "$CONTROLLER_IFACE" >/dev/null \
           || fail "configured controller interface is not present after activation"
-        for _ in $(seq 30); do
-          static_address_present && break
-          sleep 1
-        done
-        if ! static_address_present; then
-          nmcli --wait 60 connection up nixorium-lab ifname "$CONTROLLER_IFACE" >/dev/null \
-            || fail "could not activate the laboratory network profile; run: nmcli connection up nixorium-lab ifname $CONTROLLER_IFACE"
+        if nmcli -t general status >/dev/null 2>&1; then
+          for _ in $(seq 30); do
+            static_address_present && break
+            sleep 1
+          done
+          if ! static_address_present; then
+            nmcli --wait 60 connection up nixorium-lab ifname "$CONTROLLER_IFACE" >/dev/null \
+              || fail "could not activate the laboratory network profile; run: nmcli connection up nixorium-lab ifname $CONTROLLER_IFACE"
+          fi
+        elif ! static_address_present; then
+          # Without NetworkManager (a minimal controller) set the address itself.
+          ip address replace "$CONTROLLER_STATIC_CIDR" dev "$CONTROLLER_IFACE" \
+            || fail "could not apply the controller static address after activation"
         fi
         static_address_present \
           || fail "controller static address is absent after activation; run: nmcli connection up nixorium-lab ifname $CONTROLLER_IFACE"
