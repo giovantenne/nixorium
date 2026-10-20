@@ -3166,7 +3166,7 @@ func (model dashboardModel) pxeNextStepView() []string {
 	if model.pxeJustFinished() {
 		return []string{
 			tuiSection("Next: check the installed computers", model.isDark),
-			"  Press h to open the computer inventory: each installed computer should answer and be up to date.",
+			"  Press Enter to open the computer inventory: each installed computer should answer and be up to date.",
 			"  A computer installed again offers a new SSH key; review it there before updating it.",
 		}
 	}

@@ -43,6 +43,11 @@ func (model dashboardModel) pxePrimaryAction() tuiAction {
 	case "degraded", "recovery-required":
 		return tuiAction{key: "n", label: "Recover the network"}
 	}
+	if model.pxeJustFinished() && model.actions.LoadHosts != nil {
+		// After network installation the next step is checking the
+		// installed computers, as the screen says.
+		return tuiAction{key: "h", label: "Check computers"}
+	}
 	if model.report.PXEPreparation.Ready {
 		return tuiAction{key: "s", label: "Review start"}
 	}

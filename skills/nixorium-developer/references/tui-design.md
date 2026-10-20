@@ -79,6 +79,30 @@ what Enter will do before the user presses it.
 Avoid decorative borders, badges, and colors that do not improve hierarchy.
 Review both light and dark backgrounds and ASCII, ANSI, and ANSI-256 output.
 
+## Show the next step
+
+Owner decision 2026-10-20: a novice must see at once what to do next.
+
+- One primary action per screen. When the footer contains an Enter action
+  that does more than navigate, the shell draws it as the next step: on its
+  own line between the notices and the key footer, an arrow and the key with
+  its label on the selection colour (red for an action that erases or
+  replaces data; its typed word stays). The footer then lists only the other,
+  secondary keys, in muted text. Short terminals (under 30 rows) keep it in
+  its footer place with the same colour, so nothing else is pushed off the
+  screen. Navigation labels (Open, Details, Select, Return, Back and area
+  names) stay ordinary footer keys. A screen may name another key as its
+  primary (`tuiShell.primary`).
+- Enter does what the next step says. When the text says "Next: …", Enter
+  performs that step; other actions keep their letter keys.
+- Colours keep their meaning: green for done and verified, amber for
+  attention, red for failure or danger. A success is never shown in amber
+  with "!". Meaning never depends on colour alone: arrow, symbol and text
+  remain.
+- Every result screen names its next step (as the primary action, with a
+  "Next: …" line when it needs explaining) or says that nothing else is
+  needed.
+
 ## Make interactions predictable
 
 Prefer a small shared vocabulary:

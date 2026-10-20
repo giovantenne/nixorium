@@ -139,7 +139,8 @@ Full terms: DISCLAIMER.md and LICENSE in the Nixorium repository.
 Enter acknowledges these operational risks and continues.
 The next screen asks separately about optional adoption statistics.
 
-Enter Accept & continue  ·  ↑/↓ Scroll  ·  q Exit
+▶ Enter Accept & continue
+↑/↓ Scroll  ·  q Exit
 ```
 
 ## Optional adoption statistics
@@ -422,7 +423,8 @@ Applies to all future conversations of this lab until you turn it off.
 
 [ ] Share my conversations with Nixorium for 90 days to improve Assistant
 
-Enter Toggle sharing  ·  Esc Cancel  ·  F1 Help
+▶ Enter Toggle sharing
+Esc Cancel  ·  F1 Help
 ```
 
 ## Explicit answer report
@@ -444,7 +446,8 @@ or sensitive text. It is kept for 90 days.
 Comment (optional, max 500 characters)
 › The scope review was helpful.
 
-↑/↓ Rating  ·  Enter Send  ·  Esc Cancel  ·  F1 Help
+▶ Enter Send
+↑/↓ Rating  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Assistant candidate ready
@@ -596,7 +599,8 @@ Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. Comput
 You can update them later from Computers → Update computers: try one computer first, check it, then update the
 others.
 
-Enter Chat  ·  F1 Help
+▶ Enter Chat
+F1 Help
 ```
 
 ## Pinned package search
@@ -616,7 +620,8 @@ Choose a package, then its computers; you review before saving.
 
 Saved choices reach the client computers with Computers → Update computers.
 
-Type Search  ·  ↑/↓ Results  ·  Enter Choose computers  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
+▶ Enter Choose computers
+Type Search  ·  ↑/↓ Results  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
 ```
 
 ## Additive software profile review
@@ -640,7 +645,8 @@ Clients      5 included in the added packages
 Now          Save and rebuild pc99 (this controller)
 Later        Review and update the affected client computers
 
-↑/↓ Inspect  ·  Enter Add profile  ·  Esc Computers  ·  F1 Help
+▶ Enter Add profile
+↑/↓ Inspect  ·  Esc Computers  ·  F1 Help
 ```
 
 ## Contextual client deployment selection
@@ -666,8 +672,8 @@ Not checked in this session · r checks the computers now
 
 ! Software selection saved locally.
 
-Space Select  ·  a All  ·  n Those needing update  ·  r Check computers  ·  Enter Review  ·  Esc Computers
-F1 Help
+▶ Enter Review
+Space Select  ·  a All  ·  n Those needing update  ·  r Check computers  ·  Esc Computers  ·  F1 Help
 ```
 
 ## Update computers review
@@ -695,7 +701,8 @@ Enter updates these computers.
   Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
 next one.
 
-Enter Update computers  ·  Esc Selection  ·  F1 Help
+▶ Enter Update computers
+Esc Selection  ·  F1 Help
 ```
 
 ## Verified deployment result
@@ -747,7 +754,8 @@ Enter updates these computers.
   Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
 next one.
 
-F2 Reachable only  ·  Enter Update computers  ·  Esc Selection  ·  F1 Help
+▶ Enter Update computers
+F2 Reachable only  ·  Esc Selection  ·  F1 Help
 ```
 
 ## A new review for reachable computers only
@@ -771,7 +779,8 @@ Enter updates these computers.
   Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
 next one.
 
-Enter Update computers  ·  Esc Selection  ·  F1 Help
+▶ Enter Update computers
+Esc Selection  ·  F1 Help
 ```
 
 ## Per-computer deployment outcomes
@@ -834,7 +843,8 @@ Enter starts network installation mode.
 at 192.168.1.123. The school's DHCP keeps giving out addresses. Finish installation, or a restart, brings the
 laboratory address back. Remote connections to the controller may be interrupted meanwhile.
 
-Enter Start PXE  ·  Esc Cancel  ·  F1 Help
+▶ Enter Start PXE
+Esc Cancel  ·  F1 Help
 ```
 
 ## Saved PXE settings
@@ -855,7 +865,8 @@ Continue the guided preparation using these saved values.
 Keys, configuration, controller and installation files are checked next.
 This summary is not a readiness check. The installation still requires its own review.
 
-Enter Continue  ·  e Edit settings  ·  Esc Back  ·  F1 Help
+▶ Enter Continue
+e Edit settings  ·  Esc Back  ·  F1 Help
 ```
 
 ## USB SSH disk review
@@ -876,8 +887,7 @@ Size               137438953472 bytes
 PC fingerprint     SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 Revision           0123456789abcdef0123456789abcdef01234567
 System             /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01-demo
-Signed cache       http://10.42.0.99:5000
-Replace known key  no
+Shift ↑/↓ scroll · ? help
 
 Type exactly
   ERASE
@@ -886,7 +896,8 @@ Type exactly
 × Everything on this disk will be permanently deleted
   Only this disk is erased. Computer, disk and revision are checked again just before erasing.
 
-Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
+▶ Enter Erase and install
+Esc Cancel safely  ·  F1 Help
 ```
 
 ## USB SSH verified result
@@ -927,7 +938,8 @@ An accepted request does not prove that a computer is physically off.
 
 Press Enter to shut down 2 computers. 1 session in use will be interrupted.
 
-Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
+▶ Enter Send requests
+u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Restricted teacher dashboard
@@ -971,7 +983,8 @@ An accepted request does not prove that the computer completed its restart.
 
 Press Enter to restart 1 computer.
 
-Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
+▶ Enter Send requests
+u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Settings accounts menu
@@ -1002,7 +1015,8 @@ Teacher account name, distinct from administrator and student.
 
 › teacher█
 
-Enter Continue  ·  Shift+Tab Previous  ·  Esc Cancel  ·  F1 Help
+▶ Enter Continue
+Shift+Tab Previous  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Change account passwords
@@ -1023,7 +1037,8 @@ to this controller and then update the computers.
   [s] Student
   Classroom student account
 
-↑/↓ Select  ·  Enter Change password  ·  Esc Accounts  ·  F1 Help
+▶ Enter Change password
+↑/↓ Select  ·  Esc Accounts  ·  F1 Help
 ```
 
 ## Student workspace favorites
@@ -1041,7 +1056,8 @@ Explicit selection
 
 Shift ↑/↓ changes the order of the selected favorite.
 
-Space Toggle  ·  i Inherit  ·  c Clear  ·  Enter Keep draft  ·  Esc Cancel field  ·  F1 Help
+▶ Enter Keep draft
+Space Toggle  ·  i Inherit  ·  c Clear  ·  Esc Cancel field  ·  F1 Help
 ```
 
 ## Initial files at 80x24
@@ -1079,7 +1095,8 @@ Copies are saved in Git, the Nix store, installer and cache.
 Source: /demo/materials/Lessons/_
 /demo/materials/Lessons/
 
-Tab Complete path  ·  Enter Continue  ·  Esc Cancel  ·  F1 Help
+▶ Enter Continue
+Tab Complete path  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file copy and executable review
@@ -1100,7 +1117,8 @@ Captured copies are reviewed below; executability starts off.
 Student ownership; source owner/group, permissions, ACLs and attributes
 are not inherited. Links and special files are rejected.
 
-↑/↓ Select  ·  Space Executable  ·  Enter Keep copies in draft  ·  Esc Cancel  ·  F1 Help
+▶ Enter Keep copies in draft
+↑/↓ Select  ·  Space Executable  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file declaration review
@@ -1127,7 +1145,8 @@ Review lines 1–14 of 21
 
 Enter saves and records the manifest and reviewed copies locally.
 
-↑/↓ Scroll  ·  Enter Save copies  ·  Esc Cancel  ·  F1 Help
+▶ Enter Save copies
+↑/↓ Scroll  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file removal and mode-change review
@@ -1154,7 +1173,8 @@ Review lines 1–14 of 22
 
 Enter saves and records the manifest and reviewed copies locally.
 
-↑/↓ Scroll  ·  Enter Save copies  ·  Esc Cancel  ·  F1 Help
+▶ Enter Save copies
+↑/↓ Scroll  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file protected save
@@ -1187,7 +1207,8 @@ Initial-file manifest and reviewed copies saved and recorded locally.
 Current student sessions stay unchanged. After system application,
 the saved files are restored at the next boot.
 
-Enter Apply to this controller  ·  Esc Workspace  ·  F1 Help
+▶ Enter Apply to this controller
+Esc Workspace  ·  F1 Help
 ```
 
 ## Initial-file partial save
@@ -1225,7 +1246,8 @@ Source: /demo/materials_
 ! The folder contains a symbolic link. Choose a clean materials folder without links, keys or credentials; no
 copies were added.
 
-Tab Complete path  ·  Enter Continue  ·  Esc Cancel  ·  F1 Help
+▶ Enter Continue
+Tab Complete path  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Student workspace declaration review
@@ -1251,7 +1273,8 @@ Review lines 1–13 of 38
 
 Enter saves and records only the profile JSON; no system apply or reset.
 
-↑/↓ Scroll  ·  Enter Save JSON  ·  Esc Cancel  ·  F1 Help
+▶ Enter Save JSON
+↑/↓ Scroll  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Student workspace saved and recorded, not deployed
@@ -1270,7 +1293,8 @@ Profile saved and recorded locally. No computer or student home changed.
 Apply to this controller, then review the computers to update.
 Preferences take effect at the next computer start after system application.
 
-Enter Apply to this controller  ·  Esc Settings  ·  F1 Help
+▶ Enter Apply to this controller
+Esc Settings  ·  F1 Help
 ```
 
 ## Separate controller review after a workspace save
@@ -1294,7 +1318,8 @@ Revision  0123456789abcdef0123456789abcdef01234567
   This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot
 is not normally required.
 
-Enter Apply to controller  ·  Esc Cancel  ·  F1 Help
+▶ Enter Apply to controller
+Esc Cancel  ·  F1 Help
 ```
 
 ## Workspace versions in system update review
@@ -1317,7 +1342,8 @@ Proposed flake.nix/flake.lock changes:
 Enter saves the update and applies it to this controller.
 Computers are updated afterwards, from Computers → Update computers.
 
-↑/↓ Scroll  ·  F4 Details  ·  Enter Apply update  ·  Esc Cancel  ·  F1 Help
+▶ Enter Apply update
+↑/↓ Scroll  ·  F4 Details  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Cancellable read with elapsed time
@@ -1347,7 +1373,8 @@ Diagnostics
 
 ! Loading cancelled. Nothing was changed.
 
-e Support report  ·  ↑/↓ Select  ·  Enter Evidence  ·  r Check again  ·  Esc Maintenance  ·  F1 Help
+▶ Enter Evidence
+e Support report  ·  ↑/↓ Select  ·  r Check again  ·  Esc Maintenance  ·  F1 Help
 ```
 
 ## Local support report preview
@@ -1375,7 +1402,8 @@ Minimized, not anonymous. No upload or remediation.
 
 Lines 1–14 / 41 · Versions, revision, time and counts remain visible.
 
-↑/↓ Scroll  ·  Enter Save locally  ·  r Refresh  ·  Esc Cancel  ·  F1 Help
+▶ Enter Save locally
+↑/↓ Scroll  ·  r Refresh  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Local support report saved without upload
@@ -1391,7 +1419,8 @@ Saved the exact preview locally. Nothing was uploaded.
 Local file: "/demo/state/nixorium/support/support-0123456789abcdef.json"
 SHA-256: e83aa5986a7231de21c579859bdc0b5a0c3f8caa60a1370050f21840bd25a30f
 
-Enter Diagnostics  ·  r New preview  ·  Esc Back  ·  F1 Help
+▶ Enter Diagnostics
+r New preview  ·  Esc Back  ·  F1 Help
 ```
 
 ## Deployment template reset review
@@ -1419,7 +1448,8 @@ Preserved tracked files:
 Lines 1–14 / 21
 Type RESET DEPLOYMENT:
 
-↑/↓ Scroll  ·  Enter Back up and reset  ·  Esc Cancel  ·  F1 Help
+▶ Enter Back up and reset
+↑/↓ Scroll  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Deployment template reset losses
@@ -1447,7 +1477,8 @@ Changes (local modules and assets may contain policies that will be lost):
 Lines 8–21 / 21
 Type RESET DEPLOYMENT:
 
-↑/↓ Scroll  ·  Enter Back up and reset  ·  Esc Cancel  ·  F1 Help
+▶ Enter Back up and reset
+↑/↓ Scroll  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Deployment reset saved without activation
@@ -1471,7 +1502,8 @@ Applying the controller is optional here; no client deployment or reboot starts 
 Backup: refs/nixorium/template-backups/demo
 Local commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
-Enter Apply to this controller  ·  Esc Maintenance  ·  F1 Help
+▶ Enter Apply to this controller
+Esc Maintenance  ·  F1 Help
 ```
 
 ## Changed client SSH key
@@ -1520,7 +1552,8 @@ preserved.
 
 Type ROTATE HOST KEY: _
 
-Enter Save reviewed trust  ·  Esc Cancel  ·  F1 Help
+▶ Enter Save reviewed trust
+Esc Cancel  ·  F1 Help
 ```
 
 ## SSH trust saved without deployment

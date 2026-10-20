@@ -556,6 +556,7 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 	if model.width == 0 {
 		width = 100
 	}
+	shell.compactPrimary = model.height > 0 && model.height < 30
 	regions := buildTUIShellRegions(shell, model.width, model.isDark)
 	wrappedLines := func(content string) []string {
 		if content == "" {

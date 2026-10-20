@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Every screen shows its next step: the Enter action that does more than
+  navigate is drawn above the key footer with an arrow and the selection
+  colour (red when it erases or replaces data), and the footer lists the
+  other keys. After finishing a network installation, Enter checks the
+  installed computers, as the screen says.
 - jq is now part of the software every laboratory starts with, on the
   controller and all clients, in every software profile. **Update Nixorium**
   adds it to existing laboratories; a laboratory that already declares jq,
