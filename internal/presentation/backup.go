@@ -540,8 +540,11 @@ func (model dashboardModel) backupView() string {
 				"Keep the backup away from this controller and the passphrase separately.")
 			actions = []tuiAction{{key: "Enter", label: "Create backup"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		case b.archive:
-			lines = append(lines, "Choose an existing folder outside the deployment. Your home folder is proposed;",
-				"for a USB drive, mount it first and enter its folder instead.",
+			proposal := "A connected USB drive is proposed; keep the backup away from this controller."
+			if !strings.HasPrefix(b.destination, "/run/media/") {
+				proposal = "Your home folder is proposed. For a USB drive, connect it and open Back up lab again."
+			}
+			lines = append(lines, "Choose an existing folder outside the deployment.", proposal,
 				"Use a passphrase of at least 12 characters. The whole archive is encrypted.", "")
 			fields = []field{{"Folder", b.destination}, {"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}}
 		case b.reviewed:

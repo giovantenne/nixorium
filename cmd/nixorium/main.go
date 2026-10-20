@@ -772,6 +772,12 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		GitBackupDestination: func() (string, string) { return (adapters.GitBackup{}).Destination(repository) },
 		BackupFileFolder: func() string {
+			// A connected USB drive keeps the backup away from this controller.
+			if current, err := user.Current(); err == nil {
+				if drives := adapters.MountedDrives(current.Username); len(drives) > 0 {
+					return drives[0]
+				}
+			}
 			home, err := os.UserHomeDir()
 			if err != nil {
 				return ""
@@ -836,7 +842,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		return detectInterfaceReload(os.Executable, installedInterfacePath)
 	}
 	notice := os.Getenv(presentation.ReopenNoticeEnvironment)
-	os.Unsetenv(presentation.ReopenNoticeEnvironment)
+	_ = os.Unsetenv(presentation.ReopenNoticeEnvironment)
 	reload, outcome, tuiErr := presentation.RunLoadingDashboardReload(actions, setupMode, notice)
 	if tuiErr != nil {
 		fmt.Fprintln(stderr, "Error:", tuiErr)

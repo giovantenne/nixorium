@@ -27,6 +27,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Back up lab proposes a connected USB drive for the encrypted file, or the
+  home folder when none is connected, instead of asking to mount the drive
+  and type its folder.
 - The installation summary no longer shows a saved controller DHCP address
   the controller does not have any more (a changed lease, a restored lab): it
   shows the current one, which preparation uses, and names the old one. Before

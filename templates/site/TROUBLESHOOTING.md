@@ -1129,10 +1129,11 @@ an existing deployment:
 nixorium backup clone
 ```
 
-Choose **Backup file** or **Private Git repository**. For a file, enter its path
-(for example on the mounted USB drive), a **new absolute directory** and the
-passphrase. For Git, enter the SSH repository URL, branch, a new absolute
-directory and the passphrase. Review and confirm. Both restore the deployment
+Choose **Backup file** or **Private Git repository**. For a file, Nixorium
+looks for `nixorium-backup-*.age` files on connected drives and proposes the
+newest; enter its passphrase. **Restore into** proposes a new folder next to
+the deployment (`nixorium-restored`); change it only if needed. For Git, enter
+the SSH repository URL, branch and the passphrase. Review and confirm. Both restore the deployment
 with its private keys and account passwords into the new directory and fill the
 controller's trusted computer keys in the same way. The equivalent
 noninteractive Git command is:
@@ -1150,10 +1151,20 @@ mismatches leave no published target. A finalization failure explicitly reports 
 partial result and the retained directory; keep it and collect support evidence
 before activation instead of deleting it or blindly retrying.
 
-On a replacement controller, install NixOS with the same controller number and
-network, sign in as `admin`, restore to a new directory, then use the restored
-repository at the configured deployment path. Keep any newly created deployment
-aside until recovery is verified. Run these commands from the restored deployment:
+On a replacement controller, install the controller as usual, sign in as
+`admin`, open Nixorium and choose **Replacing a controller? Restore its lab** on
+the Overview (or **Maintenance → Restore lab**). After the restore, the result
+offers **Use this lab on this controller**: the deployment created by the
+installer is kept as `nixorium-deployment-before-restore-DATE`, the restored lab
+takes its place and its keys are installed on the controller. Nothing is
+deleted or activated. Then **Review controller** applies it to the controller
+after the usual review. Computers reinstalled after the backup was made show
+"SSH key changed": compare the fingerprint on their screen before trusting
+them. The step refuses a controller that already uses different lab keys.
+
+Without the TUI, use the restored repository at the configured deployment
+path. Keep any newly created deployment aside until recovery is verified. Run
+these commands from the restored deployment:
 
 ```sh
 nixorium setup keys --verify-only
@@ -1166,9 +1177,9 @@ again. Clients retain trust in the restored original keys and do not need
 reinstallation. The passphrase decrypts existing keys; it never generates
 replacement keys. Repository access and the passphrase are both needed.
 
-For an **Encrypted file**, the TUI proposes your home folder; for a USB drive,
-mount it first and enter its folder instead (any existing absolute folder outside
-the deployment). Enter and repeat a passphrase of at least
+For an **Encrypted file**, the TUI proposes a connected USB drive, or your home
+folder when none is connected (any existing absolute folder outside the
+deployment can be entered). Enter and repeat a passphrase of at least
 12 characters, review the destination, then choose **Create backup**. No Git
 remote is needed and nothing is pushed. A detached USB need not stay mounted
 for the recorded backup to count. The equivalent CLI and restoration commands are:

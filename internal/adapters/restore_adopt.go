@@ -31,6 +31,22 @@ func RestoreFolder(repository string) string {
 	return ""
 }
 
+// MountedDrives lists the folders of removable drives mounted for the user
+// (GNOME mounts them under /run/media/USER).
+func MountedDrives(user string) []string {
+	if user == "" {
+		return nil
+	}
+	matches, _ := filepath.Glob(filepath.Join("/run/media", user, "*"))
+	drives := []string{}
+	for _, match := range matches {
+		if info, err := os.Stat(match); err == nil && info.IsDir() && unix.Access(match, unix.W_OK) == nil {
+			drives = append(drives, match)
+		}
+	}
+	return drives
+}
+
 // FindBackupFiles lists encrypted backup files on mounted drives and in the
 // home folder, newest first. Only names are read; nothing is decrypted.
 func FindBackupFiles(home, user string) []string {
