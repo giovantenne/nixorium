@@ -294,3 +294,16 @@ func TestInstallationFormMovesTheControllerToTheChosenDHCPDevice(t *testing.T) {
 		t.Fatalf("network group moved the controller to %q", kept.settings.Lab.ControllerInterface())
 	}
 }
+
+func TestInstallationSummaryNamesTheControllerInterface(t *testing.T) {
+	current := wizardSettings()
+	current.Lab.ControllerInterfaceName = "enp0s3"
+	current.Lab.ClientInterfaceName = ""
+	model := dashboardModel{width: 120, height: 40, settings: settingsModel{current: current}}
+	view := ansi.Strip(model.installationSummaryView())
+	for _, want := range []string{"Controller interface  enp0s3", "Client interface      automatic (wired network card)"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+}

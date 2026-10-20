@@ -426,6 +426,16 @@ func undetectedValueWarning(field settingsField, value string) string {
 	return fmt.Sprintf("%s is not one of the controller's current addresses (found: %s). Check it before preparing network installation.", value, found)
 }
 
+// emptyInterfaceMeaning says what an empty interface field uses: clients
+// match their wired card whatever its name (ADR 0017), the controller the
+// shared fallback name.
+func (model settingsWizardModel) emptyInterfaceMeaning() string {
+	if model.fields[model.index].id == "lab.clientIfaceName" {
+		return "any wired network card"
+	}
+	return model.settings.Lab.InterfaceName
+}
+
 func (model settingsWizardModel) optionalInterface() bool {
 	id := model.fields[model.index].id
 	return id == "lab.clientIfaceName" || id == "lab.controllerIfaceName"
@@ -438,7 +448,7 @@ func (model settingsWizardModel) View() tea.View {
 		lines := []string{tuiTitle(field.label, model.isDark), "", info.description,
 			tuiFieldDetail("Example", info.example, model.isDark)}
 		if model.optionalInterface() {
-			lines = append(lines, "", tuiFieldDetail("Default when empty", model.settings.Lab.InterfaceName, model.isDark),
+			lines = append(lines, "", tuiFieldDetail("Default when empty", model.emptyInterfaceMeaning(), model.isDark),
 				tuiFieldDetail("Controller network interface", model.settings.Lab.ControllerInterface(), model.isDark),
 				"Use the controller's device name only if the client hardware matches.")
 		}
@@ -483,7 +493,7 @@ func (model settingsWizardModel) shell() tuiShell {
 		if model.drafts[model.index] == "" {
 			hint := "e.g. " + info.example
 			if model.optionalInterface() {
-				hint = model.settings.Lab.InterfaceName + " (default)"
+				hint = model.emptyInterfaceMeaning() + " (default)"
 			}
 			input += tuiMuted(hint, model.isDark)
 		}

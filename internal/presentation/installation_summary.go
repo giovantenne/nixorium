@@ -16,11 +16,12 @@ func (model dashboardModel) installationSummaryView() string {
 	}
 	lines := []string{
 		tuiTitle("Use the saved installation settings?", model.isDark), "",
-		fmt.Sprintf("Laboratory network  %s/%d", lab.NetworkBase, lab.NetworkPrefix),
-		"Controller DHCP     " + lab.MasterDHCPIP,
-		"Client interface    " + clientInterface,
-		fmt.Sprintf("Client computers    %d", lab.PCCount),
-		"Accounts            admin / " + lab.TeacherUser + " / " + lab.StudentUser,
+		fmt.Sprintf("Laboratory network    %s/%d", lab.NetworkBase, lab.NetworkPrefix),
+		"Controller interface  " + lab.ControllerInterface(),
+		"Controller DHCP       " + lab.MasterDHCPIP,
+		"Client interface      " + clientInterface,
+		fmt.Sprintf("Client computers      %d", lab.PCCount),
+		"Accounts              admin / " + lab.TeacherUser + " / " + lab.StudentUser,
 		"", "Continue the guided preparation using these saved values.",
 		"Keys, configuration, controller and installation files are checked next.",
 		"This summary is not a readiness check. The installation still requires its own review.",
