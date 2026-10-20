@@ -249,10 +249,6 @@ func destructiveAction(label string) bool {
 
 // tuiPrimaryAction renders the next step of a screen: an arrow, then the key
 // and its label on the selection colour, so it stays visible without colour.
-func tuiPrimaryAction(action tuiAction, darkBackground, compact bool) string {
-	return tuiPrimaryActionStyled(action, darkBackground, compact, destructiveAction(action.label))
-}
-
 func tuiPrimaryActionStyled(action tuiAction, darkBackground, compact, danger bool) string {
 	theme := newTUITheme(darkBackground)
 	arrow := lipgloss.NewStyle().Bold(true).Foreground(theme.accent).Render("▶ ")
