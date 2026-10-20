@@ -136,6 +136,7 @@ grep -F 'Files go to the new disk, not into the memory of the USB system' "${TES
 grep -F '/dev/vda  40G QEMU HARDDISK' "${TEST_ROOT}/output" >/dev/null
 grep -F '[3/3] Downloading and installing the controller system' "${TEST_ROOT}/output" >/dev/null
 grep -F '[ OK ] Controller system installed.' "${TEST_ROOT}/output" >/dev/null
+grep -F '[ OK ] Disk prepared.' "${TEST_ROOT}/output" >/dev/null
 
 # An empty answer cancels; a mistyped word would be asked again on a terminal.
 printf '\n' > "$CONFIRM"
@@ -194,5 +195,6 @@ if PATH="${MOCK_BIN}:$PATH" \
 fi
 grep -F 'Installation stopped while downloading and installing the controller system' "${TEST_ROOT}/failed-output" >/dev/null
 grep -F 'run the setup' "${TEST_ROOT}/failed-output" >/dev/null
+grep -F 'Full log: /tmp/nixorium-install.log' "${TEST_ROOT}/failed-output" >/dev/null
 
 echo "Controller installer tests passed."

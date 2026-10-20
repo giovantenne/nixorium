@@ -322,10 +322,10 @@ activate_bootstrap_keyboard() {
   case "$BOOTSTRAP_ENVIRONMENT" in
     gnome)
       if activate_gnome_keyboard; then
-        ui_success "Keyboard set to $BOOTSTRAP_KEYBOARD for this session. The same layout is used after installation."
+        ui_success "Keyboard set to $(keyboard_label "$BOOTSTRAP_KEYBOARD") for this session. The same layout is used after installation."
       else
         ui_feedback "Could not change the layout automatically."
-        ui_note "Choose '$BOOTSTRAP_KEYBOARD' from the keyboard menu in the GNOME top bar,"
+        ui_note "Choose '$(keyboard_label "$BOOTSTRAP_KEYBOARD")' from the keyboard menu in the GNOME top bar,"
         ui_note "then press Enter to continue."
         IFS= read -r -u "$BOOTSTRAP_INPUT_FD" _ || true
       fi
@@ -347,7 +347,7 @@ activate_bootstrap_keyboard() {
       "No password has been asked yet. Check the live console and run the command again."
     return 1
   fi
-  ui_success "Keyboard set to $BOOTSTRAP_KEYBOARD. It is used from now on and after installation."
+  ui_success "Keyboard set to $(keyboard_label "$BOOTSTRAP_KEYBOARD"). It is used from now on and after installation."
 }
 
 suggest_time_zone() {
@@ -361,6 +361,23 @@ suggest_time_zone() {
     de) BOOTSTRAP_TIME_ZONE="Europe/Berlin" ;;
     es) BOOTSTRAP_TIME_ZONE="Europe/Madrid" ;;
   esac
+}
+
+keyboard_name() {
+  case "$1" in
+    us) echo "English (US)" ;;
+    gb) echo "English (UK)" ;;
+    it) echo "Italian" ;;
+    fr) echo "French" ;;
+    de) echo "German" ;;
+    es) echo "Spanish" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# "Italian (it)": the name people know, then the code the system uses.
+keyboard_label() {
+  printf '%s (%s)' "$(keyboard_name "$1")" "$1"
 }
 
 keyboard_number() {
@@ -469,7 +486,7 @@ collect_bootstrap_configuration() {
     collect_passwords || return 1
 
     ui_section "Check your answers"
-    ui_detail "Keyboard" "$BOOTSTRAP_KEYBOARD"
+    ui_detail "Keyboard" "$(keyboard_label "$BOOTSTRAP_KEYBOARD")"
     ui_detail "Time zone" "$BOOTSTRAP_TIME_ZONE"
     echo
     ui_detail "Administrator" "admin"
@@ -930,6 +947,7 @@ ui_note "  1. Remove the USB stick, then type ${UI_BOLD}reboot${UI_RESET} and pr
 ui_note "  2. Sign in as ${UI_BOLD}admin${UI_RESET} with the administrator password."
 ui_note "  3. Open ${UI_BOLD}Nixorium${UI_RESET} from the app grid, or type nixorium in a terminal."
 ui_note "     To add the student computers, choose Installation > Network boot (PXE)."
+ui_note "  4. Replacing a controller? After signing in, open ${UI_BOLD}Nixorium → Maintenance → Restore lab${UI_RESET}."
 echo
 ui_note "${UI_MUTED}The lab configuration is saved in ~/${DEPLOYMENT_NAME}.${UI_RESET}"
 echo

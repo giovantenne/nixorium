@@ -22,6 +22,7 @@ BOOTSTRAP_SWAP=""
 DISK_STEP_TITLE="${NIXORIUM_DISK_STEP_TITLE:-Choose the disk}"
 DISK_CHANGE_STARTED=0
 CURRENT_STEP=""
+INSTALL_LOG="${NIXORIUM_INSTALL_LOG:-/tmp/nixorium-install.log}"
 UI_RULE="--------------------------------------------------------"
 UI_RESET=""
 UI_BOLD=""
@@ -72,6 +73,29 @@ ui_error() {
   for LINE in "$@"; do
     printf '    %s\n' "$LINE" >&2
   done
+}
+
+# The tools behind the installation print shell traces, Nix warnings and boot
+# loader noise. The complete output goes to INSTALL_LOG; the screen shows the
+# end of it only when a step fails.
+fail_with_log() {
+  local LINE
+  printf '\n  %sx%s %s%s%s\n' "$UI_ERROR" "$UI_RESET" "$UI_BOLD" "$1" "$UI_RESET" >&2
+  printf '    %sLast lines of the log:%s\n' "$UI_MUTED" "$UI_RESET" >&2
+  while IFS= read -r LINE; do
+    printf '      %s\n' "$LINE" >&2
+  done < <(tail -n 15 -- "$INSTALL_LOG" 2>/dev/null || true)
+  printf '    Full log: %s\n' "$INSTALL_LOG" >&2
+  exit 1
+}
+
+# Quiet progress for the longest step: a running count of the packages that
+# were downloaded, instead of one line for each.
+install_progress() {
+  awk '
+    /^copying path / { n++; if (n % 100 == 0) { print "        " n " packages downloaded so far..."; fflush() }; next }
+    /^(these|this) [0-9]+ paths? will be (fetched|built)/ { print "        " $0; fflush() }
+  '
 }
 
 # Force the bootstrap install to use the official NixOS cache only.
@@ -270,10 +294,14 @@ ui_note "installing can take a while, depending on the Internet connection."
 echo
 DISK_CHANGE_STARTED=1
 CURRENT_STEP="preparing the disk"
+: > "$INSTALL_LOG"
 ui_log "[1/3] Preparing the disk (the partitioning tool is downloaded first)..."
+# shellcheck disable=SC2024 # The log belongs to the invoking user on purpose.
 sudo env NIX_CONFIG="$NIX_CONFIG" \
   nix --extra-experimental-features "nix-command flakes" \
-  run "${UPSTREAM_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE"
+  run "${UPSTREAM_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE" >> "$INSTALL_LOG" 2>&1 ||
+  fail_with_log "The disk could not be prepared."
+ui_success "Disk prepared."
 
 BOOTSTRAP_CACHE="${TARGET_ROOT}/var/cache/nixorium-bootstrap"
 sudo install -d -o "$(id -u)" -g "$(id -g)" "$BOOTSTRAP_CACHE"
@@ -294,7 +322,8 @@ ui_log "[2/3] Fixing the exact versions of the lab configuration..."
 # newest commit of its channel. The lock still declares the channel, so later
 # package-base updates move it forward through the reviewed workflow.
 PACKAGE_BASE_REVISION="$(nix --extra-experimental-features "nix-command flakes" \
-  eval --raw "${UPSTREAM_REF}#lib.packageBase.referenceRevision")"
+  eval --raw "${UPSTREAM_REF}#lib.packageBase.referenceRevision" 2>> "$INSTALL_LOG")" ||
+  fail_with_log "The exact versions of the lab software could not be looked up."
 if [[ ! "$PACKAGE_BASE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
   echo "Error: the release does not name a validated nixpkgs revision." >&2
   exit 1
@@ -303,8 +332,8 @@ fi
   cd "$DEPLOYMENT_PATH"
   nix --extra-experimental-features "nix-command flakes" \
     flake lock --override-input nixorium "$UPSTREAM_REF" \
-    --override-input nixpkgs "github:NixOS/nixpkgs/${PACKAGE_BASE_REVISION}"
-)
+    --override-input nixpkgs "github:NixOS/nixpkgs/${PACKAGE_BASE_REVISION}" >> "$INSTALL_LOG" 2>&1
+) || fail_with_log "The exact versions of the lab configuration could not be fixed."
 if [[ ! -f "${DEPLOYMENT_PATH}/flake.lock" ]]; then
   echo "Error: the private deployment lock was not created." >&2
   exit 1
@@ -327,21 +356,26 @@ if [[ -f "$DEPLOYMENT_PATH/lab-credentials.json" ]]; then
         teacherPassword = credentials.teacher;
         studentPassword = credentials.student;
       }; })
-    ' > "$EVALUATION_SOURCE/lab-settings.json"
+    ' > "$EVALUATION_SOURCE/lab-settings.json" 2>> "$INSTALL_LOG" ||
+    fail_with_log "The lab configuration could not be checked."
   FLAKE_REF="path:$EVALUATION_SOURCE"
 fi
+ui_success "Lab configuration fixed."
 
 CURRENT_STEP="downloading and installing the controller system"
 ui_log "[3/3] Downloading and installing the controller system. This is the longest step."
 ui_note "${UI_MUTED}Files go to the new disk, not into the memory of the USB system.${UI_RESET}"
-sudo env \
+ui_note "${UI_MUTED}Technical details are saved in ${INSTALL_LOG}.${UI_RESET}"
+if ! sudo env \
   NIX_CONFIG="$NIX_CONFIG" \
   XDG_CACHE_HOME="$BOOTSTRAP_CACHE" \
   nixos-install \
   --root "$TARGET_ROOT" \
   --flake "${FLAKE_REF}#pc${MASTER_HOST_NUMBER}" \
   --no-write-lock-file \
-  --no-root-passwd
+  --no-root-passwd 2>&1 | tee -a "$INSTALL_LOG" | install_progress; then
+  fail_with_log "The controller system could not be installed."
+fi
 
 DISK_CHANGE_STARTED=0
 ui_success "Controller system installed."
