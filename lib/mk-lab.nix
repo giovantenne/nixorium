@@ -674,7 +674,11 @@ let
       "$out/bin/disko-destroy-format-mount"
     cp -a ${remoteInstallerMetadata}/. "$out/share/nixorium/"
   '';
-  nixoriumPackage = bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {};
+  # Laboratories build Nixorium from source on the controller. The Go tests
+  # run in CI (tests/source-checks.nix builds the package with them); on a
+  # busy controller they only add minutes, and a timing-sensitive test there
+  # once failed an installation.
+  nixoriumPackage = (bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {}).overrideAttrs { doCheck = false; };
   hostState = bootstrapPkgs.writeShellApplication {
     name = "nixorium-host-state";
     runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.gnused ];
