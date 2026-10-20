@@ -112,7 +112,7 @@ func TestSoftwarePlanUsesCatalogAndSeparatesConfigurationFromDistribution(t *tes
 	if report.HasErrors() || report.State != "ready" || source.validations != 1 || len(report.AffectedClients) != 2 || report.ReviewToken == "" || report.Confirmation != "" {
 		t.Fatalf("software plan = %+v validations=%d", report, source.validations)
 	}
-	if !strings.Contains(report.Message, "no system has been built or changed") {
+	if !strings.Contains(report.Message, "no computer changes until you update it") {
 		t.Fatalf("plan confused declaration with effects: %s", report.Message)
 	}
 }

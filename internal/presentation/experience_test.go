@@ -180,7 +180,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 						},
 					},
 				},
-				expected: []string{"Software  /  Review", "Available in this laboratory’s software versions", "Enter", "Save", "Esc", "Computers", "Help"},
+				expected: []string{"Software  /  Review", "Available in this laboratory’s software versions", "Enter", "Save", "Esc", "Choose computers", "Help"},
 			},
 			{
 				name: "partial result",

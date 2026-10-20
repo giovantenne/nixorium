@@ -298,10 +298,10 @@ func TestSoftwareTextSeparatesDeclarationFromBuildAndDeployment(t *testing.T) {
 		State: "ready", ManagedFile: "lab-software.json",
 		Request:         domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "media"}},
 		AffectedClients: []string{"pc01", "pc02"}, ReviewToken: "sha256:review",
-		Message: "no system has been built or changed",
+		Message: "no computer changes until you update it",
 	}
 	SoftwareChangePlanText(&output, plan)
-	for _, expected := range []string{"Software proposal: READY", "vlc", "media", "pc01, pc02", "sha256:review", "no system has been built or changed"} {
+	for _, expected := range []string{"Software proposal: READY", "vlc", "media", "pc01, pc02", "sha256:review", "no computer changes until you update it"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("software plan omits %q:\n%s", expected, output.String())
 		}

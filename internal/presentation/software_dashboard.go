@@ -727,7 +727,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		back := "Details"
 		primary := "Remove"
 		if model.plan.Request.Present {
-			back = "Computers"
+			back = "Choose computers"
 			primary = "Save"
 		}
 		return []tuiAction{{key: "Enter", label: primary}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}
