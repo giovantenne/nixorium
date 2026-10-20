@@ -479,7 +479,9 @@ nmcli connection up nixorium-lab    # bring the laboratory profile up
 systemctl list-jobs                 # is an activation or start-up job still running?
 ```
 
-Add `ifname DEVICE` to `nmcli connection up nixorium-lab` to choose the card
+The controller uses the same profile since 3.10: the same commands apply on
+its console when it lost its laboratory address. Add `ifname DEVICE` to
+`nmcli connection up nixorium-lab` to choose the card
 that has the cable. Without an interface name, the laboratory profile is active
 on the first wired card that comes up; for a computer with several wired cards,
 name the right one with a `hostIfaceNames` entry in the private deployment

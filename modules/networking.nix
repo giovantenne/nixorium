@@ -13,8 +13,13 @@ let
   # Callers that do not provide the flag keep the name-based behaviour.
   ifaceExplicit = labSettings.ifaceExplicit or true;
   byType = laboratoryEnabled && !isController && !ifaceExplicit;
-  # Clients configured through the NetworkManager profile.
-  profile = byType || shared;
+  # Every laboratory host, the controller included, is configured only
+  # through the NetworkManager profile below: NixOS scripted addresses and
+  # dhcpcd on the same card as NetworkManager raced at boot and could drop
+  # the static address (owner decision 2026-10-20).
+  profile = laboratoryEnabled;
+  # The controller and named clients bind the profile to their card.
+  byName = profile && !byType;
   prefixLength = labSettings.networkPrefixLength;
   # Clients answer Wake-on-LAN magic packets on their lab card, so Switch on
   # can start them; their firmware must allow it too.
@@ -32,10 +37,6 @@ let
     else if shared then "$NIXORIUM_PREVIOUS_ADDRESS"
     else transition.hostIps.${hostName} or null;
   labAddress = if shared then "$NIXORIUM_LAB_ADDRESS" else hostIp;
-  previousAddress = lib.optional (laboratoryEnabled && previousHostIp != null) {
-    address = previousHostIp;
-    prefixLength = transition.prefixLength;
-  };
 in
 {
   # A shared system has no single name. Services that write the configured
@@ -47,19 +48,6 @@ in
   environment.etc.hostname.enable = lib.mkIf shared (lib.mkForce false);
   services.avahi.hostName = lib.mkIf shared (lib.mkDefault "");
   system.name = lib.mkIf shared "nixorium-client-${nixoriumClass.id}";
-  # Controller-only bootstrap uses NetworkManager, without a speculative lab IP.
-  networking.interfaces = lib.mkIf (laboratoryEnabled && !profile) {
-    ${labSettings.ifaceName} = {
-      useDHCP = lib.mkDefault true;
-      ipv4.addresses = [
-        {
-          address = hostIp;
-          prefixLength = prefixLength;
-        }
-      ] ++ previousAddress;
-    };
-  };
-
   # Name-independent client network. NetworkManager already runs on every
   # host, so one declarative profile for any wired Ethernet device (wireless,
   # bridges, veth and other virtual devices are different NetworkManager
@@ -71,7 +59,9 @@ in
   # DHCP-only profiles for the other NICs are disabled so that nothing else
   # competes. Such PCs should use hostIfaceNames.
   networking.networkmanager.settings.main = lib.mkIf profile ({
-    "no-auto-default" = "*";
+    # Clients: nothing else competes for a wired card. The controller keeps
+    # NetworkManager's automatic DHCP on its other cards (an Internet uplink).
+    "no-auto-default" = if isController then "interface-name:${labSettings.ifaceName}" else "*";
   } // lib.optionalAttrs shared {
     # DHCP must never rename a computer of a shared system.
     hostname-mode = "none";
@@ -87,7 +77,10 @@ in
       # same number): NetworkManager then retries a few times and waits five
       # minutes, instead of retrying several times a second.
       autoconnect-retries = if shared then "3" else "0";
-    } // lib.optionalAttrs (shared && ifaceExplicit) {
+      # Preferred over any connection NetworkManager saved for the card
+      # earlier (for example by a release that still raced).
+      autoconnect-priority = "100";
+    } // lib.optionalAttrs byName {
       interface-name = labSettings.ifaceName;
     };
     # Magic-packet wake (0x40 in NetworkManager's flags), set on the card
@@ -119,14 +112,15 @@ in
         sleep 0.5
       done
     '';
-    # Upgrading a running client (Colmena switch) replaces the scripted lab
-    # address with this profile: the old address is removed and the restarted
+    # Upgrading a running computer from the scripted lab address (clients
+    # before 3.9, controllers and named clients before 3.10) replaces it with
+    # this profile: the old address is removed and the restarted
     # NetworkManager adopts the card as "connected (externally)", which blocks
     # autoconnect. Activate the profile explicitly, without waiting, unless it
     # is already active or activating (normal boot).
     postStart = ''
       if ! nmcli -t -f NAME connection show --active | grep -Fxq nixorium-lab; then
-        device=${if shared && ifaceExplicit then lib.escapeShellArg labSettings.ifaceName else ''$(nmcli -t -f DEVICE,TYPE,STATE device \
+        device=${if byName then lib.escapeShellArg labSettings.ifaceName else ''$(nmcli -t -f DEVICE,TYPE,STATE device \
           | awk -F: '$2 == "ethernet" && $3 != "unmanaged" { print $1; exit }')''}
         if [ -n "$device" ]; then
           nmcli -w 0 connection up nixorium-lab ifname "$device" || true
@@ -154,11 +148,4 @@ in
     ACTION=="add", SUBSYSTEM=="net", NAME=="", KERNEL=="${labSettings.ifaceName}", RUN+="${ethtool} -s $name wol g"
   '';
 
-  # The interface already exists when a controller-only installation switches
-  # live to laboratory mode, so no new udev event starts this generated unit.
-  # Linking it to the active network target also applies the static address
-  # during switch-to-configuration; PXE later removes it transactionally.
-  systemd.services."network-addresses-${labSettings.ifaceName}" = lib.mkIf (laboratoryEnabled && isController) {
-    wantedBy = [ "network.target" ];
-  };
 }

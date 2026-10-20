@@ -165,13 +165,23 @@ override, role override, then fallback. `labMeta.network.ifaceName` remains the
 effective controller interface for older management consumers; controller and
 client records also expose their effective interface explicitly.
 
-A host is configured by name only when it is the controller or has a
-`hostIfaceNames` entry or a `clientIfaceName`. `labMeta.clients.hosts[].ifaceExplicit`
-and `labSettings.ifaceExplicit` (passed to every module; absent means `true`)
-state this. Other clients ignore the fallback name: `modules/networking.nix`
-declares a NetworkManager profile `nixorium-lab` for any wired Ethernet device
-(DHCP plus the static lab address, no interface name), disables NetworkManager's
-automatic default profiles on those clients, and `modules/client-internet.nix`
+Every laboratory host, the controller included, gets its address from one
+NetworkManager profile, `nixorium-lab` (`modules/networking.nix`): DHCP plus
+the static laboratory address (and the previous one during a change of
+laboratory network), with no NixOS scripted address and no dhcpcd on the same
+card. Earlier releases gave the controller and named clients a scripted
+address next to NetworkManager and dhcpcd; at boot NetworkManager could
+remove the static address while DHCP kept working. The controller's profile
+is bound to its card, and NetworkManager keeps automatic DHCP on its other
+cards (`no-auto-default=interface-name:<card>`); on clients automatic profiles
+are disabled.
+
+A host's profile is bound to its card by name only when it is the controller
+or has a `hostIfaceNames` entry or a `clientIfaceName`.
+`labMeta.clients.hosts[].ifaceExplicit` and `labSettings.ifaceExplicit` (passed
+to every module; absent means `true`) state this. Other clients ignore the
+fallback name: their profile has no interface name and matches any wired
+Ethernet device, and `modules/client-internet.nix`
 and `modules/firewall.nix` omit `iifname`/`oifname` from their rules
 (`lib/client-internet-rules.nix` and `lib/client-firewall-rules.nix` take
 `interface = null`). With several wired cards, only the first to come up carries
@@ -181,9 +191,9 @@ carries the live address. See ADR 0017.
 
 Clients answer Wake-on-LAN magic packets on their lab card, so **Switch on**
 can start them (see [Classroom view](#classroom-view)); the controller does
-not. A client configured by type sets `ethernet.wake-on-lan=64` (magic packet)
-in the `nixorium-lab` profile, which NetworkManager applies to the card each
-time it activates the profile. A client configured by name gets a udev rule
+not. Every client sets `ethernet.wake-on-lan=64` (magic packet) in the
+`nixorium-lab` profile, which NetworkManager applies to the card each time it
+activates the profile. A client configured by name also gets a udev rule
 that runs `ethtool -s <interface> wol g` when that card appears, matching the
 final interface name, or the kernel name when nothing renames it. The NixOS
 `networking.interfaces.<name>.wakeOnLan` option is not used: its systemd

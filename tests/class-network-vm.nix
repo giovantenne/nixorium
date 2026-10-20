@@ -56,8 +56,8 @@ in
         labSettings = labSettings // { ifaceExplicit = false; };
       };
     };
-    # pc02 on its per-host system with a named card (scripted networking),
-    # switched live to the shared system that binds the profile to the card.
+    # pc02 on its per-host system with a named card (its own profile bound to
+    # the card), switched live to the shared system that binds it the same way.
     b = { lib, ... }: {
       imports = [ common ];
       _module.args = {
@@ -112,11 +112,12 @@ in
       controller.wait_until_succeeds(ssh + "root@10.0.0.1 true", timeout=60)
       assert controller.succeed(ssh + "root@10.0.0.1 hostname").strip() == "pc01"
 
-    with subtest("A per-host system writes its record and keeps its scripted card"):
+    with subtest("A per-host system writes its record and binds its profile to the card"):
       b.wait_for_unit("multi-user.target")
       b.wait_until_succeeds("ip -4 -o address show dev eth1 | grep -F ' 10.0.0.2/24 '", timeout=60)
       b.succeed("grep -Fx '{\"schemaVersion\":1,\"number\":2}' ${record}")
-      b.succeed("systemctl cat network-addresses-eth1.service")
+      b.wait_until_succeeds("nmcli -t -f NAME,DEVICE connection show --active | grep -Fx 'nixorium-lab:eth1'", timeout=60)
+      b.fail("systemctl cat network-addresses-eth1.service")
       controller.wait_until_succeeds(ssh + "root@10.0.0.2 true", timeout=60)
 
     with subtest("A live switch to the shared system keeps the computer reachable"):

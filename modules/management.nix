@@ -116,6 +116,7 @@ let
       pkgs.git
       pkgs.iproute2
       pkgs.jq
+      pkgs.networkmanager
       pkgs.nix
       pkgs.systemd
       pkgs.util-linux
@@ -330,25 +331,32 @@ let
       [[ "$(readlink -f /nix/var/nix/profiles/system)" == "$SYSTEM_PATH" ]] \
         || fail "persistent system profile differs after controller activation"
 
-      # A controller-only installation already has a live interface when the
-      # first laboratory configuration is activated. The generated NixOS
-      # address unit is persistent across reboot, but it is not guaranteed to
-      # receive a fresh device event during a live switch. Reconcile the one
-      # reviewed static address before PXE preparation is allowed to continue.
-      if [[ "$DEPLOYMENT_MODE" == laboratory ]]; then
+      # NetworkManager's profile nixorium-lab carries the controller's
+      # laboratory address; activating it is asynchronous, and a controller
+      # switching live from an earlier release (or from controller-only mode)
+      # may still hold another connection on the card. Wait for the reviewed
+      # address, activate the profile if it does not come, and verify it
+      # before PXE preparation is allowed to continue. During network
+      # installation the PXE session owns the address and it stays away.
+      static_address_present() {
+        ip -4 -o address show dev "$CONTROLLER_IFACE" scope global \
+          | awk -v cidr="$CONTROLLER_STATIC_CIDR" \
+            '$3 == "inet" && $4 == cidr { found = 1 } END { exit !found }'
+      }
+      if [[ "$DEPLOYMENT_MODE" == laboratory && ! -e /var/lib/nixorium/pxe/session.json ]]; then
         CONTROLLER_STATIC_CIDR="$CONTROLLER_STATIC_IP/$CONTROLLER_PREFIX_LENGTH"
         ip link show dev "$CONTROLLER_IFACE" >/dev/null \
           || fail "configured controller interface is not present after activation"
-        if ! ip -4 -o address show dev "$CONTROLLER_IFACE" scope global \
-            | awk -v cidr="$CONTROLLER_STATIC_CIDR" \
-              '$3 == "inet" && $4 == cidr { found = 1 } END { exit !found }'; then
-          ip address replace "$CONTROLLER_STATIC_CIDR" dev "$CONTROLLER_IFACE" \
-            || fail "could not apply the controller static address after activation"
+        for _ in $(seq 30); do
+          static_address_present && break
+          sleep 1
+        done
+        if ! static_address_present; then
+          nmcli --wait 60 connection up nixorium-lab ifname "$CONTROLLER_IFACE" >/dev/null \
+            || fail "could not activate the laboratory network profile; run: nmcli connection up nixorium-lab ifname $CONTROLLER_IFACE"
         fi
-        ip -4 -o address show dev "$CONTROLLER_IFACE" scope global \
-          | awk -v cidr="$CONTROLLER_STATIC_CIDR" \
-            '$3 == "inet" && $4 == cidr { found = 1 } END { exit !found }' \
-          || fail "controller static address is absent after activation"
+        static_address_present \
+          || fail "controller static address is absent after activation; run: nmcli connection up nixorium-lab ifname $CONTROLLER_IFACE"
       fi
 
       publish_progress running verify "Activated controller system and verified networking" 3

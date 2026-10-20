@@ -15,6 +15,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The controller, and a client that has its network card named and is the
+  only computer of its kind, now get their laboratory address from the same
+  single network profile as the other computers. Before, two programs managed
+  the same card and at start-up one could remove the laboratory address while
+  the school network kept working: the computer was then unreachable from the
+  controller until it was restarted. **After this update the controller may
+  receive a different address from the school network**: if the installation
+  files say so, prepare them again (Installation → Network boot).
 - Laboratory settings during installation: choosing the controller's current
   address on another network card now moves the laboratory network to that
   card, and the summary names the controller's card. Before, a controller with

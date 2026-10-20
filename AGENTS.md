@@ -70,7 +70,7 @@ modules/
   nix-ld.nix               # nix-ld loader and common libraries for downloaded Linux binaries
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
-  networking.nix           # Hostname + static IP with shared iface name
+  networking.nix           # Hostname + NetworkManager profile nixorium-lab (DHCP + static IP)
   identity.nix             # Client identity record (/var/lib/nixorium/identity.json)
   management.nix           # Controller-only management command installation
   pxe.nix                  # Transactional PXE address state and boot recovery
@@ -310,12 +310,17 @@ that release's notes, so a release is not finished until the site follows it.
   is a full IPv4 network address and `networkPrefixLength` its CIDR prefix;
   host numbers are validated offsets. Each PC gets DHCP plus its static address
   on its resolved interface.
-  The controller always uses its resolved name. A client uses it only when
+  Every laboratory host, the controller included, gets DHCP plus its static
+  address from one NetworkManager profile, `nixorium-lab`; never add
+  `networking.interfaces` addresses or dhcpcd for a laboratory card (they raced
+  NetworkManager at boot and dropped the static address). The controller always
+  binds the profile to its resolved name. A client binds it only when
   `clientIfaceName` or a `hostIfaceNames` entry is set (`ifaceExplicit`);
-  otherwise it gets DHCP plus the static address on the wired Ethernet card by
-  type (a NetworkManager profile), its Internet-block and SSH nftables rules
-  omit interface names, and installers skip the name check. Keep these paths
-  consistent (ADR 0017).
+  otherwise its profile matches the wired Ethernet card by type, its
+  Internet-block and SSH nftables rules omit interface names, and installers
+  skip the name check. PXE changes the controller's laboratory address only in
+  the connection applied to the card (`nmcli device modify`). Keep these paths
+  consistent (ADR 0017 amendment).
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by the deployment engine and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
 - Clients substitute only from the controller's Harmonia cache: `modules/cache.nix`
   replaces the NixOS `cache.nixos.org` default on clients (override priority 90),
