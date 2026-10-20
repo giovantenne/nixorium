@@ -114,6 +114,7 @@
           };
         } pkgs;
       });
+      bootFallbackVmTest = pkgs.testers.runNixOSTest ./tests/boot-fallback-vm.nix;
       clientNetworkUpgradeVmTest = pkgs.testers.runNixOSTest (import ./tests/client-network-upgrade-vm.nix {
         networkingModule = ./modules/networking.nix;
       });
@@ -289,6 +290,7 @@
         '';
         client-installer-vm = clientInstallerVmTest;
         remote-client-installer-vm = remoteClientInstallerVmTest;
+        boot-fallback-vm = bootFallbackVmTest;
         client-network-upgrade-vm = clientNetworkUpgradeVmTest;
         class-network-vm = classNetworkVmTest;
         network-transition-vm = networkTransitionVmTest;

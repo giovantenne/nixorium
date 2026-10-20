@@ -8,6 +8,7 @@
     ./time.nix
     ./power.nix
     ./ssh.nix
+    ./boot-fallback.nix
   ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];

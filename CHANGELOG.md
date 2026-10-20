@@ -15,6 +15,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A computer still starts from its disk when its firmware forgets the boot
+  entry (after a CMOS reset, a firmware update, or on firmware that drops
+  entries it did not create): GRUB is also copied to the standard fallback
+  path on Nixorium's own EFI partition each time the boot loader is
+  installed.
 - The controller, and a client that has its network card named and is the
   only computer of its kind, now get their laboratory address from the same
   single network profile as the other computers. Before, two programs managed
