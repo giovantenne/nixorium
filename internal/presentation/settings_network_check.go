@@ -42,7 +42,7 @@ func withDetectedDHCPChoices(fields []settingsField, addresses domain.Controller
 		field.choices = []settingsChoice{}
 		field.detected = []string{}
 		for _, choice := range addresses.Choices {
-			field.choices = append(field.choices, settingsChoice{value: choice.Address, label: choice.Address, description: "Current address on " + choice.Device})
+			field.choices = append(field.choices, settingsChoice{value: choice.Address, label: choice.Address, description: "Current address on " + choice.Device, device: choice.Device})
 			field.detected = append(field.detected, choice.Address)
 		}
 		field.other = "Other…"

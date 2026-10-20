@@ -261,3 +261,36 @@ func TestSettingsLoadReadsControllerAddresses(t *testing.T) {
 		t.Fatalf("addresses not loaded: read=%d", read)
 	}
 }
+
+func TestInstallationFormMovesTheControllerToTheChosenDHCPDevice(t *testing.T) {
+	current := wizardSettings()
+	current.Lab.ControllerInterfaceName = "enp0s8"
+	current.Lab.MasterDHCPIP = "198.51.100.7"
+	addresses := domain.ControllerAddresses{Detected: true, Choices: []domain.DHCPAddressChoice{
+		{Address: "198.51.100.7", Device: "enp0s8"}, {Address: "192.0.2.10", Device: "enp0s3"},
+	}}
+	model := dashboardModel{width: 120, height: 40, settings: settingsModel{current: current, addresses: addresses}}
+	editor := model.newSettingsEditor(current, installationSettingsFields, "Installation / Laboratory settings")
+	for editor.fields[editor.index].id != "lab.masterDhcpIp" {
+		editor = editor.moveToField(editor.index + 1)
+	}
+	picked := editorKey(editorKey(editor, tea.KeyPressMsg{Code: tea.KeyDown}), tea.KeyPressMsg{Code: tea.KeyEnter})
+	if picked.settings.Lab.MasterDHCPIP != "192.0.2.10" || picked.settings.Lab.ControllerInterface() != "enp0s3" {
+		t.Fatalf("dhcp=%q controller=%q", picked.settings.Lab.MasterDHCPIP, picked.settings.Lab.ControllerInterface())
+	}
+	if view := ansi.Strip(renderTUIShell(picked.shell(), 160, false)); !strings.Contains(view, "The controller will use enp0s3 for the laboratory network: it carries 192.0.2.10.") {
+		t.Fatalf("change not reported:\n%s", view)
+	}
+	// Picking the address on the controller's own device changes nothing.
+	same := editorKey(editor, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if same.settings.Lab.ControllerInterface() != "enp0s8" || same.note != "" {
+		t.Fatalf("controller=%q note=%q", same.settings.Lab.ControllerInterface(), same.note)
+	}
+	// The network settings group asks for the device, so it is never moved.
+	group := dhcpFieldEditor(t, "198.51.100.7", addresses)
+	group.settings.Lab.ControllerInterfaceName = "enp0s8"
+	kept := editorKey(editorKey(group, tea.KeyPressMsg{Code: tea.KeyDown}), tea.KeyPressMsg{Code: tea.KeyEnter})
+	if kept.settings.Lab.ControllerInterface() != "enp0s8" {
+		t.Fatalf("network group moved the controller to %q", kept.settings.Lab.ControllerInterface())
+	}
+}

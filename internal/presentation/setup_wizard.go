@@ -29,6 +29,8 @@ type settingsChoice struct {
 	value       string
 	label       string
 	description string
+	// device is the network device carrying a detected controller address.
+	device string
 }
 
 type settingsChoiceItem settingsChoice
@@ -104,7 +106,9 @@ type settingsWizardModel struct {
 	replace   bool
 	custom    bool
 	// warning is a non-blocking notice about the previous answer.
-	warning  string
+	warning string
+	// note reports a setting the previous answer changed too.
+	note     string
 	selector list.Model
 	width    int
 	height   int
@@ -207,7 +211,7 @@ func (model settingsWizardModel) choiceHeight() int {
 func (model settingsWizardModel) moveToField(index int) settingsWizardModel {
 	model.index = index
 	model.err = ""
-	model.warning = ""
+	model.warning, model.note = "", ""
 	model.prepareCurrentField()
 	return model
 }
@@ -365,6 +369,7 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 		model.err = err.Error()
 		return model, nil
 	}
+	candidate, note := model.followDHCPDevice(candidate, field)
 	model.settings = candidate
 	model.err = ""
 	warning := undetectedValueWarning(field, model.drafts[model.index])
@@ -377,8 +382,29 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 		return model, tea.Quit
 	}
 	model = model.moveToField(model.index + 1)
-	model.warning = warning
+	model.warning, model.note = warning, note
 	return model, nil
+}
+
+// followDHCPDevice moves the controller to the device carrying the chosen
+// detected DHCP address when the form does not ask for the controller's
+// device: the laboratory network and the DHCP address share one cable.
+func (model settingsWizardModel) followDHCPDevice(settings domain.LabSettingsFile, field settingsField) (domain.LabSettingsFile, string) {
+	if field.id != "lab.masterDhcpIp" {
+		return settings, ""
+	}
+	for _, other := range model.fields {
+		if other.id == "lab.controllerIfaceName" || other.id == "lab.ifaceName" {
+			return settings, ""
+		}
+	}
+	for _, choice := range field.choices {
+		if choice.value == settings.Lab.MasterDHCPIP && choice.device != "" && choice.device != settings.Lab.ControllerInterface() {
+			settings.Lab.ControllerInterfaceName = choice.device
+			return settings, fmt.Sprintf("The controller will use %s for the laboratory network: it carries %s.", choice.device, choice.value)
+		}
+	}
+	return settings, ""
 }
 
 // undetectedValueWarning warns when a typed controller DHCP address is not one
@@ -477,6 +503,9 @@ func (model settingsWizardModel) shell() tuiShell {
 		lines = append(lines, preview...)
 	}
 	notices := []tuiNotice{}
+	if model.note != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusSuccess, title: model.note})
+	}
 	if model.warning != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.warning})
 	}
