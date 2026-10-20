@@ -377,7 +377,7 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 	} else if status.PXEPreparation.Present {
 		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Managed PXE preparation is stale or invalid", Evidence: status.PXEPreparation.Detail, Remediation: "Review the reported mismatch and run `nixorium pxe prepare` again."})
 	} else {
-		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Managed PXE preparation has not run", Remediation: "Run `nixorium pxe prepare` before starting installation mode."})
+		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Managed PXE preparation has not run", Remediation: "Prepare the installation files in Installation → Network boot (PXE) (`nixorium pxe prepare`) before starting network installation."})
 	}
 	for _, artifact := range status.Artifacts {
 		level := domain.LevelOK
@@ -408,7 +408,7 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 	case "ready", "stopped":
 		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelOK, Summary: "PXE installation mode is " + status.PXE.Mode, Evidence: status.PXE.Detail})
 	case "degraded", "recovery-required":
-		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelError, Summary: "PXE lifecycle requires recovery", Evidence: status.PXE.Detail, Remediation: "Run `nixorium pxe recover` before starting installation mode again."})
+		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelError, Summary: "PXE lifecycle requires recovery", Evidence: status.PXE.Detail, Remediation: "Recover the controller network in Installation → Network boot (PXE) (`nixorium pxe recover`) before starting network installation again."})
 	default:
 		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelWarning, Summary: "PXE lifecycle is unavailable", Evidence: status.PXE.Detail})
 	}
@@ -459,7 +459,7 @@ func (i *Inspector) addNetworkFindings(status domain.StatusReport, add func(doma
 		} else if status.PXEPreparation.Ready && status.PXEPreparation.DHCPAddress != "" && containsAddress(addresses, status.PXEPreparation.DHCPAddress) {
 			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelOK, Summary: "Prepared runtime controller address is assigned", Evidence: fmt.Sprintf("prepared: %s; configured hint: %s", status.PXEPreparation.DHCPAddress, status.Meta.Controller.DHCPIP)})
 		} else {
-			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelWarning, Summary: "Configured controller DHCP address is not currently assigned", Evidence: "configured hint: " + status.Meta.Controller.DHCPIP, Remediation: "Run `nixorium pxe prepare`; it will capture the live address when exactly one non-static candidate exists."})
+			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelWarning, Summary: "Configured controller DHCP address is not currently assigned", Evidence: "configured hint: " + status.Meta.Controller.DHCPIP, Remediation: "Usually harmless: the school network gave the controller a new address. Preparing the installation files again (Installation → Network boot (PXE), or `nixorium pxe prepare`) uses the current one when there is exactly one candidate."})
 		}
 	}
 
