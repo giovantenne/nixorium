@@ -39,6 +39,9 @@ type BackupReport struct {
 	PrivateKeys   []string          `json:"privateKeys"`
 	Message       string            `json:"message,omitempty"`
 	Issues        []ValidationIssue `json:"issues"`
+	// Previous is where the lab in use before a restored lab took its place
+	// was kept.
+	Previous string `json:"previous,omitempty"`
 }
 
 func (r BackupReport) HasErrors() bool {

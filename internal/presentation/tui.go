@@ -172,7 +172,17 @@ type DashboardActions struct {
 	SyncGitBackup           func(context.Context, string) domain.BackupReport
 	BackupFileFolder        func() string
 	RestoreLabArchive       func(string, string, []byte) domain.BackupReport
-	ApplyResetRecovery      func(domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult
+	// RestoreFolder proposes where Restore lab puts the restored lab;
+	// FindBackupFiles lists backup files on connected drives, newest first.
+	RestoreFolder   func() string
+	FindBackupFiles func() []string
+	// UseRestoredLab makes a restored lab the one this controller manages;
+	// the second argument is the backup file it came from, if any.
+	UseRestoredLab func(domain.BackupReport, string) domain.BackupReport
+	// LabComputerCount reads the number of client computers in the saved
+	// settings without evaluating the configuration.
+	LabComputerCount   func() (int, bool)
+	ApplyResetRecovery func(domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult
 }
 
 type dashboardScreen int

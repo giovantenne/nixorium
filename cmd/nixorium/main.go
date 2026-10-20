@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -782,6 +783,39 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		RestoreLabArchive: func(source, target string, passphrase []byte) domain.BackupReport {
 			return local.RestoreLab(ctx, source, passphrase, target)
+		},
+		RestoreFolder: func() string { return adapters.RestoreFolder(repository) },
+		FindBackupFiles: func() []string {
+			home, _ := os.UserHomeDir()
+			name := ""
+			if current, err := user.Current(); err == nil {
+				name = current.Username
+			}
+			return adapters.FindBackupFiles(home, name)
+		},
+		UseRestoredLab: func(restored domain.BackupReport, backupFile string) domain.BackupReport {
+			adminKey := ""
+			if home, err := os.UserHomeDir(); err == nil {
+				adminKey = filepath.Join(home, ".ssh", "id_ed25519")
+			}
+			return app.RestoredLab{
+				Source:     local,
+				VerifyKeys: setupManager.VerifyKeys,
+				InstallSecrets: func(installCtx context.Context) domain.ActionReport {
+					return app.NewSystemActions(local).InstallSecrets(installCtx)
+				},
+			}.Use(ctx, repository, adminKey, backupFile, restored)
+		},
+		LabComputerCount: func() (int, bool) {
+			raw, err := local.ReadSettings(repository)
+			if err != nil {
+				return 0, false
+			}
+			settings, issues := domain.DecodeLabSettings(raw)
+			if len(issues) > 0 {
+				return 0, false
+			}
+			return settings.Lab.PCCount, true
 		},
 		OpenClassroomView: classroomViewAction(),
 		ApplyResetRecovery: func(plan domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult {

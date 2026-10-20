@@ -12,6 +12,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   controller and all clients, in every software profile. **Update Nixorium**
   adds it to existing laboratories; a laboratory that already declares jq,
   for some computers only, keeps its choice.
+- Replacing a controller no longer needs the terminal. After **Restore lab**,
+  **Use this lab on this controller** keeps the lab created by the installer
+  aside, puts the restored lab in its place and installs its keys; **Review
+  controller** then applies it. A newly installed controller shows **Replacing
+  a controller? Restore its lab** on the Overview, Restore lab proposes the
+  newest backup file found on a connected drive and a folder to restore into,
+  and the restored backup counts as the lab's last backup.
 
 ### Fixed
 

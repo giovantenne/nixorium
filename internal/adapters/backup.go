@@ -498,7 +498,7 @@ func (Local) RestoreLab(ctx context.Context, name string, passphrase []byte, tar
 	}
 	report.State, report.CreatedAt, report.Files = "completed", unpacked.CreatedAt, unpacked.Files
 	report.PrivateKeys = append([]string{}, privateDeploymentPaths...)
-	report.Message = "Lab restored with its original keys and trusted computers. Open nixorium --repo " + target + "; follow the controller replacement guide before applying. No system was activated."
+	report.Message = "Lab restored into " + target + " with its original keys and trusted computers. No system was activated."
 	return report
 }
 

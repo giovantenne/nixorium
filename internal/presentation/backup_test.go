@@ -304,7 +304,7 @@ func TestRestoreLabFromBackupFileReview(t *testing.T) {
 	}
 	next, _ = m.Update(tea.KeyPressMsg{Text: "f", Code: 'f'})
 	m = next.(dashboardModel)
-	for _, field := range []string{"/media/usb/nixorium-backup.age", "/home/admin/lab", "long passphrase"} {
+	for _, field := range []string{"/media/usb/nixorium-backup.age", "long passphrase", "/home/admin/lab"} {
 		next, _ = m.Update(tea.KeyPressMsg{Text: field})
 		m = next.(dashboardModel)
 		next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -351,5 +351,114 @@ func TestBackupFileProposesTheHomeFolder(t *testing.T) {
 	m = next.(dashboardModel)
 	if m.backup.destination != "/home/admin" || !strings.Contains(m.View().Content, "/home/admin") {
 		t.Fatalf("home folder not proposed: %q", m.backup.destination)
+	}
+}
+
+func TestRestoreLabProposesTheNewestBackupAndAFolder(t *testing.T) {
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		RestoreLabArchive: func(string, string, []byte) domain.BackupReport { return domain.BackupReport{} },
+		FindBackupFiles: func() []string {
+			return []string{"/run/media/admin/USB/nixorium-backup-20261020-153344.age", "/home/admin/nixorium-backup-20261001-090000.age"}
+		},
+		RestoreFolder: func() string { return "/home/admin/nixorium-restored" },
+	}, false)
+	next, _ := m.openRestoreLab()
+	m = next.(dashboardModel)
+	next, _ = m.Update(tea.KeyPressMsg{Text: "f", Code: 'f'})
+	m = next.(dashboardModel)
+	b := m.backup
+	if b.source != "/run/media/admin/USB/nixorium-backup-20261020-153344.age" || b.destination != "/home/admin/nixorium-restored" || b.field != 1 {
+		t.Fatalf("restore form not prefilled: %+v", b)
+	}
+	view := m.View().Content
+	for _, text := range []string{"Found 2 backup files; the newest is proposed.", "Restore into", "/home/admin/nixorium-restored"} {
+		if !strings.Contains(view, text) {
+			t.Fatalf("restore form misses %q:\n%s", text, view)
+		}
+	}
+	if strings.Contains(view, "New folder") {
+		t.Fatal("restore form still says New folder")
+	}
+}
+
+func TestRestoredLabIsOfferedForThisController(t *testing.T) {
+	var used domain.BackupReport
+	var usedFile string
+	planned := false
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		RestoreLabArchive: func(string, string, []byte) domain.BackupReport { return domain.BackupReport{} },
+		UseRestoredLab: func(restored domain.BackupReport, file string) domain.BackupReport {
+			used, usedFile = restored, file
+			return domain.BackupReport{State: "completed", Message: "This controller now manages the restored lab and has its keys.", Previous: "/home/admin/nixorium-deployment-before-restore-20261020-195600"}
+		},
+		PlanController: func(context.Context) domain.ControllerRebuildPlanReport {
+			planned = true
+			return domain.ControllerRebuildPlanReport{}
+		},
+	}, false)
+	m.screen = dashboardBackup
+	m.backup = backupModel{restore: true, archive: true, done: true, source: "/run/media/admin/USB/nixorium-backup.age", result: domain.BackupReport{State: "completed", Path: "/home/admin/nixorium-restored", Message: "Lab restored into /home/admin/nixorium-restored with its original keys and trusted computers. No system was activated."}}
+	view := m.View().Content
+	if !strings.Contains(view, "Use this lab on this controller") || !strings.Contains(view, "nothing is deleted") {
+		t.Fatalf("restored lab not offered:\n%s", view)
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	if cmd == nil {
+		t.Fatal("using the restored lab did not start")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	if used.Path != "/home/admin/nixorium-restored" || usedFile != "/run/media/admin/USB/nixorium-backup.age" || !m.backup.adopted {
+		t.Fatalf("restored lab not used: %+v %q", used, usedFile)
+	}
+	view = m.View().Content
+	for _, text := range []string{"nixorium-deployment-before-restore-20261020-195600", "Next: apply the restored lab to this controller", "Review controller", "SSH key changed"} {
+		if !strings.Contains(view, text) {
+			t.Fatalf("adopt result misses %q:\n%s", text, view)
+		}
+	}
+	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	if m.screen != dashboardController || cmd == nil {
+		t.Fatal("next step does not open the controller review")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	if !planned {
+		t.Fatal("controller review not planned")
+	}
+}
+
+func TestStandaloneRestoreDoesNotOfferThisController(t *testing.T) {
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		UseRestoredLab: func(domain.BackupReport, string) domain.BackupReport { t.Fatal("used"); return domain.BackupReport{} },
+	}, false)
+	m.screen = dashboardBackup
+	m.backup = backupModel{restore: true, archive: true, done: true, standalone: true, result: domain.BackupReport{State: "completed", Path: "/home/admin/restored", Message: "Lab restored"}}
+	if view := m.View().Content; strings.Contains(view, "Use this lab on this controller") || !strings.Contains(view, "Replacing the controller") {
+		t.Fatalf("standalone restore result:\n%s", view)
+	}
+}
+
+func TestFreshLabOverviewOffersRestore(t *testing.T) {
+	count := 0
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		RestoreLabArchive: func(string, string, []byte) domain.BackupReport { return domain.BackupReport{} },
+		LabComputerCount:  func() (int, bool) { return count, true },
+	}, false)
+	m.recovery = domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryBackupDue, Title: "This laboratory has no backup yet", Next: domain.NextStep{Code: "BACKUP-NONE"}}}}
+	found := false
+	for _, task := range m.pendingTasks() {
+		found = found || task.id == "pending-restore"
+	}
+	if !found {
+		t.Fatal("fresh lab does not offer Restore lab")
+	}
+	count = 2
+	for _, task := range m.pendingTasks() {
+		if task.id == "pending-restore" {
+			t.Fatal("lab with computers offers Restore lab")
+		}
 	}
 }

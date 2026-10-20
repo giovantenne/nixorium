@@ -676,7 +676,7 @@ func (g GitBackup) Restore(ctx context.Context, remote, branch, target string, p
 	if err := writeGitBackupRecord(target, gitBackupRecord{Plan: plan, PublishedRevision: revision, KeysDigest: backupKeysDigest(target), CreatedAt: time.Now().UTC()}); err != nil {
 		return partial(err)
 	}
-	return domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-clone", State: "completed", Path: target, Revision: revision, PrivateKeys: append([]string{}, privateDeploymentPaths...), Message: "Lab restored with its original keys and trusted computers. Open nixorium --repo " + target + "; follow the controller replacement guide before applying. No system was activated."}
+	return domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-clone", State: "completed", Path: target, Revision: revision, PrivateKeys: append([]string{}, privateDeploymentPaths...), Message: "Lab restored into " + target + " with its original keys and trusted computers. No system was activated."}
 }
 
 // publishRestoredLab checks a staged deployment whose private keys are already

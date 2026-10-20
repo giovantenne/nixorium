@@ -50,6 +50,9 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 			add("pending-network", condition.Title, condition.Detail)
 		}
 	}
+	if model.freshLabOffersRestore() {
+		add("pending-restore", "Replacing a controller? Restore its lab", "Maintenance → Restore lab brings back the lab, its keys and its computers from a backup.")
+	}
 	if model.usbReserved {
 		add("pending-usb", situationTitle("USB-RESERVED"), "Open it to resume, verify or close it. Other computer operations wait until then.")
 	}
@@ -156,6 +159,8 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 		return model.openRecovery()
 	case "pending-backup":
 		return model.openBackup()
+	case "pending-restore":
+		return model.openRestoreLab()
 	case "pending-deferred":
 		return model.openDeferredUpdates()
 	case "pending-network":
@@ -179,4 +184,23 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 		model.message = "This follow-up is unavailable in this session."
 	}
 	return model, nil
+}
+
+// freshLabOffersRestore reports a lab with no computers and no backup, as the
+// installer leaves it: a technician replacing a controller starts here.
+func (model dashboardModel) freshLabOffersRestore() bool {
+	if model.actions.RestoreLabArchive == nil || model.actions.LabComputerCount == nil || model.actions.ClassroomMode {
+		return false
+	}
+	never := false
+	for _, condition := range model.recovery.Conditions {
+		if condition.Kind == domain.RecoveryBackupDue && condition.Next.Code == "BACKUP-NONE" {
+			never = true
+		}
+	}
+	if !never {
+		return false
+	}
+	count, ok := model.actions.LabComputerCount()
+	return ok && count == 0
 }

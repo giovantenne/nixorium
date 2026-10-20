@@ -22,8 +22,14 @@ type backupModel struct {
 	plan                                domain.GitBackupPlan
 	reviewed, restore, standalone, done bool
 	result                              domain.BackupReport
+	// found lists backup files on connected drives, newest first.
+	found []string
+	// adopted holds the result of using the restored lab on this controller.
+	adopted     bool
+	adoptResult domain.BackupReport
 }
 type backupResultMsg struct{ report domain.BackupReport }
+type backupAdoptMsg struct{ report domain.BackupReport }
 type gitBackupPlanMsg struct {
 	plan domain.GitBackupPlan
 	err  error
@@ -63,7 +69,27 @@ func (model dashboardModel) openRestoreLab() (tea.Model, tea.Cmd) {
 	next, _ := model.openBackup()
 	model = next.(dashboardModel)
 	model.backup.restore = true
+	if model.actions.FindBackupFiles != nil {
+		model.backup.found = model.actions.FindBackupFiles()
+	}
 	return model, nil
+}
+
+// offersAdopt reports a completed restore that can become the lab this
+// controller manages, the step a new or replaced controller needs.
+func (model dashboardModel) offersAdopt() bool {
+	b := model.backup
+	return b.done && b.restore && !b.standalone && !b.result.HasErrors() && b.result.Path != "" && model.actions.UseRestoredLab != nil
+}
+
+func (model dashboardModel) useRestoredLab() (tea.Model, tea.Cmd) {
+	action, restored, source := model.actions.UseRestoredLab, model.backup.result, ""
+	if model.backup.archive {
+		source = strings.TrimSpace(model.backup.source)
+	}
+	model.busy = "Putting the restored lab in place and installing its keys"
+	model.message = ""
+	return model, func() tea.Msg { return backupAdoptMsg{action(restored, source)} }
 }
 func (b *backupModel) clearSecrets() {
 	clear(b.passphrase)
@@ -151,6 +177,13 @@ func (model dashboardModel) finishBackupSync(message backupSyncMsg) (tea.Model, 
 
 func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	b := &model.backup
+	if b.done && key.String() == "enter" && model.offersAdopt() && !b.adopted {
+		return model.useRestoredLab()
+	}
+	if b.adopted && key.String() == "enter" && !b.adoptResult.HasErrors() && model.actions.PlanController != nil {
+		model.backup = backupModel{}
+		return model.openControllerReview()
+	}
 	if key.String() == "esc" || (b.done && key.String() == "enter") {
 		done := b.done
 		b.clearSecrets()
@@ -201,6 +234,16 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			if b.archive && !b.restore && b.destination == "" && model.actions.BackupFileFolder != nil {
 				b.destination = model.actions.BackupFileFolder()
 			}
+			if b.restore && b.destination == "" && model.actions.RestoreFolder != nil {
+				b.destination = model.actions.RestoreFolder()
+			}
+			if b.restore && b.archive && b.source == "" && len(b.found) > 0 {
+				b.source = b.found[0]
+			}
+			if b.restore && b.archive && b.source != "" {
+				// The newest backup is proposed: the passphrase comes next.
+				b.field = 1
+			}
 			if choice == 1 && b.gitConfigured() && model.actions.SyncGitBackup != nil {
 				return model.syncBackupNow()
 			}
@@ -246,11 +289,11 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 		}
 		if b.restore && !b.reviewed {
 			if b.archive && (strings.TrimSpace(b.source) == "" || strings.TrimSpace(b.destination) == "" || len(b.passphrase) == 0) {
-				model.message = "Enter the backup file, a new folder and the passphrase."
+				model.message = "Enter the backup file, its passphrase and the folder to restore into."
 				return model, nil
 			}
 			if !b.archive && (b.remote == "" || b.branch == "" || b.destination == "" || len(b.passphrase) == 0) {
-				model.message = "Enter the SSH repository URL, branch, new folder and passphrase."
+				model.message = "Enter the SSH repository URL, branch, the folder to restore into and the passphrase."
 				return model, nil
 			}
 			b.reviewed = true
@@ -321,9 +364,9 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			case 0:
 				plain = &b.source
 			case 1:
-				plain = &b.destination
-			case 2:
 				secret = &b.passphrase
+			case 2:
+				plain = &b.destination
 			}
 		case b.restore:
 			switch b.field {
@@ -397,17 +440,44 @@ func (model dashboardModel) backupView() string {
 	}
 	lines := []string{tuiTitle(title, model.isDark)}
 	actions := []tuiAction{{key: "Tab", label: "Next field"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
-	if b.done {
-		lines = append(lines, "", tuiResult(b.result.Message, !b.result.HasErrors(), model.isDark))
-		if b.result.Path != "" {
-			lines = append(lines, "Location: "+b.result.Path)
+	var notices []tuiNotice
+	if b.adopted {
+		lines = append(lines, "", tuiResult(b.adoptResult.Message, !b.adoptResult.HasErrors(), model.isDark))
+		if b.adoptResult.Previous != "" {
+			lines = append(lines, "Previous lab folder, kept unchanged: "+b.adoptResult.Previous)
 		}
+		actions = []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+		if !b.adoptResult.HasErrors() {
+			lines = append(lines, "", tuiSection("Next: apply the restored lab to this controller", model.isDark),
+				"  The review shows what changes on this controller; nothing changes until you confirm it.",
+				"  Afterwards, computers reinstalled since the backup was made show \"SSH key changed\":",
+				"  compare the fingerprint on their screen before trusting them.")
+			if model.actions.PlanController != nil {
+				actions = []tuiAction{{key: "Enter", label: "Review controller"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+			}
+		}
+	} else if b.done {
+		lines = append(lines, "", tuiResult(b.result.Message, !b.result.HasErrors(), model.isDark))
 		if b.result.Revision != "" {
 			lines = append(lines, "Revision: "+shortRevision(b.result.Revision))
 		}
 		actions = []tuiAction{{key: "Enter", label: "Return"}, {key: "F1", label: "Help"}}
+		switch {
+		case model.offersAdopt():
+			lines = append(lines, "", tuiSection("Next: use this lab on this controller", model.isDark),
+				"  For a new or replaced controller. Nixorium then manages the restored lab:",
+				"  • the current lab folder is kept beside it under a new name; nothing is deleted",
+				"  • the restored lab takes its place and its keys are installed on this controller",
+				"  • nothing is built yet: you review and apply the controller next")
+			if model.report.Meta.Clients.Count > 0 {
+				notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: fmt.Sprintf("This controller already manages %s.", countNoun(model.report.Meta.Clients.Count, "computer")), detail: "Use the restored lab only if it replaces the lab of this controller."})
+			}
+			actions = []tuiAction{{key: "Enter", label: "Use this lab on this controller"}, {key: "Esc", label: "Not now"}, {key: "F1", label: "Help"}}
+		case b.restore && !b.result.HasErrors():
+			lines = append(lines, "", "To make this controller use it, follow \"Replacing the controller\" in the troubleshooting guide.")
+		}
 	} else if b.choosing && b.restore {
-		lines = append(lines, "Restore into a new folder. Existing folders are never replaced and no system is activated.", "", "Where is the backup?", "",
+		lines = append(lines, "Brings back a lab from its backup, for example on a new or replaced controller.", "Existing folders are never replaced and no system is activated.", "", "Where is the backup?", "",
 			tuiSelection("[f] Backup file — for example on a USB drive", b.field == 0, model.isDark),
 			tuiSelection("[g] Private Git repository", b.field == 1, model.isDark))
 		actions = []tuiAction{{key: "↑/↓", label: "Choose"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
@@ -430,17 +500,26 @@ func (model dashboardModel) backupView() string {
 		dots := func(r []rune) string { return strings.Repeat("•", len(r)) }
 		switch {
 		case b.restore && b.archive && b.reviewed:
-			lines = append(lines, "", "Backup file: "+b.source, "New folder: "+b.destination, "", "Restore the deployment with its private keys, account passwords and trusted computers.", "Existing folders are never replaced. No system will be activated.")
+			lines = append(lines, "", "Backup file: "+b.source, "Restore into: "+b.destination, "", "Restore the deployment with its private keys, account passwords and trusted computers.", "Existing folders are never replaced. No system will be activated.")
 			actions = []tuiAction{{key: "Enter", label: "Restore lab"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		case b.restore && b.archive:
-			lines = append(lines, "Enter the backup file (nixorium-backup-….age), a new folder for the", "deployment and the passphrase used when the backup was made.", "")
-			fields = []field{{"Backup file", b.source}, {"New folder", b.destination}, {"Passphrase", dots(b.passphrase)}}
+			lines = append(lines, "Choose the backup file (nixorium-backup-….age) and enter the passphrase used", "when it was made. The lab is restored into a new folder; nothing is replaced.")
+			switch len(b.found) {
+			case 0:
+				lines = append(lines, "No backup file was found on a connected drive: connect the USB drive and", "open Restore lab again, or type the file's full path.")
+			case 1:
+				lines = append(lines, "Found on a connected drive: "+b.found[0])
+			default:
+				lines = append(lines, fmt.Sprintf("Found %d backup files; the newest is proposed.", len(b.found)))
+			}
+			lines = append(lines, "")
+			fields = []field{{"Backup file", b.source}, {"Passphrase", dots(b.passphrase)}, {"Restore into", b.destination}}
 		case b.restore && b.reviewed:
-			lines = append(lines, "", "Repository: "+b.remote, "Branch: "+b.branch, "New folder: "+b.destination, "", "Restore original keys and trusted computers. Existing folders are never replaced.", "No system will be activated.")
+			lines = append(lines, "", "Repository: "+b.remote, "Branch: "+b.branch, "Restore into: "+b.destination, "", "Restore original keys and trusted computers. Existing folders are never replaced.", "No system will be activated.")
 			actions = []tuiAction{{key: "Enter", label: "Restore lab"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		case b.restore:
 			lines = append(lines, "Restore into a new folder using independent SSH access.", "No password or Git token belongs in the repository URL.", "")
-			fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}, {"New folder", b.destination}, {"Passphrase", dots(b.passphrase)}}
+			fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}, {"Restore into", b.destination}, {"Passphrase", dots(b.passphrase)}}
 		case b.archive && b.reviewed:
 			lines = append(lines, "", "Destination folder: "+b.destination,
 				"The entire deployment, Git history, private keys, account passwords and",
@@ -471,8 +550,9 @@ func (model dashboardModel) backupView() string {
 	shell.body = strings.Join(lines, "\n")
 	shell.actions = actions
 	if model.message != "" {
-		shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: model.message}}
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
+	shell.notices = notices
 	return model.renderShell(shell)
 }
 
