@@ -15,6 +15,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A reinstalled computer could keep showing "SSH key changed" after its new
+  key was reviewed: OpenSSH had replaced the controller's link to the
+  Nixorium copy of the known computers with a stale file. OpenSSH no longer
+  rewrites it, and reviewing a key puts the link back.
 - Network installation on a controller whose laboratory address comes from
   its network profile: starting, stopping or recovering it could fail
   because the address change takes a moment to appear; it now waits for it.

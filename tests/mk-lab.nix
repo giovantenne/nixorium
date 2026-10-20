@@ -253,6 +253,8 @@ assert controllerOnlyLab.nixoriumHostClasses == [ { representative = "pc99"; mem
 # the site's development module says (labs created before 3.8.0 lack it).
 assert subnetLab.nixosConfigurations.pc01.config.environment.sessionVariables.WB_NO_KEYRING == "1";
 assert controllerOnly.environment.sessionVariables.WB_NO_KEYRING == "1";
+# OpenSSH must not rewrite the controller's link to the managed known hosts.
+assert lib.hasInfix "UpdateHostKeys no" controllerOnly.programs.ssh.extraConfig;
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
 assert controllerOnly.virtualisation.virtualbox.guest.enable;
 assert subnetLab.nixosConfigurations.pc99.config.virtualisation.virtualbox.guest.enable;
