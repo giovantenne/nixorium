@@ -319,8 +319,8 @@ type treeEntry struct {
 	content []byte
 	mode    fs.FileMode
 	regular bool
-	// large: over the size a migration may change; content is a size and
-	// time fingerprint, not the file.
+	// large: over the size a migration may change; content is the size and
+	// SHA-256 digest, not the file.
 	large bool
 }
 
