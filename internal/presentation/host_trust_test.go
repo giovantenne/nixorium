@@ -111,3 +111,48 @@ func TestClassroomCannotOpenHostTrust(t *testing.T) {
 		t.Fatal("classroom gained administrative action")
 	}
 }
+
+func TestSavedHostTrustChecksTheComputersAgain(t *testing.T) {
+	checks := 0
+	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{
+		PlanHostTrust: func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() },
+		ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
+			return domain.HostTrustResult{Operation: "host-key-apply", State: "saved", Host: "pc01", Message: "Reviewed trust saved"}
+		},
+		LoadHosts: func(context.Context) (domain.HostsReport, error) {
+			checks++
+			return domain.HostsReport{}, nil
+		},
+	}, false)
+	opened, read := model.openHostTrust("pc01")
+	model = opened.(dashboardModel)
+	updated, _ := model.Update(read())
+	model = updated.(dashboardModel)
+	model.hostTrust.confirmation = "ROTATE HOST KEY"
+	updated, write := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, check := model.Update(write())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHosts || check == nil || !strings.Contains(model.message, "pc01 is saved; checking the computers again") {
+		t.Fatalf("screen = %v, message = %q, check started = %v", model.screen, model.message, check != nil)
+	}
+}
+
+func TestAComputerWithAChangedKeyIsNotOfferedForUpdate(t *testing.T) {
+	report := testDashboardReport("stopped")
+	model := newDashboardModel(report, domain.SetupReport{}, DashboardActions{
+		PlanHostTrust:  func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() },
+		ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult { return domain.HostTrustResult{} },
+	}, false)
+	model.screen = dashboardHosts
+	model.computers.hosts = domain.HostsReport{Hosts: []domain.HostStatus{{Name: "pc01", IP: "10.0.0.1", HostKeyCondition: domain.HostKeyChanged}}}
+	model.computers.hostDetail = true
+	view := model.View().Content
+	if strings.Contains(view, "Update this computer") || !strings.Contains(view, "Review changed SSH key") {
+		t.Fatalf("detail actions:\n%s", view)
+	}
+	updated, _ := model.Update(demoText("d"))
+	if next := updated.(dashboardModel); next.screen != dashboardHosts || !strings.Contains(next.message, "Review it first") {
+		t.Fatalf("d opened %v with %q", next.screen, next.message)
+	}
+}

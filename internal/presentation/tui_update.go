@@ -114,6 +114,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.hostTrust.applying = false
 		model.busy = ""
 		model.hostTrust.result = message.result
+		if message.result.State == "saved" && model.actions.LoadHosts != nil {
+			// Check the computers again at once, so its details and the
+			// update selection show the reviewed key instead of the warning.
+			model.screen = dashboardHosts
+			next, read := model.checkComputersThen()
+			updated := next.(dashboardModel)
+			updated.message = "The reviewed SSH key of " + message.result.Host + " is saved; checking the computers again."
+			return updated, read
+		}
 		return model, nil
 	case dashboardInventoryMsg:
 		return model.finishInventory(message)

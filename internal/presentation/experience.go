@@ -113,8 +113,14 @@ func (model dashboardModel) computersView() string {
 		lines = append(lines, model.computerDetail(hosts[min(model.computers.hostCursor, len(hosts)-1)]))
 		actions = []tuiAction{{key: "t", label: "Technical"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		if !model.actions.ClassroomMode {
-			actions = append([]tuiAction{{key: "d", label: "Update this computer"}, {key: "i", label: "Diagnostics"}}, actions...)
-			if hosts[min(model.computers.hostCursor, len(hosts)-1)].HostKeyCondition == domain.HostKeyChanged && model.actions.PlanHostTrust != nil && model.actions.ApplyHostTrust != nil && !model.actions.ClassroomMode {
+			keyChanged := hosts[min(model.computers.hostCursor, len(hosts)-1)].HostKeyCondition == domain.HostKeyChanged
+			if keyChanged {
+				// The detail says not to update it until the key is reviewed.
+				actions = append([]tuiAction{{key: "i", label: "Diagnostics"}}, actions...)
+			} else {
+				actions = append([]tuiAction{{key: "d", label: "Update this computer"}, {key: "i", label: "Diagnostics"}}, actions...)
+			}
+			if keyChanged && model.actions.PlanHostTrust != nil && model.actions.ApplyHostTrust != nil {
 				actions = append([]tuiAction{{key: "h", label: "Review changed SSH key"}}, actions...)
 			}
 		}

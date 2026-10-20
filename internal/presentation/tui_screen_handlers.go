@@ -778,7 +778,12 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			hosts := model.filteredHosts()
 			if len(hosts) > 0 {
-				return model.openHostDeployment(hosts[min(model.computers.hostCursor, len(hosts)-1)].Name)
+				host := hosts[min(model.computers.hostCursor, len(hosts)-1)]
+				if host.HostKeyCondition == domain.HostKeyChanged {
+					model.message = host.Name + " offers a changed SSH key. Review it first (h); updating it would not be safe."
+					return model, nil
+				}
+				return model.openHostDeployment(host.Name)
 			}
 		case "r":
 			model.busy = "Refreshing computer status"

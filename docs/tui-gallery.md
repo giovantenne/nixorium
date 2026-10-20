@@ -1504,7 +1504,7 @@ physical-console fingerprint and review this computer's SSH trust.
 
 Address  10.42.0.11
 
-h Review changed SSH key  ·  d Update this computer  ·  i Diagnostics  ·  t Technical  ·  Esc Back  ·  F1 Help
+h Review changed SSH key  ·  i Diagnostics  ·  t Technical  ·  Esc Back  ·  F1 Help
 ```
 
 ## Cancellable SSH trust inspection
@@ -1541,12 +1541,15 @@ Enter Save reviewed trust  ·  Esc Cancel  ·  F1 Help
 ## SSH trust saved without deployment
 
 ```text
-Nixorium  /  Computers  /  SSH trust
+Nixorium  /  Computers  /  Inventory
 
-Review this computer's changed SSH key
-Reviewed trust saved for pc01 only. Refresh Computers before reviewing deployment.
+⣾  Checking the configured computers
 
-Enter Computer details  ·  Esc Back  ·  F1 Help
+Elapsed: 0s · Read-only; Esc cancels. Limit: 2m0s.
+
+! The reviewed SSH key of pc01 is saved; checking the computers again.
+
+Esc Cancel read  ·  F1 Help
 ```
 
 ## Overview finds an existing managed job
