@@ -307,3 +307,41 @@ func TestInstallationSummaryNamesTheControllerInterface(t *testing.T) {
 		}
 	}
 }
+
+func TestControllerInterfaceIsChosenAmongItsWiredCards(t *testing.T) {
+	current := wizardSettings()
+	current.Lab.InterfaceName, current.Lab.ControllerInterfaceName = "enp0s3", ""
+	addresses := domain.ControllerAddresses{Detected: true, Wired: []domain.NetworkDevice{
+		{Name: "enp0s3", Kind: domain.NetworkDeviceWired, Addresses: []domain.NetworkAddress{{Address: "192.168.57.99"}, {Address: "10.0.0.99"}}},
+		{Name: "enp0s8", Kind: domain.NetworkDeviceWired},
+	}}
+	model := dashboardModel{width: 120, height: 40, settings: settingsModel{current: current, addresses: addresses}}
+	model = model.openSettingsEditor(networkGroupFields(), "Maintenance / Settings / Network")
+	editor := model.settings.editor
+	if editor.fields[editor.index].id != "lab.controllerIfaceName" {
+		t.Fatalf("first field = %s", editor.fields[editor.index].id)
+	}
+	for _, field := range editor.fields {
+		if field.id == "lab.ifaceName" {
+			t.Fatal("the shared fallback name is still asked")
+		}
+	}
+	view := ansi.Strip(renderTUIShell(editor.shell(), 140, false))
+	for _, want := range []string{"Choose the controller's card on the laboratory network", "Wired card · 192.168.57.99, 10.0.0.99", "Wired card without an address now", "Type a device name that is not listed"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+	if selected := editor.selector.SelectedItem().(settingsChoiceItem); selected.value != "enp0s3" {
+		t.Fatalf("the card in use is not preselected: %+v", selected)
+	}
+	// Confirming the card already in use changes nothing.
+	kept := editorKey(editor, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if kept.settings.Lab.ControllerInterfaceName != "" {
+		t.Fatalf("confirming the inherited card saved %q", kept.settings.Lab.ControllerInterfaceName)
+	}
+	moved := editorKey(editorKey(editor, tea.KeyPressMsg{Code: tea.KeyDown}), tea.KeyPressMsg{Code: tea.KeyEnter})
+	if moved.settings.Lab.ControllerInterfaceName != "enp0s8" {
+		t.Fatalf("choosing another card saved %q", moved.settings.Lab.ControllerInterfaceName)
+	}
+}

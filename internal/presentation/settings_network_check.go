@@ -36,6 +36,28 @@ func withDetectedDHCPChoices(fields []settingsField, addresses domain.Controller
 	}
 	updated := append([]settingsField(nil), fields...)
 	for index, field := range updated {
+		if field.id == "lab.controllerIfaceName" && len(addresses.Wired) > 0 {
+			// The controller's wired cards, with what they carry now.
+			field.choices = []settingsChoice{}
+			field.detected = []string{}
+			for _, device := range addresses.Wired {
+				carried := []string{}
+				for _, address := range device.Addresses {
+					if !strings.HasPrefix(address.Address, "fe80:") {
+						carried = append(carried, address.Address)
+					}
+				}
+				description := "Wired card without an address now"
+				if len(carried) > 0 {
+					description = "Wired card · " + strings.Join(carried, ", ")
+				}
+				field.choices = append(field.choices, settingsChoice{value: device.Name, label: device.Name, description: description})
+				field.detected = append(field.detected, device.Name)
+			}
+			field.other = "Other…"
+			updated[index] = field
+			continue
+		}
 		if field.id != "lab.masterDhcpIp" {
 			continue
 		}

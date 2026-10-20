@@ -372,6 +372,9 @@ type DHCPAddressChoice struct {
 // ControllerAddresses is what the settings form detects on the controller.
 type ControllerAddresses struct {
 	Choices []DHCPAddressChoice `json:"choices"`
+	// Wired lists the controller's wired network devices, offered as its
+	// laboratory interface.
+	Wired []NetworkDevice `json:"wired,omitempty"`
 	// Detected is false when the controller's addresses could not be read;
 	// the form then keeps a typed value.
 	Detected bool   `json:"detected"`

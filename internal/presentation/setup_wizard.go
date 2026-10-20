@@ -154,6 +154,11 @@ func (model *settingsWizardModel) prepareCurrentField() {
 	}
 	items := make([]list.Item, 0, len(field.choices)+2)
 	current := model.drafts[model.index]
+	inherited := false
+	if field.id == "lab.controllerIfaceName" && current == "" && field.detected != nil {
+		// An empty value uses the shared name; preselect the card it names.
+		current, inherited = model.settings.Lab.ControllerInterface(), true
+	}
 	selected := 0
 	found := false
 	for index, choice := range field.choices {
@@ -163,7 +168,7 @@ func (model *settingsWizardModel) prepareCurrentField() {
 			found = true
 		}
 	}
-	if current != "" && !found {
+	if current != "" && !found && !inherited {
 		description := "Current custom value"
 		if field.detected != nil {
 			description = "Saved value; the controller does not have it now"
@@ -178,6 +183,9 @@ func (model *settingsWizardModel) prepareCurrentField() {
 	other := settingsChoiceItem{value: customSettingsChoice, label: "Custom…", description: "Enter another validated value"}
 	if field.other != "" {
 		other.label, other.description = field.other, "Type an address that is not listed"
+		if field.id == "lab.controllerIfaceName" {
+			other.description = "Type a device name that is not listed"
+		}
 	}
 	items = append(items, other)
 	delegate := tuiListDelegate(model.isDark)
@@ -353,7 +361,11 @@ func (model settingsWizardModel) updateChoiceField(key tea.KeyPressMsg) (tea.Mod
 			model.err = ""
 			return model, nil
 		}
-		model.drafts[model.index] = selected.value
+		// Confirming the card the controller already uses through the shared
+		// name keeps the field empty, so the review shows no change.
+		if field := model.fields[model.index]; !(field.id == "lab.controllerIfaceName" && model.drafts[model.index] == "" && selected.value == model.settings.Lab.ControllerInterface()) {
+			model.drafts[model.index] = selected.value
+		}
 		return model.acceptCurrentField()
 	default:
 		updated, command := model.selector.Update(key)
@@ -423,6 +435,9 @@ func undetectedValueWarning(field settingsField, value string) string {
 	if len(field.detected) > 0 {
 		found = strings.Join(field.detected, ", ")
 	}
+	if field.id == "lab.controllerIfaceName" {
+		return fmt.Sprintf("The controller has no wired card called %s (found: %s). The review checks it again before saving.", value, found)
+	}
 	return fmt.Sprintf("%s is not one of the controller's current addresses (found: %s). Check it before preparing network installation.", value, found)
 }
 
@@ -482,6 +497,9 @@ func (model settingsWizardModel) shell() tuiShell {
 		prompt := "Choose a suggested value, or press / to search."
 		if field.detected != nil {
 			prompt = "Choose one of the controller's current addresses, or " + strings.TrimSuffix(field.other, "…") + " to type one."
+			if field.id == "lab.controllerIfaceName" {
+				prompt = "Choose the controller's card on the laboratory network, or " + strings.TrimSuffix(field.other, "…") + " to type a name."
+			}
 		}
 		lines = append(lines, "", prompt, "", trimBlankLines(model.selector.View()))
 		actions = append(actions, tuiAction{key: "↑/↓", label: "Choose"}, tuiAction{key: "Enter", label: "Continue"}, tuiAction{key: "/", label: "Search"}, tuiAction{key: "Esc", label: "Cancel"})
