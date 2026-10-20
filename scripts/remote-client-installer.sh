@@ -369,8 +369,28 @@ run_plan() {
   RUN_INSTALLED=true
   RUN_PHASE=ready-to-reboot
   write_receipt "$operation_dir" "$operation_id" ready-to-reboot "$RUN_PHASE" true true \
-    "installation completed; remove or deprioritize the USB before reboot"
+    "installation completed; the PC restarts from its disk"
   trap - EXIT
+}
+
+# boot_installed_disk_next makes the next start use the boot entry that the
+# installation created on the selected disk, so the PC starts the installed
+# system even while the USB stick is still connected (removing it under the
+# running live system breaks that system before it restarts). It is best
+# effort: without the entry the firmware's order applies.
+boot_installed_disk_next() {
+  local plan_file=$1 disk partuuids entry
+  command -v efibootmgr >/dev/null 2>&1 || return 0
+  disk=$(jq -r '.disk.path // empty' "$plan_file" 2>/dev/null) || return 0
+  [[ "$disk" =~ ^/dev/[A-Za-z0-9_.+-]+$ ]] || return 0
+  partuuids=$(lsblk -nro PARTUUID -- "$disk" 2>/dev/null | tr 'A-Z' 'a-z' | grep -E '^[0-9a-f-]{36}$') || return 0
+  entry=$(efibootmgr -v 2>/dev/null | tr 'A-Z' 'a-z' | awk -v ids="$partuuids" '
+    BEGIN { n = split(ids, list, "\n") }
+    /^boot[0-9a-f]{4}/ {
+      for (i = 1; i <= n; i++) if (list[i] != "" && index($0, list[i]) > 0) { print substr($1, 5, 4); exit }
+    }') || return 0
+  [[ "$entry" =~ ^[0-9a-f]{4}$ ]] || return 0
+  efibootmgr -q -n "$entry" >/dev/null 2>&1 || true
 }
 
 reboot_operation() {
@@ -384,6 +404,7 @@ reboot_operation() {
       echo "operation is not ready for an explicit reboot" >&2
       return 1
     }
+  boot_installed_disk_next "$operation_dir/plan.json"
   reboot_unit="nixorium-remote-reboot-$operation_id"
   if ! "$SYSTEMD_RUN" --no-ask-password \
     --unit="$reboot_unit" --collect --quiet --on-active=10s \

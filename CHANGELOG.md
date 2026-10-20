@@ -27,6 +27,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- USB over SSH no longer asks to remove the USB stick before restarting the
+  installed PC: removing it under the running live system broke the restart.
+  The installer now makes the next start use the new disk's boot entry, and
+  the stick is removed after the restart.
 - Back up lab proposes a connected USB drive for the encrypted file, or the
   home folder when none is connected, instead of asking to mount the drive
   and type its folder.

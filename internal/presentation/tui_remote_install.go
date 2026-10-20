@@ -245,7 +245,7 @@ func (model dashboardModel) remoteInstallView() string {
 	case remoteInstallConfirmReboot, remoteInstallConfirmClose, remoteInstallConfirmCancel:
 		label := "Restart the PC"
 		title := "Restart the installed computer?"
-		detail := "Remove the USB stick first (or make the disk boot first). The PC restarts once, then the controller checks that it came back as installed."
+		detail := "Keep the USB stick in: the PC restarts once from its new disk, then the controller checks that it came back as installed. Remove the stick after the restart (if the PC starts from the USB stick again, remove it and restart the PC)."
 		switch {
 		case remote.stage == remoteInstallConfirmCancel:
 			label = "Cancel safely"
@@ -276,7 +276,7 @@ func (model dashboardModel) remoteInstallView() string {
 		// stays in the details (d).
 		outcome, _ := model.remoteInstallOutcome()
 		if remote.response.State == "ready-to-reboot" {
-			outcome = "Installation completed. Remove the USB stick before restarting the PC."
+			outcome = "Installation completed. Restart the PC; remove the USB stick after it has restarted."
 		}
 		notices = append(notices, tuiNotice{kind: kind, title: outcome, plain: true})
 		if step, found := remoteInstallSituation(remote.response); found {
@@ -409,7 +409,7 @@ func (model dashboardModel) remoteInstallDetailLines() []string {
 		lines = append(lines, "The installation command may have started. Do not start it again; check the existing operation.")
 	}
 	if response.State == "ready-to-reboot" {
-		lines = append(lines, "", "Remove the USB stick (or make the disk boot first) before restarting.")
+		lines = append(lines, "", "Remove the USB stick after the restart, not before: the system on it is still running.")
 	}
 	if response.State == "reconciliation-required" {
 		lines = append(lines, "", "Do not start another installation. Refresh this operation until its result can be confirmed.")

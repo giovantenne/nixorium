@@ -708,7 +708,7 @@ func renderUSBInstallationDemo(revision string, width, height int) DemoScenario 
 	r.model.installation.remote.response = domain.RemoteInstallResponse{
 		State: "ready-to-reboot", OperationID: preparation.OperationID,
 		Execution: &domain.RemoteInstallExecutionReport{OperationID: preparation.OperationID, Phase: domain.RemoteInstallPhaseReadyToReboot, MutationStarted: true, DiskMayBeModified: true, Installed: true, LogID: "usb-install-0123456789abcdef0123456789abcdef.log"},
-		Message:   "installation completed; remove or deprioritize the USB medium before reboot",
+		Message:   "installation completed; the PC restarts from its disk",
 	}
 	r.capture("Show installed state before reboot", 3000)
 	r.model.installation.remote.stage = remoteInstallConfirmReboot

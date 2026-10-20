@@ -639,6 +639,7 @@ let
       bootstrapPkgs.btrfs-progs
       bootstrapPkgs.coreutils
       bootstrapPkgs.dosfstools
+      bootstrapPkgs.efibootmgr
       bootstrapPkgs.findutils
       bootstrapPkgs.gawk
       bootstrapPkgs.gnugrep

@@ -156,7 +156,7 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 			"This view refreshes by itself every few seconds. You can leave it; the job continues on the computer."
 	case response.State == "ready-to-reboot":
 		return "The system is installed on " + host + " and is waiting to restart.",
-			"Remove the USB stick (or make the disk boot first), then restart it."
+			"Keep the USB stick in until it has restarted: the PC restarts from its disk."
 	case response.State == "reboot-requested" || response.State == "reboot-dispatching":
 		return "Restart of " + host + " was requested.",
 			"The controller checks the installed identity automatically every few seconds."
