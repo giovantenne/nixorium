@@ -92,3 +92,29 @@ func TestEvaluationCacheKeepsTheMostRecentResults(t *testing.T) {
 		t.Fatal("the new result must be kept")
 	}
 }
+
+func TestSoftwareValidationIsRememberedPerSourceAndCandidate(t *testing.T) {
+	useEvaluationCacheDirectory(t)
+	source := "path:/nix/store/0zqqvpdl52lb87zqq7jwhjkqfhb68rlf-source"
+	path, cacheable := softwareValidationCachePath(source, "expression", []byte(`{"packages":["htop"]}`))
+	if !cacheable {
+		t.Fatal("a prepared source must be cacheable")
+	}
+	for _, other := range []struct {
+		flake, expression, candidate string
+	}{
+		{"path:/nix/store/1zqqvpdl52lb87zqq7jwhjkqfhb68rlf-source", "expression", `{"packages":["htop"]}`},
+		{source, "another expression", `{"packages":["htop"]}`},
+		{source, "expression", `{"packages":["jq"]}`},
+	} {
+		if otherPath, _ := softwareValidationCachePath(other.flake, other.expression, []byte(other.candidate)); otherPath == path {
+			t.Fatalf("%+v shares the entry", other)
+		}
+	}
+	if _, cacheable := softwareValidationCachePath("path:/home/admin/nixorium-deployment", "expression", nil); cacheable {
+		t.Fatal("a worktree must never be cached")
+	}
+	if path == func() string { p, _ := evaluationCachePath(source, "deploymentStatus"); return p }() {
+		t.Fatal("software validation shares the readiness entry")
+	}
+}

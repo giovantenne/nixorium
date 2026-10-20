@@ -154,6 +154,12 @@ func (Local) ValidateSoftwareCandidate(ctx context.Context, repository string, s
 	if err != nil {
 		return err
 	}
+	cache, cacheable := softwareValidationCachePath(flake, softwareCandidateValidationExpression, data)
+	if cacheable {
+		if _, valid := readCachedEvaluation(cache); valid {
+			return nil
+		}
+	}
 	temporary, err := os.CreateTemp("", "nixorium-software-candidate-*.json")
 	if err != nil {
 		return fmt.Errorf("create software candidate: %w", err)
@@ -190,6 +196,9 @@ func (Local) ValidateSoftwareCandidate(ctx context.Context, repository string, s
 			detail = err.Error()
 		}
 		return fmt.Errorf("software candidate evaluation failed: %s", detail)
+	}
+	if cacheable {
+		writeCachedEvaluation(cache, []byte(`{"valid":true}`))
 	}
 	return nil
 }

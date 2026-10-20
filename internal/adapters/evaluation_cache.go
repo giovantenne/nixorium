@@ -50,6 +50,23 @@ func evaluationCachePath(flake, attribute string) (string, bool) {
 	return filepath.Join(directory, hex.EncodeToString(digest[:])+".json"), true
 }
 
+// softwareValidationCachePath names the remembered success of a software
+// candidate checked against a prepared source. The same source and candidate
+// always evaluate alike, so saving after a review does not evaluate the whole
+// laboratory a second time; only successes are remembered.
+func softwareValidationCachePath(flake, expression string, candidate []byte) (string, bool) {
+	source, prepared := strings.CutPrefix(flake, "path:")
+	if !prepared || !domain.ValidStorePath(source) {
+		return "", false
+	}
+	directory, err := evaluationCacheDirectory()
+	if err != nil {
+		return "", false
+	}
+	digest := sha256.Sum256([]byte(source + "\x00software-candidate\x00" + expression + "\x00" + string(candidate)))
+	return filepath.Join(directory, hex.EncodeToString(digest[:])+".json"), true
+}
+
 func readCachedEvaluation(path string) ([]byte, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil || len(data) > maximumCachedEvaluation || !json.Valid(data) {
