@@ -207,6 +207,10 @@ migration in the same change:
   replacements that end with a newline, and keep each text short. A migration
   may also create, change or remove files through `Tree.Write` and
   `Tree.Remove`.
+- To give existing laboratories a package the template now declares for
+  every computer, use `AddSharedPackage`: it adds the package to
+  `lab-software.json` for the controller and all clients, and leaves it
+  alone when the deployment already names it with any scope.
 - `Outcome.Files` must list every file an applied migration changed, created
   or removed. The installed release refuses the update if a changed file is
   not declared or a declared file did not change. Only regular files are

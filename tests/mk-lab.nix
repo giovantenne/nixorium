@@ -159,6 +159,7 @@ let
     "chromium"
     "ghostty"
     "git"
+    "jq"
     "liberation_ttf"
     "nodejs"
     "python3Packages.terminaltexteffects"

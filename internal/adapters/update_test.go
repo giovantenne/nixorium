@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/giovantenne/nixorium/internal/deploymigrate"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -351,7 +350,7 @@ esac
 	t.Setenv("NIXORIUM_TEST_NIX_LOG", logPath)
 	stages := t.TempDir()
 	t.Setenv("NIXORIUM_TEST_STAGES", stages)
-	useMigrator(t, deploymigrate.Registry, nil)
+	useMigrator(t, workstationMigration, nil)
 	snapshot, err := (Local{}).InspectUpdateInput(repository)
 	if err != nil {
 		t.Fatal(err)

@@ -37,7 +37,8 @@ Files copied from the site template belong to the deployment, so later releases
 cannot simply overwrite them. The changes are Go code in the release:
 `Registry` in `internal/deploymigrate/registry.go` (ADR 0034), a list of
 `Migration{ID, Description, Apply(Tree) Outcome}` with the helper
-`ReplaceExact` and `Tree.Read`/`Write`/`Remove`, so a migration may change,
+`ReplaceExact`, `AddSharedPackage` (a package for every computer in
+`lab-software.json`) and `Tree.Read`/`Write`/`Remove`, so a migration may change,
 create or remove files. The release being installed runs them. During Update
 Nixorium the installed controller builds the target's `nixorium` package from
 the candidate, checks its marker `share/nixorium/deployment-migrate-contract`

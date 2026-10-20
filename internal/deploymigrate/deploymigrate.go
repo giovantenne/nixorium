@@ -17,6 +17,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 // ContractVersion is the version of the contract between the release that
@@ -240,6 +242,38 @@ func ReplaceExact(tree Tree, file, from, to string) Outcome {
 	default:
 		return Outcome{State: Manual, Detail: manualReplacement(file, from, to)}
 	}
+}
+
+// SoftwareFile is the deployment's software declaration.
+const SoftwareFile = "lab-software.json"
+
+// AddSharedPackage declares a package for the controller and all clients:
+// applied when the deployment does not name it, done when it names it with
+// any scope (an administrator's choice is kept), manual when the software
+// declaration cannot be read.
+func AddSharedPackage(tree Tree, name string) Outcome {
+	content, mode, found, err := tree.Read(SoftwareFile)
+	if err != nil || !found {
+		return Outcome{State: Manual, Detail: fmt.Sprintf("%s is missing or cannot be read. Add %s in Software for this controller and all clients.", SoftwareFile, name)}
+	}
+	software, err := domain.DecodeLabSoftware(content)
+	if err != nil {
+		return Outcome{State: Manual, Detail: fmt.Sprintf("%s is not valid. Correct it, then add %s in Software for this controller and all clients.", SoftwareFile, name)}
+	}
+	for _, entry := range software.Packages {
+		if entry.Package == name {
+			return Outcome{State: Done}
+		}
+	}
+	software.Packages = append(software.Packages, domain.SoftwareDeclaration{Package: name, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}})
+	updated, err := domain.MarshalLabSoftware(software)
+	if err != nil {
+		return Outcome{State: Manual, Detail: fmt.Sprintf("%s cannot take %s. Add it in Software for this controller and all clients.", SoftwareFile, name)}
+	}
+	if err := tree.Write(SoftwareFile, updated, mode); err != nil {
+		return Outcome{State: Manual, Detail: SoftwareFile + " cannot be written"}
+	}
+	return Outcome{State: Applied, Files: []string{SoftwareFile}}
 }
 
 func manualReplacement(file, from, to string) string {

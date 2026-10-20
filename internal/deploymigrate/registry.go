@@ -12,4 +12,11 @@ var Registry = []Migration{
 				"  isController = args.isController or false;\n")
 		},
 	},
+	{
+		ID:          "2026-10-jq-in-every-laboratory",
+		Description: "jq joins the software every laboratory starts with, on the controller and all clients.",
+		Apply: func(tree Tree) Outcome {
+			return AddSharedPackage(tree, "jq")
+		},
+	},
 }

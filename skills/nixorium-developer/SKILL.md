@@ -63,7 +63,8 @@ change must reach existing deployments, add an entry to
 `Registry` in `internal/deploymigrate/registry.go` in the same change, with a
 date-prefixed id, a one-sentence description and an `Apply` function (use
 `ReplaceExact`, with a `from` copied from every released form of the template
-text, for a text replacement). `Files` must list every file an applied
+text, for a text replacement; `AddSharedPackage` for a package every
+computer gets). `Files` must list every file an applied
 migration changed, and a unit test in `internal/deploymigrate` is required.
 Never edit or remove a released entry. Change the contract with the installed
 release only by adding a version and keeping the old one for a year of

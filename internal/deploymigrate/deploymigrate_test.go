@@ -7,9 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 const oldWorkstation = "args@{ ... }:\nlet\n  isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);\nin { }\n"
+
+// workstationOnly runs the first migration alone, so its tests do not
+// depend on the migrations added after it.
+var workstationOnly = Registry[:1]
 
 func treeWith(t *testing.T, files map[string]string) string {
 	t.Helper()
@@ -37,7 +43,7 @@ func read(t *testing.T, root, name string) string {
 
 func TestTheWorkstationMigrationRunsOnceAndIsRecorded(t *testing.T) {
 	root := treeWith(t, map[string]string{"modules/workstation.nix": oldWorkstation})
-	report, err := Run(root, "3.10.0", Registry)
+	report, err := Run(root, "3.10.0", workstationOnly)
 	if err != nil || len(report.Migrations) != 1 || report.Migrations[0].State != Applied || report.ContractVersion != 1 || report.TargetVersion != "3.10.0" {
 		t.Fatalf("report = %+v, %v", report, err)
 	}
@@ -55,7 +61,7 @@ func TestTheWorkstationMigrationRunsOnceAndIsRecorded(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "modules/workstation.nix"), []byte(oldWorkstation), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if report, err := Run(root, "3.10.0", Registry); err != nil || len(report.Migrations) != 0 || read(t, root, "modules/workstation.nix") != oldWorkstation {
+	if report, err := Run(root, "3.10.0", workstationOnly); err != nil || len(report.Migrations) != 0 || read(t, root, "modules/workstation.nix") != oldWorkstation {
 		t.Fatalf("second run = %+v, %v", report, err)
 	}
 }
@@ -65,7 +71,7 @@ func TestMigrationsLeaveChangedFilesAndKeepUnknownRecords(t *testing.T) {
 		"modules/workstation.nix": "  isController = true;\n",
 		RecordFile:                "{\"schemaVersion\":1,\"applied\":[\"2027-01-from-a-newer-release\"]}\n",
 	})
-	report, err := Run(root, "3.10.0", Registry)
+	report, err := Run(root, "3.10.0", workstationOnly)
 	if err != nil || len(report.Migrations) != 1 || report.Migrations[0].State != Manual || !strings.Contains(report.Migrations[0].Detail, "Replace") {
 		t.Fatalf("report = %+v, %v", report, err)
 	}
@@ -73,14 +79,14 @@ func TestMigrationsLeaveChangedFilesAndKeepUnknownRecords(t *testing.T) {
 		t.Fatal("a manual migration changed files or the record")
 	}
 	done := treeWith(t, map[string]string{"modules/workstation.nix": "  isController = args.isController or false;\n"})
-	if report, err := Run(done, "3.10.0", Registry); err != nil || report.Migrations[0].State != Done || !strings.Contains(read(t, done, RecordFile), "2026-10-workstation-is-controller") {
+	if report, err := Run(done, "3.10.0", workstationOnly); err != nil || report.Migrations[0].State != Done || !strings.Contains(read(t, done, RecordFile), "2026-10-workstation-is-controller") {
 		t.Fatalf("done = %+v, %v", report, err)
 	}
 }
 
 func TestAnInvalidRecordIsRefused(t *testing.T) {
 	root := treeWith(t, map[string]string{RecordFile: "{\"applied\":[\"no\"]}\n"})
-	if _, err := Run(root, "3.10.0", Registry); !errors.Is(err, ErrRefused) {
+	if _, err := Run(root, "3.10.0", workstationOnly); !errors.Is(err, ErrRefused) {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -114,5 +120,32 @@ func TestEveryRegistryIDIsValidAndUnique(t *testing.T) {
 	}
 	if !SupportsContract(ContractVersion) || SupportsContract(ContractVersion+1) {
 		t.Fatal("contract versions")
+	}
+}
+
+func TestJqIsAddedToEveryLaboratoryOnce(t *testing.T) {
+	jq := []Migration{Registry[1]}
+	original := "{\n  \"schemaVersion\": 1,\n  \"packages\": [\n    { \"package\": \"git\", \"scope\": { \"kind\": \"shared\" } }\n  ]\n}\n"
+	root := treeWith(t, map[string]string{SoftwareFile: original})
+	report, err := Run(root, "3.10.0", jq)
+	if err != nil || len(report.Migrations) != 1 || report.Migrations[0].State != Applied || len(report.Migrations[0].Files) != 1 || report.Migrations[0].Files[0] != SoftwareFile {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	software, err := domain.DecodeLabSoftware([]byte(read(t, root, SoftwareFile)))
+	if err != nil || len(software.Packages) != 2 || software.Packages[1].Package != "jq" || software.Packages[1].Scope.Kind != domain.SoftwareScopeShared {
+		t.Fatalf("software = %+v, %v", software, err)
+	}
+
+	// An administrator who already chose jq, for some clients only, keeps it.
+	chosen := "{\"schemaVersion\":1,\"packages\":[{\"package\":\"jq\",\"scope\":{\"kind\":\"clients\",\"clients\":[\"pc01\"]}}]}\n"
+	kept := treeWith(t, map[string]string{SoftwareFile: chosen})
+	if report, err := Run(kept, "3.10.0", jq); err != nil || report.Migrations[0].State != Done || read(t, kept, SoftwareFile) != chosen {
+		t.Fatalf("chosen jq = %+v, %v", report, err)
+	}
+
+	// An unreadable declaration is left alone and explained.
+	broken := treeWith(t, map[string]string{SoftwareFile: "{"})
+	if report, err := Run(broken, "3.10.0", jq); err != nil || report.Migrations[0].State != Manual || !strings.Contains(report.Migrations[0].Detail, "add jq in Software") || read(t, broken, SoftwareFile) != "{" {
+		t.Fatalf("broken = %+v, %v", report, err)
 	}
 }

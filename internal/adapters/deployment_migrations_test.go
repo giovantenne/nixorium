@@ -43,6 +43,10 @@ func migrationRepository(t *testing.T, files map[string]string) string {
 	return repository
 }
 
+// workstationMigration is the first released migration alone: these tests
+// cover the mechanism, not the registry, which grows with each release.
+var workstationMigration = deploymigrate.Registry[:1]
+
 // useMigrator makes the target release a migrator that runs in-process with
 // the given registry, plus an optional extra change made behind its back.
 func useMigrator(t *testing.T, registry []deploymigrate.Migration, extra func(directory string)) {
@@ -66,7 +70,7 @@ func useMigrator(t *testing.T, registry []deploymigrate.Migration, extra func(di
 
 func TestTheTargetReleaseMigratesACopyAndTheDifferenceIsReviewed(t *testing.T) {
 	repository := migrationRepository(t, map[string]string{"modules/workstation.nix": "let\n" + oldControllerTest + "in { }\n"})
-	useMigrator(t, deploymigrate.Registry, nil)
+	useMigrator(t, workstationMigration, nil)
 	results, files, raw, migrator, err := planDeploymentMigrations(context.Background(), repository, "path:/nix/store/00000000000000000000000000000000-source", true)
 	if err != nil || len(results) != 1 || results[0].State != domain.MigrationApplied || migrator == "" || len(raw) == 0 {
 		t.Fatalf("results = %+v, migrator = %q, error = %v", results, migrator, err)
@@ -91,7 +95,7 @@ func TestTheTargetReleaseMigratesACopyAndTheDifferenceIsReviewed(t *testing.T) {
 
 func TestMigrationsRunOnlyWhenTheReleaseChanges(t *testing.T) {
 	repository := migrationRepository(t, map[string]string{"modules/workstation.nix": oldControllerTest})
-	useMigrator(t, deploymigrate.Registry, nil)
+	useMigrator(t, workstationMigration, nil)
 	if results, files, _, _, err := planDeploymentMigrations(context.Background(), repository, "path:/nix/store/00000000000000000000000000000000-source", false); err != nil || results != nil || files != nil {
 		t.Fatalf("a package-base update ran migrations: %+v %+v %v", results, files, err)
 	}
@@ -115,7 +119,7 @@ func TestUndeclaredOrForbiddenChangesRefuseTheUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			repository := migrationRepository(t, map[string]string{"modules/workstation.nix": oldControllerTest, "README.md": "x\n", "flake.nix": "{ }\n", "keys/cache-public-key": "k\n",
 				domain.DeploymentMigrationsFile: "{\"schemaVersion\":1,\"applied\":[]}\n"})
-			useMigrator(t, deploymigrate.Registry, extra)
+			useMigrator(t, workstationMigration, extra)
 			if _, _, _, _, err := planDeploymentMigrations(context.Background(), repository, "path:/nix/store/00000000000000000000000000000000-source", true); err == nil {
 				t.Fatal("the update was not refused")
 			}
@@ -133,7 +137,7 @@ func TestUndeclaredOrForbiddenChangesRefuseTheUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			repository := migrationRepository(t, map[string]string{"modules/workstation.nix": oldControllerTest,
 				domain.DeploymentMigrationsFile: `{"schemaVersion":1,"applied":["2025-01-old"]}` + "\n"})
-			useMigrator(t, deploymigrate.Registry, extra)
+			useMigrator(t, workstationMigration, extra)
 			if _, _, _, _, err := planDeploymentMigrations(context.Background(), repository, "path:/nix/store/00000000000000000000000000000000-source", true); err == nil || !strings.Contains(err.Error(), "record") {
 				t.Fatalf("error = %v", err)
 			}
@@ -185,7 +189,7 @@ func TestMigrationsMayCreateAndRemoveFiles(t *testing.T) {
 
 func TestMigratedFilesAreWrittenOnlyAsReviewed(t *testing.T) {
 	repository := migrationRepository(t, map[string]string{"modules/workstation.nix": oldControllerTest})
-	useMigrator(t, deploymigrate.Registry, nil)
+	useMigrator(t, workstationMigration, nil)
 	_, files, _, _, err := planDeploymentMigrations(context.Background(), repository, "path:/nix/store/00000000000000000000000000000000-source", true)
 	if err != nil {
 		t.Fatal(err)

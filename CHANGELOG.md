@@ -6,6 +6,34 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- jq is now part of the software every laboratory starts with, on the
+  controller and all clients, in every software profile. **Update Nixorium**
+  adds it to existing laboratories; a laboratory that already declares jq,
+  for some computers only, keeps its choice.
+
+### Fixed
+
+- Laboratory settings during installation: choosing the controller's current
+  address on another network card now moves the laboratory network to that
+  card, and the summary names the controller's card. Before, a controller with
+  two cards could keep the laboratory on the wrong one, so network
+  installation served the wrong cable.
+- The client network card hint said the controller's card name; an empty
+  value means any wired card.
+- A new laboratory shows "This laboratory has no backup yet" instead of a
+  backup being due.
+- The network installation screen shows the address it serves after the
+  controller's DHCP address changed.
+- Client installers no longer fill the screen with Nix lock file messages,
+  and no longer report a missing identity record while installing a computer
+  that shares its class system.
+- A failed controller installation releases the new disk, so running the
+  setup command again finds it.
+- Controllers build Nixorium without running its test suite, which only
+  added minutes and once failed an installation on a busy computer.
+
 ## [3.10.0-beta.1] - 2026-10-19
 
 ### Added
