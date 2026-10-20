@@ -278,7 +278,7 @@ func (model dashboardModel) areaView(path, title, description string, tasks []da
 
 func (model dashboardModel) computersAreaView() string {
 	title := "Manage client computers"
-	description := "Observed state is loaded only by Computer inventory or an operation that needs it."
+	description := "Check which computers are on, update them, switch them on or off, and control Internet access."
 	if model.actions.ClassroomMode {
 		title = "Classroom controls"
 		description = "Check computers, watch and lock students' screens, send files, control temporary Internet access, or switch computers on, shut them down or restart them after a review. Administrative configuration is not available here."

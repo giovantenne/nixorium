@@ -151,7 +151,7 @@ func (m *ControllerManager) Apply(ctx context.Context, repository, expectedRevis
 	report.Verified = true
 	report.State = "completed"
 	report.Phase = domain.ControllerRebuildPhaseComplete
-	report.Message = "reviewed controller revision built, activated, and verified"
+	report.Message = "The controller now uses the saved configuration."
 	return report
 }
 

@@ -12,6 +12,16 @@ import (
 // entry: what was not done and why, the reason Nixorium stops, and the way
 // forward. The technical text stays available as a details line.
 
+// messageNotice shows the current message, as a success when it only reports
+// the verified controller apply that just finished.
+func (model dashboardModel) messageNotice() tuiNotice {
+	result := model.controller.result
+	if result.Operation != "" && !result.HasErrors() && result.Applied && result.Verified && result.Message == model.message {
+		return tuiNotice{kind: tuiStatusSuccess, title: model.message}
+	}
+	return tuiNotice{kind: tuiStatusAttention, title: model.message}
+}
+
 // failureNotice reports a failed attempt; prefix says what was tried.
 func failureNotice(prefix, message string) tuiNotice {
 	return tuiNotice{kind: tuiStatusAttention, title: message, prefix: prefix}

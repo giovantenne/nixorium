@@ -290,7 +290,7 @@ func (model dashboardModel) networkChangeView() string {
 	}
 	shell.body = strings.Join(lines, "\n")
 	if model.message != "" {
-		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+		shell.notices = append(shell.notices, model.messageNotice())
 	}
 	return model.renderShell(shell)
 }

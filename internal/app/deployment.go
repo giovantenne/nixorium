@@ -176,7 +176,7 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 	}
 	report.Phase = domain.DeploymentPhaseComplete
 	report.State = "completed"
-	report.Message = "all selected targets were built, applied, authenticated, and recorded successfully"
+	report.Message = "The selected computers were updated, checked, and recorded."
 	emitDeploymentProgress(observe, domain.DeploymentProgress{
 		Phase: domain.DeploymentPhaseComplete, Completed: 4, Total: 4,
 		TargetCurrent: report.Verification.Verified, TargetTotal: report.Verification.Attempted,

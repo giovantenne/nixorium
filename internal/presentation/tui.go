@@ -2663,8 +2663,8 @@ func (model dashboardModel) deployView() string {
 		shell.fixedBody = tuiSection("Enter updates these computers.", model.isDark)
 		shell.notices = append(shell.notices, tuiNotice{
 			kind:   tuiStatusAttention,
-			title:  "Target services may restart; unreachable computers may remain unchanged",
-			detail: "Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or interrupted apply may require recovery before another operation.",
+			title:  "Programs on the computers may restart during the update",
+			detail: deploymentUnreachableNote(queueable) + " If an update is interrupted, recovery may be needed before the next one.",
 		})
 		if model.message != "" {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
@@ -2683,16 +2683,10 @@ func (model dashboardModel) deployView() string {
 		success := !model.deployment.result.HasErrors()
 		summary := model.deployment.result.ResultSummary()
 		lines := []string{
-			tuiResult(summary.Headline, success, model.isDark),
-			"",
-			fmt.Sprintf("State: %s   Phase: %s", model.deployment.result.State, model.deployment.result.Phase),
-			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployment.result.BuildCompleted, model.deployment.result.ApplyCompleted),
+			tuiResult(deploymentResultHeadline(summary, success), success, model.isDark),
 		}
-		if model.deployment.result.Verification.Attempted > 0 {
-			lines = append(lines, fmt.Sprintf("Authenticated: %d/%d   Recorded: %d", model.deployment.result.Verification.Verified, model.deployment.result.Verification.Attempted, model.deployment.result.Verification.Recorded))
-		}
-		if model.deployment.result.LogPath != "" {
-			lines = append(lines, "Detailed log: "+model.deployment.result.LogPath)
+		if line := deploymentResultCounts(summary); line != "" && !success {
+			lines = append(lines, "", line)
 		}
 		for _, computer := range summary.Computers {
 			lines = append(lines, "", computer.Name+" — "+computer.Outcome, "  "+computer.Guidance)
@@ -2744,6 +2738,47 @@ func (model dashboardModel) deployView() string {
 	shell.body = strings.Join(lines, "\n")
 	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "n", label: "Those needing update"}, {key: "r", label: "Check computers"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
 	return model.renderShell(shell)
+}
+
+// deploymentResultHeadline leads with how many computers were updated when
+// the whole update went through.
+func deploymentResultHeadline(summary domain.DeploymentResultSummary, success bool) string {
+	updated := 0
+	for _, computer := range summary.Computers {
+		if computer.Outcome == "Updated" {
+			updated++
+		}
+	}
+	if success && updated > 0 && updated == len(summary.Computers) {
+		return countNoun(updated, "computer") + " updated"
+	}
+	return summary.Headline
+}
+
+// deploymentResultCounts summarizes the per-computer outcomes below it.
+func deploymentResultCounts(summary domain.DeploymentResultSummary) string {
+	counts, order := map[string]int{}, []string{}
+	for _, computer := range summary.Computers {
+		outcome := strings.ToLower(computer.Outcome)
+		if counts[outcome] == 0 {
+			order = append(order, outcome)
+		}
+		counts[outcome]++
+	}
+	parts := make([]string, 0, len(order))
+	for _, outcome := range order {
+		parts = append(parts, fmt.Sprintf("%d %s", counts[outcome], outcome))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// deploymentUnreachableNote says what happens to computers that did not
+// answer the quick check.
+func deploymentUnreachableNote(queueable bool) string {
+	if queueable {
+		return "Computers that did not answer are left unchanged, or updated when switched on if you choose that (F3)."
+	}
+	return "Computers that did not answer are left unchanged."
 }
 
 func (model dashboardModel) deploymentProgressView() []string {
@@ -2884,7 +2919,7 @@ func (model dashboardModel) pxeView() string {
 				path:    path,
 				body:    strings.Join(lines, "\n"),
 				notices: []tuiNotice{{kind: tuiStatusFailure, title: "Computer installation could not continue", detail: model.message}},
-				actions: []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}},
+				actions: []tuiAction{{key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}},
 			})
 		}
 	}
@@ -2948,8 +2983,8 @@ func (model dashboardModel) pxeView() string {
 		}, "\n")
 		notices := []tuiNotice{{
 			kind:   tuiStatusAttention,
-			title:  "Temporarily remove " + model.installation.startPlan.StaticCIDR + "; remote connections may be interrupted",
-			detail: "Serve ProxyDHCP, TFTP, HTTP and cache via " + model.installation.startPlan.DHCPAddress + ". Institutional DHCP remains authoritative; stop or reboot recovery restores normal addressing.",
+			title:  "The controller's laboratory address (" + model.installation.startPlan.StaticCIDR + ") is paused until network installation is finished",
+			detail: "Client computers on this network will be able to start the installer from the network, served by the controller at " + model.installation.startPlan.DHCPAddress + ". The school's DHCP keeps giving out addresses. Finish installation, or a restart, brings the laboratory address back. Remote connections to the controller may be interrupted meanwhile.",
 		}}
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
@@ -3040,7 +3075,7 @@ func (model dashboardModel) pxeActions() []tuiAction {
 		return []tuiAction{{key: "q", label: "Quit Nixorium; work continues"}, {key: "F1", label: "Help"}}
 	}
 	if model.installation.flow && model.installation.failed {
-		return []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+		return []tuiAction{{key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}}
 	}
 	primary := model.pxePrimaryAction()
 	actions := []tuiAction{{key: "Enter", label: primary.label}}

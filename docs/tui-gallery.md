@@ -173,7 +173,7 @@ q Exit  ·  F1 Help
 Nixorium  /  Computers
 
 Manage client computers
-Observed state is loaded only by Computer inventory or an operation that needs it.
+Check which computers are on, update them, switch them on or off, and control Internet access.
 
 › [h] Computer inventory
   [d] Update computers
@@ -691,9 +691,9 @@ pc05  10.42.0.15  Reachable at last check
 
 Enter updates these computers.
 
-! Target services may restart; unreachable computers may remain unchanged
-  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
-interrupted apply may require recovery before another operation.
+! Programs on the computers may restart during the update
+  Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
+next one.
 
 Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
@@ -703,12 +703,7 @@ Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```text
 Nixorium  /  Computers  /  Update computers
 
-✓ Deployment completed and verified
-
-State: completed   Phase: complete
-Build complete: true   Apply complete: true
-Authenticated: 5/5   Recorded: 5
-Detailed log: /demo/state/deploy-lab.log
+✓ 5 computers updated
 
 pc01 — Updated
   Authenticated at the reviewed revision.
@@ -722,7 +717,8 @@ pc03 — Updated
 pc04 — Updated
   Authenticated at the reviewed revision.
 
-Shift ↑/↓ scroll · ? help
+pc05 — Updated
+  Authenticated at the reviewed revision.
 
 ○ All five clients report the reviewed revision.
 
@@ -747,9 +743,9 @@ pc02  10.42.0.12  Not reached at last check
 
 Enter updates these computers.
 
-! Target services may restart; unreachable computers may remain unchanged
-  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
-interrupted apply may require recovery before another operation.
+! Programs on the computers may restart during the update
+  Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
+next one.
 
 F2 Reachable only  ·  Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
@@ -771,9 +767,9 @@ pc01  10.42.0.11  Reachable at last check
 
 Enter updates these computers.
 
-! Target services may restart; unreachable computers may remain unchanged
-  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
-interrupted apply may require recovery before another operation.
+! Programs on the computers may restart during the update
+  Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
+next one.
 
 Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
@@ -785,10 +781,7 @@ Nixorium  /  Computers  /  Update computers
 
 ! Some computers were not reached
 
-State: partial   Phase: verify
-Build complete: true   Apply complete: true
-Authenticated: 1/2   Recorded: 1
-Detailed log: /demo/state/deploy-mixed.log
+1 updated, 1 not reached
 
 pc01 — Updated
   Authenticated at the reviewed revision.
@@ -807,10 +800,7 @@ Nixorium  /  Computers  /  Update computers
 
 ! Deployment requires recovery — some computers were not reached
 
-State: failed   Phase: apply
-Build complete: true   Apply complete: false
-Authenticated: 1/2   Recorded: 0
-Detailed log: /demo/state/deploy-mixed.log
+1 not verified, 1 not reached
 
 pc01 — Not verified
   Inspect authenticated computer state and the private log before a fresh review. Activation completion is
@@ -839,9 +829,10 @@ Affects  enp1s0 · controller network
 
 Enter starts network installation mode.
 
-! Temporarily remove 10.42.0.99/24; remote connections may be interrupted
-  Serve ProxyDHCP, TFTP, HTTP and cache via 192.168.1.123. Institutional DHCP remains authoritative; stop or
-reboot recovery restores normal addressing.
+! The controller's laboratory address (10.42.0.99/24) is paused until network installation is finished
+  Client computers on this network will be able to start the installer from the network, served by the controller
+at 192.168.1.123. The school's DHCP keeps giving out addresses. Finish installation, or a restart, brings the
+laboratory address back. Remote connections to the controller may be interrupted meanwhile.
 
 Enter Start PXE  ·  Esc Cancel  ·  F1 Help
 ```

@@ -399,7 +399,7 @@ func (model dashboardModel) settingsView() string {
 			lines = append(lines, "", "A new password takes effect only after you apply the configuration to this controller and then update the computers.")
 		}
 		if model.message != "" {
-			notice := tuiNotice{kind: tuiStatusAttention, title: model.message}
+			notice := model.messageNotice()
 			if !success && model.settings.result.State != "saved" {
 				notice = failureNotice("The settings were not saved", model.message)
 			}

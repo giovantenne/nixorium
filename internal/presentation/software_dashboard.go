@@ -740,7 +740,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 			return []tuiAction{{key: "Enter", label: "Retry controller"}, {key: "a", label: "Retry controller"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canDistribute(context.controllerResult) {
-			return []tuiAction{{key: "Enter", label: "Update computers"}, {key: "d", label: "Update affected computers"}, {key: "v", label: "Check systems"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
+			return []tuiAction{{key: "Enter", label: "Update affected computers"}, {key: "v", label: "Check systems"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canInspectState() {
 			return []tuiAction{{key: "v", label: "Check systems"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
@@ -1032,7 +1032,7 @@ func (model softwareModel) resultView(context softwareViewContext) []string {
 		if result.AffectedController != "" && !verified {
 			lines = append(lines, "", "The configuration remains saved; retrying the controller does not duplicate it.")
 		} else if len(result.AffectedClients) > 0 {
-			lines = append(lines, "", "Select computers and confirm a fresh deployment review; no client changed here.")
+			lines = append(lines, "", "The computers get this change when they are updated. Nothing has changed on them yet.")
 		} else {
 			lines = append(lines, "", "No client deployment is required.")
 		}

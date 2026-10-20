@@ -18,7 +18,7 @@ func TestGalleryRenderingIsDeterministicAndSemantic(t *testing.T) {
 		"Profile review",
 		"4 add · 0 already configured · 1 excluded",
 		"Opened from a saved software change",
-		"Deployment completed and verified",
+		"5 computers updated",
 		"Enter starts network installation mode",
 		"in use: those sessions will be shut down",
 		"Logged in, not in use",

@@ -436,7 +436,7 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 	updated, _ = model.Update(planMessage)
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if model.screen != dashboardPXEStartReview || starts != 0 || !strings.Contains(view, "Temporarily remove 10.0.0.99/24") || !strings.Contains(view, "Enter starts network installation mode") || strings.Contains(view, "pilot") {
+	if model.screen != dashboardPXEStartReview || starts != 0 || !strings.Contains(view, "laboratory address (10.0.0.99/24) is paused") || !strings.Contains(view, "Enter starts network installation mode") || strings.Contains(view, "pilot") {
 		t.Fatalf("flow did not stop at the sole PXE review: screen=%d starts=%d\n%s", model.screen, starts, view)
 	}
 }

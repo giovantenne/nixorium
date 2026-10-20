@@ -155,7 +155,9 @@ func (model dashboardModel) homeFilesView() string {
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: safeWorkspaceText(model.message)})
+		notice := model.messageNotice()
+		notice.title = safeWorkspaceText(model.message)
+		notices = append(notices, notice)
 	}
 	return model.renderShell(tuiShell{path: []string{"Settings", "Student workspace", "Initial files"}, body: strings.Join(lines, "\n"), fixedBody: fixed, notices: notices, actions: actions})
 }

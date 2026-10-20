@@ -1047,7 +1047,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 		updated, command = model.Update(command())
 		model = updated.(dashboardModel)
 	}
-	if applied != 1 || model.deployment.applying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Deployment completed and verified") || !strings.Contains(model.View().Content, "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View().Content, "/state/deploy.log") || !strings.Contains(model.View().Content, "New review") {
+	if applied != 1 || model.deployment.applying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Deployment completed and verified") || strings.Contains(model.View().Content, "Authenticated: 2/2") || strings.Contains(model.View().Content, "/state/deploy.log") || strings.Contains(model.View().Content, "Build complete:") || !strings.Contains(model.View().Content, "New review") {
 		t.Fatalf("deployment result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -2058,7 +2058,7 @@ func TestDashboardPXEStartIsConfirmedWithEnter(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardPXEStartReview || !strings.Contains(model.View().Content, "Temporarily remove 10.0.0.99/24") {
+	if model.screen != dashboardPXEStartReview || !strings.Contains(model.View().Content, "laboratory address (10.0.0.99/24) is paused") {
 		t.Fatalf("start review not shown:\n%s", model.View().Content)
 	}
 
