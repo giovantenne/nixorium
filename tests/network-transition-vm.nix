@@ -30,6 +30,8 @@ in
       imports = laboratoryModules;
       _module.args = hostArgs "pc99";
       virtualisation.interfaces.eth1 = { vlan = 1; assignIP = false; };
+      # The test driver's own card is not part of the laboratory.
+      networking.networkmanager.unmanaged = [ "interface-name:eth0" ];
       systemd.tmpfiles.rules = [
         "d /var/lib/nixorium/keys 0700 root root -"
         "C /var/lib/nixorium/keys/harmonia-secret-key 0600 root root - ${cacheSecretKey}"

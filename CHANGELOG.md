@@ -42,6 +42,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   that shares its class system.
 - A failed controller installation releases the new disk, so running the
   setup command again finds it.
+- Diagnostics reports a failed last apply to the controller with its cause,
+  and Operation history shows why an operation failed, with plain names and
+  local times.
 - When applying to the controller or preparing installation files fails,
   the message names the cause from the service's own log (no Internet or
   DNS, a full disk, or the error Nix reported) instead of only saying that a

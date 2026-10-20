@@ -34,6 +34,7 @@ var supportGuides = map[string]string{
 	"COMMAND-NIX-COPY-CLOSURE": "build-resources-and-controller-tools",
 	"CLIENT-SSH":               "one-client-is-offline-or-unknown",
 	"CONTROLLER-BUILD":         "controller-apply-failed",
+	"LAST-CONTROLLER-APPLY":    "controller-apply-failed",
 	"TIME-SYNC":                "first-diagnostics",
 
 	"RECOVERY-DEPLOYMENT-PENDING":     "interrupted-client-deployment",

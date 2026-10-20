@@ -338,6 +338,42 @@ func (i *Inspector) addLocalFindings(ctx context.Context, repository string, rep
 			add(domain.Finding{ID: "TIME-SYNC", Level: domain.LevelOK, Summary: "The controller clock is synchronized"})
 		}
 	}
+	if finding, found := lastControllerApplyFailure(i.source); found {
+		add(finding)
+	}
+}
+
+type operationRecordSource interface {
+	OperationRecords(int) ([]domain.OperationRecord, error)
+}
+
+// lastControllerApplyFailure reports the latest controller apply when it
+// failed, with its recorded cause, so Diagnostics shows it after the screen
+// that reported it is gone. A later successful apply clears it.
+func lastControllerApplyFailure(source any) (domain.Finding, bool) {
+	records, ok := source.(operationRecordSource)
+	if !ok {
+		return domain.Finding{}, false
+	}
+	recent, err := records.OperationRecords(20)
+	if err != nil {
+		return domain.Finding{}, false
+	}
+	for _, record := range recent {
+		if record.Operation != "controller-apply" && record.Operation != "setup-apply-controller" {
+			continue
+		}
+		if record.State != "failed" {
+			return domain.Finding{}, false
+		}
+		return domain.Finding{
+			ID: "LAST-CONTROLLER-APPLY", Level: domain.LevelWarning,
+			Summary:     "The last apply to the controller failed",
+			Evidence:    record.RecordedAt.Local().Format("2006-01-02 15:04") + ": " + record.Summary,
+			Remediation: "Fix the cause shown, then apply again in Maintenance → Apply to controller (`nixorium controller plan`).",
+		}, true
+	}
+	return domain.Finding{}, false
 }
 
 func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusReport, options DoctorOptions) domain.DoctorReport {

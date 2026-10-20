@@ -58,6 +58,9 @@ in
   # with several wired NICs the first one to come up carries it; automatic
   # DHCP-only profiles for the other NICs are disabled so that nothing else
   # competes. Such PCs should use hostIfaceNames.
+  # The laboratory address depends on NetworkManager; desktops enable it
+  # anyway, this keeps the module complete on its own.
+  networking.networkmanager.enable = lib.mkIf profile (lib.mkDefault true);
   networking.networkmanager.settings.main = lib.mkIf profile ({
     # Clients: nothing else competes for a wired card. The controller keeps
     # NetworkManager's automatic DHCP on its other cards (an Internet uplink).
