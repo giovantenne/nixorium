@@ -853,7 +853,12 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 		detail := item.Summary
 		if model.mode == softwareConfigured {
 			if entry, found := model.declaration(item.ID); found {
+				// What the package is, then where it goes: identifiers such as
+				// apacheHttpd mean little on their own.
 				detail = "Installed on " + softwareScopeLabel(entry.Scope)
+				if summary := strings.TrimSpace(item.Summary); summary != "" {
+					detail = summary + " · " + strings.ToLower(detail[:1]) + detail[1:]
+				}
 			}
 		} else if entry, found := model.declaration(item.ID); found {
 			detail = "Already installed on " + softwareScopeLabel(entry.Scope)
