@@ -660,7 +660,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if model.installation.flow {
 			model.screen = dashboardPXE
 			if message.report.HasErrors() || !message.report.Applied || !message.report.Verified {
-				return model.failComputerInstallation("Controller activation failed: " + message.report.Message)
+				return model.failComputerInstallation("Controller activation failed: " + strings.TrimPrefix(message.report.Message, "controller build or activation failed: "))
 			}
 			model.busy = "Checking installation prerequisites"
 			if model.actions.LoadControllerProgress != nil {

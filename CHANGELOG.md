@@ -31,6 +31,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   that shares its class system.
 - A failed controller installation releases the new disk, so running the
   setup command again finds it.
+- When applying to the controller or preparing installation files fails,
+  the message names the cause from the service's own log (no Internet or
+  DNS, a full disk, or the error Nix reported) instead of only saying that a
+  systemd job failed.
 - Controllers build Nixorium without running its test suite, which only
   added minutes and once failed an installation on a busy computer.
 

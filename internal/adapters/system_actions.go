@@ -4,12 +4,55 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
+	"time"
 )
 
 var controllerApplyUnitPattern = regexp.MustCompile(`^nixorium-apply-controller@[0-9a-f]{40}\.service$`)
 
 func (Local) StartSystemUnit(ctx context.Context, unit string) error {
-	return (Local{}).ControlSystemUnit(ctx, "start", unit)
+	err := (Local{}).ControlSystemUnit(ctx, "start", unit)
+	if err == nil || !strings.Contains(err.Error(), "failed because the control process exited") {
+		return err
+	}
+	// systemctl only says that the job failed; the unit's own messages say
+	// why. Read the last ones of this run, bounded, for a cause to act on.
+	readCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	invocation, _ := run(readCtx, "systemctl", "show", "--property=InvocationID", "--value", unit)
+	invocation = strings.TrimSpace(invocation)
+	if invocation == "" {
+		return err
+	}
+	journal, _ := run(readCtx, "journalctl", "_SYSTEMD_INVOCATION_ID="+invocation, "--output=cat", "--lines=200", "--no-pager")
+	if cause := unitFailureCause(journal); cause != "" {
+		return fmt.Errorf("%s (details: journalctl -u %s)", cause, unit)
+	}
+	return err
+}
+
+var unresolvedHostPattern = regexp.MustCompile(`Could not resolve host:? ([A-Za-z0-9.-]+)`)
+
+// unitFailureCause turns the last messages of a failed Nixorium unit into a
+// cause an administrator can act on, or "" when none is recognized.
+func unitFailureCause(journal string) string {
+	lines := strings.Split(strings.TrimSpace(journal), "\n")
+	for index := len(lines) - 1; index >= 0; index-- {
+		line := strings.TrimSpace(lines[index])
+		switch {
+		case unresolvedHostPattern.MatchString(line):
+			host := unresolvedHostPattern.FindStringSubmatch(line)[1]
+			return "the controller cannot reach the Internet: it could not find " + host + ". Check its network cable and its DNS server, then try again"
+		case strings.Contains(line, "No space left on device"):
+			return "the controller's disk is full. Free space in Maintenance → Free disk space, then try again"
+		}
+	}
+	for index := len(lines) - 1; index >= 0; index-- {
+		if line := strings.TrimSpace(lines[index]); strings.HasPrefix(line, "error:") {
+			return "Nix reported: " + strings.TrimSpace(strings.TrimPrefix(line, "error:"))
+		}
+	}
+	return ""
 }
 
 func (Local) ControlSystemUnit(ctx context.Context, verb, unit string) error {
