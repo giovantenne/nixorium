@@ -148,10 +148,14 @@ in
     installer.succeed("set -o pipefail; /etc/nixorium-test/run-client-installer 2>&1 | tee /tmp/client-installer.log")
     installer.succeed("grep -F 'detected automatically' /tmp/client-installer.log")
     installer.succeed("grep -F 'DESTRUCTIVE REVIEW' /tmp/client-installer.log")
-    installer.succeed("grep -F '[1/3] Partitioning /dev/vdb' /tmp/client-installer.log")
-    installer.succeed("grep -F '[2/3] Installing pc01' /tmp/client-installer.log")
-    installer.succeed("grep -F '[3/3] Verifying' /tmp/client-installer.log")
-    installer.succeed("grep -F 'SUCCESS: pc01 is installed on /dev/vdb' /tmp/client-installer.log")
+    installer.succeed("grep -F 'Partitioning /dev/vdb' /tmp/client-installer.log")
+    installer.succeed("grep -F 'Boot loader installed' /tmp/client-installer.log")
+    installer.succeed("grep -F 'Verifying the installed system' /tmp/client-installer.log")
+    installer.succeed("grep -F 'pc01 is installed on /dev/vdb' /tmp/client-installer.log")
+    # The store path list and the boot loader noise stay in the log file.
+    installer.fail("grep -F 'copying path' /tmp/client-installer.log")
+    installer.fail("grep -E '^ +/nix/store/' /tmp/client-installer.log")
+    installer.succeed("test -s /tmp/nixorium-install.log")
     # The profile links are absolute; they resolve inside the target, not here.
     installer.succeed("test -L /mnt/nix/var/nix/profiles/system && test \"$(readlink /mnt/nix/var/nix/profiles/system-1-link)\" = ${clientSystem}")
     installer.succeed("test -e /mnt${clientSystem}")

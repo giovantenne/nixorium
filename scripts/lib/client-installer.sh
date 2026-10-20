@@ -41,13 +41,27 @@ nixorium_canonical_disk() {
 }
 
 # nixos-install forwards nix's "copying path ..." line for every store path
-# (thousands per installation) and has no quiet option. This keeps everything
-# else, including errors, and replaces those lines with a count every 500.
+# (thousands per installation), lists every path it is about to fetch, and has
+# no quiet option. This keeps everything else, including errors, and replaces
+# those lines with a count every 500.
 nixorium_summarize_copy_output() {
   awk '
     /^copying path / { n++; if (n % 500 == 0) { print "  " n " store paths copied..."; fflush() }; next }
+    /^[[:space:]]+\/nix\/store\// { next }
     { print; fflush() }
     END { if (n > 0) print "  " n " store paths copied." }
+  '
+}
+
+# The quiet variant for the guided client installer, which keeps the complete
+# output in a log file: only the "these N paths will be fetched" summary and a
+# running count reach the screen. Errors are in the log, which the caller shows
+# when the installation fails.
+nixorium_copy_progress() {
+  awk '
+    /^copying path / { n++; if (n % 250 == 0) { print "      " n " store paths copied so far..."; fflush() }; next }
+    /^(these|this) [0-9]+ paths? will be (fetched|built)/ { print "      " $0; fflush(); next }
+    END { if (n > 0) print "      " n " store paths copied." }
   '
 }
 
