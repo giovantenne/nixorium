@@ -191,7 +191,7 @@ list_disks() {
   local INDEX=1 DISK DETAILS
   for DISK in "${AVAILABLE_DISKS[@]}"; do
     DETAILS=$(lsblk -dnpo PATH,MODEL,SERIAL,TRAN -- "$DISK" | sed 's/[[:space:]]\{1,\}/ /g')
-    printf '  %s%d)%s %s, %s\n' "$UI_FOCUS" "$INDEX" "$UI_RESET" "$(format_bytes "$(disk_size "$DISK")")" "$DETAILS"
+    printf '    %s%d)%s %s, %s\n' "$UI_FOCUS" "$INDEX" "$UI_RESET" "$(format_bytes "$(disk_size "$DISK")")" "$DETAILS"
     INDEX=$((INDEX + 1))
   done
 }
@@ -249,7 +249,7 @@ describe_disk_identity() {
 
 list_hosts() {
   printf '%s' "$LAB_CLIENT_HOSTS_JSON" | jq -r '
-    to_entries[] | "  \(.key + 1)) \(.value.name)  \(.value.ip)"
+    to_entries[] | "    \(.key + 1)) \(.value.name)  \(.value.ip)"
   '
 }
 
@@ -316,7 +316,7 @@ check_duplicate_identity() {
       ;;
     1)
       ui_success "No other computer answers as ${SELECTED_HOST} (${SELECTED_HOST_IP})."
-      ui_note "      If someone is installing another computer right now, make sure it is not also ${SELECTED_HOST}."
+      ui_note "       If someone is installing another computer right now, make sure it is not also ${SELECTED_HOST}."
       ;;
     *)
       ui_feedback "Cannot check whether ${SELECTED_HOST} (${SELECTED_HOST_IP}) is already in use: the network route is unavailable."
