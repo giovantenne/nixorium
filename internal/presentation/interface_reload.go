@@ -62,6 +62,18 @@ func (model dashboardModel) reloadActions() []tuiAction {
 	return []tuiAction{{key: "Enter", label: "Reopen now"}, {key: "Esc", label: "Keep this interface"}, {key: "F1", label: "Help"}}
 }
 
+// ReopenNoticeEnvironment carries the outcome shown before the interface
+// reopened on the installed Nixorium, so the new interface shows it too.
+const ReopenNoticeEnvironment = "NIXORIUM_REOPEN_NOTICE"
+
+// reloadOutcome is the result to show after the interface reopens.
+func (model dashboardModel) reloadOutcome() string {
+	if model.screen == dashboardUpdate {
+		return "Nixorium and this controller are updated. Next: Computers → Update computers."
+	}
+	return "This controller runs the updated Nixorium."
+}
+
 // offerInterfaceReload starts the countdown after a successful controller
 // activation when the installed Nixorium differs from the running one.
 func (model dashboardModel) offerInterfaceReload() (dashboardModel, tea.Cmd) {

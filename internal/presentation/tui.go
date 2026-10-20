@@ -300,6 +300,9 @@ type controllerModel struct {
 	progressID          uint64
 	details             bool
 	progressUnavailable bool
+	// progressFailures counts consecutive unreadable progress polls; a
+	// single miss, common while systemd reloads, is not reported.
+	progressFailures int
 }
 
 // settingsModel owns the settings editor and its reviewed local save. The
@@ -508,25 +511,28 @@ type dashboardModel struct {
 	networkChange          networkChangeModel
 	controller             controllerModel
 	reload                 interfaceReloadModel
-	maintenance            maintenanceModel
-	updates                updateModel
-	settings               settingsModel
-	workspace              workspaceModel
-	homeFiles              homeFilesModel
-	updateNotification     domain.UpdateNotification
-	telemetry              telemetryModel
-	support                supportModel
-	templateReset          templateResetModel
-	software               softwareModel
-	internet               internetModel
-	lock                   lockModel
-	share                  shareModel
-	cleanup                cleanupModel
-	shutdown               shutdownModel
-	width                  int
-	height                 int
-	isDark                 bool
-	activitySpinner        spinner.Model
+	// reopenNotice is the outcome of the update that reopened this
+	// interface, shown on the first screen.
+	reopenNotice       string
+	maintenance        maintenanceModel
+	updates            updateModel
+	settings           settingsModel
+	workspace          workspaceModel
+	homeFiles          homeFilesModel
+	updateNotification domain.UpdateNotification
+	telemetry          telemetryModel
+	support            supportModel
+	templateReset      templateResetModel
+	software           softwareModel
+	internet           internetModel
+	lock               lockModel
+	share              shareModel
+	cleanup            cleanupModel
+	shutdown           shutdownModel
+	width              int
+	height             int
+	isDark             bool
+	activitySpinner    spinner.Model
 
 	inventory    inventoryLoad
 	initializing bool
@@ -670,6 +676,14 @@ type dashboardControllerResultMsg struct {
 	status    domain.StatusReport
 	statusErr error
 	recovery  *domain.RecoveryReport
+	// refreshLater means the status arrives separately, as a
+	// controllerStatusRefreshMsg, after the result is shown.
+	refreshLater bool
+}
+
+type controllerStatusRefreshMsg struct {
+	status domain.StatusReport
+	err    error
 }
 
 type dashboardControllerProgressTickMsg struct {
@@ -792,15 +806,18 @@ type dashboardShutdownPlanMsg struct{ report domain.ShutdownPlanReport }
 type dashboardShutdownApplyMsg struct{ report domain.ShutdownApplyReport }
 
 func RunLoadingDashboard(actions DashboardActions, setupMode bool) error {
-	_, err := RunLoadingDashboardReload(actions, setupMode)
+	_, _, err := RunLoadingDashboardReload(actions, setupMode, "")
 	return err
 }
 
 // RunLoadingDashboardReload runs the dashboard and reports whether it ended
-// because the administrator asked to reopen it on the installed Nixorium. The
-// terminal is already restored when it returns.
-func RunLoadingDashboardReload(actions DashboardActions, setupMode bool) (bool, error) {
+// because the administrator asked to reopen it on the installed Nixorium, with
+// the outcome to show once it has reopened. notice is such an outcome from the
+// interface this one replaced. The terminal is already restored when it
+// returns.
+func RunLoadingDashboardReload(actions DashboardActions, setupMode bool, notice string) (bool, string, error) {
 	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, actions, false)
+	model.reopenNotice = notice
 	model.setupMode = setupMode
 	model.initializing = true
 	model.busy = "Opening the laboratory and checking setup progress"
@@ -812,11 +829,12 @@ func RunLoadingDashboardReload(actions DashboardActions, setupMode bool) (bool, 
 		model.busy = "Reading local acknowledgement"
 	}
 	final, err := tea.NewProgram(model).Run()
-	reload := false
+	reload, outcome := false, ""
 	if finished, ok := final.(dashboardModel); ok {
 		reload = finished.reload.state == interfaceReloadRequested
+		outcome = finished.reloadOutcome()
 	}
-	return reload && err == nil, err
+	return reload && err == nil, outcome, err
 }
 
 func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions, setupMode bool) dashboardModel {

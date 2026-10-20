@@ -835,7 +835,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	actions.InstalledInterface = func() (presentation.InterfaceReload, bool) {
 		return detectInterfaceReload(os.Executable, installedInterfacePath)
 	}
-	reload, tuiErr := presentation.RunLoadingDashboardReload(actions, setupMode)
+	notice := os.Getenv(presentation.ReopenNoticeEnvironment)
+	os.Unsetenv(presentation.ReopenNoticeEnvironment)
+	reload, outcome, tuiErr := presentation.RunLoadingDashboardReload(actions, setupMode, notice)
 	if tuiErr != nil {
 		fmt.Fprintln(stderr, "Error:", tuiErr)
 		return 1
@@ -843,7 +845,8 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	if reload {
 		// The terminal is restored: bubbletea released the alternate screen
 		// and raw mode when Run returned.
-		return reopenInterface(installedInterfacePath, os.Args[1:], os.Environ(), stderr)
+		environment := append(os.Environ(), presentation.ReopenNoticeEnvironment+"="+outcome)
+		return reopenInterface(installedInterfacePath, os.Args[1:], environment, stderr)
 	}
 	return 0
 }

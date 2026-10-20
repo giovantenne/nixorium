@@ -201,7 +201,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			model.screen = dashboardHome
 		}
-		model.message = ""
+		// The outcome of the update that reopened this interface, if any.
+		model.message, model.reopenNotice = model.reopenNotice, ""
 		if model.actions.LoadDisclaimer != nil && !model.actions.ClassroomMode {
 			next, invitation := model.beginTelemetryInvitation()
 			return next, tea.Batch(poll, invitation, model.checkUpdateNotification())
@@ -669,9 +670,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.observeControllerResult(message.report)
 		model.message = message.report.Message
 		model.controller.details = false
-		if message.statusErr != nil {
+		switch {
+		case message.refreshLater:
+		case message.statusErr != nil:
 			model.message += "; dashboard refresh failed: " + message.statusErr.Error()
-		} else {
+		default:
 			model.report = message.status
 		}
 		if model.installation.flow {
@@ -718,6 +721,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, tea.Batch(model.loadControllerProgress(model.controller.progressID), reload)
 		}
 		return model, reload
+	case controllerStatusRefreshMsg:
+		if message.err == nil {
+			model.report = message.status
+		}
+		return model, nil
 	case dashboardControllerProgressTickMsg:
 		if !model.controller.applying || message.id != model.controller.progressID || model.actions.LoadControllerProgress == nil {
 			return model, nil
@@ -727,7 +735,12 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.id != model.controller.progressID {
 			return model, nil
 		}
-		model.controller.progressUnavailable = message.err != nil
+		if message.err != nil {
+			model.controller.progressFailures++
+		} else {
+			model.controller.progressFailures = 0
+		}
+		model.controller.progressUnavailable = model.controller.progressFailures >= controllerProgressMissesShown
 		if message.err == nil && (model.controller.started.IsZero() || !message.progress.StartedAt.Before(model.controller.started)) {
 			model.controller.progress = message.progress
 		}

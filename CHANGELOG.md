@@ -22,6 +22,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- After applying the controller, the result appears as soon as the controller
+  is verified instead of 1-2 minutes later; the status refresh continues in the
+  background. A short gap in the progress is no longer reported as "could not
+  be refreshed", and "update saved locally" no longer shows while the
+  controller is being updated. When the interface reopens on the updated
+  Nixorium, the Overview says that the update succeeded and what comes next.
 - The Update Nixorium review now shows what changes: the release, the
   deployment file migrations, the applications whose version changes and the
   file changes. Unchanged versions, extension requirements and preferences

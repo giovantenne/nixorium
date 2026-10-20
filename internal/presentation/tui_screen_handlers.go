@@ -1544,16 +1544,25 @@ func (model dashboardModel) startReviewedControllerApply() (tea.Model, tea.Cmd) 
 	model.controller.progressID++
 	model.message = ""
 	plan := model.controller.plan
+	refresh := model.actions.Refresh
 	operation := func() tea.Msg {
 		report := model.actions.ApplyController(plan)
 		recovery := model.recoveryAfterControllerApply()
-		if model.actions.Refresh == nil {
-			return dashboardControllerResultMsg{report: report, recovery: recovery}
+		result := dashboardControllerResultMsg{report: report, recovery: recovery, refreshLater: refresh != nil}
+		if refresh == nil {
+			return result
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
-		defer cancel()
-		status, err := model.actions.Refresh(ctx)
-		return dashboardControllerResultMsg{report: report, status: status, statusErr: err, recovery: recovery}
+		// The result is shown at once; the full status, which evaluates the
+		// configuration again, follows in the background.
+		return tea.BatchMsg{
+			func() tea.Msg { return result },
+			func() tea.Msg {
+				ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+				defer cancel()
+				status, err := refresh(ctx)
+				return controllerStatusRefreshMsg{status: status, err: err}
+			},
+		}
 	}
 	return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
 }

@@ -1161,7 +1161,16 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	if !ok || len(batch) != 2 {
 		t.Fatalf("controller apply did not schedule action and progress polling")
 	}
-	updated, _ = model.Update(batch[0]())
+	operation, ok := batch[0]().(tea.BatchMsg)
+	if !ok || len(operation) != 2 {
+		t.Fatal("controller result and status refresh are not separate")
+	}
+	updated, _ = model.Update(operation[0]())
+	model = updated.(dashboardModel)
+	if refreshed != 0 || model.busy != "" {
+		t.Fatal("result waited for the status refresh")
+	}
+	updated, _ = model.Update(operation[1]())
 	model = updated.(dashboardModel)
 	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Applied to this controller and verified") || !strings.Contains(model.View().Content, "Enter") || !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("controller result missing: applied=%d refreshed=%d\n%s", applied, refreshed, model.View().Content)

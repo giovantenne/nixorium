@@ -77,8 +77,15 @@ func TestControllerProgressReadFailureIsVisibleAndCanRecover(t *testing.T) {
 		controller: controllerModel{applying: true, progressID: 4, started: time.Now()}, progressDetails: true}
 	updated, _ := model.Update(dashboardControllerProgressMsg{id: 4, err: errors.New("private filesystem error")})
 	model = updated.(dashboardModel)
+	if strings.Contains(model.View().Content, "cannot be read") {
+		t.Fatal("a single unreadable poll was reported")
+	}
+	for range controllerProgressMissesShown - 1 {
+		updated, _ = model.Update(dashboardControllerProgressMsg{id: 4, err: errors.New("private filesystem error")})
+		model = updated.(dashboardModel)
+	}
 	view := model.View().Content
-	if !strings.Contains(view, "could not be refreshed") || strings.Contains(view, "private filesystem error") || !strings.Contains(view, "journalctl") {
+	if !strings.Contains(view, "cannot be read") || strings.Contains(view, "private filesystem error") || !strings.Contains(view, "journalctl") {
 		t.Fatalf("missing safe progress fallback:\n%s", view)
 	}
 	updated, _ = model.Update(dashboardControllerProgressMsg{id: 3})

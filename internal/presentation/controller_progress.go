@@ -8,6 +8,10 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// controllerProgressMissesShown is how many consecutive unreadable polls
+// (about 350 ms apart) pass before the progress is reported unreadable.
+const controllerProgressMissesShown = 20
+
 // All controller entry points share progress tracking, including automatic
 // follow-ups after saving a framework, package-base or software change.
 func (model *dashboardModel) trackControllerApply(operation tea.Cmd) tea.Cmd {
@@ -17,6 +21,9 @@ func (model *dashboardModel) trackControllerApply(operation tea.Cmd) tea.Cmd {
 	model.controller.progressID++
 	model.controller.details = false
 	model.controller.progressUnavailable = false
+	model.controller.progressFailures = 0
+	// What led here (for example "update saved") is not the progress.
+	model.message = ""
 	model.progressDetails = false
 	if model.actions.LoadControllerProgress == nil {
 		return operation
@@ -30,8 +37,8 @@ func (model dashboardModel) controllerProgressView(path []string) string {
 	if model.controller.progressUnavailable {
 		// Without readable progress the journal is the only view of the job:
 		// it is shown at once, not behind the details key.
-		lines = append(lines, tuiStatus("Managed progress could not be refreshed; the operation may still be running.", tuiStatusAttention, model.isDark))
-		lines = append(lines, "  journalctl -u 'nixorium-apply-controller*' -f")
+		lines = append(lines, tuiStatus("Progress cannot be read right now; the work continues on the controller.", tuiStatusAttention, model.isDark))
+		lines = append(lines, tuiMuted("  Full log: journalctl -u 'nixorium-apply-controller*' -f", model.isDark))
 	}
 	if model.progressDetails && model.controllerDetailsAvailable() && !model.controller.progressUnavailable {
 		lines = append(lines, "", tuiMuted("These are managed phases, not the build log. Full output is in the controller service journal.", model.isDark))
