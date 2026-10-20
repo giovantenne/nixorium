@@ -1726,7 +1726,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if planned != 1 || model.screen != dashboardSettingsReview || !strings.Contains(model.View().Content, "Student Git author name: Student → Lab Student") || !strings.Contains(model.View().Content, "Only lab-settings.json") {
+	if planned != 1 || model.screen != dashboardSettingsReview || !strings.Contains(model.View().Content, "Student Git author name: Student → Lab Student") || !strings.Contains(model.View().Content, "Only the lab settings file") {
 		t.Fatalf("settings review missing: planned=%d\n%s", planned, model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Text: "y"})

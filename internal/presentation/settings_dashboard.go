@@ -490,7 +490,7 @@ func (model dashboardModel) settingsPasswordsView() string {
 func (model dashboardModel) settingsReviewView() string {
 	lines := []string{
 		tuiTitle("Review settings", model.isDark),
-		"Validated managed-setting changes",
+		"Changes to save",
 	}
 	for _, change := range model.settings.plan.Changes {
 		before := change.Before
@@ -528,7 +528,7 @@ func (model dashboardModel) settingsReviewView() string {
 	actions = append(actions, tuiAction{key: "Esc", label: "Cancel"}, tuiAction{key: "F1", label: "Help"})
 	lines = append(lines,
 		"",
-		"Only lab-settings.json will be replaced atomically.",
+		"Only the lab settings file (lab-settings.json) is updated, in one step.",
 		"Existing unrelated files and changes are preserved.",
 		"Saving does not rebuild or change any computer.",
 		"",

@@ -227,7 +227,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "u  Review available updates", "x  Dismiss this update version")
 		}
 		if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
-			lines = append(lines, "v  View existing managed work without starting or resuming it")
+			lines = append(lines, "v  See work already running or finished (nothing is started)")
 		}
 	case dashboardAssistantReview:
 		lines = append(lines, "Choose Technical details to scroll the full comparison.", "Save and update the controller (Ctrl+R, then Enter) saves a local commit and a backup, updates this controller, then lets you choose the computers.", "Save only keeps the change; update computers later from Computers → Update computers. Esc goes back.")

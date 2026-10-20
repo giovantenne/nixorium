@@ -33,6 +33,9 @@ func deploymentStateLabel(host domain.HostStatus, found bool) string {
 	switch {
 	case !found:
 		return "Not checked"
+	case host.HostKeyCondition == domain.HostKeyChanged:
+		// The same words as Inventory (domain.ComputerCondition).
+		return "SSH key changed"
 	case host.Reachability != domain.ReachabilityReachable:
 		return "Off or not reachable at last check"
 	case host.Deployment == domain.DeploymentOutdated:

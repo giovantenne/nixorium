@@ -54,7 +54,7 @@ func RemoteInstallResponseText(writer io.Writer, response domain.RemoteInstallRe
 				if !disk.Eligible {
 					status = "excluded"
 				}
-				fmt.Fprintf(writer, "  %s  %d bytes  %s  %s  [%s]\n", disk.Path, disk.SizeBytes, disk.Model, disk.Serial, status)
+				fmt.Fprintf(writer, "  %s  %d bytes  %s  %s  [%s]\n", disk.Path, disk.SizeBytes, unescapeUdev(disk.Model), disk.Serial, status)
 				for _, reason := range disk.ExclusionReasons {
 					fmt.Fprintf(writer, "    - %s\n", reason)
 				}

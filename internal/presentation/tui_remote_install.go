@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -181,7 +182,7 @@ func (model dashboardModel) remoteInstallView() string {
 			"Disks that cannot be used, such as the USB stick, are listed but not selectable.", "")
 		preparation := remote.response.Session.Preparation
 		for index, disk := range preparation.Facts.Disks {
-			detail := fmt.Sprintf("%s · %s · serial %s", humanBytes(disk.SizeBytes), disk.Model, disk.Serial)
+			detail := fmt.Sprintf("%s · %s · serial %s", humanBytes(disk.SizeBytes), unescapeUdev(disk.Model), disk.Serial)
 			if !disk.Eligible {
 				detail = "not selectable: " + remoteDiskExclusions(disk.ExclusionReasons) + " · " + detail
 			}
@@ -222,7 +223,7 @@ func (model dashboardModel) remoteInstallView() string {
 		lines = append(lines, "")
 		lines = append(lines, tuiFields(model.isDark,
 			[2]string{"Disk to erase", tuiStatus(fmt.Sprintf("%s · %s", plan.Disk.Path, humanBytes(plan.Disk.SizeBytes)), tuiStatusFailure, model.isDark)},
-			[2]string{"Disk serial / WWN", plan.Disk.Serial + " / " + plan.Disk.WWN},
+			[2]string{"Disk serial / WWN", joinNonEmpty(" / ", plan.Disk.Serial, plan.Disk.WWN)},
 			[2]string{"Computer", plan.Host.Name},
 			[2]string{"Address afterwards", plan.Host.StaticIP + " on " + plan.Host.Interface},
 			[2]string{"PC on the USB stick", plan.Host.LiveIP},
@@ -266,7 +267,7 @@ func (model dashboardModel) remoteInstallView() string {
 		kind := tuiStatusNeutral
 		if remoteInstallResponseFailed(remote.response) {
 			kind = tuiStatusFailure
-		} else if remote.response.State == "verified" {
+		} else if remote.response.State == "verified" || remote.response.State == "cancelled" {
 			kind = tuiStatusSuccess
 		} else if remote.response.State == "ready-to-reboot" || remote.response.State == "reboot-requested" {
 			kind = tuiStatusAttention
@@ -958,7 +959,8 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 		remote.stage = remoteInstallResult
 		if message.response.State == "cancelled" {
 			remote.bootstrapError = ""
-			model.message = "Cancellation and pre-apply cleanup were confirmed."
+			// The result screen reports it as a success; no warning message.
+			model.message = ""
 		}
 	}
 	return model, nil
@@ -1105,4 +1107,33 @@ func (model dashboardModel) handleRemoteInterfaceSaved(message dashboardRemoteIn
 		response, err := prepare(host)
 		return dashboardRemoteInstallMsg{action: "prepare", response: response, err: err}
 	}
+}
+
+// unescapeUdev turns the \xNN escapes udev puts in device names ("VBOX\x20HARDDISK")
+// back into the characters they stand for, for display only.
+func unescapeUdev(value string) string {
+	var out strings.Builder
+	for index := 0; index < len(value); index++ {
+		if value[index] == '\\' && index+3 < len(value) && value[index+1] == 'x' {
+			if decoded, err := strconv.ParseUint(value[index+2:index+4], 16, 8); err == nil {
+				out.WriteByte(byte(decoded))
+				index += 3
+				continue
+			}
+		}
+		out.WriteByte(value[index])
+	}
+	return strings.TrimSpace(out.String())
+}
+
+// joinNonEmpty joins the values that exist, so an absent one leaves no
+// dangling separator.
+func joinNonEmpty(separator string, values ...string) string {
+	kept := make([]string, 0, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			kept = append(kept, value)
+		}
+	}
+	return strings.Join(kept, separator)
 }

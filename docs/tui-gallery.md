@@ -706,19 +706,19 @@ Nixorium  /  Computers  /  Update computers
 ✓ 5 computers updated
 
 pc01 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc02 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc03 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc04 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc05 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 ○ All five clients report the reviewed revision.
 
@@ -784,7 +784,7 @@ Nixorium  /  Computers  /  Update computers
 1 updated, 1 not reached
 
 pc01 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc02 — Not reached
   Check power and networking. The update outcome is not known; this does not prove the computer is off or

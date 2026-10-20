@@ -122,6 +122,10 @@ func (model dashboardModel) settingsNetworkCheckLines() []string {
 			lines = append(lines, "  Correct the name, or press c to save anyway for the computers listed.")
 		}
 	}
+	if len(lines) == 2 {
+		// Only the heading: nothing to report, so no heading either.
+		return nil
+	}
 	return lines
 }
 

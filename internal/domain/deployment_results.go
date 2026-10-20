@@ -49,7 +49,7 @@ func (report DeploymentExecutionReport) ResultSummary() DeploymentResultSummary 
 			result.Guidance = "SSH host key changed. Verify physical identity and review this computer's host-key plan."
 		case observation.State == "verified" && !report.RecoveryRequired && report.ApplyCompleted:
 			result.Outcome = "Updated"
-			result.Guidance = "Authenticated at the reviewed revision."
+			result.Guidance = "Updated and checked: it is running the reviewed version."
 		case observation.Reachability == ReachabilityUnreachable && observation.State != "verified" && observation.Revision == "" && observation.SystemPath == "":
 			result.Outcome = "Not reached"
 			result.Guidance = "Check power and networking. The update outcome is not known; this does not prove the computer is off or unchanged."

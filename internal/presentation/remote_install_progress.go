@@ -163,7 +163,7 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 	case response.State == "verified":
 		return host + " is installed and verified.", "It now appears among the configured computers."
 	case response.State == "cancelled":
-		return "The installation was cancelled; no disk was changed.", "Start again from Installation when the computer is ready."
+		return "The USB installation was cancelled. Nothing was changed on that computer.", "Start again from Installation when the computer is ready."
 	case response.State == "closed-before-apply":
 		return "The record was closed; the disk was not touched.", "Restart the computer started from the USB stick before using it, then start again from Installation."
 	case response.State == "closed-installed":

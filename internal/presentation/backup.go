@@ -458,6 +458,19 @@ func (model dashboardModel) backupView() string {
 		}
 	} else if b.done {
 		lines = append(lines, "", tuiResult(b.result.Message, !b.result.HasErrors(), model.isDark))
+		if b.result.Path != "" && !b.restore {
+			lines = append(lines, "Location: "+b.result.Path)
+		}
+		if !b.result.CreatedAt.IsZero() {
+			created := "Created:  " + b.result.CreatedAt.Local().Format("2006-01-02 15:04")
+			if b.restore {
+				created = "Backup made: " + b.result.CreatedAt.Local().Format("2006-01-02 15:04")
+			}
+			if strings.HasSuffix(b.result.Path, ".age") {
+				created += " (local time; the file name uses UTC)"
+			}
+			lines = append(lines, created)
+		}
 		if b.result.Revision != "" {
 			lines = append(lines, "Revision: "+shortRevision(b.result.Revision))
 		}

@@ -2661,7 +2661,7 @@ func (model dashboardModel) deployView() string {
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
-	if model.deployment.context != "" {
+	if model.deployment.context != "" && model.deployment.result.Operation == "" {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.deployment.context})
 	}
 	if model.screen == dashboardDeployReview {
@@ -2985,7 +2985,7 @@ func (model dashboardModel) pxeView() string {
 		notice := tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Preparation continues if this view closes",
-			detail: "The systemd-owned operation is recorded and can be inspected again later.",
+			detail: "You can close Nixorium: the work continues and you can check it again later.",
 		}
 		if model.installation.pxeProgress.State == "completed" {
 			notice = tuiNotice{kind: tuiStatusSuccess, title: "Client preparation completed", detail: "The client systems and network installation files are ready."}
