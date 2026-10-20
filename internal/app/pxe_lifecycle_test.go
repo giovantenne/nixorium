@@ -211,7 +211,7 @@ func TestPXEStopAndRecoverUseOnlyFixedOrder(t *testing.T) {
 	if report := manager.Stop(context.Background(), "/deployment"); report.HasErrors() || report.Mode != "stopped" {
 		t.Fatalf("stop report = %+v", report)
 	}
-	wantStop := []string{"stop " + PXEListenerUnit, "stop " + PXENetworkUnit}
+	wantStop := []string{"stop " + PXEListenerUnit, "stop " + PXENetworkUnit, "reset-failed " + PXEListenerUnit, "reset-failed " + PXENetworkUnit}
 	if !reflect.DeepEqual(source.controls, wantStop) {
 		t.Fatalf("stop controls = %v", source.controls)
 	}
@@ -219,7 +219,7 @@ func TestPXEStopAndRecoverUseOnlyFixedOrder(t *testing.T) {
 	if report := manager.Recover(context.Background(), "/deployment"); report.HasErrors() || report.Mode != "stopped" {
 		t.Fatalf("recover report = %+v", report)
 	}
-	wantRecover := []string{"stop " + PXEListenerUnit, "stop " + PXENetworkUnit, "start " + PXERecoverUnit}
+	wantRecover := []string{"stop " + PXEListenerUnit, "stop " + PXENetworkUnit, "start " + PXERecoverUnit, "reset-failed " + PXEListenerUnit, "reset-failed " + PXENetworkUnit}
 	if !reflect.DeepEqual(source.controls, wantRecover) {
 		t.Fatalf("recover controls = %v", source.controls)
 	}

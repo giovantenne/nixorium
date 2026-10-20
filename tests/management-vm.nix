@@ -956,7 +956,11 @@ in
     controller.succeed("jq -e '.operation == \"pxe-start\" and .state == \"failed\" and (.message | contains(\"nixorium-pxe.service\"))' /tmp/pxe-start-failed.json")
     controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'; test ! -e /var/lib/nixorium/pxe/session.json; ! systemctl is-active --quiet nixorium-pxe-network.service")
     controller.succeed("journalctl -u nixorium-pxe.service --no-pager | grep -F 'PXE HTTP port 8080 is already in use'")
-    controller.succeed("systemctl stop nixorium-test-pxe-conflict.service; systemctl reset-failed nixorium-pxe.service nixorium-pxe-network.service")
+    # Recovery from the TUI or CLI clears the failure it resolved, so the
+    # installation no longer reads as interrupted.
+    controller.succeed("systemctl stop nixorium-test-pxe-conflict.service; systemctl is-failed --quiet nixorium-pxe.service")
+    controller.succeed("su - admin -c 'nixorium pxe recover --repo ~/nixorium-deployment --json' | jq -e '.operation == \"pxe-recover\" and .state == \"completed\" and .mode == \"stopped\"'")
+    controller.succeed("! systemctl is-failed --quiet nixorium-pxe.service; ! systemctl is-failed --quiet nixorium-pxe-network.service")
     controller.succeed("ip addr add 198.51.100.7/24 dev lab0")
     controller.succeed("systemctl start nixorium-pxe-network.service")
     controller.succeed("systemctl is-active --quiet nixorium-pxe-network.service")

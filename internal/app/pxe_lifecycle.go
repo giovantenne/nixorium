@@ -126,6 +126,7 @@ func (m PXELifecycle) Stop(ctx context.Context, repository string) domain.PXELif
 	if len(errors) > 0 {
 		return failPXEReport(report, strings.Join(errors, "; "))
 	}
+	m.clearFailedUnits(ctx)
 	report.State = "completed"
 	report.Mode = "stopped"
 	report.Message = "PXE installation mode stopped and normal addressing restored"
@@ -146,6 +147,7 @@ func (m PXELifecycle) Recover(ctx context.Context, repository string) domain.PXE
 	if len(errors) > 0 {
 		return failPXEReport(report, strings.Join(errors, "; "))
 	}
+	m.clearFailedUnits(ctx)
 	report.State = "completed"
 	report.Mode = "stopped"
 	report.Message = "PXE recovery completed; installation mode is stopped"
@@ -247,6 +249,15 @@ func (m PXELifecycle) stopUnits(ctx context.Context) []string {
 		errors = append(errors, err.Error())
 	}
 	return errors
+}
+
+// clearFailedUnits forgets a failure the stop or recovery has just
+// resolved: systemd keeps a failed unit failed until told otherwise, and
+// the lifecycle would keep reporting an interrupted installation. Best
+// effort: the addressing was already verified.
+func (m PXELifecycle) clearFailedUnits(ctx context.Context) {
+	_ = m.source.ControlSystemUnit(ctx, "reset-failed", PXEListenerUnit)
+	_ = m.source.ControlSystemUnit(ctx, "reset-failed", PXENetworkUnit)
 }
 
 func (m PXELifecycle) failStartedPXE(ctx context.Context, report domain.PXELifecycleReport, message string) domain.PXELifecycleReport {

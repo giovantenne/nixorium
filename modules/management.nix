@@ -814,8 +814,9 @@ in
                /^nixorium-clean-generations@[0-9a-f]{16}\.service$/.test(unit) ||
                unit == "nixorium-pxe-recover.service")) ||
              (unit == "nixorium-pxe.service" &&
-              (verb == "start" || verb == "stop")) ||
-             (unit == "nixorium-pxe-network.service" && verb == "stop")) &&
+              (verb == "start" || verb == "stop" || verb == "reset-failed")) ||
+             (unit == "nixorium-pxe-network.service" &&
+              (verb == "stop" || verb == "reset-failed"))) &&
             subject.isInGroup("wheel")) {
           return polkit.Result.YES;
         }

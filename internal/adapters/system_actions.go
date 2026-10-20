@@ -72,8 +72,8 @@ func controlSystemUnit(ctx context.Context, coordination string, jobConflict fun
 		"nixorium-apply-controller.service": {"start": true},
 		"nixorium-prepare-pxe.service":      {"start": true},
 		"nixorium-remote-install.service":   {"start": true},
-		"nixorium-pxe.service":              {"start": true, "stop": true},
-		"nixorium-pxe-network.service":      {"stop": true},
+		"nixorium-pxe.service":              {"start": true, "stop": true, "reset-failed": true},
+		"nixorium-pxe-network.service":      {"stop": true, "reset-failed": true},
 		"nixorium-pxe-recover.service":      {"start": true},
 	}
 	if !allowed[unit][verb] && !(verb == "start" && (controllerApplyUnitPattern.MatchString(unit) || cleanupUnitPattern.MatchString(unit))) {

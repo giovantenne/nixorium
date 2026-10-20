@@ -83,6 +83,17 @@ let
         ip addr replace "$cidr" dev "$iface"
       }
 
+      # NetworkManager applies a modified connection asynchronously: the
+      # address appears or disappears shortly after nmcli returns.
+      wait_until() {
+        local deadline=$((SECONDS + $1))
+        shift
+        until "$@"; do
+          ((SECONDS < deadline)) || return 1
+          sleep 0.2
+        done
+      }
+
       address_present() {
         local iface="$1"
         local address="$2"
@@ -159,10 +170,15 @@ let
           restore_static_address "$iface" "$static_cidr" \
             || fail "could not restore $static_cidr on $iface"
         fi
-        address_present "$iface" "$static_cidr" \
+        wait_until 15 address_present "$iface" "$static_cidr" \
           || fail "restored static address $static_cidr is not observable on $iface"
         archive_session "$final_state" "$reason"
         echo "Restored $static_cidr on $iface ($reason)"
+      }
+
+      transition_observed() {
+        ! address_present "$CONFIGURED_IFACE" "$CONFIGURED_STATIC_CIDR" \
+          && ip_present "$CONFIGURED_IFACE" "$PREPARED_DHCP_IP"
       }
 
       validate_preparation() {
@@ -267,8 +283,7 @@ let
           restore_session start-failed remove-static-failed
           fail "could not remove $CONFIGURED_STATIC_CIDR from $CONFIGURED_IFACE"
         fi
-        if address_present "$CONFIGURED_IFACE" "$CONFIGURED_STATIC_CIDR" \
-            || ! ip_present "$CONFIGURED_IFACE" "$PREPARED_DHCP_IP"; then
+        if ! wait_until 15 transition_observed; then
           restore_session start-failed transition-verification-failed
           fail "PXE address transition verification failed and was rolled back"
         fi

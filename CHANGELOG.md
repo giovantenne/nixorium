@@ -15,6 +15,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Network installation on a controller whose laboratory address comes from
+  its network profile: starting, stopping or recovering it could fail
+  because the address change takes a moment to appear; it now waits for it.
+  After a recovery the installation screen no longer keeps saying that the
+  network installation was interrupted.
 - MySQL Workbench could not connect in laboratories created before 3.8.0:
   the setting that lets it work without a desktop keyring was only in the
   development module copied at creation. Every laboratory desktop now gets
