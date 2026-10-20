@@ -32,7 +32,7 @@ const (
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
-var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/choose": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
+var postPaths = map[string]bool{"/api/input": true, "/api/control": true, "/api/clipboard/set": true, "/api/clipboard/get": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/choose": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
 
 // viewSource lists computers, their images, and forwards input.
 type viewSource interface {
@@ -40,6 +40,11 @@ type viewSource interface {
 	Thumbnail(name string) ([]byte, bool)
 	Frame(name string, since int64) ([]byte, int64, bool)
 	Input(name string, events []classroomview.InputEvent, release bool) error
+	// Control starts or ends the teacher's control of a computer, which is
+	// what turns its shared clipboard on or off.
+	Control(name string, on bool) error
+	ClipboardSet(name, text string) error
+	ClipboardGet(name string) (string, error)
 }
 
 // viewServer serves the teacher's classroom view on the controller's
@@ -276,6 +281,8 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			return
 		}
 		writer.WriteHeader(http.StatusNoContent)
+	case "/api/control", "/api/clipboard/set", "/api/clipboard/get":
+		server.clipboard(writer, request)
 	default:
 		http.NotFound(writer, request)
 	}

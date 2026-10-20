@@ -37,6 +37,12 @@ const (
 	TypeBroadcastFrame = "broadcast.frame"
 	TypeBroadcastStop  = "broadcast.stop"
 	TypeBroadcastShown = "broadcast.shown"
+	// Shared clipboard while the teacher controls the computer (clipboard.go).
+	TypeClipboardBegin = "clipboard.begin"
+	TypeClipboardSet   = "clipboard.set"
+	TypeClipboardGet   = "clipboard.get"
+	TypeClipboardEnd   = "clipboard.end"
+	TypeClipboardDone  = "clipboard.done"
 )
 
 // Frame width limits accepted by the agent: small for the overview, up to
@@ -113,6 +119,10 @@ const (
 	CodeLockUnavailable = "lock-unavailable"
 	// CodeBroadcastFailed: the session could not show the teacher's screen.
 	CodeBroadcastFailed = "broadcast-failed"
+	// CodeClipboard: the session could not share its clipboard.
+	CodeClipboard = "clipboard-failed"
+	// CodeClipboardTooLarge: the text is over MaxClipboardBytes.
+	CodeClipboardTooLarge = "clipboard-too-large"
 )
 
 // MaxBroadcastBytes bounds one picture of the teacher's screen.
@@ -212,6 +222,14 @@ type Session interface {
 	// it.
 	ShowFrame(image []byte) error
 	StopBroadcast() error
+	// ClipboardBegin turns the shared clipboard on for the length of a
+	// control; ClipboardEnd turns it off. ClipboardSet puts text on the
+	// computer's clipboard; ClipboardGet returns text its user copied since
+	// the last call ("" when nothing new).
+	ClipboardBegin() error
+	ClipboardEnd() error
+	ClipboardSet(text string) error
+	ClipboardGet() (string, error)
 	// SendFiles places files on the session's desktop; content opens the
 	// file at an entry's position. It returns the names given there.
 	SendFiles(entries []FileEntry, content func(int) (io.ReadCloser, error)) ([]string, error)

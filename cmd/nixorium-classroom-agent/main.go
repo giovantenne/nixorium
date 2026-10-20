@@ -234,6 +234,8 @@ func handle(connection net.Conn, agent agentContext) {
 	var outgoing *collector
 	showing := false
 	defer func() {
+		// The shared clipboard lives only as long as a control does.
+		_ = capture.ClipboardEnd()
 		if incoming != nil {
 			incoming.abort()
 		}
@@ -309,6 +311,10 @@ func handle(connection net.Conn, agent agentContext) {
 			}
 		case classroomview.TypeInput:
 			if err := classroomview.Write(connection, inputReply(capture, message)); err != nil {
+				return
+			}
+		case classroomview.TypeClipboardBegin, classroomview.TypeClipboardSet, classroomview.TypeClipboardGet, classroomview.TypeClipboardEnd:
+			if err := classroomview.Write(connection, clipboardReply(capture, message)); err != nil {
 				return
 			}
 		default:

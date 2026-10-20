@@ -85,6 +85,36 @@ func (session *sshAgentSession) SetLocked(locked bool) (bool, error) {
 	return reply.Locked, nil
 }
 
+func (session *sshAgentSession) clipboard(request classroomview.Message) (string, error) {
+	reply, err := session.exchange(request, 8*time.Second)
+	if err != nil {
+		return "", err
+	}
+	if reply.Type != classroomview.TypeClipboardDone {
+		return "", classroomview.AgentError{Code: reply.Code}
+	}
+	return reply.Text, nil
+}
+
+func (session *sshAgentSession) ClipboardBegin() error {
+	_, err := session.clipboard(classroomview.Message{Type: classroomview.TypeClipboardBegin})
+	return err
+}
+
+func (session *sshAgentSession) ClipboardEnd() error {
+	_, err := session.clipboard(classroomview.Message{Type: classroomview.TypeClipboardEnd})
+	return err
+}
+
+func (session *sshAgentSession) ClipboardSet(text string) error {
+	_, err := session.clipboard(classroomview.Message{Type: classroomview.TypeClipboardSet, Text: text})
+	return err
+}
+
+func (session *sshAgentSession) ClipboardGet() (string, error) {
+	return session.clipboard(classroomview.Message{Type: classroomview.TypeClipboardGet})
+}
+
 func (session *sshAgentSession) ShowFrame(image []byte) error {
 	return session.broadcast(classroomview.Message{Type: classroomview.TypeBroadcastFrame, Image: image})
 }

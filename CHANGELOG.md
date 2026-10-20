@@ -6,6 +6,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- While you control a student computer from the classroom view, copy and
+  paste now work between your computer and theirs, as plain text in both
+  directions: Ctrl+V pastes your text into the student's application, and
+  Ctrl+C or Ctrl+X brings back what they copied, with a short note in the
+  window bar. It works only while you control that computer, up to 64 KiB, and
+  the text is never recorded.
+
 ## [3.10.0-beta.2] - 2026-10-20
 
 ### Added

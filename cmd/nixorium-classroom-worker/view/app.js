@@ -757,13 +757,89 @@ viewerImage.addEventListener('wheel', (event) => {
   queueEvent({ kind: 'scroll', steps: event.deltaY > 0 ? 1 : -1 });
 }, { passive: false });
 
+// Shared clipboard (text only, while controlling). Ctrl+V and Shift+Insert are
+// not sent as keys: the browser's paste event gives the text, which is put on
+// the student's clipboard before Ctrl+V is typed there. Ctrl+C and Ctrl+X go
+// to the student as usual, then the copied text is brought back.
+let clipboardReady = false;
+let clipboardTimer = 0;
+const clipboardNote = document.getElementById('viewer-clipboard');
+
+function clipboardNotice(text) {
+  clearTimeout(clipboardTimer);
+  clipboardNote.textContent = text;
+  clipboardNote.hidden = !text;
+  if (text) clipboardTimer = setTimeout(() => { clipboardNote.hidden = true; }, 4000);
+}
+
+async function clipboardCall(path, body) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error((await response.text()).trim() || 'The clipboard could not be shared.');
+  return response;
+}
+
+async function copyFromComputer() {
+  const name = selected;
+  if (!controlling || !clipboardReady || !name) return;
+  try {
+    const response = await clipboardCall('/api/clipboard/get', { computer: name });
+    const { text } = await response.json();
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    clipboardNotice('Copied from ' + name);
+  } catch (error) {
+    clipboardNotice(error.message || 'The clipboard could not be shared.');
+  }
+}
+
+async function pasteToComputer(text) {
+  const name = selected;
+  try {
+    await clipboardCall('/api/clipboard/set', { computer: name, text });
+  } catch (error) {
+    clipboardNotice(error.message || 'The clipboard could not be shared.');
+    return;
+  }
+  // Ctrl+V on the student's computer, with the teacher's own Control key
+  // left as it is.
+  const held = pressedCodes.has('ControlLeft') || pressedCodes.has('ControlRight');
+  if (!held) queueEvent({ kind: 'key', keysym: 0xffe3, pressed: true });
+  queueEvent({ kind: 'key', keysym: 0x76, pressed: true });
+  queueEvent({ kind: 'key', keysym: 0x76, pressed: false });
+  if (!held) queueEvent({ kind: 'key', keysym: 0xffe3, pressed: false });
+  clipboardNotice('Pasted into ' + name);
+}
+
+function isPasteKey(event) {
+  const key = event.key.toLowerCase();
+  return (key === 'v' && (event.ctrlKey || event.metaKey) && !event.altKey) || (event.key === 'Insert' && event.shiftKey && !event.ctrlKey);
+}
+
+document.addEventListener('paste', (event) => {
+  if (!controlling || actionDialog.open) return;
+  event.preventDefault();
+  const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+  if (!clipboardReady) clipboardNotice('Clipboard sharing is not available on this computer.');
+  else if (text) pasteToComputer(text);
+});
+
 window.addEventListener('keydown', (event) => {
   if (!controlling || event.target === controlButton || actionDialog.open) return;
+  // The paste event follows; the key itself is not sent twice.
+  if (clipboardReady && isPasteKey(event)) return;
   const symbol = keysym(event);
   if (!symbol) return;
   event.preventDefault();
   pressedCodes.set(event.code, symbol);
   queueEvent({ kind: 'key', keysym: symbol, pressed: true });
+  const key = event.key.toLowerCase();
+  if (clipboardReady && (key === 'c' || key === 'x') && event.ctrlKey && !event.altKey && !event.repeat) {
+    setTimeout(copyFromComputer, 250);
+  }
 });
 window.addEventListener('keyup', (event) => {
   if (!controlling || actionDialog.open) return;
@@ -781,12 +857,26 @@ function setControl(on) {
   controlButton.classList.toggle('primary', !on);
   controllingNotice.hidden = !on;
   viewerImage.classList.toggle('control', on);
+  clipboardReady = false;
+  clipboardNotice('');
   if (on) {
     viewerImage.focus();
+    const name = selected;
+    clipboardCall('/api/control', { computer: name, on: true })
+      .then(() => { clipboardReady = controlling && selected === name; })
+      .catch(() => clipboardNotice('Clipboard sharing is not available on ' + name + '.'));
   } else {
     queue = [];
     pressedCodes.clear();
     send([], true);
+    if (selected) {
+      fetch('/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ computer: selected, on: false }),
+        keepalive: true,
+      }).catch(() => {});
+    }
   }
 }
 

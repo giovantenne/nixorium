@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -43,6 +44,31 @@ func (fakeViewSource) Input(name string, events []classroomview.InputEvent, rele
 	}
 	receivedInput = events
 	return nil
+}
+
+// clipboardSource records the shared clipboard calls; only pc01 is under
+// control after Control("pc01", true).
+var clipboardCalls []string
+var clipboardControlled bool
+
+func (fakeViewSource) Control(name string, on bool) error {
+	clipboardControlled = on && name == "pc01"
+	return nil
+}
+
+func (fakeViewSource) ClipboardSet(name, text string) error {
+	if name != "pc01" || !clipboardControlled {
+		return app.ErrClassroomNotControlled
+	}
+	clipboardCalls = append(clipboardCalls, "set:"+text)
+	return nil
+}
+
+func (fakeViewSource) ClipboardGet(name string) (string, error) {
+	if name != "pc01" || !clipboardControlled {
+		return "", app.ErrClassroomNotControlled
+	}
+	return "copied", nil
 }
 
 func viewRequest(server *viewServer, path, host, cookie string) *httptest.ResponseRecorder {
@@ -182,5 +208,61 @@ func TestPageNamesAComputerWhoseMonitoringStopped(t *testing.T) {
 	}
 	if !strings.Contains(string(page), `id="icon-alert"`) {
 		t.Fatal("index.html lacks the warning icon of the stopped state")
+	}
+}
+
+func TestSharedClipboardEndpoints(t *testing.T) {
+	server := newViewServer(fakeViewSource{})
+	address, _ := server.Open(1000)
+	host := strings.TrimPrefix(strings.SplitN(address, "/open", 2)[0], "http://")
+	cookie := viewRequest(server, "/open"+strings.SplitN(address, "/open", 2)[1], host, "").Result().Cookies()[0]
+	post := func(path, body, session string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+		request.Host = host
+		request.Header.Set("Origin", "http://"+host)
+		request.Header.Set("Content-Type", "application/json")
+		if session != "" {
+			request.AddCookie(&http.Cookie{Name: viewCookie, Value: session})
+		}
+		recorder := httptest.NewRecorder()
+		server.ServeHTTP(recorder, request)
+		return recorder
+	}
+	clipboardCalls, clipboardControlled = nil, false
+	// Without control nothing reaches the computer, and the words are plain.
+	if response := post("/api/clipboard/set", `{"computer":"pc01","text":"hi"}`, cookie.Value); response.Code != http.StatusConflict || strings.Contains(response.Body.String(), "classroom") || len(clipboardCalls) != 0 {
+		t.Fatalf("set without control = %d %q", response.Code, response.Body.String())
+	}
+	if response := post("/api/clipboard/get", `{"computer":"pc01"}`, cookie.Value); response.Code != http.StatusConflict {
+		t.Fatalf("get without control = %d", response.Code)
+	}
+	if response := post("/api/control", `{"computer":"pc01","on":true}`, cookie.Value); response.Code != http.StatusNoContent {
+		t.Fatalf("control = %d", response.Code)
+	}
+	if response := post("/api/clipboard/set", `{"computer":"pc01","text":"a\u0000b"}`, cookie.Value); response.Code != http.StatusNoContent || len(clipboardCalls) != 1 || clipboardCalls[0] != "set:ab" {
+		t.Fatalf("set = %d %v", response.Code, clipboardCalls)
+	}
+	if response := post("/api/clipboard/get", `{"computer":"pc01"}`, cookie.Value); response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"text":"copied"`) {
+		t.Fatalf("get = %d %q", response.Code, response.Body.String())
+	}
+	// Another computer, an oversized text, a stranger and unknown fields.
+	if response := post("/api/clipboard/set", `{"computer":"pc02","text":"hi"}`, cookie.Value); response.Code != http.StatusConflict {
+		t.Fatalf("other computer = %d", response.Code)
+	}
+	big, _ := json.Marshal(map[string]string{"computer": "pc01", "text": strings.Repeat("x", classroomview.MaxClipboardBytes+1)})
+	if response := post("/api/clipboard/set", string(big), cookie.Value); response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), "64 KiB") || len(clipboardCalls) != 1 {
+		t.Fatalf("large text = %d %q", response.Code, response.Body.String())
+	}
+	if response := post("/api/clipboard/set", `{"computer":"pc01","text":"hi"}`, ""); response.Code == http.StatusNoContent {
+		t.Fatal("clipboard without a session")
+	}
+	if response := post("/api/clipboard/set", `{"computer":"pc01","text":"hi","x":1}`, cookie.Value); response.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field = %d", response.Code)
+	}
+	if response := post("/api/control", `{"computer":"pc01","on":false}`, cookie.Value); response.Code != http.StatusNoContent {
+		t.Fatalf("control end = %d", response.Code)
+	}
+	if response := post("/api/clipboard/get", `{"computer":"pc01"}`, cookie.Value); response.Code != http.StatusConflict {
+		t.Fatalf("get after control = %d", response.Code)
 	}
 }

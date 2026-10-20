@@ -142,3 +142,8 @@ func TestBroadcastReviewSaysWhyAComputerWaits(t *testing.T) {
 		}
 	}
 }
+
+func (session screenSession) ClipboardBegin() error         { return nil }
+func (session screenSession) ClipboardEnd() error           { return nil }
+func (session screenSession) ClipboardSet(string) error     { return nil }
+func (session screenSession) ClipboardGet() (string, error) { return "", nil }

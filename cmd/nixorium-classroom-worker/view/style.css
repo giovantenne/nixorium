@@ -107,6 +107,7 @@ body.screen-mode #viewer-panel { display: flex; flex-direction: column; height: 
 .toast li.skip, .toast li .note { color: var(--muted); }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
 .viewer-bar .controlling { flex: none; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--warning); color: #000; font-weight: 600; }
+.viewer-bar .clipboard-note { flex: none; color: var(--muted); }
 #viewer-image.control { outline: 3px solid var(--warning); outline-offset: -3px; }
 #viewer-image:focus { outline: none; }
 /* Full screen: only the student's screen; the bar slides in at the top edge. */

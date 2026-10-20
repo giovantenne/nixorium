@@ -514,6 +514,20 @@ button still pressed. Input is accepted only as JSON from the page itself
 (same Origin, session cookie), at most 128 events per message, and only for
 a computer currently open in the large view.
 
+While controlling, the clipboard is shared as plain text in both directions.
+Ctrl+V (or Shift+Insert) takes the text of the teacher's own clipboard from the
+browser's paste event, the worker hands it to the agent, which offers it to
+the student's session through the remote desktop session's clipboard
+(`EnableClipboard`, `SetSelection`, and `SelectionTransfer` answered with
+`SelectionWrite`), and the page then types Ctrl+V there, so the keystroke is
+not sent twice. After Ctrl+C or Ctrl+X the page asks for the text the student
+copied (`SelectionOwnerChanged`, `SelectionRead`) and writes it to the
+teacher's clipboard; a short note in the window bar says "Copied from" or
+"Pasted into" the computer. The clipboard is turned on when control starts and
+off when it ends, the window closes or the connection drops; only the text
+formats are offered or read, at most 64 KiB (NUL removed), only for the
+computer under control and not locked, and the text is never logged or kept.
+
 Check boxes on the overview select computers for **Block/Allow Internet**,
 **Lock/Unlock**, **Restart** and **Shut down**; a computer's window offers the
 same in its **Actions** menu. The page calls the classroom service's own

@@ -80,6 +80,7 @@ type ClassroomViewHub struct {
 	running    map[string]bool
 	sessions   map[string]classroomview.Session
 	focus      map[string]time.Time
+	controlled map[string]bool
 	lastViewed time.Time
 	now        func() time.Time
 	// Answered, when set, hears of every computer that answered over the
@@ -93,7 +94,7 @@ func NewClassroomViewHub(hosts func(ctx context.Context) ([]domain.HostMeta, err
 		hosts: hosts, connector: connector, width: 320,
 		interval: 1500 * time.Millisecond, idle: 15 * time.Second,
 		computers: map[string]*ClassroomComputer{}, running: map[string]bool{},
-		sessions: map[string]classroomview.Session{}, focus: map[string]time.Time{}, now: time.Now,
+		sessions: map[string]classroomview.Session{}, focus: map[string]time.Time{}, controlled: map[string]bool{}, now: time.Now,
 	}
 }
 
@@ -169,6 +170,90 @@ func (hub *ClassroomViewHub) Input(name string, events []classroomview.InputEven
 	return session.Input(events, release)
 }
 
+// Errors of the shared clipboard, which works only while the teacher controls
+// a computer that is open in full and not locked.
+var (
+	ErrClassroomNotControlled = errors.New("this computer is not under control")
+	ErrClassroomLockedScreen  = errors.New("this computer is locked")
+)
+
+// Control starts or ends the teacher's control of a computer open in full,
+// which turns its shared clipboard on or off. It fails when the computer is
+// not open, is locked or cannot share a clipboard; control of the keyboard
+// and mouse does not depend on it.
+func (hub *ClassroomViewHub) Control(name string, on bool) error {
+	hub.mutex.Lock()
+	session, found := hub.sessions[name]
+	computer := hub.computers[name]
+	focused := hub.now().Sub(hub.focus[name]) < classroomFocusTimeout
+	wasOn := hub.controlled[name]
+	if !on {
+		delete(hub.controlled, name)
+	}
+	hub.mutex.Unlock()
+	if !on {
+		if found && wasOn {
+			return session.ClipboardEnd()
+		}
+		return nil
+	}
+	if !found || !focused {
+		return ErrClassroomNotViewed
+	}
+	if computer == nil || computer.State != ClassroomViewing || computer.Locked {
+		return ErrClassroomLockedScreen
+	}
+	if err := session.ClipboardBegin(); err != nil {
+		return err
+	}
+	hub.mutex.Lock()
+	hub.controlled[name] = true
+	hub.mutex.Unlock()
+	return nil
+}
+
+// clipboardSession returns the session of a computer under control.
+func (hub *ClassroomViewHub) clipboardSession(name string) (classroomview.Session, error) {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	session, found := hub.sessions[name]
+	if !found || !hub.controlled[name] || hub.now().Sub(hub.focus[name]) >= classroomFocusTimeout {
+		return nil, ErrClassroomNotControlled
+	}
+	if computer := hub.computers[name]; computer == nil || computer.State != ClassroomViewing || computer.Locked {
+		return nil, ErrClassroomLockedScreen
+	}
+	return session, nil
+}
+
+// ClipboardSet puts the teacher's text on the clipboard of a controlled
+// computer. The text is never logged or kept.
+func (hub *ClassroomViewHub) ClipboardSet(name, text string) error {
+	text, err := classroomview.ValidateClipboardText(text)
+	if err != nil {
+		return err
+	}
+	session, err := hub.clipboardSession(name)
+	if err != nil {
+		return err
+	}
+	return session.ClipboardSet(text)
+}
+
+// ClipboardGet returns the text copied on a controlled computer since the
+// last call, or "" when there is none.
+func (hub *ClassroomViewHub) ClipboardGet(name string) (string, error) {
+	session, err := hub.clipboardSession(name)
+	if err != nil {
+		return "", err
+	}
+	text, err := session.ClipboardGet()
+	if err != nil {
+		return "", err
+	}
+	return classroomview.ValidateClipboardText(text)
+}
+
 func (hub *ClassroomViewHub) watched() bool {
 	hub.mutex.Lock()
 	defer hub.mutex.Unlock()
@@ -186,6 +271,7 @@ func (hub *ClassroomViewHub) setSession(name string, session classroomview.Sessi
 	defer hub.mutex.Unlock()
 	if session == nil {
 		delete(hub.sessions, name)
+		delete(hub.controlled, name)
 	} else {
 		hub.sessions[name] = session
 	}

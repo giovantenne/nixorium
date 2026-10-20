@@ -898,7 +898,9 @@ that release's notes, so a release is not finished until the site follows it.
   when the page stops polling. Remote input is accepted only as bounded,
   validated JSON from the page's own Origin for a computer open in the large
   view, and every path that ends control must release pressed keys and
-  buttons. Page actions on selected computers (Internet, power) call the
+  buttons. The shared clipboard is plain text only, on only while the teacher
+  controls that unlocked computer (the worker rejects anything else), at most
+  64 KiB, and its text is never logged or kept. Page actions on selected computers (Internet, power) call the
   worker's own typed plan/apply handling in process: the review token never
   reaches the page, and each review is applied at most once. By owner
   decision the page confirms with one explicit button, without a typed word,

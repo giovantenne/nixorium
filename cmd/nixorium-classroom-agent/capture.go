@@ -33,6 +33,12 @@ type capturer interface {
 	// Thumbnail returns the latest frame; image is nil when frame equals since.
 	Thumbnail(width int, since int64) (image []byte, height int, capturedAt time.Time, frame int64, err error)
 	Input(events []classroomview.InputEvent, release bool) error
+	// The shared clipboard (clipboard.go), on only while the teacher controls
+	// the computer.
+	ClipboardBegin() error
+	ClipboardEnd() error
+	ClipboardSet(text string) error
+	ClipboardGet() (string, error)
 }
 
 // widthMemory keeps the largest width asked for recently, so the overview and
@@ -64,6 +70,7 @@ type mutterCapture struct {
 	keysDown    map[uint32]bool
 	buttonsDown map[string]bool
 	keyboardOn  bool
+	clipboard   clipboardState
 }
 
 func newMutterCapture() *mutterCapture {
@@ -200,6 +207,7 @@ func (capture *mutterCapture) stopWhenIdle() {
 func (capture *mutterCapture) stopLocked() {
 	if capture.running {
 		capture.releaseLocked()
+		capture.clipboardOffLocked()
 	}
 	if capture.stop != nil {
 		capture.stop()
@@ -246,6 +254,8 @@ func (capture *mutterCapture) startLocked(width int) error {
 		{dbus.WithMatchObjectPath(streamPath), dbus.WithMatchInterface(screenCastName + ".Stream"), dbus.WithMatchMember("PipeWireStreamAdded")},
 		{dbus.WithMatchObjectPath(remotePath), dbus.WithMatchInterface(remoteDesktopName + ".Session"), dbus.WithMatchMember("Closed")},
 		{dbus.WithMatchInterface(displayConfigName), dbus.WithMatchMember("MonitorsChanged")},
+		{dbus.WithMatchObjectPath(remotePath), dbus.WithMatchInterface(remoteDesktopName + ".Session"), dbus.WithMatchMember("SelectionOwnerChanged")},
+		{dbus.WithMatchObjectPath(remotePath), dbus.WithMatchInterface(remoteDesktopName + ".Session"), dbus.WithMatchMember("SelectionTransfer")},
 	} {
 		if err := connection.AddMatchSignal(match...); err != nil {
 			return fail(err)
@@ -311,6 +321,10 @@ func (capture *mutterCapture) startLocked(width int) error {
 	}()
 	go func() {
 		for signal := range signals {
+			if signal.Path == remotePath && strings.HasPrefix(signal.Name, remoteDesktopName+".Session.Selection") {
+				capture.selectionSignal(generation, remote, signal)
+				continue
+			}
 			if signal.Path == remotePath && strings.HasSuffix(signal.Name, ".Closed") {
 				capture.ended(generation, errors.New("the screen cast was closed"))
 				return
@@ -337,6 +351,7 @@ func (capture *mutterCapture) ended(generation int, err error) {
 	capture.stop()
 	capture.running, capture.stop, capture.frame = false, nil, nil
 	capture.remote, capture.keyboardOn = nil, false
+	capture.clipboard = clipboardState{}
 	if err != nil && !errors.Is(err, io.EOF) {
 		capture.failure = err
 	}

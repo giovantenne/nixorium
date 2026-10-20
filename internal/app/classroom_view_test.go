@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -16,7 +18,25 @@ type fakeAgentSession struct {
 	closed *int
 	inputs *int
 	reply  classroomview.Message
+	// clip records the shared clipboard calls ("begin", "set:text", "end").
+	clip   *[]string
+	copied string
 }
+
+func (session fakeAgentSession) note(call string) {
+	if session.clip != nil {
+		session.mutex.Lock()
+		*session.clip = append(*session.clip, call)
+		session.mutex.Unlock()
+	}
+}
+func (session fakeAgentSession) ClipboardBegin() error { session.note("begin"); return nil }
+func (session fakeAgentSession) ClipboardEnd() error   { session.note("end"); return nil }
+func (session fakeAgentSession) ClipboardSet(text string) error {
+	session.note("set:" + text)
+	return nil
+}
+func (session fakeAgentSession) ClipboardGet() (string, error) { return session.copied, nil }
 
 func (session fakeAgentSession) Thumbnail(width int, since int64) (classroomview.Message, error) {
 	return session.reply, nil
@@ -51,6 +71,7 @@ type fakeAgentConnector struct {
 	mutex  sync.Mutex
 	closed int
 	inputs int
+	clip   []string
 	errors map[string]error
 	codes  map[string]string
 }
@@ -63,7 +84,7 @@ func (connector *fakeAgentConnector) Connect(_ context.Context, host domain.Host
 	if code := connector.codes[host.Name]; code != "" {
 		reply = classroomview.Message{Type: classroomview.TypeError, Code: code}
 	}
-	return fakeAgentSession{mutex: &connector.mutex, closed: &connector.closed, inputs: &connector.inputs, reply: reply}, nil
+	return fakeAgentSession{mutex: &connector.mutex, closed: &connector.closed, inputs: &connector.inputs, reply: reply, clip: &connector.clip, copied: "from pc\x00"}, nil
 }
 
 func TestClassroomViewHubShowsEveryComputerAndStopsWhenNobodyLooks(t *testing.T) {
@@ -243,5 +264,55 @@ func TestClassroomViewHubReportsComputersThatAnswered(t *testing.T) {
 	// off does not.
 	if !answered["pc01"] || !answered["pc02"] || answered["pc03"] {
 		t.Fatalf("answered = %v", answered)
+	}
+}
+
+func TestClassroomClipboardWorksOnlyUnderControl(t *testing.T) {
+	connector := &fakeAgentConnector{}
+	hub := NewClassroomViewHub(func(context.Context) ([]domain.HostMeta, error) {
+		return []domain.HostMeta{{Name: "pc01"}}, nil
+	}, connector)
+	hub.interval, hub.idle = 10*time.Millisecond, 5*time.Second
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		computers, _ := hub.Computers(context.Background())
+		if computers[0].State == ClassroomViewing {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	hub.Frame("pc01", 0)
+	if err := hub.ClipboardSet("pc01", "hello"); !errors.Is(err, ErrClassroomNotControlled) {
+		t.Fatalf("set without control: %v", err)
+	}
+	if _, err := hub.ClipboardGet("pc01"); !errors.Is(err, ErrClassroomNotControlled) {
+		t.Fatalf("get without control: %v", err)
+	}
+	if err := hub.Control("pc09", true); err == nil {
+		t.Fatal("control of an unknown computer")
+	}
+	if err := hub.Control("pc01", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := hub.ClipboardSet("pc01", strings.Repeat("x", classroomview.MaxClipboardBytes+1)); !errors.Is(err, classroomview.ErrClipboardTooLarge) {
+		t.Fatalf("large text: %v", err)
+	}
+	if err := hub.ClipboardSet("pc01", "hello\x00"); err != nil {
+		t.Fatal(err)
+	}
+	if text, err := hub.ClipboardGet("pc01"); err != nil || text != "from pc" {
+		t.Fatalf("get = %q, %v", text, err)
+	}
+	if err := hub.Control("pc01", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := hub.ClipboardSet("pc01", "late"); !errors.Is(err, ErrClassroomNotControlled) {
+		t.Fatalf("set after control ended: %v", err)
+	}
+	connector.mutex.Lock()
+	got := strings.Join(connector.clip, ",")
+	connector.mutex.Unlock()
+	if got != "begin,set:hello,end" {
+		t.Fatalf("calls = %s", got)
 	}
 }
