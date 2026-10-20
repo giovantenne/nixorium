@@ -114,6 +114,9 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 	if model.screen == dashboardDeploy && model.deployment.result.Operation == "" && !model.deployment.applying {
 		switch key.String() {
 		case "r":
+			// A fresh check supersedes the availability the last review
+			// probed, which the selection would otherwise keep showing.
+			model.deployment.plan.Availability = nil
 			return model.checkComputersThen()
 		case "n":
 			chosen, message := model.selectComputers(model.deployment.chosen, hostNeedsUpdate, "No computer needed an update at the last check.")

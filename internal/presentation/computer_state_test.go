@@ -145,3 +145,15 @@ func TestInventoryUpdatesComputersThatNeedIt(t *testing.T) {
 		t.Fatalf("update opened %q on screen %d", requested, m.screen)
 	}
 }
+
+func TestCheckingComputersAgainReplacesTheLastReviewsAvailability(t *testing.T) {
+	report := testDashboardReport("ready")
+	report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}}
+	model := dashboardModel{report: report, screen: dashboardDeploy, width: 120, height: 40}
+	model.deployment.plan.Availability = []domain.DeploymentTargetAvailability{{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityUnreachable}}
+	model.actions.LoadHosts = func(context.Context) (domain.HostsReport, error) { return domain.HostsReport{}, nil }
+	next, _ := model.updateDeployment(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	if updated := next.(dashboardModel); len(updated.deployment.plan.Availability) != 0 {
+		t.Fatalf("the earlier review's availability is still shown: %+v", updated.deployment.plan.Availability)
+	}
+}
