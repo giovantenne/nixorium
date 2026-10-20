@@ -15,6 +15,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Installation from a USB stick refused every computer with 4 GB of memory
+  ("live installer needs at least … bytes free"): the check counted the
+  installer twice, once already in the live system's memory and once more as
+  free room. It now asks for room to run it once, and when it refuses it says
+  why on the screen, in megabytes or gigabytes.
 - **Update Nixorium** refused every update with deployment migrations when
   the deployment had a file larger than 1 MiB (a wallpaper, for example),
   saying the migrations had changed it. Unchanged large files are now

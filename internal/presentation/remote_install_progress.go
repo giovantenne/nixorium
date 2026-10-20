@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -174,8 +175,12 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 		if remoteInstallDiskMayBeChanged(response) {
 			disk = "The disk may have been changed."
 		}
-		return "The installation of " + host + " did not complete. " + disk,
-			"Read the reason in the details (d) and fix the cause, then check again."
+		next := "Read the reason in the details (d) and fix the cause, then check again."
+		// A preparation that Nixorium refused says why in plain words.
+		if reason := sanitizeRemoteInstallText(response.Message); response.State == "blocked" && reason != "" {
+			next = "Reason: " + strings.TrimSuffix(reason, ".") + ". Fix the cause, then check again."
+		}
+		return "The installation of " + host + " did not complete. " + disk, next
 	}
 	if neverDispatched && response.State != "closed-before-apply" {
 		return "The installation of " + host + " was prepared but not started.",

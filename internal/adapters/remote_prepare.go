@@ -293,12 +293,8 @@ func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts d
 	if facts.BootID != session.Facts.BootID || !remoteFactsHaveAddress(facts, hostInterface, session.Address) {
 		return result, errors.New("live boot identity, declared NIC, or DHCP address changed during preparation")
 	}
-	if artifacts.BundleClosureBytes > ^uint64(0)/2 {
-		return result, errors.New("installer bundle resource requirement overflows")
-	}
-	requiredLiveBytes := artifacts.BundleClosureBytes * 2
-	if facts.MemoryAvailableBytes < requiredLiveBytes || facts.StoreAvailableBytes < requiredLiveBytes {
-		return result, fmt.Errorf("live installer needs at least %d bytes free in memory and store for the installer bundle", requiredLiveBytes)
+	if err := domain.CheckRemoteLiveResources(facts, artifacts.BundleClosureBytes); err != nil {
+		return result, err
 	}
 
 	result = domain.RemoteInstallPreparation{

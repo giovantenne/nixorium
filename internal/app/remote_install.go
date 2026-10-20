@@ -11,7 +11,6 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-const remoteBundleSafetyMultiplier = 2
 const remoteInstallHeadroomBytes = 2 * 1024 * 1024 * 1024
 
 type RemoteInstallDispatch struct {
@@ -98,12 +97,8 @@ func (m *RemoteInstallManager) plan(ctx context.Context, preparation domain.Remo
 	if preparation.BundleClosureBytes == 0 || preparation.SystemClosureBytes == 0 || !remoteStorePath(preparation.BundlePath) {
 		return remotePlanIssue(report, "preparation", "prepared closure measurements are incomplete")
 	}
-	if preparation.BundleClosureBytes > ^uint64(0)/remoteBundleSafetyMultiplier {
-		return remotePlanIssue(report, "resources", "remote installer closure measurement overflows")
-	}
-	requiredLiveBytes := preparation.BundleClosureBytes * remoteBundleSafetyMultiplier
-	if preparation.Facts.StoreAvailableBytes < requiredLiveBytes || preparation.Facts.MemoryAvailableBytes < requiredLiveBytes {
-		return remotePlanIssue(report, "resources", fmt.Sprintf("live installer needs at least %d bytes free in memory and store", requiredLiveBytes))
+	if err := domain.CheckRemoteLiveResources(preparation.Facts, preparation.BundleClosureBytes); err != nil {
+		return remotePlanIssue(report, "resources", err.Error())
 	}
 	if preparation.SystemClosureBytes > ^uint64(0)-remoteInstallHeadroomBytes {
 		return remotePlanIssue(report, "resources", "system closure measurement overflows")

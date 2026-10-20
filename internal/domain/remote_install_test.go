@@ -184,3 +184,18 @@ func TestDecodeRemoteMachineFactsLimitsAndSupport(t *testing.T) {
 		t.Fatal("oversized interface inventory accepted")
 	}
 }
+
+func TestRemoteLiveResourcesCountTheBundleOnce(t *testing.T) {
+	// A 4 GB computer started from the minimal ISO, measured after the
+	// 763 MiB bundle reached its 2 GB live store.
+	bundle := uint64(800_000_000)
+	facts := RemoteMachineFacts{MemoryAvailableBytes: 2_770_000_000, StoreAvailableBytes: 1_250_000_000}
+	if err := CheckRemoteLiveResources(facts, bundle); err != nil {
+		t.Fatalf("4 GB computer refused: %v", err)
+	}
+	facts.StoreAvailableBytes = 500_000_000
+	err := CheckRemoteLiveResources(facts, bundle)
+	if err == nil || !strings.Contains(err.Error(), "needs 800.0 MB free and has 500.0 MB") {
+		t.Fatalf("short store error = %v", err)
+	}
+}

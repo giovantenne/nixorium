@@ -344,6 +344,36 @@ var (
 	remoteCacheKeyPattern    = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}:[A-Za-z0-9+/]+={0,2}$`)
 )
 
+// CheckRemoteLiveResources checks the live computer's free memory and store
+// once the installer bundle is already in its store, as both are measured.
+// The installed system goes straight to the target disk, so the live store
+// only needs room to run the bundle: as much again as the bundle itself.
+// Counting the bundle twice refused every 4 GB computer, whose live store is
+// half its memory.
+func CheckRemoteLiveResources(facts RemoteMachineFacts, bundleClosureBytes uint64) error {
+	required := bundleClosureBytes
+	if facts.MemoryAvailableBytes < required || facts.StoreAvailableBytes < required {
+		return fmt.Errorf("the computer started from USB has too little free memory: the installer needs %s free and has %s; use a computer with more memory, or close other programs on it",
+			decimalBytes(required), decimalBytes(min(facts.MemoryAvailableBytes, facts.StoreAvailableBytes)))
+	}
+	return nil
+}
+
+// decimalBytes prints a size in decimal units, as memory and disks are sold.
+func decimalBytes(size uint64) string {
+	units := []string{"kB", "MB", "GB", "TB"}
+	if size < 1000 {
+		return fmt.Sprintf("%d B", size)
+	}
+	value := float64(size) / 1000
+	unit := 0
+	for value >= 1000 && unit < len(units)-1 {
+		value /= 1000
+		unit++
+	}
+	return fmt.Sprintf("%.1f %s", value, units[unit])
+}
+
 func NewRemoteOperationID() (string, error) {
 	value := make([]byte, 16)
 	if _, err := io.ReadFull(rand.Reader, value); err != nil {
