@@ -27,6 +27,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- In Internet access and Lock screens, **New review** starts with no computer
+  selected, so the first **a All** selects them all instead of clearing the
+  previous selection.
 - USB over SSH no longer asks to remove the USB stick before restarting the
   installed PC: removing it under the running live system broke the restart.
   The installer now makes the next start use the new disk's boot entry, and

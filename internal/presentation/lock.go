@@ -74,8 +74,10 @@ func (model dashboardModel) updateLock(key tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	if m.stage == 2 {
 		switch key.String() {
 		case "n":
+			// A new review starts with nothing selected (see Internet access).
 			m.stage = 0
 			m.plan = domain.LockPlan{}
+			m.chosen, m.cursor = map[string]bool{}, 0
 		case "enter":
 			model.screen = dashboardComputersArea
 		}

@@ -72,8 +72,11 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 			return model.openComputerTask("h")
 		}
 		if key.String() == "n" {
+			// A new review starts with nothing selected, so "a All"
+			// selects everyone instead of clearing the last selection.
 			m.stage = 0
 			m.plan = domain.InternetPlan{}
+			m.chosen, m.cursor = map[string]bool{}, 0
 		}
 		if key.String() == "enter" {
 			model.screen = dashboardComputersArea
