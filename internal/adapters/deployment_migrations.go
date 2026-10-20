@@ -3,9 +3,12 @@ package adapters
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -382,6 +385,19 @@ func diffMigratedTrees(original, migrated string) ([]domain.MigratedFile, error)
 	return files, nil
 }
 
+func fileDigest(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
 func readMigrationTree(root string) (map[string]treeEntry, error) {
 	entries := map[string]treeEntry{}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
@@ -402,11 +418,17 @@ func readMigrationTree(root string) (map[string]treeEntry, error) {
 		}
 		item := treeEntry{mode: info.Mode().Perm(), regular: info.Mode().IsRegular()}
 		if item.regular {
-			// Larger files are kept by size only: the diff rule refuses a
-			// change to them without reading them whole.
+			// Larger files (wallpapers, for example) are kept by size and
+			// content digest, streamed: the two copies have different
+			// modification times, and the diff rule refuses a change to them
+			// without holding them in memory.
 			if info.Size() > maximumMigratedFile {
+				digest, err := fileDigest(path)
+				if err != nil {
+					return err
+				}
 				item.large = true
-				item.content = []byte(fmt.Sprintf("%d %d", info.Size(), info.ModTime().UnixNano()))
+				item.content = []byte(fmt.Sprintf("%d %s", info.Size(), digest))
 				entries[relative] = item
 				return nil
 			}

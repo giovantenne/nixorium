@@ -15,6 +15,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Update Nixorium** refused every update with deployment migrations when
+  the deployment had a file larger than 1 MiB (a wallpaper, for example),
+  saying the migrations had changed it. Unchanged large files are now
+  compared by content. A controller on 3.10.0-beta.1 runs that comparison
+  with its own release, so it updates once with the new release's program:
+  `nix run github:giovantenne/nixorium/<release> -- update plan --target
+  <release>` in the deployment folder, then `update apply` with the review
+  token it prints.
 - A computer still starts from its disk when its firmware forgets the boot
   entry (after a CMOS reset, a firmware update, or on firmware that drops
   entries it did not create): GRUB is also copied to the standard fallback

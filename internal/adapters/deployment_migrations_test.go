@@ -1,12 +1,14 @@
 package adapters
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/deploymigrate"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -222,5 +224,41 @@ func TestMigrationReportsAreChecked(t *testing.T) {
 	results, declared, err := parseMigrationReport([]byte(`{"contractVersion":1,"targetVersion":"3.10.0","future":true,"migrations":[{"id":"2027-01-x","description":"x","state":"applied","files":["modules/a.nix"]},{"id":"2027-01-y","description":"y","state":"skipped"}]}`))
 	if err != nil || len(results) != 1 || !declared["modules/a.nix"] {
 		t.Fatalf("results = %+v, %v", results, err)
+	}
+}
+
+func TestLargeUnchangedFilesAreNotMigrationChanges(t *testing.T) {
+	original, migrated := t.TempDir(), t.TempDir()
+	wallpaper := bytes.Repeat([]byte("ristretto "), maximumMigratedFile/10+10)
+	for _, root := range []string{original, migrated} {
+		if err := os.MkdirAll(filepath.Join(root, "assets/backgrounds"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "assets/backgrounds/2-ristretto.jpg"), wallpaper, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "lab-software.json"), []byte("{}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The two copies are written at different times, as in a real update.
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(migrated, "assets/backgrounds/2-ristretto.jpg"), later, later); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(migrated, "lab-software.json"), []byte("{\"jq\":true}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	files, err := diffMigratedTrees(original, migrated)
+	if err != nil || len(files) != 1 || files[0].Path != "lab-software.json" {
+		t.Fatalf("files = %+v, %v", files, err)
+	}
+	// A large file whose content changed is still refused.
+	changed := append(append([]byte(nil), wallpaper...), '!')
+	if err := os.WriteFile(filepath.Join(migrated, "assets/backgrounds/2-ristretto.jpg"), changed, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := diffMigratedTrees(original, migrated); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("a changed large file was accepted: %v", err)
 	}
 }
