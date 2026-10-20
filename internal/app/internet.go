@@ -154,7 +154,12 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 				after := m.source.ObserveInternet(ctx, t.HostMeta)
 				if after.Valid() && after.BootID == before.BootID && after.State == p.Action.DesiredState() {
 					o.State = "verified"
-					o.Detail = "Internet " + after.State + "; reboot restores Internet."
+					// The block is temporary: it lasts until Internet is enabled
+					// again or the computer restarts. Enabling needs no follow-up.
+					o.Detail = "Internet is on again."
+					if p.Action == domain.InternetBlock {
+						o.Detail = "Internet is blocked until you enable it again or the computer restarts."
+					}
 					confirmed++
 				} else {
 					o.State = "unconfirmed"

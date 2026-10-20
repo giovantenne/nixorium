@@ -169,7 +169,10 @@ func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 				verified++
 			}
 		}
-		record.Summary = fmt.Sprintf("Internet %s: verified=%d; reboot restores Internet", report.Action, verified)
+		record.Summary = fmt.Sprintf("Internet %s: verified=%d", report.Action, verified)
+		if report.Action == domain.InternetBlock {
+			record.Summary += "; a restart restores Internet"
+		}
 	case domain.ScheduleRunReport:
 		record = scheduleRunRecord(report)
 	default:
