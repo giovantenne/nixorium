@@ -1302,26 +1302,20 @@ Enter Apply to controller  ·  Esc Cancel  ·  F1 Help
 ```text
 Nixorium  /  Maintenance  /  Update system and packages  /  Review
 
-Review update and student workspace
-Builds passed; runtime and plugin loading remain unverified.
-Workspace and diff lines 1-14 of 41
-Student workspace: current pin -> proposed pin (not live versions)
-This is a system/package update, not an isolated extension update.
-Builds do not certify plugin loading or the latest vendor release.
-Extension example.extension: 1.0 -> 2.0
-Package nodejs: not selected -> 24.0
-Package vscode: 1.0 -> 2.0
-Current pin: student student
-  controller (controller)
-  pc01 (client)
-  pc02 (client)
-  example.extension requires packages [], extensions []
-Current pin effective preferences:
-{
-  "schemaVersion": 1,
+Review update
+Builds passed; programs are checked when they run on a computer.
+Lines 1-8 of 8
+Nixorium: nixos-26.05 -> nixos-26.05
+Applications whose version changes:
+  Extension example.extension: 1.0 -> 2.0
+  Package nodejs: not selected -> 24.0
+  Package vscode: 1.0 -> 2.0
 
-Enter saves/records the pin and activates this controller.
-No client deploy or home reset. Verify runtime on one client.
+Proposed flake.nix/flake.lock changes:
++ reviewed pin
+
+Enter saves the update and applies it to this controller.
+Computers are updated afterwards, from Computers → Update computers.
 
 ↑/↓ Scroll  ·  F4 Details  ·  Enter Apply update  ·  Esc Cancel  ·  F1 Help
 ```

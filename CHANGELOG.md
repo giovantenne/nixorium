@@ -22,6 +22,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The Update Nixorium review now shows what changes: the release, the
+  deployment file migrations, the applications whose version changes and the
+  file changes. Unchanged versions, extension requirements and preferences
+  are under F4 Details.
 - A reinstalled computer could keep showing "SSH key changed" after its new
   key was reviewed: OpenSSH had replaced the controller's link to the
   Nixorium copy of the known computers with a stale file. OpenSSH no longer

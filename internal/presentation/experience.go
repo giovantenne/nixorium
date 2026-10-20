@@ -708,7 +708,7 @@ func (model dashboardModel) releaseReviewView() string {
 			lines = append(lines, check.ID+" · "+check.State+" · "+check.Message)
 		}
 	}
-	patch := updateReviewLines(model.updates.plan)
+	patch := updateReviewLines(model.updates.plan, model.updateDetails)
 	start := min(model.updates.scroll, max(0, len(patch)-model.updateReviewHeight()))
 	end := min(len(patch), start+model.updateReviewHeight())
 	lines = append(lines, "", fmt.Sprintf("Diff lines %d-%d of %d", start+1, end, len(patch)))

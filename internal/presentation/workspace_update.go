@@ -75,9 +75,49 @@ func workspaceUpdateText(writer io.Writer, impact *domain.WorkspaceUpdateImpact)
 	fmt.Fprintln(writer, "Verify the controller and one client before fleet distribution; preferences change at boot reset, not at profile save.")
 }
 
-func updateReviewLines(report domain.UpdatePlanReport) []string {
+// workspaceVersionChanges lists the applications whose pinned version the
+// update changes, in the order of the full comparison.
+func workspaceVersionChanges(impact *domain.WorkspaceUpdateImpact) []string {
+	if impact == nil {
+		return nil
+	}
+	var full bytes.Buffer
+	workspaceUpdateText(&full, impact)
+	changes := []string{}
+	for _, line := range strings.Split(full.String(), "\n") {
+		if !strings.HasPrefix(line, "Package ") && !strings.HasPrefix(line, "Extension ") {
+			continue
+		}
+		name, versions, found := strings.Cut(line, ": ")
+		old, next, arrow := strings.Cut(versions, " -> ")
+		if found && arrow && old != next {
+			changes = append(changes, name+": "+old+" -> "+next)
+		}
+	}
+	return changes
+}
+
+// updateReviewLines is the review of an update. The summary shows what
+// changes: the release, the deployment file migrations, the applications
+// whose version changes and the file diff; full adds every pinned version,
+// target and preference (F4 Details, and the command-line plan).
+func updateReviewLines(report domain.UpdatePlanReport, full bool) []string {
 	var content bytes.Buffer
-	workspaceUpdateText(&content, report.Workspace)
+	if full {
+		workspaceUpdateText(&content, report.Workspace)
+	} else if report.Workspace != nil {
+		if report.CurrentRef != "" || report.Target != "" {
+			fmt.Fprintf(&content, "Nixorium: %s -> %s\n", safeWorkspaceText(report.CurrentRef), safeWorkspaceText(report.Target))
+		}
+		if changes := workspaceVersionChanges(report.Workspace); len(changes) > 0 {
+			fmt.Fprintln(&content, "Applications whose version changes:")
+			for _, change := range changes {
+				fmt.Fprintln(&content, "  "+change)
+			}
+		} else {
+			fmt.Fprintln(&content, "No application version changes. F4 shows every version.")
+		}
+	}
 	if migrations := deploymentMigrationLines(report.Migrations); len(migrations) > 0 {
 		fmt.Fprintln(&content, strings.Join(migrations, "\n"))
 		fmt.Fprintln(&content, "\nProposed changes to deployment files:")
@@ -89,7 +129,7 @@ func updateReviewLines(report domain.UpdatePlanReport) []string {
 }
 
 func (model dashboardModel) updateReviewContent() []string {
-	lines := updateReviewLines(model.updates.plan)
+	lines := updateReviewLines(model.updates.plan, model.updateDetails)
 	if model.updates.plan.Workspace == nil {
 		return lines
 	}
@@ -108,15 +148,15 @@ func (model dashboardModel) workspaceUpdateReviewView() string {
 	content := model.updateReviewContent()
 	start := min(model.updates.scroll, max(0, len(content)-model.updateReviewHeight()))
 	end := min(len(content), start+model.updateReviewHeight())
-	lines := []string{tuiTitle("Review update and student workspace", model.isDark),
-		"Builds passed; runtime and plugin loading remain unverified.",
-		fmt.Sprintf("Workspace and diff lines %d-%d of %d", start+1, end, len(content))}
+	lines := []string{tuiTitle("Review update", model.isDark),
+		"Builds passed; programs are checked when they run on a computer.",
+		fmt.Sprintf("Lines %d-%d of %d", start+1, end, len(content))}
 	lines = append(lines, content[start:end]...)
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: safeWorkspaceText(model.message)})
 	}
 	return model.renderShell(tuiShell{path: []string{"Maintenance", model.updateTitle(), "Review"}, body: strings.Join(lines, "\n"),
-		fixedBody: "Enter saves/records the pin and activates this controller.\nNo client deploy or home reset. Verify runtime on one client.", notices: notices,
+		fixedBody: "Enter saves the update and applies it to this controller.\nComputers are updated afterwards, from Computers → Update computers.", notices: notices,
 		actions: []tuiAction{{key: "↑/↓", label: "Scroll"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
 }

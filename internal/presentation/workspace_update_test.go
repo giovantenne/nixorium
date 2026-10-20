@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func TestWorkspaceUpdateTextDistinguishesPinsAndRuntimeEvidence(t *testing.T) {
@@ -63,5 +64,33 @@ func TestWorkspaceUpdateScrollableReviewKeepsCancelAndVersionComparison(t *testi
 				t.Fatal("review cancellation invoked update")
 			}
 		}
+	}
+}
+
+func TestUpdateReviewShowsOnlyChangesUntilDetails(t *testing.T) {
+	plan := demoWorkspaceUpdatePlan()
+	plan.Workspace.Current.Packages = append(plan.Workspace.Current.Packages, domain.WorkspacePackage{Package: "gcc", Version: "15.2.0"})
+	plan.Workspace.Proposed.Packages = append(plan.Workspace.Proposed.Packages, domain.WorkspacePackage{Package: "gcc", Version: "15.2.0"})
+	summary := strings.Join(updateReviewLines(plan, false), "\n")
+	for _, want := range []string{"Nixorium: nixos-26.05 -> nixos-26.05", "Applications whose version changes:", "Package vscode: 1.0 -> 2.0", "Package nodejs: not selected -> 24.0", "+ reviewed pin"} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("summary misses %q:\n%s", want, summary)
+		}
+	}
+	for _, unwanted := range []string{"gcc", "requires packages", "effective preferences"} {
+		if strings.Contains(summary, unwanted) {
+			t.Fatalf("summary shows %q:\n%s", unwanted, summary)
+		}
+	}
+	full := strings.Join(updateReviewLines(plan, true), "\n")
+	for _, want := range []string{"Package gcc: 15.2.0 -> 15.2.0", "requires packages [nodejs]", "effective preferences"} {
+		if !strings.Contains(full, want) {
+			t.Fatalf("details miss %q:\n%s", want, full)
+		}
+	}
+	plan.Workspace.Proposed.Packages = plan.Workspace.Current.Packages
+	plan.Workspace.Proposed.Extensions = plan.Workspace.Current.Extensions
+	if summary := strings.Join(updateReviewLines(plan, false), "\n"); !strings.Contains(summary, "No application version changes") {
+		t.Fatalf("unchanged summary:\n%s", summary)
 	}
 }
