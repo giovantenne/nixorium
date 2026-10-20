@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.10.0-beta.2] - 2026-10-20
+
 ### Added
 
 - Every screen shows its next step: the Enter action that does more than
@@ -91,8 +93,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   saying the migrations had changed it. Unchanged large files are now
   compared by content. A controller on 3.10.0-beta.1 runs that comparison
   with its own release, so it updates once with the new release's program:
-  `nix run github:giovantenne/nixorium/<release> -- update plan --target
-  <release>` in the deployment folder, then `update apply` with the review
+  `nix run github:giovantenne/nixorium/v3.10.0-beta.2 -- update plan --target
+  v3.10.0-beta.2` in the deployment folder, then `update apply` with the review
   token it prints.
 - A computer still starts from its disk when its firmware forgets the boot
   entry (after a CMOS reset, a firmware update, or on firmware that drops
