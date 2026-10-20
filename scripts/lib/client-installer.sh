@@ -256,6 +256,23 @@ nixorium_write_identity_record() {
   }
 }
 
+# nixorium_prepare_host_key creates the installed computer's SSH host key
+# (ed25519, the type the controller pins) when the installation has none and
+# prints its fingerprint, so it can be shown at the end of the installation and
+# compared with the one the controller asks to review for a reinstalled
+# computer.
+nixorium_prepare_host_key() {
+  local install_root=${1:-/mnt} key
+  key="$install_root/etc/ssh/ssh_host_ed25519_key"
+  local -a privileged=()
+  (( EUID == 0 )) || privileged=(sudo)
+  if ! "${privileged[@]}" test -s "$key"; then
+    "${privileged[@]}" install -d -m 0755 "$install_root/etc/ssh"
+    "${privileged[@]}" ssh-keygen -q -t ed25519 -N "" -C "" -f "$key" </dev/null >/dev/null
+  fi
+  "${privileged[@]}" ssh-keygen -l -E sha256 -f "$key.pub" | awk '{ print $2 }'
+}
+
 nixorium_verify_installed_profile() {
   local expected_system=$1 selected_disk=$2 install_root=${3:-/mnt} profile root_source root_device root_parent
   profile=$(readlink -f "$install_root/nix/var/nix/profiles/system" 2>/dev/null || true)

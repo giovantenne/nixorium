@@ -112,7 +112,20 @@ test_install_mount_check_rejects_an_occupied_mountpoint() (
   ! nixorium_require_clean_install_mount >/dev/null 2>&1
 )
 
+test_host_key_is_created_once_and_its_fingerprint_printed() (
+  fixture=$(mktemp -d)
+  trap 'rm -rf "$fixture"' EXIT
+  sudo() { "$@"; }
+  first=$(nixorium_prepare_host_key "$fixture")
+  [[ "$first" =~ ^SHA256:[A-Za-z0-9+/]{43}$ ]]
+  [[ "$(stat -c %a "$fixture/etc/ssh/ssh_host_ed25519_key")" == 600 ]]
+  grep -q '^ssh-ed25519 ' "$fixture/etc/ssh/ssh_host_ed25519_key.pub"
+  # An existing key is kept, never replaced.
+  [[ "$(nixorium_prepare_host_key "$fixture")" == "$first" ]]
+)
+
 test_identity_is_content_bound
+test_host_key_is_created_once_and_its_fingerprint_printed
 test_exclusions_are_additive
 test_safe_disk_has_no_exclusion
 test_exact_profile_and_parent_are_required

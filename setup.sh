@@ -440,7 +440,8 @@ install_system() {
 
 verify_installation() {
   nixorium_verify_installed_profile "$SELECTED_SYSTEM_PATH" "$SELECTED_DISK" &&
-    nixorium_write_identity_record "$SELECTED_HOST"
+    nixorium_write_identity_record "$SELECTED_HOST" &&
+    HOST_KEY_FINGERPRINT=$(nixorium_prepare_host_key)
 }
 
 reboot_system() {
@@ -556,6 +557,10 @@ main() {
 
   echo
   echo "SUCCESS: ${SELECTED_HOST} is installed on ${SELECTED_DISK}."
+  if [[ -n "${HOST_KEY_FINGERPRINT:-}" ]]; then
+    echo "Its SSH key fingerprint is ${HOST_KEY_FINGERPRINT}."
+    echo "If the controller asks to review a changed SSH key for ${SELECTED_HOST}, it must show this fingerprint."
+  fi
   echo "Remove or deprioritize network boot so the machine starts from disk."
   prompt_input "Reboot now? [y/N] (Enter remains in the installer): " REBOOT_CONFIRMATION || return 1
   if [[ "${REBOOT_CONFIRMATION,,}" == "y" || "${REBOOT_CONFIRMATION,,}" == "yes" ]]; then

@@ -34,6 +34,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   backup being due.
 - The network installation screen shows the address it serves after the
   controller's DHCP address changed.
+- A computer installed by network boot shows its SSH key fingerprint at the
+  end of the installation, so the key review the controller asks for after a
+  reinstallation can be compared with it.
 - Client installers no longer fill the screen with Nix lock file messages,
   and no longer report a missing identity record while installing a computer
   that shares its class system.
