@@ -687,10 +687,10 @@ let
     runtimeInputs = [ pkgs.coreutils ];
     text = ''
       SESSION=${nixoriumSession}/bin/nixorium-session
-      if command -v ghostty >/dev/null; then exec ghostty --class=${dashboardWindowClass} -e "$SESSION"; fi
+      if command -v ghostty >/dev/null; then exec ghostty --class=${dashboardWindowClass} --title=Nixorium -e "$SESSION"; fi
       if command -v kgx >/dev/null; then exec kgx -- "$SESSION"; fi
-      if command -v gnome-terminal >/dev/null; then exec gnome-terminal -- "$SESSION"; fi
-      if command -v xterm >/dev/null; then exec xterm -e "$SESSION"; fi
+      if command -v gnome-terminal >/dev/null; then exec gnome-terminal --title=Nixorium -- "$SESSION"; fi
+      if command -v xterm >/dev/null; then exec xterm -T Nixorium -e "$SESSION"; fi
       echo "No terminal application is installed; open a terminal and run: nixorium" >&2
       exit 1
     '';

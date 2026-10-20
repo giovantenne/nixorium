@@ -40,6 +40,17 @@ nixorium_canonical_disk() {
   readlink -m -- "$raw"
 }
 
+# nixos-install forwards nix's "copying path ..." line for every store path
+# (thousands per installation) and has no quiet option. This keeps everything
+# else, including errors, and replaces those lines with a count every 500.
+nixorium_summarize_copy_output() {
+  awk '
+    /^copying path / { n++; if (n % 500 == 0) { print "  " n " store paths copied..."; fflush() }; next }
+    { print; fflush() }
+    END { if (n > 0) print "  " n " store paths copied." }
+  '
+}
+
 nixorium_disk_kname() {
   lsblk -dnro KNAME -- "$1"
 }

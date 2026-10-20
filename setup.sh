@@ -150,6 +150,24 @@ format_bytes() {
   numfmt --to=iec-i --suffix=B "$1"
 }
 
+# One readable line for the review; the JSON stays the exact identity that
+# revalidate_disk compares.
+describe_disk_identity() {
+  local size details
+  if ! size=$(printf '%s' "$1" | jq -er '.sizeBytes | numbers' 2>/dev/null) \
+      || ! details=$(printf '%s' "$1" | jq -r '
+        def clean: gsub("\\\\x20"; " ") | gsub("^ +| +$"; "");
+        [ (if .model != "" then (.model | clean) else empty end),
+          (if .serial != "" then "serial \(.serial)" else empty end),
+          (if .transport != "" then .transport else empty end)
+        ] | join(", ")' 2>/dev/null); then
+    printf '%s\n' "$1"
+    return 0
+  fi
+  # The same size unit as the disk list above it.
+  printf '%s, %s%s\n' "$(printf '%s' "$1" | jq -r '.path')" "$(format_bytes "$size")" "${details:+, $details}"
+}
+
 list_hosts() {
   printf '%s' "$LAB_CLIENT_HOSTS_JSON" | jq -r '
     to_entries[] | "  \(.key + 1)) \(.value.name)  \(.value.ip)"
@@ -411,12 +429,13 @@ install_system() {
   # The installation activates the system once; a shared class system reads
   # the computer's number from this record then (ADR 0033).
   nixorium_write_identity_record "$SELECTED_HOST" || return 1
+  echo "Copying the prepared system from the controller (this can take several minutes)..."
   sudo nixos-install --system "$SELECTED_SYSTEM_PATH" \
     --option substituters "http://${LAB_CONTROLLER_DHCP_IP}:${LAB_CACHE_PORT}" \
     --option trusted-public-keys "$CACHE_KEY" \
     --option fallback false \
     --no-channel-copy \
-    --no-root-passwd
+    --no-root-passwd 2>&1 | nixorium_summarize_copy_output
 }
 
 verify_installation() {
@@ -496,13 +515,13 @@ main() {
   echo "Minimum target capacity: $(format_bytes "$REQUIRED_DISK_BYTES")"
   echo
   select_disk "$REQUESTED_DISK" || return 1
-  echo "Selected target disk: ${SELECTED_DISK} (${SELECTED_DISK_ID})"
+  echo "Selected target disk: $(describe_disk_identity "$SELECTED_DISK_ID")"
   echo
   echo "DESTRUCTIVE REVIEW"
   echo "  Install identity: ${SELECTED_HOST} (${SELECTED_HOST_IP})"
   echo "  Erase disk:       ${SELECTED_DISK}"
   echo "  All data on this disk will be permanently destroyed."
-  echo "  No host reservation has been made on the controller."
+  echo "  Nothing is changed until you type ERASE."
   EXPECTED_CONFIRMATION="ERASE"
   # A mistyped word is asked again; an empty answer or end of input cancels.
   while true; do

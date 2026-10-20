@@ -944,7 +944,7 @@ builtins.mapAttrs (name: value:
               echo "To start the guided installer again, run: sudo /installer/setup.sh"
             fi
           '';
-          services.getty.helpLine = lib.mkAfter ''
+          services.getty.helpLine = lib.mkForce ''
 
             The Nixorium guided installer starts on the first console.
             To run it again: sudo /installer/setup.sh

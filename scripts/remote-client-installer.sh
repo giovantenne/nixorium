@@ -337,13 +337,14 @@ run_plan() {
   # The installation activates the system once; a shared class system reads
   # the computer's number from this record then (ADR 0033).
   nixorium_write_identity_record "$host_name"
+  echo "Copying the prepared system from the controller (this can take several minutes)..."
   nixos-install --system "$system_path" \
     --option substituters "$cache_url" \
     --option trusted-public-keys "$cache_key" \
     --option require-sigs true \
     --option fallback false \
     --option builders "" \
-    --no-channel-copy --no-root-passwd
+    --no-channel-copy --no-root-passwd 2>&1 | nixorium_summarize_copy_output
 
   RUN_PHASE=verify
   install -D -o root -g root -m 0600 /etc/ssh/ssh_host_ed25519_key /mnt/etc/ssh/ssh_host_ed25519_key
