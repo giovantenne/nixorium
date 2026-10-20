@@ -945,8 +945,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			// installation preflight still runs after Continue. Guided first
 			// setup (no method yet) always shows the form.
 			method := model.installation.method
-			stale := staleDHCPAddress(message.settings.Lab.MasterDHCPIP, message.addresses)
-			if (method == "pxe" || method == domain.RemoteInstallUSBSSH) && message.settings.InstallationSettingsComplete() && !stale {
+			if (method == "pxe" || method == domain.RemoteInstallUSBSSH) && message.settings.InstallationSettingsComplete() {
 				model.installation.savedSummary = true
 				model.screen, model.message = dashboardSettings, ""
 				return model, nil
@@ -957,9 +956,6 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			}
 			model.settings.collectPasswords = !domain.CredentialsFromSettings(model.settings.current).Ready()
 			model.settings.editor = model.newSettingsEditor(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
-			if stale {
-				model.settings.editor = model.settings.editor.withChangedDHCPAddress(message.addresses)
-			}
 			model.message = ""
 			model.screen = dashboardSettingsEdit
 			return model, nil

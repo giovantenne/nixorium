@@ -307,26 +307,3 @@ func TestInstallationSummaryNamesTheControllerInterface(t *testing.T) {
 		}
 	}
 }
-
-func TestInstallationOpensTheFormWhenTheDHCPAddressChanged(t *testing.T) {
-	current := wizardSettings()
-	current.Lab.MasterDHCPIP = "192.168.56.99"
-	moved := domain.ControllerAddresses{Detected: true, Choices: []domain.DHCPAddressChoice{{Address: "192.168.57.99", Device: "enp0s3"}}}
-	if !staleDHCPAddress(current.Lab.MasterDHCPIP, moved) {
-		t.Fatal("moved address not detected")
-	}
-	if staleDHCPAddress(current.Lab.MasterDHCPIP, domain.ControllerAddresses{}) || staleDHCPAddress("192.168.57.99", moved) {
-		t.Fatal("unread or present address reported as changed")
-	}
-	model := dashboardModel{width: 120, height: 40, settings: settingsModel{current: current, addresses: moved}}
-	editor := model.newSettingsEditor(current, installationSettingsFields, "Installation / Laboratory settings").withChangedDHCPAddress(moved)
-	if view := ansi.Strip(renderTUIShell(editor.shell(), 200, false)); !strings.Contains(view, "The controller no longer has its saved DHCP address 192.168.56.99 (it has: 192.168.57.99).") {
-		t.Fatalf("change not explained:\n%s", view)
-	}
-	for editor.fields[editor.index].id != "lab.masterDhcpIp" {
-		editor = editor.moveToField(editor.index + 1)
-	}
-	if selected := editor.selector.SelectedItem().(settingsChoiceItem); selected.value != "192.168.57.99" {
-		t.Fatalf("current address not proposed: %+v", selected)
-	}
-}
