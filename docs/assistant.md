@@ -109,9 +109,10 @@ a request containing client version and tool version only. The subsequent steps 
 names, requested file contents and tool results to the Assistant service and
 its AI provider. The service does not keep your configuration files. It keeps the text of your
 messages and Assistant's answers for 30 days to detect abuse, then deletes it.
-Whole conversations, including files, saved history and diagnostics Assistant
-read, are kept for 90 days
-only if you report an answer or turn on sharing. Sharing is off by default. Do not enter passwords or student data in a request.
+Conversations (your questions, the answers and the tool results Assistant
+used, after the controller's best-effort redaction) are saved on the service
+for 90 days so support can review them. Saving is on by default and the
+administrator can switch it off. Do not enter passwords or student data in a request.
 
 The model sees tracked files from the chat's base commit plus its own candidate
 files. Untracked and ignored files, private-key paths, `keys/`, `.git`, `.ssh`,
@@ -142,14 +143,18 @@ of the transcript and model messages. The portal return page lets you close the
 tab and return to Nixorium. The displayed invoice notice is **Official electronic
 invoices are delivered through SDI.**
 
-## Reports and conversation sharing
+## Reports and saved conversations
 
-The activation consent offers **Share my conversations with Nixorium for 90 days
-to improve Assistant** (off by default; Space toggles it). In the chat,
-**/share** opens **Conversation sharing**; Enter changes the saved setting and
-Esc cancels. Sharing uploads the complete redacted saved conversation after
-final and error responses, replacing the previous version. Upload failures
-never block a response or change its result.
+The activation consent shows **Save conversations on the service: On**,
+pre-selected (Space switches it off). The consent text says that conversations
+are saved on the Nixorium Assistant service for 90 days so support can review
+them. In the chat, **/share** opens **Assistant settings** with the same
+switch; Enter changes the saved setting and Esc cancels. Saving uploads the
+complete redacted saved conversation after final and error responses, replacing
+the previous version; nothing is uploaded when it is Off. Upload failures never
+block a response or change its result. A controller that accepted an earlier
+consent text sees the updated consent once, with saving pre-selected On, and
+can refuse it.
 
 After a final response, **/report** opens **Report this answer**. Choose
 **Helpful** or **Wrong** with Up/Down and optionally type up to 500 characters.
@@ -157,7 +162,7 @@ The screen explains that sending includes the whole conversation: your
 messages, configuration and history contents read, diagnostics and check
 results. Known secret patterns are filtered, but personal or sensitive text
 may remain. Enter sends; Esc cancels. A report is retained for 90 days even when
-ongoing sharing is off. Successful submission shows **Report sent. Thank you.**
+saving conversations is off. Successful submission shows **Report sent. Thank you.**
 The laboratory token authenticates requests and is kept out of their bodies.
 
 ## Tools and limits

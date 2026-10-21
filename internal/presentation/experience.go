@@ -239,11 +239,11 @@ func (model dashboardModel) helpView() string {
 		case "activate":
 			lines = append(lines, "Enter Activate; Esc Cancel")
 		case "consent":
-			lines = append(lines, "Space Toggle sharing; Enter Continue without sending; Esc Back")
+			lines = append(lines, "Space Switch saving; Enter Continue without sending; Esc Back")
 		case "name", "name-saving":
 			lines = append(lines, "Type the laboratory name (60 characters); Enter Save; an empty name removes it; Esc Cancel")
 		case "sharing":
-			lines = append(lines, "Enter Toggle conversation sharing; Esc Cancel")
+			lines = append(lines, "Enter Switch conversation saving; Esc Cancel")
 		case "report":
 			lines = append(lines, "Up/Down Helpful or Wrong; type an optional comment (500 characters); Enter Send report; Esc Cancel")
 		case "report-sending":
@@ -251,7 +251,7 @@ func (model dashboardModel) helpView() string {
 		case "running":
 			lines = append(lines, "Esc Stop; the deployment remains unchanged")
 		default:
-			lines = append(lines, "Enter Send; Alt+Enter or Ctrl+J New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back", "/review Review proposal; /new New chat; /report Report this answer", "/share Conversation sharing; /name Laboratory name; /help Help; /code Activation code")
+			lines = append(lines, "Enter Send; Alt+Enter or Ctrl+J New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back", "/review Review proposal; /new New chat; /report Report this answer", "/share Save conversations; /name Laboratory name; /help Help; /code Activation code")
 		}
 		lines = append(lines, "Messages and files leave the controller only after subscription and consent checks.")
 	case dashboardComputersArea:

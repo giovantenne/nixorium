@@ -19,8 +19,8 @@ func TestAssistantSharingCheckboxAndSettingsAreExplicitAndPersistent(t *testing.
 	actions.WriteSharing = store.WriteSharing
 	actions.WriteConsentSharing = store.WriteConsentSharing
 	m.assistant.state = "consent"
-	if m.assistant.sharing || !strings.Contains(m.View().Content, "[ ] "+assistantSharingText) {
-		t.Fatal("sharing not off by default")
+	if !m.assistant.sharing || !strings.Contains(m.View().Content, "[x] Save conversations on the service: On") {
+		t.Fatal("saving not on by default")
 	}
 	for _, disclosure := range []string{"configuration history", "recent logs", "best effort", "Student home files are not read", "30 days", "90 days"} {
 		if !strings.Contains(assistantConsentText, disclosure) {
@@ -29,7 +29,7 @@ func TestAssistantSharingCheckboxAndSettingsAreExplicitAndPersistent(t *testing.
 	}
 	updated, _ := m.Update(keyPress("space"))
 	m = updated.(dashboardModel)
-	if !m.assistant.sharing {
+	if m.assistant.sharing || !strings.Contains(m.View().Content, "[ ] Save conversations on the service: Off") {
 		t.Fatal("checkbox did not toggle")
 	}
 	updated, _ = m.Update(keyPress("esc"))
@@ -39,7 +39,7 @@ func TestAssistantSharingCheckboxAndSettingsAreExplicitAndPersistent(t *testing.
 	}
 	updated, _ = m.openAssistantSharing()
 	m = updated.(dashboardModel)
-	if m.assistant.state != "sharing" || m.assistant.sharing || !strings.Contains(m.View().Content, "Conversation sharing") {
+	if m.assistant.state != "sharing" || m.assistant.sharing || !strings.Contains(m.View().Content, "Save conversations on the service: Off") {
 		t.Fatal("settings did not load saved state")
 	}
 	updated, _ = m.Update(keyPress("enter"))
@@ -159,7 +159,7 @@ func TestAssistantSharingAndReportLayouts(t *testing.T) {
 				if state == "report" && !strings.Contains(view, "90 days.") {
 					t.Fatal("disclosure clipped")
 				}
-				if state == "consent" && !strings.Contains(view, "Share my conversations") {
+				if state == "consent" && !strings.Contains(view, "Save conversations on the service") {
 					t.Fatal("checkbox clipped")
 				}
 			}
@@ -184,9 +184,9 @@ func TestAssistantAcceptConsentSavesSelectedSharingAndReplacementResetsCheckbox(
 			t.Fatal("consent persistence", err)
 		}
 	}
-	m.assistant.sharing = true
-	updated, _ := m.finishAssistantActivation(assistantActivationMsg{id: m.assistant.id, account: domain.AssistantAccount{Name: "Synthetic account"}})
-	if updated.(dashboardModel).assistant.sharing {
-		t.Fatal("activation inherited old checkbox")
+	m.assistant.sharing = false
+	updated, _ := m.finishAssistantActivation(assistantActivationMsg{id: m.assistant.id, sharing: true, account: domain.AssistantAccount{Name: "Synthetic account"}})
+	if !updated.(dashboardModel).assistant.sharing {
+		t.Fatal("new consent did not preselect saving")
 	}
 }

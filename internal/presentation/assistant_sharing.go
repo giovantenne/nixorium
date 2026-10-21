@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-const assistantSharingText = "Share my conversations with Nixorium for 90 days to improve Assistant"
+const assistantSharingText = "Save conversations on the service"
 const assistantReportText = "This sends the whole conversation to Nixorium, including your messages, configuration and history contents, diagnostics and check results Assistant read. Known secret patterns are filtered, but filtering may leave personal or sensitive text. It is kept for 90 days."
 
 type assistantReportMsg struct {
@@ -17,16 +17,15 @@ type assistantReportMsg struct {
 }
 
 func (model dashboardModel) assistantSharingCheckbox() string {
-	mark := "[ ] "
 	if model.assistant.sharing {
-		mark = "[x] "
+		return "[x] " + assistantSharingText + ": On"
 	}
-	return mark + assistantSharingText
+	return "[ ] " + assistantSharingText + ": Off"
 }
 func (model dashboardModel) openAssistantSharing() (tea.Model, tea.Cmd) {
 	actions := model.actions.AssistantService
 	if actions == nil || actions.ReadSharing == nil || actions.WriteSharing == nil {
-		model.message = "Conversation sharing is unavailable. Update Nixorium and try again."
+		model.message = "Conversation saving is unavailable. Update Nixorium and try again."
 		return model, nil
 	}
 	share, err := actions.ReadSharing()
@@ -126,8 +125,8 @@ func (model dashboardModel) finishAssistantReport(message assistantReportMsg) (t
 	return model, model.assistant.input.Focus()
 }
 func (model dashboardModel) assistantSharingView() string {
-	title, body := "Conversation sharing", "Applies to all future conversations of this lab until you turn it off.\n\n"+model.assistantSharingCheckbox()
-	actions := []tuiAction{{key: "Enter", label: "Toggle sharing"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+	title, body := "Assistant settings", "Saved on the Nixorium Assistant service for 90 days so support can review them. Applies to all future conversations of this lab.\n\n"+model.assistantSharingCheckbox()
+	actions := []tuiAction{{key: "Enter", label: "Switch on/off"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	if model.assistant.state != "sharing" {
 		title = "Report this answer"
 		rating := "› Helpful\n  Wrong"

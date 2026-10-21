@@ -28,7 +28,7 @@ func TestAssistantCompleteHelpAndScrolling(t *testing.T) {
 		"How Assistant works\n  Describe what your lab should do. Assistant prepares the change in a private\n  copy and checks it. Nothing is saved or installed until you review and save it.\n  Each message you send uses one request from your trial or yearly allowance.",
 		"/review   Review the current proposal and save it.", "/save     Same as /review: opens the review to save the proposal.", "/new      Start a new chat. Use it when you change topic or after saving.",
 		"/report   Tell us one answer was helpful or wrong. Sends this conversation\n            to Nixorium once, so we can fix mistakes. Kept for 90 days.",
-		"/share    Turn automatic sharing on or off (off by default). When on, every\n            conversation of this lab is sent to Nixorium to improve Assistant.\n            Kept for 90 days.",
+		"/share    Switch \"Save conversations on the service\" On or Off (On by\n            default). When on, every conversation of this lab is saved on the\n            Nixorium Assistant service for 90 days so support can review it.",
 		"/code     Enter an activation code (for example after subscribing).", "/help     Show this help.",
 		"Keys\n  Enter        Send the message\n  Alt+Enter    New line (Ctrl+J also works)\n  Ctrl+R       Review the proposal\n  Ctrl+N       New chat\n  PgUp/PgDn    Scroll the conversation\n  Select text      Drag with the mouse (or Shift+drag in some terminals)\n  Esc          Stop Assistant while it works, or go back",
 	} {
@@ -61,14 +61,14 @@ func TestAssistantExplanations(t *testing.T) {
 	assistantEnableCommands(&m)
 	m.assistant.input.SetValue("/")
 	view := ansi.Strip(m.View().Content)
-	for _, want := range []string{"/review  Review the current proposal and save it.", "/save  Same as /review: opens the review to save the proposal.", "/new  Start a new chat.", "/report  Tell us one answer was helpful or wrong.", "/share  Turn automatic sharing on or off (off by default).", "/code  Enter an activation code (for example after subscribing).", "/help  Show this help."} {
+	for _, want := range []string{"/review  Review the current proposal and save it.", "/save  Same as /review: opens the review to save the proposal.", "/new  Start a new chat.", "/report  Tell us one answer was helpful or wrong.", "/share  Switch saving conversations on the service On or Off (On by default).", "/code  Enter an activation code (for example after subscribing).", "/help  Show this help."} {
 		if !strings.Contains(view, want) {
 			t.Fatal("missing command explanation", want, view)
 		}
 	}
 	for _, state := range []string{"consent"} {
 		m.assistant.state = state
-		if !strings.Contains(ansi.Strip(m.View().Content), "Each message you send uses one request.") {
+		if !strings.Contains(strings.Join(strings.Fields(ansi.Strip(m.View().Content)), " "), "Each message you send uses one request.") {
 			t.Fatal(state, "missing request explanation")
 		}
 	}
@@ -79,7 +79,7 @@ func TestAssistantExplanations(t *testing.T) {
 	}
 	m.assistant.state = "sharing"
 	view = ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "Applies to all future conversations of this lab until you turn it off.") {
+	if !strings.Contains(strings.Join(strings.Fields(view), " "), "Applies to all future conversations of this lab.") {
 		t.Fatal("sharing distinction missing", view)
 	}
 }

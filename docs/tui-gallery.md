@@ -395,20 +395,18 @@ Assistant                                                                       
 
 Before you send
 
-Your messages, configuration files and saved configuration history read by
-Assistant are sent to the Nixorium Assistant service and its AI provider.
-Assistant may also read system state, recent logs and configuration files
+Your messages, configuration files and saved configuration history read by Assistant are sent to the Nixorium
+Assistant service and its AI provider. Assistant may also read system state, recent logs and configuration files
 (never home folders, passwords or keys) from declared computers. Known secret patterns and common private
-identifiers are filtered;
-filtering is best effort and may leave personal or sensitive text.
-Student home files are not read. The service does not keep configuration files.
-It keeps messages and answers for 30 days to detect abuse, then deletes them.
-Whole conversations, including files and diagnostics read, are kept for
-90 days only if you report an answer or turn on sharing below.
-Each message you send uses one request.
+identifiers are filtered; filtering is best effort and may leave personal or sensitive text. Student home files are
+not read. The service does not keep configuration files. It keeps messages and answers for 30 days to detect abuse,
+then deletes them.
+Conversations (questions, answers and tool results, after best-effort redaction) are saved on the service for 90
+days so support can review them. Press Space to switch saving off; /share changes it later. Each message you send
+uses one request.
 
-[ ] Share my conversations with Nixorium for 90 days to improve Assistant
-Space toggle sharing · Enter continue · Esc back
+[x] Save conversations on the service: On
+Space switch saving · Enter continue · Esc back
 ```
 
 ## Optional conversation sharing
@@ -416,13 +414,14 @@ Space toggle sharing · Enter continue · Esc back
 ```text
 Nixorium  /  Assistant
 
-Conversation sharing
+Assistant settings
 
-Applies to all future conversations of this lab until you turn it off.
+Saved on the Nixorium Assistant service for 90 days so support can review them. Applies to all future
+conversations of this lab.
 
-[ ] Share my conversations with Nixorium for 90 days to improve Assistant
+[x] Save conversations on the service: On
 
-⏎ Enter Toggle sharing  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Switch on/off  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Explicit answer report

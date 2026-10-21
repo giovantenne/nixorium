@@ -366,7 +366,7 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 				if err == nil && actions.ReadConsent != nil {
 					accepted, err = actions.ReadConsent()
 				}
-				sharing := false
+				sharing := true
 				if err == nil && accepted && actions.ReadSharing != nil {
 					sharing, err = actions.ReadSharing()
 				}

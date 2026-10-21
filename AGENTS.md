@@ -511,10 +511,12 @@ that release's notes, so a release is not finished until the site follows it.
   installs `/etc/nixorium/assistant.json` and its private state directory;
   account activation and consent remain explicit and separate. Service and
   subscription URL overrides are for staging/tests.
-  Account checks send no draft or files. Conversation sharing defaults to false
-  and requires explicit saved consent; reports require their own whole-chat
+  Account checks send no draft or files. Conversation saving is On by default
+  (consent text version 4, pre-selected on the consent screen, switch "Save
+  conversations on the service: On/Off" in /share, kept for 90 days) and still
+  requires saved consent; an older consent text is asked once again; reports require their own whole-chat
   disclosure and confirmation. Upload only redacted saved transcripts through
-  typed callbacks, never the laboratory token; sharing failures stay silent and
+  typed callbacks, never the laboratory token; upload failures stay silent and
   never block a turn. Report/share contents are kept by the service for 90 days.
   Trial size, length, quota and purchase links come from the service; never
   hard-code them in the client, which sends `X-Nixorium-Client-Version` so the

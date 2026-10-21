@@ -206,8 +206,9 @@ func TestAssistantWelcomeOfferActivationConsentAndReopen(t *testing.T) {
 	if accepted, _ := store.ReadConsent(); accepted {
 		t.Fatal("consent implicit")
 	}
-	updated, _ = m.Update(keyPress("space"))
-	m = updated.(dashboardModel)
+	if !m.assistant.sharing {
+		t.Fatal("consent screen does not preselect saving")
+	}
 	m.assistant.input.Reset() // this test checks consent alone, not the pending prompt
 	updated, cmd = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
@@ -293,7 +294,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					m.assistant.activationKind, m.assistant.codeStep = "free trial", true
 					required = append(required, "Paste the code you receive by email.", "Activation code")
 				case "consent":
-					required = append(required, "Share my conversations", "Enter continue", "configuration history", "recent logs", "best effort", "Student home files", "90 days", "one request")
+					required = append(required, "Save conversations on the service: On", "Enter continue", "configuration history", "recent logs", "best effort", "Student home files", "90 days", "one request")
 				case "running":
 					m.assistant.started = time.Now()
 					m.assistant.entries = []assistantEntry{{role: "activity", text: "● Reading modules/course.nix"}, {role: "activity", text: "✗ Evaluation failed"}}
@@ -330,7 +331,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					writer := colorprofile.Writer{Forward: &output, Profile: profile}
 					writer.Write([]byte(view))
 					for _, want := range required {
-						if !strings.Contains(ansi.Strip(output.String()), want) {
+						if !strings.Contains(strings.Join(strings.Fields(ansi.Strip(output.String())), " "), want) {
 							t.Fatalf("%s %dx%d %v missing %q\n%s", state, size[0], size[1], profile, want, output.String())
 						}
 					}

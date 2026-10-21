@@ -163,7 +163,7 @@ func newAssistantModel() assistantModel {
 	labName.Prompt = "› "
 	labName.Placeholder = "For example Lab 2 – Informatica"
 	labName.CharLimit = assistantLabNameLimit
-	return assistantModel{initialized: true, state: "chat", input: input, code: code, reportComment: comment, labName: labName}
+	return assistantModel{initialized: true, state: "chat", sharing: true, input: input, code: code, reportComment: comment, labName: labName}
 }
 
 func (model dashboardModel) openAssistant() (tea.Model, tea.Cmd) {
@@ -238,6 +238,10 @@ func (model dashboardModel) assistantAccess(ctx context.Context, id uint64, acce
 	}
 	if result.err == nil && actions.ReadSharing != nil {
 		result.sharing, result.err = actions.ReadSharing()
+	}
+	if result.err == nil && !result.consent {
+		// Saving is pre-selected On on the consent screen; the administrator can switch it off.
+		result.sharing = true
 	}
 	if result.err != nil || !result.consent {
 		return result

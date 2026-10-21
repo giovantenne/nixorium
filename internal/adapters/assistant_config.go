@@ -205,9 +205,10 @@ func (store AssistantStateStore) DeleteToken() error {
 }
 
 // assistantConsentTextVersion is the disclosure the saved consent accepted.
-// Version 3 adds allowlisted system configuration files (ADR 0032); an older
-// consent is asked again once.
-const assistantConsentTextVersion = 3
+// Version 4 states that conversations are saved on the service for 90 days by
+// default, with a switch; an older consent is asked again once (ADR 0032 added
+// allowlisted system configuration files in version 3).
+const assistantConsentTextVersion = 4
 
 func (store AssistantStateStore) ReadConsent() (bool, error) {
 	root, err := store.root()

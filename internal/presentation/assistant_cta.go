@@ -24,7 +24,7 @@ const assistantFailedNotice = "The Assistant could not complete this request. Tr
 // service_unavailable cover refunded and counted cases alike. A request the user
 // stops shows no notice at all.
 const assistantNotCountedNotice = "This request was not counted."
-const assistantConsentText = "Your messages, configuration files and saved configuration history read by\nAssistant are sent to the Nixorium Assistant service and its AI provider.\nAssistant may also read system state, recent logs and configuration files\n(never home folders, passwords or keys) from declared computers. Known secret patterns and common private identifiers are filtered;\nfiltering is best effort and may leave personal or sensitive text.\nStudent home files are not read. The service does not keep configuration files.\nIt keeps messages and answers for 30 days to detect abuse, then deletes them.\nWhole conversations, including files and diagnostics read, are kept for\n90 days only if you report an answer or turn on sharing below.\nEach message you send uses one request."
+const assistantConsentText = "Your messages, configuration files and saved configuration history read by Assistant are sent to the Nixorium Assistant service and its AI provider. Assistant may also read system state, recent logs and configuration files (never home folders, passwords or keys) from declared computers. Known secret patterns and common private identifiers are filtered; filtering is best effort and may leave personal or sensitive text. Student home files are not read. The service does not keep configuration files. It keeps messages and answers for 30 days to detect abuse, then deletes them.\nConversations (questions, answers and tool results, after best-effort redaction) are saved on the service for 90 days so support can review them. Press Space to switch saving off; /share changes it later. Each message you send uses one request."
 
 func assistantServiceNotice(err error, subscribeURL string) string {
 	if err != nil {
@@ -127,7 +127,7 @@ func (model dashboardModel) assistantGateView() string {
 	case "consent":
 		title = "Before you send"
 		body = assistantConsentText + "\n\n" + model.assistantSharingCheckbox()
-		hint = "Space toggle sharing · Enter continue · Esc back"
+		hint = "Space switch saving · Enter continue · Esc back"
 	case "activate":
 		title = "Activate Assistant"
 		code := model.assistant.code

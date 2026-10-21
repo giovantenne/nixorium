@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The Assistant now saves every conversation on the Nixorium Assistant service
+  for 90 days, so support can review them and help you better. Nothing more is
+  sent than before, and the usual filtering of passwords, keys and Wi-Fi
+  details still applies. The administrator can switch it off at any time in
+  the Assistant settings ("Save conversations on the service: On/Off"). A
+  controller that accepted the earlier text sees the updated consent once,
+  with saving already selected, and can refuse it.
 - The next step on each screen is now drawn as a button with a rounded border
   (red when the action erases or replaces data) instead of a highlighted bar,
   so it no longer looks like a selected row. On short terminals it stays a

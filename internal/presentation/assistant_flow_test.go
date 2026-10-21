@@ -97,7 +97,7 @@ func assistantFlowFixture(t *testing.T, handler http.HandlerFunc) (dashboardMode
 	client := adapters.AssistantClient{Endpoint: server.URL + "/v1", Version: "3.2.0"}
 	actions := DashboardActions{Assistant: domain.AssistantConfig{Enabled: true, Endpoint: server.URL + "/v1", SubscribeURL: "https://example.org/subscribe"}, AssistantService: &AssistantActions{
 		ReadToken: store.ReadToken, WriteToken: store.WriteToken, DeleteToken: store.DeleteToken,
-		ReadConsent: store.ReadConsent, WriteConsent: store.WriteConsent, Activate: client.Activate,
+		ReadConsent: store.ReadConsent, WriteConsent: store.WriteConsent, WriteConsentSharing: store.WriteConsentSharing, ReadSharing: store.ReadSharing, WriteSharing: store.WriteSharing, Activate: client.Activate,
 	}}
 	fixture := &assistantFlowStore{AssistantStateStore: store}
 	runner := app.AssistantTurnRunner{Client: client, Store: fixture, Tools: fixture, Version: client.Version}
