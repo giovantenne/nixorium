@@ -216,34 +216,6 @@ func inspectReservationAt(directory *os.File) (bool, error) {
 	return true, nil
 }
 
-func ensureTestCoordinationDirectory(stateRoot string) (string, error) {
-	directory := filepath.Join(stateRoot, "nixorium", "coordination")
-	if err := os.MkdirAll(directory, 0700); err != nil {
-		return "", err
-	}
-	lockPath := filepath.Join(directory, coordinationLockName)
-	file, err := os.OpenFile(lockPath, os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		return "", err
-	}
-	if err := file.Chmod(0600); err != nil {
-		file.Close()
-		return "", err
-	}
-	if err := file.Close(); err != nil {
-		return "", err
-	}
-	classroom, err := os.OpenFile(filepath.Join(directory, classroomLockName), os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		return "", err
-	}
-	if err := classroom.Chmod(0600); err != nil {
-		classroom.Close()
-		return "", err
-	}
-	return directory, classroom.Close()
-}
-
 type remoteInstallReservation struct {
 	directoryPath string
 	operationID   string

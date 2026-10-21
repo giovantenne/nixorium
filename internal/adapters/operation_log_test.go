@@ -216,3 +216,15 @@ func TestOperationLogsRequirePrivateOwnedDirectories(t *testing.T) {
 		t.Fatalf("unsafe directory error = %v", err)
 	}
 }
+
+func openDeploymentOperation(stateRoot string, now time.Time) (*DeploymentOperation, error) {
+	coordinationDirectory, err := ensureTestCoordinationDirectory(stateRoot)
+	if err != nil {
+		return nil, err
+	}
+	gate, err := acquireOperationGateAt(coordinationDirectory, false)
+	if err != nil {
+		return nil, err
+	}
+	return openDeploymentOperationWithGate(stateRoot, now, gate)
+}

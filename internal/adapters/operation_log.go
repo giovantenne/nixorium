@@ -95,18 +95,6 @@ func OpenDeploymentOperation() (*DeploymentOperation, error) {
 	return openDeploymentOperationWithGate(stateRoot, time.Now(), gate)
 }
 
-func openDeploymentOperation(stateRoot string, now time.Time) (*DeploymentOperation, error) {
-	coordinationDirectory, err := ensureTestCoordinationDirectory(stateRoot)
-	if err != nil {
-		return nil, err
-	}
-	gate, err := acquireOperationGateAt(coordinationDirectory, false)
-	if err != nil {
-		return nil, err
-	}
-	return openDeploymentOperationWithGate(stateRoot, now, gate)
-}
-
 func openDeploymentOperationWithGate(stateRoot string, now time.Time, gate *operationGate) (*DeploymentOperation, error) {
 	fail := func(err error) (*DeploymentOperation, error) {
 		_ = gate.Close()
