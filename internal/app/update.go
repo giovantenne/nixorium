@@ -270,11 +270,6 @@ func emitUpdatePlanProgress(progress func(domain.UpdatePlanProgress), phase doma
 	progress(domain.UpdatePlanProgress{Phase: phase, Detail: detail, Current: current, Total: total})
 }
 
-func (m *UpdateManager) Apply(ctx context.Context, repository, target, expectedToken string, allowPrerelease, allowDowngrade bool) domain.UpdateApplyReport {
-	plan := m.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
-	return m.ApplyPlan(ctx, plan, expectedToken)
-}
-
 func (m *UpdateManager) ApplyPlan(ctx context.Context, plan domain.UpdatePlanReport, expectedToken string) domain.UpdateApplyReport {
 	report := domain.UpdateApplyReport{
 		SchemaVersion: domain.SchemaVersion,

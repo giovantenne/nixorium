@@ -37,13 +37,6 @@ type RemoteInstallReservation interface {
 	ReleaseResolved() error
 }
 
-type RemoteInstallCapabilities struct {
-	SchemaVersion int                 `json:"schemaVersion"`
-	Method        RemoteInstallMethod `json:"method"`
-	Ready         bool                `json:"ready"`
-	Issues        []ValidationIssue   `json:"issues"`
-}
-
 type RemoteInstallerEndpoint struct {
 	Address     string `json:"address"`
 	Port        int    `json:"port"`

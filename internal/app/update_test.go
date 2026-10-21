@@ -364,11 +364,11 @@ func TestUpdateApplyRequiresCurrentPlanToken(t *testing.T) {
 	}
 	manager := NewUpdateManager(source)
 	plan := manager.Plan(context.Background(), ".", "v1.1.0", false, false)
-	blocked := manager.Apply(context.Background(), ".", "v1.1.0", "sha256:stale", false, false)
+	blocked := manager.ApplyPlan(context.Background(), manager.Plan(context.Background(), ".", "v1.1.0", false, false), "sha256:stale")
 	if blocked.State != "blocked" || source.applied != 0 {
 		t.Fatalf("blocked apply = %+v, calls = %d", blocked, source.applied)
 	}
-	report := manager.Apply(context.Background(), ".", "v1.1.0", plan.ReviewToken, false, false)
+	report := manager.ApplyPlan(context.Background(), manager.Plan(context.Background(), ".", "v1.1.0", false, false), plan.ReviewToken)
 	if report.State != "completed" || !report.Updated || report.RetrySafe || source.applied != 1 || source.prepared != 3 {
 		t.Fatalf("apply = %+v, calls = %d", report, source.applied)
 	}
