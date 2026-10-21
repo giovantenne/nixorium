@@ -104,7 +104,7 @@ func TestNewReviewStartsWithNothingSelected(t *testing.T) {
 	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
 	m.report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}, {Name: "pc02"}}
 	m.screen = dashboardInternet
-	m.internet = internetModel{stage: 2, chosen: map[string]bool{"pc01": true, "pc02": true}}
+	m.internet = internetModel{stage: 2, hostPicker: hostPicker{chosen: map[string]bool{"pc01": true, "pc02": true}}}
 	next, _ := m.Update(tea.KeyPressMsg{Text: "n", Code: 'n'})
 	m = next.(dashboardModel)
 	next, _ = m.Update(tea.KeyPressMsg{Text: "a", Code: 'a'})
@@ -113,7 +113,7 @@ func TestNewReviewStartsWithNothingSelected(t *testing.T) {
 		t.Fatalf("first a after a new review did not select all: %v", m.internet.chosen)
 	}
 	m.screen = dashboardLock
-	m.lock = lockModel{stage: 2, chosen: map[string]bool{"pc01": true, "pc02": true}}
+	m.lock = lockModel{stage: 2, hostPicker: hostPicker{chosen: map[string]bool{"pc01": true, "pc02": true}}}
 	next, _ = m.Update(tea.KeyPressMsg{Text: "n", Code: 'n'})
 	m = next.(dashboardModel)
 	if len(m.lock.chosen) != 0 {

@@ -53,11 +53,11 @@ const (
 )
 
 type shareModel struct {
-	cursor, stage int
-	path          string
-	chosen        map[string]bool
-	plan          domain.SharePlan
-	result        domain.ShareReport
+	hostPicker
+	stage  int
+	path   string
+	plan   domain.SharePlan
+	result domain.ShareReport
 }
 type sharePlanMsg struct{ plan domain.SharePlan }
 type shareApplyMsg struct{ report domain.ShareReport }
@@ -67,7 +67,7 @@ func newShareModel() shareModel {
 	if home, err := os.UserHomeDir(); err == nil {
 		path = home + "/"
 	}
-	return shareModel{path: path, chosen: map[string]bool{}}
+	return shareModel{hostPicker: newHostPicker(), path: path}
 }
 
 func (model dashboardModel) updateShare(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -116,32 +116,13 @@ func (model dashboardModel) updateShare(key tea.KeyPressMsg) (tea.Model, tea.Cmd
 		}
 		return model, nil
 	}
+	if m.pick(key.String(), hosts) {
+		return model, nil
+	}
 	switch key.String() {
-	case "up", "k":
-		m.cursor = max(0, m.cursor-1)
-	case "down", "j":
-		m.cursor = min(max(0, len(hosts)-1), m.cursor+1)
-	case "space":
-		if len(hosts) > 0 {
-			name := hosts[m.cursor].Name
-			m.chosen[name] = !m.chosen[name]
-		}
-	case "a":
-		all := true
-		for _, h := range hosts {
-			all = all && m.chosen[h.Name]
-		}
-		for _, h := range hosts {
-			m.chosen[h.Name] = !all
-		}
 	case "enter":
-		names := []string{}
-		for _, h := range hosts {
-			if m.chosen[h.Name] {
-				names = append(names, h.Name)
-			}
-		}
-		if len(names) == 0 {
+		requested := m.requested(hosts)
+		if requested == "" {
 			model.message = "Select at least one client."
 			return model, nil
 		}
@@ -149,7 +130,7 @@ func (model dashboardModel) updateShare(key tea.KeyPressMsg) (tea.Model, tea.Cmd
 			model.message = "Sending files is unavailable in this session."
 			return model, nil
 		}
-		requested, path := strings.Join(names, ","), strings.TrimSpace(m.path)
+		path := strings.TrimSpace(m.path)
 		model.busy = "Preparing the files and checking the computers"
 		return model.startRead(func(ctx context.Context) tea.Msg {
 			return sharePlanMsg{model.actions.PlanShare(ctx, requested, path)}
@@ -193,22 +174,9 @@ func (model dashboardModel) shareView() string {
 	default:
 		lines = append(lines, tuiMuted("Sending "+strings.TrimSpace(m.path), model.isDark), "")
 		hosts := model.report.Meta.Clients.Hosts
-		count := max(1, model.height-ctaRows(model.height)-18)
-		start, end := listWindow(len(hosts), m.cursor, count)
-		for i := start; i < end; i++ {
-			h := hosts[i]
-			mark := "[ ]"
-			if m.chosen[h.Name] {
-				mark = "[x]"
-			}
-			lines = append(lines, tuiSelection(fmt.Sprintf("%s %-10s %s", mark, h.Name, h.IP), i == m.cursor, model.isDark))
-		}
-		if len(hosts) == 0 {
-			lines = append(lines, "No client computers configured.")
-		}
-		if start > 0 || end < len(hosts) {
-			lines = append(lines, fmt.Sprintf("Showing %d–%d of %d", start+1, end, len(hosts)))
-		}
+		lines = append(lines, m.rows(hosts, max(1, model.height-ctaRows(model.height)-18), model.isDark, func(h domain.HostMeta) string {
+			return fmt.Sprintf("%-10s %s", h.Name, h.IP)
+		})...)
 		shell.actions = []tuiAction{{key: "↑/↓", label: "Move"}, {key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	}
 	shell.body = strings.Join(lines, "\n")

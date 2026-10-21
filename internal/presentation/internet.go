@@ -42,12 +42,12 @@ func ConfirmInternet(input io.Reader, output io.Writer, p domain.InternetPlan) (
 }
 
 type internetModel struct {
-	cursor, stage int
-	chosen        map[string]bool
-	action        domain.InternetAction
-	plan          domain.InternetPlan
-	result        domain.InternetReport
-	applying      bool
+	hostPicker
+	stage    int
+	action   domain.InternetAction
+	plan     domain.InternetPlan
+	result   domain.InternetReport
+	applying bool
 	// observed is the last read-only Internet check of this session.
 	observed   map[string]string
 	observedAt time.Time
@@ -76,7 +76,7 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 			// selects everyone instead of clearing the last selection.
 			m.stage = 0
 			m.plan = domain.InternetPlan{}
-			m.chosen, m.cursor = map[string]bool{}, 0
+			m.clear()
 		}
 		if key.String() == "enter" {
 			model.screen = dashboardComputersArea
@@ -90,6 +90,9 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 			model.busy = "Applying and verifying Internet access"
 			return model, func() tea.Msg { return internetApplyMsg{model.actions.ApplyInternet(plan)} }
 		}
+		return model, nil
+	}
+	if m.pick(key.String(), hosts) {
 		return model, nil
 	}
 	switch key.String() {
@@ -117,23 +120,6 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 		}
 		m.chosen = chosen
 		model.message = ""
-	case "up", "k":
-		m.cursor = max(0, m.cursor-1)
-	case "down", "j":
-		m.cursor = min(max(0, len(hosts)-1), m.cursor+1)
-	case "space":
-		if len(hosts) > 0 {
-			name := hosts[m.cursor].Name
-			m.chosen[name] = !m.chosen[name]
-		}
-	case "a":
-		all := true
-		for _, h := range hosts {
-			all = all && m.chosen[h.Name]
-		}
-		for _, h := range hosts {
-			m.chosen[h.Name] = !all
-		}
 	case "tab":
 		if m.action == domain.InternetBlock {
 			m.action = domain.InternetUnblock
@@ -141,13 +127,8 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 			m.action = domain.InternetBlock
 		}
 	case "enter":
-		names := []string{}
-		for _, h := range hosts {
-			if m.chosen[h.Name] {
-				names = append(names, h.Name)
-			}
-		}
-		if len(names) == 0 {
+		requested := m.requested(hosts)
+		if requested == "" {
 			model.message = "Select at least one client."
 			return model, nil
 		}
@@ -155,7 +136,7 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 			model.message = "Internet control is unavailable in this session."
 			return model, nil
 		}
-		requested, action := strings.Join(names, ","), m.action
+		action := m.action
 		model.busy = "Checking Internet access on selected clients"
 		model.message = ""
 		return model.startRead(func(ctx context.Context) tea.Msg {
@@ -209,22 +190,9 @@ func (model dashboardModel) internetView() string {
 	default:
 		lines = append(lines, "Action: "+string(m.action)+" Internet", tuiMuted(observationHeading(m.observedAt), model.isDark), "")
 		hosts := model.report.Meta.Clients.Hosts
-		count := max(1, model.height-ctaRows(model.height)-17)
-		start, end := listWindow(len(hosts), m.cursor, count)
-		for i := start; i < end; i++ {
-			h := hosts[i]
-			mark := "[ ]"
-			if m.chosen[h.Name] {
-				mark = "[x]"
-			}
-			lines = append(lines, tuiSelection(fmt.Sprintf("%s %-10s %-15s %s", mark, h.Name, h.IP, m.stateLabel(h.Name)), i == m.cursor, model.isDark))
-		}
-		if len(hosts) == 0 {
-			lines = append(lines, "No client computers configured.")
-		}
-		if start > 0 || end < len(hosts) {
-			lines = append(lines, fmt.Sprintf("Showing %d–%d of %d", start+1, end, len(hosts)))
-		}
+		lines = append(lines, m.rows(hosts, max(1, model.height-ctaRows(model.height)-17), model.isDark, func(h domain.HostMeta) string {
+			return fmt.Sprintf("%-10s %-15s %s", h.Name, h.IP, m.stateLabel(h.Name))
+		})...)
 		shell.actions = []tuiAction{{key: "↑/↓", label: "Move"}, {key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "n", label: "Those to change"}, {key: "r", label: "Check state"}, {key: "Tab", label: "Block / unblock"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	}
 	shell.body = strings.Join(lines, "\n")

@@ -13,8 +13,7 @@ import (
 // shutdownModel owns the transient selection, review and result state for
 // client shutdown. Navigation and application callbacks remain in the root.
 type shutdownModel struct {
-	cursor       int
-	chosen       map[string]bool
+	hostPicker
 	policy       domain.ShutdownSessionPolicy
 	action       domain.ClientPowerAction
 	plan         domain.ShutdownPlanReport
@@ -32,9 +31,9 @@ type shutdownModel struct {
 
 func newShutdownModel() shutdownModel {
 	return shutdownModel{
-		chosen: map[string]bool{},
-		policy: domain.ShutdownProtectUnknown,
-		action: domain.ClientPowerOff,
+		hostPicker: newHostPicker(),
+		policy:     domain.ShutdownProtectUnknown,
+		action:     domain.ClientPowerOff,
 	}
 }
 
@@ -63,26 +62,8 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 		switch key.String() {
 		case "esc", "left":
 			return model, shutdownIntent{kind: shutdownCloseIntent}
-		case "up", "k":
-			model.cursor = max(0, model.cursor-1)
-		case "down", "j":
-			model.cursor = min(max(0, len(hosts)-1), model.cursor+1)
-		case "space":
-			if len(hosts) > 0 {
-				name := hosts[model.cursor].Name
-				model.chosen[name] = !model.chosen[name]
-			}
-		case "a":
-			selectAll := false
-			for _, host := range hosts {
-				if !model.chosen[host.Name] {
-					selectAll = true
-					break
-				}
-			}
-			for _, host := range hosts {
-				model.chosen[host.Name] = selectAll
-			}
+		case "up", "k", "down", "j", "space", "a":
+			model.pick(key.String(), hosts)
 		case "tab":
 			model = model.nextAction()
 		case "enter":
@@ -526,15 +507,14 @@ func shutdownHasUnknown(plan domain.ShutdownPlanReport) bool {
 	return false
 }
 
+// requested names the whole laboratory as @lab when every client is chosen.
 func (model shutdownModel) requested(hosts []domain.HostMeta) string {
-	names := []string{}
+	all := len(hosts) > 0
 	for _, host := range hosts {
-		if model.chosen[host.Name] {
-			names = append(names, host.Name)
-		}
+		all = all && model.chosen[host.Name]
 	}
-	if len(names) == len(hosts) && len(hosts) > 0 {
+	if all {
 		return "@lab"
 	}
-	return strings.Join(names, ",")
+	return model.hostPicker.requested(hosts)
 }

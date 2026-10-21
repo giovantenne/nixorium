@@ -39,14 +39,14 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		return model.openDeferredUpdates()
 	case "i":
 		model.screen = dashboardInternet
-		model.internet = internetModel{chosen: map[string]bool{}, action: domain.InternetBlock}
+		model.internet = internetModel{hostPicker: newHostPicker(), action: domain.InternetBlock}
 		model.message = ""
 	case "l":
 		if model.actions.PlanLock == nil {
 			return model, nil
 		}
 		model.screen = dashboardLock
-		model.lock = lockModel{chosen: map[string]bool{}, action: domain.LockOn}
+		model.lock = lockModel{hostPicker: newHostPicker(), action: domain.LockOn}
 		model.message = ""
 	case "s":
 		if model.actions.PlanShare == nil {
