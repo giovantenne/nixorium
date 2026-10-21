@@ -9,7 +9,7 @@ import (
 )
 
 func TestTelemetryUIRequiresExplicitChoice(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardAdministration
 	enabled := 0
 	m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
@@ -59,7 +59,7 @@ func TestTelemetryUIRequiresExplicitChoice(t *testing.T) {
 func TestTelemetryFirstInvitationChoices(t *testing.T) {
 	for _, key := range []string{"e", "enter", "n", "d", "esc"} {
 		t.Run(key, func(t *testing.T) {
-			m := experienceFixture(2)
+			m := experienceFixture(t, 2)
 			m.screen = dashboardHome
 			calls := []string{}
 			m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
@@ -113,7 +113,7 @@ func TestTelemetryFirstInvitationChoices(t *testing.T) {
 func TestTelemetryInvitationRenderGallery(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {160, 40}} {
 		for _, dark := range []bool{false, true} {
-			m := experienceFixture(2)
+			m := experienceFixture(t, 2)
 			m.screen = dashboardTelemetry
 			m.width, m.height, m.isDark = size[0], size[1], dark
 			m.telemetry.report = domain.TelemetryReport{Consent: "undecided", Payload: domain.TelemetryPayload{Version: "3.0.0", DeploymentMode: "laboratory", ConfiguredClients: "16-30"}}
@@ -134,7 +134,7 @@ func TestTelemetryInvitationRenderGallery(t *testing.T) {
 }
 
 func TestTelemetryDetailsRemainLocalAndReturnToChoice(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardTelemetry
 	m.telemetry.firstOffer = true
 	m.telemetry.report = domain.TelemetryReport{Consent: "undecided", Payload: domain.TelemetryPayload{Version: "3.0.0"}}
@@ -159,7 +159,7 @@ func TestTelemetryDetailsRemainLocalAndReturnToChoice(t *testing.T) {
 }
 func TestTelemetryOfferDoesNotRememberUndecidedAsRefused(t *testing.T) {
 	for _, consent := range []string{"undecided", "enabled", "disabled"} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.screen = dashboardHome
 		m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
 			if action != "status" {
@@ -182,7 +182,7 @@ func TestTelemetryDetailGalleryAndInvitationExitLegend(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {160, 40}} {
 		for _, dark := range []bool{false, true} {
 			for _, detail := range []string{"", "p", "i"} {
-				m := experienceFixture(2)
+				m := experienceFixture(t, 2)
 				m.screen = dashboardTelemetry
 				m.width, m.height, m.isDark = size[0], size[1], dark
 				m.telemetry.firstOffer = true

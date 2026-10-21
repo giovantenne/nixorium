@@ -16,7 +16,7 @@ import (
 
 func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 	for _, profile := range []colorprofile.Profile{colorprofile.ASCII, colorprofile.ANSI, colorprofile.ANSI256} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		var output bytes.Buffer
 		writer := colorprofile.Writer{Forward: &output, Profile: profile}
 		if _, err := writer.Write([]byte(m.View().Content)); err != nil {
@@ -34,7 +34,7 @@ func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 
 func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.width = size[0]
 		m.height = size[1]
 		view := m.View().Content
@@ -59,7 +59,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 		}
 	}
 
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.report.PXE.Mode = "recovery-required"
 	view := m.View().Content
 	if !strings.Contains(view, "Network installation is still active") || !strings.Contains(view, "Enter") {
@@ -397,7 +397,7 @@ func TestConfigurationReviewHelpCannotApply(t *testing.T) {
 	}
 }
 
-func experienceFixture(count int) dashboardModel {
+func experienceFixture(t testing.TB, count int) dashboardModel {
 	now := time.Now()
 	status := testDashboardReport("ready")
 	status.GeneratedAt = now
@@ -412,7 +412,7 @@ func experienceFixture(count int) dashboardModel {
 		status.Meta.Clients.Hosts = append(status.Meta.Clients.Hosts, domain.HostMeta{Name: name, IP: ip})
 		hosts.Hosts = append(hosts.Hosts, domain.HostStatus{Name: name, IP: ip, SSH: domain.SSHAvailable, Reachability: domain.ReachabilityReachable, Deployment: domain.DeploymentCurrent})
 	}
-	m := newDashboardModel(status, domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	m := newTestModel(t, withReport(status), withSetup(domain.SetupReport{State: "ready"}))
 	m.computers.hosts = hosts
 	m.width = 120
 	m.height = 30
@@ -433,7 +433,7 @@ func hostMetaNames(hosts []domain.HostMeta) []string {
 }
 
 func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
-	m := experienceFixture(200)
+	m := experienceFixture(t, 200)
 	m.screen = dashboardHosts
 	m = press(m, "/")
 	m = press(m, "pc17")
@@ -463,7 +463,7 @@ func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
 
 func TestComputerInventoryShellKeepsActionsVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		m := experienceFixture(200)
+		m := experienceFixture(t, 200)
 		m.width = size[0]
 		m.height = size[1]
 		m.screen = dashboardHosts
@@ -480,7 +480,7 @@ func TestComputerInventoryShellKeepsActionsVisible(t *testing.T) {
 }
 
 func TestInterventionEntryDoesNotScanTheFleet(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m = press(m, "c")
 	updated, command := m.Update(tea.KeyPressMsg{Text: "d"})
 	next := updated.(dashboardModel)
@@ -493,7 +493,7 @@ func TestInterventionEntryDoesNotScanTheFleet(t *testing.T) {
 }
 
 func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardDeployReview
 	m.deployment.plan = domain.DeploymentPlanReport{ColmenaSelector: "@lab"}
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
@@ -521,7 +521,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardSoftware, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardSetupKeys, dashboardUpdate, dashboardAdministration} {
-			m := experienceFixture(200)
+			m := experienceFixture(t, 200)
 			m.width = size[0]
 			m.height = size[1]
 			m.screen = screen
@@ -588,7 +588,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 
 func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		model := experienceFixture(2)
+		model := experienceFixture(t, 2)
 		model.width = size[0]
 		model.height = size[1]
 		model.screen = dashboardUpdate
@@ -634,7 +634,7 @@ func TestUpdateProgressExplainsSystemChecksInOperatorLanguage(t *testing.T) {
 }
 
 func TestAdministrationBackAndDiagnosticsUseTypedCallback(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m = press(m, "m")
 	m.actions.LoadDoctor = func(ctx context.Context) (domain.DoctorReport, error) {
 		return domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}}, nil
@@ -657,7 +657,7 @@ func TestAdministrationBackAndDiagnosticsUseTypedCallback(t *testing.T) {
 }
 
 func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.setup.State = "incomplete"
 	m = press(m, "enter")
 	m = press(m, "down")
@@ -673,7 +673,7 @@ func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
 }
 
 func TestPrimaryAreasPreserveContext(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return wizardSettings(), nil }
 	m = press(m, "enter")
 	if m.screen != dashboardComputersArea {
@@ -720,7 +720,7 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 
 func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.width = size[0]
 		m.height = size[1]
 		m.screen = dashboardSetup
@@ -747,7 +747,7 @@ func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 
 func TestEnterReviewsIgnoreTypedTextAndEscCancelsSafely(t *testing.T) {
 	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.screen = screen
 		m.deployment.plan.ColmenaSelector = "@lab"
 		for _, key := range []tea.KeyPressMsg{{Text: "wrong"}, {Text: "DEPLOY"}} {
@@ -767,7 +767,7 @@ func TestEnterReviewsIgnoreTypedTextAndEscCancelsSafely(t *testing.T) {
 }
 
 func TestExperienceStatesAndDisclosure(t *testing.T) {
-	m := experienceFixture(24)
+	m := experienceFixture(t, 24)
 	if !strings.Contains(m.View().Content, "Laboratory overview") || !strings.Contains(m.View().Content, "Computers") || strings.Contains(m.View().Content, "24 computers") {
 		t.Fatal("entry is not intervention-oriented")
 	}
@@ -775,16 +775,16 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 	if !strings.Contains(m.View().Content, m.busy) {
 		t.Fatal("loading not visible")
 	}
-	m = experienceFixture(0)
+	m = experienceFixture(t, 0)
 	if strings.Contains(m.View().Content, "No computers configured") || strings.Contains(m.View().Content, "0 / 0") {
 		t.Fatal("empty inventory leaked into intervention entry")
 	}
-	m = experienceFixture(2)
+	m = experienceFixture(t, 2)
 	m.report.PXE.Mode = "recovery-required"
 	if !strings.Contains(m.View().Content, "Network installation is still active") {
 		t.Fatal("error not prominent")
 	}
-	m = experienceFixture(2)
+	m = experienceFixture(t, 2)
 	m.screen = dashboardHosts
 	m.computers.hosts.Hosts[0].CurrentSystem = "/nix/store/technical-system"
 	if strings.Contains(m.View().Content, "/nix/store/") {
@@ -799,7 +799,7 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 // These are actual View() outputs from deterministic synthetic lab scenarios,
 // useful for review without connecting to or changing a real laboratory.
 func TestExperienceRenderGallery(t *testing.T) {
-	m := experienceFixture(24)
+	m := experienceFixture(t, 24)
 	m.computers.hosts.GeneratedAt = time.Now().Truncate(time.Minute)
 	for _, name := range []string{"interventions", "setup", "installation", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "shutdown", "shutdown-confirmation", "shutdown-result", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
 		m.screen = dashboardHome
@@ -880,7 +880,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 }
 
 func TestShutdownResultDisclosesTechnicalDetailOnlyOnRequest(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardShutdownResult
 	m.shutdown.result = domain.ShutdownApplyReport{
 		State:       "partial",

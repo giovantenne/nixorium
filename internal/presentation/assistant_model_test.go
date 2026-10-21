@@ -21,9 +21,9 @@ func TestAssistantMenuRequiresInstalledConfigAndAdministratorRole(t *testing.T) 
 		{"missing-or-disabled-config", false, false, false}, {"enabled", true, false, true}, {"classroom", true, true, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{
+			m := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}), withActions(DashboardActions{
 				Assistant: domain.AssistantConfig{Enabled: test.enabled}, ClassroomMode: test.classroom,
-			}, false)
+			}))
 			areas := m.homeAreas()
 			if (len(areas) == 5) != test.visible || len(dashboardTasks) != 4 {
 				t.Fatalf("areas=%+v", areas)
@@ -57,7 +57,7 @@ func TestAssistantMenuRequiresInstalledConfigAndAdministratorRole(t *testing.T) 
 
 func TestAssistantMenuSelectionAndLayouts(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {160, 40}} {
-		m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{Assistant: domain.AssistantConfig{Enabled: true}}, false)
+		m := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}), withActions(DashboardActions{Assistant: domain.AssistantConfig{Enabled: true}}))
 		updated, _ := m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
 		m = updated.(dashboardModel)
 		m.syncHomeTasks()

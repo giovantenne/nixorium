@@ -50,8 +50,8 @@ func (fixture *networkChangeFixture) actions() DashboardActions {
 	}
 }
 
-func networkChangeModelFor(fixture *networkChangeFixture) dashboardModel {
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), fixture.actions(), false)
+func networkChangeModelFor(t testing.TB, fixture *networkChangeFixture) dashboardModel {
+	model := newTestModel(t, withReadyLab(), withActions(fixture.actions()))
 	model.width, model.height = 120, 60
 	model.screen = dashboardAdministration
 	return model
@@ -67,7 +67,7 @@ func typeText(model dashboardModel, text string) dashboardModel {
 
 func TestNetworkChangeFormReviewsAndSavesTheStart(t *testing.T) {
 	fixture := &networkChangeFixture{status: domain.NetworkMigrationStatus{State: "none", To: "10.0.0.0/24", Message: "No change of the laboratory network is in progress."}}
-	model := networkChangeModelFor(fixture)
+	model := networkChangeModelFor(t, fixture)
 	next, command := model.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	model = runRead(next, command)
 	view := plainView(model)
@@ -124,7 +124,7 @@ func TestNetworkChangeInProgressShowsEveryComputerAndTheNextStep(t *testing.T) {
 		},
 		Migrated: 1, Previous: 1, Waiting: 1, Next: "Update computers (Computers → Update computers): 1 computer still needs the new configuration.",
 	}}
-	model := networkChangeModelFor(fixture)
+	model := networkChangeModelFor(t, fixture)
 	next, command := model.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	model = runRead(next, command)
 	view := plainView(model)
@@ -151,14 +151,14 @@ func TestNetworkChangeInProgressShowsEveryComputerAndTheNextStep(t *testing.T) {
 	}
 
 	fixture.status.ControllerReady = false
-	model = networkChangeModelFor(fixture)
+	model = networkChangeModelFor(t, fixture)
 	next, command = model.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	model = runRead(next, command)
 	if view := plainView(model); !contains(view, "not applied yet") || !contains(view, "Enter Apply to controller") {
 		t.Fatalf("controller first:\n%s", view)
 	}
 	fixture.status.ControllerReady, fixture.status.CanFinish = true, true
-	model = networkChangeModelFor(fixture)
+	model = networkChangeModelFor(t, fixture)
 	next, command = model.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	model = runRead(next, command)
 	if view := plainView(model); !contains(view, "Enter Finish the change") || !contains(view, "f Finish") {
@@ -168,7 +168,7 @@ func TestNetworkChangeInProgressShowsEveryComputerAndTheNextStep(t *testing.T) {
 
 func TestOverviewShowsANetworkChangeInProgress(t *testing.T) {
 	fixture := &networkChangeFixture{status: domain.NetworkMigrationStatus{State: "none", To: "10.1.0.0/24"}}
-	model := networkChangeModelFor(fixture)
+	model := networkChangeModelFor(t, fixture)
 	model.screen = dashboardHome
 	step, _ := domain.NextStepByCode("NETWORK-CHANGING")
 	model.recovery = domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryNetworkChanging, Title: step.Title, Detail: "From 10.0.0.0/24 to 10.1.0.0/24. Next: Apply to controller, so it answers on both networks.", Next: step}}}

@@ -27,7 +27,7 @@ func TestPXEHasOneEntryAndStateSpecificPrimaryAction(t *testing.T) {
 			called := ""
 			report := testDashboardReport(tc.mode)
 			report.PXEPreparation.Ready = tc.ready
-			m := experienceFixture(2)
+			m := experienceFixture(t, 2)
 			m.screen = dashboardInstallationArea
 			m.actions = DashboardActions{
 				LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) {
@@ -76,7 +76,7 @@ func TestPXEHasOneEntryAndStateSpecificPrimaryAction(t *testing.T) {
 }
 
 func TestPXEFailedObservationCannotActOnPreviousReadiness(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardInstallationArea
 	m.report.PXEPreparation.Ready = true
 	m.actions.Refresh = func(ctx context.Context) (domain.StatusReport, error) {
@@ -414,7 +414,7 @@ func TestActivePXEExitUsesOneGlobalReview(t *testing.T) {
 		{name: "setup ctrl-c", screen: dashboardSetup, key: tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			model := experienceFixture(2)
+			model := experienceFixture(t, 2)
 			model.report.PXE.Mode = "active"
 			model.screen = scenario.screen
 
@@ -432,7 +432,7 @@ func TestActivePXEExitUsesOneGlobalReview(t *testing.T) {
 }
 
 func TestActivePXELeaveReviewCannotBeBypassedWithControlC(t *testing.T) {
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.report.PXE.Mode = "active"
 	model.screen = dashboardPXELeaveReview
 
@@ -445,7 +445,7 @@ func TestActivePXELeaveReviewCannotBeBypassedWithControlC(t *testing.T) {
 
 func TestActivePXECanBeStoppedAndVerifiedBeforeExit(t *testing.T) {
 	stops := 0
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.report.PXE.Mode = "active"
 	model.screen = dashboardPXELeaveReview
 	model.actions.StopPXE = func() domain.PXELifecycleReport {
@@ -475,7 +475,7 @@ func TestActivePXECanBeStoppedAndVerifiedBeforeExit(t *testing.T) {
 }
 
 func TestActivePXEStopFailureKeepsDashboardOpen(t *testing.T) {
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.report.PXE.Mode = "active"
 	model.screen = dashboardPXELeaveReview
 	model.actions.StopPXE = func() domain.PXELifecycleReport {

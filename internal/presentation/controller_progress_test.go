@@ -156,7 +156,7 @@ func TestGroupedUpdateBuildRetainsDetailsWithoutInventingCompletion(t *testing.T
 }
 
 func TestControllerReviewStatesChangesOrUpToDate(t *testing.T) {
-	m := experienceFixture(1)
+	m := experienceFixture(t, 1)
 	m.screen = dashboardControllerReview
 	m.controller.plan = domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("a", 40), ChangesKnown: true, Changes: []string{"Saved settings", "Nixorium version"}}
 	view := m.View().Content

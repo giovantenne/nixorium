@@ -11,7 +11,7 @@ import (
 )
 
 func TestSavedInstallationSummaryContinuesEditsAndCancels(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+	m := newTestModel(t)
 	m.installation = installationModel{flow: true, startingLabSetup: true, method: "pxe"}
 	m.actions.LoadSetup = func(context.Context) domain.SetupReport {
 		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageValidate}
@@ -47,7 +47,7 @@ func TestSavedInstallationSummaryContinuesEditsAndCancels(t *testing.T) {
 }
 
 func TestSavedInstallationSummaryAlsoServesUSBInstallation(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+	m := newTestModel(t)
 	m.installation = installationModel{flow: true, startingLabSetup: true, method: domain.RemoteInstallUSBSSH}
 	m.actions.LoadSetup = func(context.Context) domain.SetupReport {
 		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageValidate}

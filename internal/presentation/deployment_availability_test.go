@@ -25,7 +25,7 @@ func TestDeploymentReachableOnlyCreatesFreshReviewAndExactSelection(t *testing.T
 	subset.Revision = strings.Repeat("b", 40)
 	calls := 0
 	var applied []string
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{PlanReachableDeployment: func(ctx context.Context, plan domain.DeploymentPlanReport) domain.DeploymentPlanReport {
+	model := newTestModel(t, withActions(DashboardActions{PlanReachableDeployment: func(ctx context.Context, plan domain.DeploymentPlanReport) domain.DeploymentPlanReport {
 		calls++
 		if _, ok := ctx.Deadline(); !ok {
 			t.Fatal("unbounded subset planning")
@@ -37,7 +37,7 @@ func TestDeploymentReachableOnlyCreatesFreshReviewAndExactSelection(t *testing.T
 	}, ApplyDeployment: func(_ context.Context, plan domain.DeploymentPlanReport, _ func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 		applied = append(applied, plan.Revision+" "+plan.ColmenaSelector)
 		return domain.DeploymentExecutionReport{}
-	}}, false)
+	}}))
 	model.screen = dashboardDeployReview
 	model.deployment.plan = original
 	model.deployment.chosen = map[string]bool{"pc01": true, "pc02": true}
@@ -67,9 +67,9 @@ func TestDeploymentReachableOnlyCreatesFreshReviewAndExactSelection(t *testing.T
 
 func TestDeploymentSubsetCancellationKeepsOldReviewAndIgnoresLateReply(t *testing.T) {
 	original := mixedDeploymentPlan()
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{PlanReachableDeployment: func(context.Context, domain.DeploymentPlanReport) domain.DeploymentPlanReport {
+	model := newTestModel(t, withActions(DashboardActions{PlanReachableDeployment: func(context.Context, domain.DeploymentPlanReport) domain.DeploymentPlanReport {
 		return domain.DeploymentPlanReport{State: "ready", Revision: "late"}
-	}}, false)
+	}}))
 	model.screen = dashboardDeployReview
 	model.deployment.plan = original
 	updated, command := model.Update(demoCode(tea.KeyF2))
@@ -86,7 +86,7 @@ func TestDeploymentSubsetCancellationKeepsOldReviewAndIgnoresLateReply(t *testin
 
 func TestDeploymentPerComputerResultsAndRecoveryRemainScrollable(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+		model := newTestModel(t)
 		model.width, model.height = size[0], size[1]
 		model.screen = dashboardDeploy
 		model.deployment.result = domain.DeploymentExecutionReport{Operation: "deploy-apply", State: "partial", Phase: domain.DeploymentPhaseVerify, BuildCompleted: true, ApplyCompleted: true, Targets: mixedDeploymentPlan().Targets, Verification: domain.DeploymentVerificationSummary{Attempted: 2, Verified: 1, Recorded: 1, Targets: []domain.DeploymentTargetVerification{{Name: "pc01", State: "verified"}, {Name: "pc02", State: "unverified", Reachability: domain.ReachabilityUnreachable}}}, LogPath: "/private/deploy.log"}

@@ -7,8 +7,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func overviewFitFixture(width, height int) dashboardModel {
-	m := experienceFixture(2)
+func overviewFitFixture(t testing.TB, width, height int) dashboardModel {
+	m := experienceFixture(t, 2)
 	m.actions.Assistant = domain.AssistantConfig{Enabled: true}
 	m.recovery.Conditions = []domain.BlockingCondition{
 		{Kind: domain.RecoveryBackupDue, Title: "A backup of this laboratory is due", Detail: "No backup has been made yet."},
@@ -20,7 +20,7 @@ func overviewFitFixture(width, height int) dashboardModel {
 
 func TestOverviewShowsEveryAreaWhenItFits(t *testing.T) {
 	for _, size := range [][2]int{{90, 30}, {80, 24}} {
-		view := demoANSI.ReplaceAllString(overviewFitFixture(size[0], size[1]).View().Content, "")
+		view := demoANSI.ReplaceAllString(overviewFitFixture(t, size[0], size[1]).View().Content, "")
 		for _, expected := range []string{"Laboratory overview", "Items in yellow need your attention", "[c] Computers", "[n] Installation", "[w] Software", "Maintenance", "Assistant"} {
 			if !strings.Contains(view, expected) {
 				t.Fatalf("overview %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
@@ -30,7 +30,7 @@ func TestOverviewShowsEveryAreaWhenItFits(t *testing.T) {
 			t.Fatalf("overview %dx%d windows its menu although everything fits:\n%s", size[0], size[1], view)
 		}
 	}
-	m := overviewFitFixture(90, 30)
+	m := overviewFitFixture(t, 90, 30)
 	m.recovery.Conditions = nil
 	view := demoANSI.ReplaceAllString(m.View().Content, "")
 	if !strings.Contains(view, "Choose an area with the arrows or its letter.") {
@@ -39,7 +39,7 @@ func TestOverviewShowsEveryAreaWhenItFits(t *testing.T) {
 }
 
 func TestOverviewWindowKeepsCursorVisibleWhenSmall(t *testing.T) {
-	m := overviewFitFixture(80, 18)
+	m := overviewFitFixture(t, 80, 18)
 	for index := 0; index < 6; index++ {
 		m = press(m, "j")
 	}
@@ -57,7 +57,7 @@ func TestOverviewWindowKeepsCursorVisibleWhenSmall(t *testing.T) {
 }
 
 func TestOverviewCursorStaysVisibleInTinyTerminal(t *testing.T) {
-	m := overviewFitFixture(80, 14)
+	m := overviewFitFixture(t, 80, 14)
 	for index := 0; index < 6; index++ {
 		m = press(m, "j")
 	}

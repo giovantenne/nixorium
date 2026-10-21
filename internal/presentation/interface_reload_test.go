@@ -19,8 +19,8 @@ func reloadTestActions(reload bool, checks *int) DashboardActions {
 	}
 }
 
-func updatedControllerModel(actions DashboardActions) (dashboardModel, tea.Cmd) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, actions, false)
+func updatedControllerModel(t testing.TB, actions DashboardActions) (dashboardModel, tea.Cmd) {
+	model := newTestModel(t, withActions(actions))
 	model.screen = dashboardUpdate
 	model.updates.result = domain.UpdateApplyReport{Operation: "update-apply", State: "saved", Revision: "abc", Target: "v1.1.0", Updated: true}
 	report := domain.ControllerRebuildExecutionReport{Operation: "controller-rebuild", State: "applied", Revision: "abc", Applied: true, Verified: true}
@@ -32,7 +32,7 @@ const reloadCountdownLine = "Nixorium 1.1.0 is active. The interface reopens in 
 
 func TestUpdateResultCountsDownAndRequestsReload(t *testing.T) {
 	checks := 0
-	model, command := updatedControllerModel(reloadTestActions(true, &checks))
+	model, command := updatedControllerModel(t, reloadTestActions(true, &checks))
 	view := model.View().Content
 	if command == nil || checks != 1 || !strings.Contains(view, reloadCountdownLine) || strings.Contains(view, reopenSentence) ||
 		!strings.Contains(view, "Running interface: 1.0.0") || !strings.Contains(view, "Reopen now") || !strings.Contains(view, "Keep this interface") {
@@ -62,7 +62,7 @@ func TestUpdateResultCountsDownAndRequestsReload(t *testing.T) {
 
 func TestUpdateResultEnterReopensAtOnce(t *testing.T) {
 	checks := 0
-	model, _ := updatedControllerModel(reloadTestActions(true, &checks))
+	model, _ := updatedControllerModel(t, reloadTestActions(true, &checks))
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if model.reload.state != interfaceReloadRequested || command == nil {
@@ -75,7 +75,7 @@ func TestUpdateResultEnterReopensAtOnce(t *testing.T) {
 
 func TestUpdateResultEscapeKeepsRunningInterface(t *testing.T) {
 	checks := 0
-	model, _ := updatedControllerModel(reloadTestActions(true, &checks))
+	model, _ := updatedControllerModel(t, reloadTestActions(true, &checks))
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	model = updated.(dashboardModel)
 	view := model.View().Content
@@ -96,7 +96,7 @@ func TestUpdateResultEscapeKeepsRunningInterface(t *testing.T) {
 
 func TestUpdateResultWithoutDifferentBinaryKeepsOldSentence(t *testing.T) {
 	checks := 0
-	model, command := updatedControllerModel(reloadTestActions(false, &checks))
+	model, command := updatedControllerModel(t, reloadTestActions(false, &checks))
 	view := model.View().Content
 	if command != nil || checks != 1 || !strings.Contains(view, reopenSentence) || strings.Contains(view, "is active") {
 		t.Fatalf("unexpected reload offer:\n%s", view)
@@ -108,9 +108,9 @@ func TestUpdateResultWithoutDifferentBinaryKeepsOldSentence(t *testing.T) {
 }
 
 func TestReloadCountdownWithoutVersion(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withActions(DashboardActions{
 		InstalledInterface: func() (InterfaceReload, bool) { return InterfaceReload{}, true },
-	}, false)
+	}))
 	model.screen = dashboardUpdate
 	model.updates.result = domain.UpdateApplyReport{Operation: "update-apply", State: "saved", Revision: "abc", Updated: true}
 	updated, _ := model.Update(dashboardUpdateControllerMsg{report: domain.ControllerRebuildExecutionReport{Operation: "controller-rebuild", Revision: "abc", Applied: true, Verified: true}})
@@ -121,7 +121,7 @@ func TestReloadCountdownWithoutVersion(t *testing.T) {
 
 func TestControllerResultOffersReload(t *testing.T) {
 	checks := 0
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, reloadTestActions(true, &checks), false)
+	model := newTestModel(t, withActions(reloadTestActions(true, &checks)))
 	model.screen = dashboardController
 	model.controller.applying = true
 	report := domain.ControllerRebuildExecutionReport{Operation: "controller-rebuild", State: "applied", Revision: "abc", Applied: true, Verified: true}
@@ -137,7 +137,7 @@ func TestControllerResultOffersReload(t *testing.T) {
 		t.Fatalf("Enter did not reopen from the controller result: %+v", model.reload)
 	}
 
-	model = newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, reloadTestActions(true, &checks), false)
+	model = newTestModel(t, withActions(reloadTestActions(true, &checks)))
 	model.screen = dashboardController
 	updated, _ = model.Update(dashboardControllerResultMsg{report: report})
 	model = updated.(dashboardModel)
@@ -150,7 +150,7 @@ func TestControllerResultOffersReload(t *testing.T) {
 
 func TestControllerFailureDoesNotOfferReload(t *testing.T) {
 	checks := 0
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, reloadTestActions(true, &checks), false)
+	model := newTestModel(t, withActions(reloadTestActions(true, &checks)))
 	model.screen = dashboardController
 	report := domain.ControllerRebuildExecutionReport{Operation: "controller-rebuild", State: "failed", Revision: "abc"}
 	updated, command := model.Update(dashboardControllerResultMsg{report: report})
@@ -162,7 +162,7 @@ func TestControllerFailureDoesNotOfferReload(t *testing.T) {
 
 func TestReloadCountdownStopsWhenResultLeavesScreen(t *testing.T) {
 	checks := 0
-	model, _ := updatedControllerModel(reloadTestActions(true, &checks))
+	model, _ := updatedControllerModel(t, reloadTestActions(true, &checks))
 	model.screen = dashboardHome
 	updated, command := model.Update(interfaceReloadTickMsg{id: model.reload.id})
 	model = updated.(dashboardModel)

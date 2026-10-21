@@ -20,7 +20,7 @@ func workspaceType(m dashboardModel, text string) dashboardModel {
 
 func openOtherSettings(t *testing.T) dashboardModel {
 	t.Helper()
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.workspace.group = 2
 	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	fields := workspaceGroupFields(2)
@@ -184,7 +184,7 @@ func TestStripJSONComments(t *testing.T) {
 }
 
 func TestWorkspaceExtensionSearchAddsPackagedChoices(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	var queries []string
 	m.actions.SearchSoftware = func(_ context.Context, query string) domain.SoftwareSearchReport {
 		queries = append(queries, query)
@@ -246,7 +246,7 @@ func TestWorkspaceExtensionSearchAddsPackagedChoices(t *testing.T) {
 }
 
 func TestWorkspaceMarketplaceAddUpdateAndDeselect(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	version := "3.3.4"
 	proposals := map[string]string{"platformio.platformio-ide": "3.3.4"}
 	var calls []string

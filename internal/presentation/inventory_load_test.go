@@ -14,7 +14,7 @@ import (
 func TestClientTasksRequireInventoryOnlyWhenOpened(t *testing.T) {
 	for _, action := range []string{"d", "x", "i", "h"} {
 		t.Run(action, func(t *testing.T) {
-			m := experienceFixture(2)
+			m := experienceFixture(t, 2)
 			observed := m.report
 			m.report.Meta = domain.LabMeta{}
 			calls := 0
@@ -48,7 +48,7 @@ func TestClientTasksRequireInventoryOnlyWhenOpened(t *testing.T) {
 }
 
 func TestInventoryCancellationRejectsLateAndSupersededReads(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	observed := m.report
 	m.report.Meta = domain.LabMeta{}
 	m.screen = dashboardComputersArea
@@ -86,7 +86,7 @@ func TestInventoryFailureDoesNotOpenClientSelection(t *testing.T) {
 	}{
 		{err: errors.New("invalid workspace")}, {},
 	} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.report.Meta = domain.LabMeta{}
 		m.screen = dashboardComputersArea
 		m.actions.LoadInventory = func(context.Context) (domain.StatusReport, error) { return result.report, result.err }
@@ -100,7 +100,7 @@ func TestInventoryFailureDoesNotOpenClientSelection(t *testing.T) {
 }
 
 func TestSoftwareFollowupWaitsForInventoryAndPreservesExactTargets(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	observed := m.report
 	m.report.Meta = domain.LabMeta{}
 	m.screen = dashboardSoftware
@@ -119,7 +119,7 @@ func TestSoftwareFollowupWaitsForInventoryAndPreservesExactTargets(t *testing.T)
 
 func TestFocusedDeploymentChecksFreshInventory(t *testing.T) {
 	for _, name := range []string{"pc02", "pc03"} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		observed := m.report
 		m.report.Meta = domain.LabMeta{}
 		m.screen = dashboardHosts

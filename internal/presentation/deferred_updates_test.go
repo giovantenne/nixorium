@@ -31,7 +31,7 @@ func TestDeploymentReviewQueuesComputersThatAreOffByDefault(t *testing.T) {
 			return domain.DeploymentExecutionReport{Operation: "deploy-apply", State: "completed", Queued: []string{"pc02"}}
 		},
 	}
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	model := newTestModel(t, withReadyLab(), withActions(actions))
 	model.width, model.height = 120, 40
 	updated, _ := model.Update(dashboardDeploymentPlanMsg{report: offComputerPlan()})
 	model = updated.(dashboardModel)
@@ -86,7 +86,7 @@ func TestQueuedUpdatesScreenListsAndRemoves(t *testing.T) {
 			return nil
 		},
 	}
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	model := newTestModel(t, withReadyLab(), withActions(actions))
 	model.width, model.height = 100, 30
 	found := false
 	for _, task := range model.availableComputerTasks() {
@@ -110,20 +110,20 @@ func TestQueuedUpdatesScreenListsAndRemoves(t *testing.T) {
 	}
 }
 
-func queuedEntryModel() dashboardModel {
+func queuedEntryModel(t testing.TB) dashboardModel {
 	actions := DashboardActions{
 		LoadDeferredUpdates: func(context.Context) domain.DeferredUpdateStatus {
 			return domain.DeferredUpdateStatus{State: "ready"}
 		},
 	}
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	model := newTestModel(t, withReadyLab(), withActions(actions))
 	model.width, model.height = 100, 30
 	model.screen = dashboardComputersArea
 	return model
 }
 
 func TestComputersAreaEnterOpensQueuedUpdates(t *testing.T) {
-	model := queuedEntryModel()
+	model := queuedEntryModel(t)
 	for index, task := range model.availableComputerTasks() {
 		if task.id == "queued" {
 			model.computers.areaCursor = index
@@ -141,7 +141,7 @@ func TestComputersAreaEnterOpensQueuedUpdates(t *testing.T) {
 }
 
 func TestComputersAreaShortcutOpensQueuedUpdates(t *testing.T) {
-	model := queuedEntryModel()
+	model := queuedEntryModel(t)
 	updated, command := model.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardDeferredUpdates || command == nil {
@@ -150,7 +150,7 @@ func TestComputersAreaShortcutOpensQueuedUpdates(t *testing.T) {
 }
 
 func TestComputersAreaIgnoresQueuedShortcutInClassroomMode(t *testing.T) {
-	model := queuedEntryModel()
+	model := queuedEntryModel(t)
 	model.actions.ClassroomMode = true
 	updated, command := model.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
 	if updated.(dashboardModel).screen != dashboardComputersArea || command != nil {
@@ -163,7 +163,7 @@ func TestComputersAreaIgnoresQueuedShortcutInClassroomMode(t *testing.T) {
 func TestEveryListedAreaTaskIsHandled(t *testing.T) {
 	noop := func(context.Context) domain.DeferredUpdateStatus { return domain.DeferredUpdateStatus{} }
 	base := func() dashboardModel {
-		model := experienceFixture(2)
+		model := experienceFixture(t, 2)
 		model.actions.LoadDeferredUpdates = noop
 		model.actions.PlanLock = func(context.Context, string, domain.LockAction) domain.LockPlan { return domain.LockPlan{} }
 		model.actions.PlanShare = func(context.Context, string, string) domain.SharePlan { return domain.SharePlan{} }

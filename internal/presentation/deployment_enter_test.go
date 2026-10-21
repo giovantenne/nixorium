@@ -15,12 +15,12 @@ import (
 func TestUpdateComputersReviewIsConfirmedWithEnter(t *testing.T) {
 	plan := mixedDeploymentPlan()
 	var applied []domain.DeploymentPlanReport
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withActions(DashboardActions{
 		ApplyDeployment: func(_ context.Context, plan domain.DeploymentPlanReport, _ func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 			applied = append(applied, plan)
 			return domain.DeploymentExecutionReport{Operation: "deploy-apply", State: "completed"}
 		},
-	}, false)
+	}))
 	model.width, model.height = 100, 30
 	model.screen = dashboardDeployReview
 	model.deployment.plan = plan

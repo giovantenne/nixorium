@@ -102,7 +102,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 			return domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: "saved", Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedClients: plan.AffectedClients}
 		},
 	}
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	model := newTestModel(t, withReadyLab(), withActions(actions))
 	model.width, model.height = 100, 30
 
 	updated, command := model.Update(tea.KeyPressMsg{Text: "w"})
@@ -576,7 +576,7 @@ func TestDashboardSoftwareCatalogFailureBlocksManualPackageBypass(t *testing.T) 
 }
 
 func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.screen = dashboardSoftware
 	model.software.catalog = testSoftwareCatalogReport()
 	model.software.cursor = 1

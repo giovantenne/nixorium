@@ -130,7 +130,7 @@ func TestShellShowsTheNextStepAboveTheFooter(t *testing.T) {
 }
 
 func TestFinishedNetworkInstallationChecksComputersOnEnter(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{LoadHosts: func(context.Context) (domain.HostsReport, error) { return domain.HostsReport{}, nil }}, false)
+	m := newTestModel(t, withActions(DashboardActions{LoadHosts: func(context.Context) (domain.HostsReport, error) { return domain.HostsReport{}, nil }}))
 	m.screen = dashboardPXE
 	m.report.PXEPreparation.Ready = true
 	m.installation.pxeResult = domain.PXELifecycleReport{Operation: "pxe-stop", State: "completed"}

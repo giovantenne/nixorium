@@ -14,7 +14,7 @@ import (
 func TestManagedJobsAttachOldProgressWithoutStartingOrFollowingUp(t *testing.T) {
 	started := time.Now().Add(-time.Hour)
 	job := domain.ManagedJob{Operation: "controller-apply", State: "running", Unit: "nixorium-apply-controller@" + strings.Repeat("a", 40) + ".service", Progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "build", StartedAt: started, Recent: []string{"Existing build"}}}
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{
+	model := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}), withActions(DashboardActions{
 		LoadManagedJobs: func(context.Context) ([]domain.ManagedJob, error) { return []domain.ManagedJob{job}, nil },
 		ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 			t.Fatal("attachment started a controller job")
@@ -24,7 +24,7 @@ func TestManagedJobsAttachOldProgressWithoutStartingOrFollowingUp(t *testing.T) 
 			t.Fatal("attachment resumed guided installation")
 			return domain.ActionReport{}
 		},
-	}, false)
+	}))
 	model.width, model.height = 120, 30
 	updated, command := model.Update(model.loadManagedJobs(0)())
 	model = updated.(dashboardModel)
@@ -55,7 +55,7 @@ func TestManagedJobsAttachOldProgressWithoutStartingOrFollowingUp(t *testing.T) 
 }
 
 func TestManagedJobsInterruptedAndConflict(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	model := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}))
 	model.width, model.height = 120, 30
 	job := domain.ManagedJob{Operation: "pxe-prepare", State: "running", Unit: "nixorium-prepare-pxe.service"}
 	model.jobs.items = []domain.ManagedJob{job}
@@ -86,7 +86,7 @@ func TestManagedJobsInterruptedAndConflict(t *testing.T) {
 }
 
 func TestManagedJobsStalePollAndOwnedProgressFilters(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	model := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}))
 	model.jobs.id = 3
 	updated, command := model.Update(managedJobsMsg{id: 2, jobs: []domain.ManagedJob{{State: "running"}}})
 	if command != nil || len(updated.(dashboardModel).jobs.items) != 0 {
@@ -107,9 +107,9 @@ func TestManagedJobsStalePollAndOwnedProgressFilters(t *testing.T) {
 }
 
 func TestManagedJobsCachedObservationDoesNotBlockOwnedGuidedFollowup(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withActions(DashboardActions{
 		PreparePXE: func() domain.ActionReport { return domain.ActionReport{} },
-	}, false)
+	}))
 	model.jobs.items = []domain.ManagedJob{{Operation: "controller-apply", State: "running"}}
 	model.controller.result = domain.ControllerRebuildExecutionReport{Applied: true, Verified: true}
 	updated, command := model.startComputerInstallationPreparation()
@@ -119,12 +119,12 @@ func TestManagedJobsCachedObservationDoesNotBlockOwnedGuidedFollowup(t *testing.
 }
 
 func TestManagedJobsStartupDoesNotResumeSetupOrExposeClassroomAdmin(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{LoadManagedJobs: func(ctx context.Context) ([]domain.ManagedJob, error) {
+	model := newTestModel(t, withActions(DashboardActions{LoadManagedJobs: func(ctx context.Context) ([]domain.ManagedJob, error) {
 		if _, ok := ctx.Deadline(); !ok {
 			t.Fatal("unbounded observation")
 		}
 		return []domain.ManagedJob{{State: "running"}}, nil
-	}}, true)
+	}}), withSetupMode())
 	updated, _ := model.Update(dashboardInitialMsg{setup: domain.SetupReport{CurrentStage: domain.SetupStageApply}, jobs: []domain.ManagedJob{{Operation: "controller-apply", State: "running"}}})
 	if updated.(dashboardModel).screen != dashboardHome || updated.(dashboardModel).installation.flow {
 		t.Fatal("startup resumed setup while job runs")

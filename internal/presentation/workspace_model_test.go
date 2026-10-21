@@ -14,8 +14,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func workspaceFixture() dashboardModel {
-	m := experienceFixture(2)
+func workspaceFixture(t testing.TB) dashboardModel {
+	m := experienceFixture(t, 2)
 	m.screen = dashboardWorkspace
 	plan := demoWorkspacePlan()
 	m.workspace = workspaceModel{loaded: plan, candidate: *plan.Candidate}
@@ -83,7 +83,7 @@ func TestWorkspaceFieldsPreserveInheritanceAndReviewedObjects(t *testing.T) {
 }
 
 func TestWorkspaceFieldSelectionOrderInheritanceAndNumericInput(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.workspace.startField()
 	if !m.workspace.inherit || len(m.workspace.selected) != 2 {
 		t.Fatal("baseline preview missing")
@@ -137,7 +137,7 @@ func TestWorkspaceFieldSelectionOrderInheritanceAndNumericInput(t *testing.T) {
 }
 
 func TestWorkspaceSettingsRouteAndCancelledLateLoad(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.screen = dashboardSettings
 	m.settings.menu = newRoutineSettingsMenu(true, 80, 24)
 	var request context.Context
@@ -156,7 +156,7 @@ func TestWorkspaceSettingsRouteAndCancelledLateLoad(t *testing.T) {
 		t.Fatal("late load reopened the editor")
 	}
 	for _, classroom := range []bool{false, true} {
-		m := workspaceFixture()
+		m := workspaceFixture(t)
 		m.screen = dashboardSettings
 		m.actions.ClassroomMode = classroom
 		if !classroom {
@@ -170,7 +170,7 @@ func TestWorkspaceSettingsRouteAndCancelledLateLoad(t *testing.T) {
 }
 
 func TestWorkspaceReviewRejectsConcurrentBaseAndPreservesDraft(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.workspace.candidate, _ = workspaceSetValue(m.workspace.candidate, workspaceFields[1], "dark")
 	m.actions.PlanWorkspace = func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport {
 		p := demoWorkspacePlan()
@@ -185,7 +185,7 @@ func TestWorkspaceReviewRejectsConcurrentBaseAndPreservesDraft(t *testing.T) {
 }
 
 func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	saves := 0
 	m.actions.SaveWorkspace = func(plan domain.WorkspacePlanReport) domain.WorkspaceApplyReport {
 		saves++
@@ -240,7 +240,7 @@ func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) 
 }
 
 func TestWorkspaceResultRecoveryAndContextualGitReview(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.workspace.stage = workspaceResult
 	m.workspace.result = domain.WorkspaceApplyReport{State: "partial", RecoveryRequired: true}
 	m, cmd := workspaceKey(m, demoText("r"))
@@ -266,7 +266,7 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 		for _, dark := range []bool{false, true} {
 			for _, state := range []string{"overview", "fields", "favorites", "extensions", "empty", "numeric", "review", "loading", "failure", "saving", "saved", "partial"} {
 				t.Run(fmt.Sprintf("%dx%d/dark%t/%s", size[0], size[1], dark, state), func(t *testing.T) {
-					m := workspaceFixture()
+					m := workspaceFixture(t)
 					m.width, m.height, m.isDark = size[0], size[1], dark
 					w := &m.workspace
 					want := []string{"Student workspace", "F1", "Help", "Esc"}

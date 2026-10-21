@@ -141,7 +141,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 }
 
 func TestDashboardHidesNixoriumDowngrades(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("ready"), actions: DashboardActions{}}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: testActions()}
 	report := domain.UpdateCheckReport{
 		State: "available", CurrentRef: "v3.2.0-beta.10", CurrentChannel: domain.UpdateChannelPrerelease,
 		Development: []domain.UpdateRelease{{Tag: "master", Channel: domain.UpdateChannelMoving}},

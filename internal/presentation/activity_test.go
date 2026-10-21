@@ -13,7 +13,7 @@ import (
 )
 
 func TestReadActivityCancelsContextAndIgnoresLateReplies(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{}, false)
+	model := newTestModel(t, withReport(testDashboardReport("stopped")))
 	model.screen, model.busy = dashboardServices, "Reading services"
 	started := make(chan context.Context, 1)
 	release := make(chan struct{})
@@ -63,9 +63,9 @@ func TestReadTimeoutDoesNotPublishASuccessOrStartFollowUp(t *testing.T) {
 }
 
 func TestReadActivityReturnsToOriginAndShowsUnavailableKeys(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withActions(DashboardActions{
 		LoadServices: func(context.Context) domain.ServicesReport { return domain.ServicesReport{} },
-	}, false)
+	}))
 	model.screen = dashboardAdministration
 	model.width, model.height = 80, 24
 	updated, command := model.Update(keyPress("s"))
@@ -93,7 +93,7 @@ func TestReadActivityReturnsToOriginAndShowsUnavailableKeys(t *testing.T) {
 func TestAllBusyScreensExplainElapsedTimeAndSafety(t *testing.T) {
 	for screen := dashboardHome; screen <= dashboardHostTrust; screen++ {
 		for _, reading := range []bool{false, true} {
-			model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{}, false)
+			model := newTestModel(t, withReport(testDashboardReport("stopped")))
 			model.screen, model.busy = screen, "Working"
 			model.width, model.height = 80, 24
 			safety := "Cannot be interrupted"
@@ -146,7 +146,7 @@ func TestUnclassifiedMutationCannotQuitAndBackgroundPreparationCan(t *testing.T)
 }
 
 func TestCancelledSettingsValidationPreservesEditableDraft(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{}, false)
+	model := newTestModel(t, withReport(testDashboardReport("stopped")))
 	model.screen, model.busy = dashboardSettingsEdit, "Validating settings"
 	model.settings.editor = newSettingsEditorModel(wizardSettings(), routineSettingsGroups[0].fields, "Edit settings")
 	model.settings.editor.accepted = true
@@ -172,7 +172,7 @@ func TestCancelledSettingsValidationPreservesEditableDraft(t *testing.T) {
 }
 
 func TestCancelledUpdateBuildStopsProgressAndIgnoresLateResults(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{}, false)
+	model := newTestModel(t, withReport(testDashboardReport("stopped")))
 	model.screen, model.busy = dashboardUpdate, "Validating candidate"
 	started, finished := make(chan context.Context, 1), make(chan struct{})
 	opened, command := model.startUpdatePlan(func(ctx context.Context, _ string, _, _ bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {

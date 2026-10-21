@@ -26,7 +26,7 @@ func TestEveryTaskHasVisibleUniqueShortcutAndMatchingEnterRoute(t *testing.T) {
 			used[task.shortcut] = true
 			for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 				for _, dark := range []bool{false, true} {
-					m := experienceFixture(2)
+					m := experienceFixture(t, 2)
 					m.screen = menu.screen
 					m.width = size[0]
 					m.height = size[1]
@@ -51,7 +51,7 @@ func TestEveryTaskHasVisibleUniqueShortcutAndMatchingEnterRoute(t *testing.T) {
 }
 
 func TestCanonicalDeploymentAndInstallationRoutes(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m = press(m, "c")
 	m = press(m, "d")
 	if m.screen != dashboardDeploy {
@@ -82,7 +82,7 @@ func TestSettingsShortcutsDoNotStealNavigationOrSearch(t *testing.T) {
 		if group.id == "workspace" {
 			continue // The workspace has a dedicated typed editor, tested separately.
 		}
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.screen = dashboardSettings
 		m.settings.current = wizardSettings()
 		m.settings.menu = newRoutineSettingsMenu(false, 80, 24)
@@ -98,7 +98,7 @@ func TestSettingsShortcutsDoNotStealNavigationOrSearch(t *testing.T) {
 			t.Fatalf("%s did not open", group.id)
 		}
 	}
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardSettings
 	m.settings.menu = newRoutineSettingsMenu(false, 80, 24)
 	m.settings.menu.list.Select(2)
@@ -129,7 +129,7 @@ func TestSoftwareTabsHaveDirectShortcutsIncludingDuringSearch(t *testing.T) {
 }
 
 func TestDashboardAreaNavigationUsesVisibleSelection(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
+	model := newTestModel(t, withReadyLab())
 	model.width = 90
 	model.height = 30
 	model.homeMenu.setSize(model.width, model.height)
@@ -155,7 +155,7 @@ func TestDashboardAreaNavigationUsesVisibleSelection(t *testing.T) {
 		t.Fatalf("selected dashboard task did not open: screen=%d", model.screen)
 	}
 
-	model = newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
+	model = newTestModel(t, withReadyLab())
 	for _, shortcut := range []string{"r", "d", "x", "h", "s", "l", "g", "u", "e", "p", "f", "i"} {
 		updated, _ = model.Update(tea.KeyPressMsg{Text: shortcut})
 		model = updated.(dashboardModel)
@@ -192,7 +192,7 @@ func TestRoutineScreensShareVisualTitleHierarchy(t *testing.T) {
 }
 
 func TestBusyScreensUseAnimatedSharedSpinner(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
+	model := newTestModel(t, withReadyLab())
 	model.busy = "Validating candidate configuration"
 	initial := model.busyView()
 	updated, command := model.Update(model.activitySpinner.Tick())
@@ -203,7 +203,7 @@ func TestBusyScreensUseAnimatedSharedSpinner(t *testing.T) {
 }
 
 func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.updates.result = domain.UpdateApplyReport{Operation: "update-apply", State: "applied"}
 	model.actions.CheckUpdate = func(ctx context.Context) domain.UpdateCheckReport {
 		return domain.UpdateCheckReport{Operation: "update-check", State: "current", CurrentRef: "v2.0.0"}
@@ -233,12 +233,12 @@ func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 
 func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.T) {
 	setup := domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
-	model := newDashboardModel(testDashboardReport("stopped"), setup, DashboardActions{}, false)
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withSetup(setup))
 	if model.screen != dashboardSetup || !model.setupMode {
 		t.Fatalf("incomplete initial configuration opened screen=%d setupMode=%t", model.screen, model.setupMode)
 	}
 
-	ready := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	ready := newTestModel(t, withReport(testDashboardReport("stopped")), withSetup(domain.SetupReport{State: "ready"}))
 	found := false
 	for _, task := range dashboardTasks {
 		if task.id == "installation" && task.shortcut == "n" {
@@ -249,7 +249,7 @@ func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.
 		t.Fatal("configured labs cannot reopen computer installation from the intervention menu")
 	}
 
-	maintenance := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{}, false)
+	maintenance := newTestModel(t, withReport(testDashboardReport("stopped")), withSetup(domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}))
 	if maintenance.screen != dashboardHome || !strings.Contains(maintenance.View().Content, "Computer installation is not configured yet") {
 		t.Fatalf("a later readiness issue hijacked navigation or became invisible: screen=%d\n%s", maintenance.screen, maintenance.View().Content)
 	}
@@ -258,7 +258,7 @@ func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.
 func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 	loads, settingsLoads := 0, 0
 	setup := domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withActions(DashboardActions{
 		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			loads++
 			return testDashboardReport("stopped"), setup, nil
@@ -267,7 +267,7 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 			settingsLoads++
 			return wizardSettings(), nil
 		},
-	}, false)
+	}))
 	model.initializing = true
 	model.busy = "Opening the laboratory and checking setup progress"
 	if view := model.View().Content; !strings.Contains(view, model.busy) || strings.Contains(view, "Restore computers") || strings.Contains(view, "Laboratory overview") {
@@ -289,7 +289,7 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 
 func TestLoadingDashboardFailureHasInPlaceRetry(t *testing.T) {
 	attempts := 0
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withActions(DashboardActions{
 		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			attempts++
 			if attempts == 1 {
@@ -297,7 +297,7 @@ func TestLoadingDashboardFailureHasInPlaceRetry(t *testing.T) {
 			}
 			return testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, nil
 		},
-	}, false)
+	}))
 	model.initializing = true
 	model.busy = "Opening the laboratory and checking setup progress"
 

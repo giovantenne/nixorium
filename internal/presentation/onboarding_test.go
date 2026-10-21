@@ -14,7 +14,7 @@ import (
 )
 
 func TestDisclaimerRequiresAcceptanceBeforeInitialLoad(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardDisclaimer
 	m.initializing = true
 	accepted, loaded := 0, 0
@@ -50,7 +50,7 @@ func TestDisclaimerRequiresAcceptanceBeforeInitialLoad(t *testing.T) {
 	}
 }
 func TestInitialInvitationPrecedesSetupAndLateReplyCannotReopen(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.actions.LoadDisclaimer = func(context.Context) (bool, error) { return true, nil }
 	calls := 0
 	m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
@@ -75,7 +75,7 @@ func TestInitialInvitationPrecedesSetupAndLateReplyCannotReopen(t *testing.T) {
 	}
 }
 func TestComputersExplainMissingConfigurationAndOfferInstallation(t *testing.T) {
-	m := experienceFixture(0)
+	m := experienceFixture(t, 0)
 	m.actions.LoadClientSetup = func(context.Context) (bool, error) { return false, nil }
 	m, cmd := workspaceKey(m, keyPress("c"))
 	m = workspaceComplete(t, m, cmd)
@@ -91,7 +91,7 @@ func TestComputersExplainMissingConfigurationAndOfferInstallation(t *testing.T) 
 	}
 }
 func TestUpdateNotificationDoesNotInterruptOrApply(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardSoftware
 	notice := domain.UpdateNotification{Key: "test", Target: "v3.1.0", Channel: domain.UpdateChannelStable}
 	next, _ := m.Update(updateNotificationMsg{notice: notice})
@@ -116,7 +116,7 @@ func TestOnboardingAndNotificationRenderGallery(t *testing.T) {
 	var gallery strings.Builder
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		for _, dark := range []bool{false, true} {
-			base := experienceFixture(2)
+			base := experienceFixture(t, 2)
 			base.width, base.height, base.isDark = size[0], size[1], dark
 			states := []struct {
 				name     string
@@ -185,7 +185,7 @@ func TestOnboardingAndNotificationRenderGallery(t *testing.T) {
 
 func TestSkippedTelemetryReturnsOnNextLaunch(t *testing.T) {
 	for _, consent := range []string{"undecided", "enabled", "disabled"} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
 			if action != "status" {
 				t.Fatal("startup saved consent")
@@ -211,7 +211,7 @@ func TestSkippedTelemetryReturnsOnNextLaunch(t *testing.T) {
 }
 
 func TestTelemetryLateStartupStatusCannotOverwriteChoice(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
 		consent := "undecided"
 		if action == "disable" {
@@ -236,7 +236,7 @@ func TestTelemetryLateStartupStatusCannotOverwriteChoice(t *testing.T) {
 	}
 }
 func TestUSBConsoleInstructionsScrollWithInputVisible(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.width, m.height = 80, 24
 	m.screen = dashboardUSBInstall
 	m.installation.remote = remoteInstallationModel{stage: remoteInstallConsole, host: "pc01", address: "192.0.2.20"}
@@ -263,7 +263,7 @@ func TestUSBConsoleInstructionsScrollWithInputVisible(t *testing.T) {
 }
 
 func TestReturningAdministratorDoesNotFlashDisclaimer(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.initializing = true
 	m.disclaimerChecking = true
 	if strings.Contains(m.View().Content, "Accept & continue") {
@@ -277,7 +277,7 @@ func TestReturningAdministratorDoesNotFlashDisclaimer(t *testing.T) {
 }
 
 func TestSavedRefusalNeverDisplaysInvitationDuringLoad(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.actions.Telemetry = func(context.Context, string) (domain.TelemetryReport, error) {
 		return domain.TelemetryReport{Consent: "disabled"}, nil
 	}

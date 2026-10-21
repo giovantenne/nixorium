@@ -17,8 +17,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func assistantReviewFixture() dashboardModel {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{Assistant: domain.AssistantConfig{Enabled: true}}, false)
+func assistantReviewFixture(t testing.TB) dashboardModel {
+	m := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}), withActions(DashboardActions{Assistant: domain.AssistantConfig{Enabled: true}}))
 	m.assistant = newAssistantModel()
 	m.report.Meta.Controller.Name = "pc99"
 	m.screen = dashboardAssistantReview
@@ -29,7 +29,7 @@ func assistantReviewFixture() dashboardModel {
 func TestAssistantReviewLayoutsAndScroll(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 40}} {
 		for _, profile := range []colorprofile.Profile{colorprofile.NoTTY, colorprofile.ANSI256} {
-			m := assistantReviewFixture()
+			m := assistantReviewFixture(t)
 			m.width, m.height = size[0], size[1]
 			captureView := func() string {
 				var output bytes.Buffer
@@ -107,7 +107,7 @@ func TestAssistantReviewShowsSettingsImpacts(t *testing.T) {
 	}
 	flat := func(view string) string { return strings.Join(strings.Fields(view), " ") }
 	for _, size := range [][2]int{{80, 24}, {120, 40}} {
-		m := assistantReviewFixture()
+		m := assistantReviewFixture(t)
 		m.width, m.height = size[0], size[1]
 		if view := ansi.Strip(m.View().Content); strings.Contains(view, "Apply to controller") {
 			t.Fatal("impacts shown for a proposal that does not change the settings", view)
@@ -139,7 +139,7 @@ func TestAssistantReviewShowsSettingsImpacts(t *testing.T) {
 }
 
 func TestAssistantReviewShowsReusedEvaluationAge(t *testing.T) {
-	m := assistantReviewFixture()
+	m := assistantReviewFixture(t)
 	m.width, m.height = 80, 24
 	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "✓ Checked by Nixorium: the configuration is valid") || strings.Contains(view, "(verified") {
 		t.Fatal(view)
@@ -176,7 +176,7 @@ func TestAssistantProposalChangesAndHosts(t *testing.T) {
 			t.Fatal(got, test.want)
 		}
 	}
-	m := assistantReviewFixture()
+	m := assistantReviewFixture(t)
 	m.report.Meta.Controller.Name = "pc99"
 	m.assistant.review.plan.ChangedHosts = []string{"pc99", "pc03", "pc02", "pc01"}
 	if got := m.assistantProposalHosts(); got != "pc01–pc03, the controller (pc99)" {
@@ -190,7 +190,7 @@ func TestAssistantProposalChangesAndHosts(t *testing.T) {
 
 func TestAssistantSaveWordsOpenLocalReview(t *testing.T) {
 	for _, word := range []string{"save", "SAVE", "salva", "SalVa", "/save", "/SAVE"} {
-		m := assistantReviewFixture()
+		m := assistantReviewFixture(t)
 		m.screen = dashboardAssistant
 		m.assistant.conversation.ID = "synthetic-proposal"
 		m.assistant.changedFiles = 1
@@ -227,8 +227,8 @@ type assistantChain struct {
 	clients                                     []domain.HostMeta
 }
 
-func assistantChainFixture(c *assistantChain) dashboardModel {
-	m := assistantReviewFixture()
+func assistantChainFixture(t testing.TB, c *assistantChain) dashboardModel {
+	m := assistantReviewFixture(t)
 	revision := strings.Repeat("b", 40)
 	c.planReport = domain.ControllerRebuildPlanReport{State: "ready", Revision: revision}
 	c.applyReport = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Revision: revision, Applied: true, Verified: true}
@@ -277,7 +277,7 @@ func runChain(t *testing.T, m dashboardModel) dashboardModel {
 
 func TestAssistantReviewOptionsAndNoConfirmationStep(t *testing.T) {
 	c := &assistantChain{}
-	m := assistantChainFixture(c)
+	m := assistantChainFixture(t, c)
 	m.width, m.height = 100, 40
 	view := ansi.Strip(m.View().Content)
 	for _, want := range []string{"Save and update the controller", "Save only — update computers later", "Technical details", "Back"} {
@@ -295,7 +295,7 @@ func TestAssistantReviewOptionsAndNoConfirmationStep(t *testing.T) {
 
 func TestAssistantSaveAndUpdateControllerWithOneEnter(t *testing.T) {
 	c := &assistantChain{}
-	m := runChain(t, assistantChainFixture(c))
+	m := runChain(t, assistantChainFixture(t, c))
 	if c.saves != 1 || c.plans != 1 || c.applies != 1 || c.inventories != 1 || c.deploys != 1 {
 		t.Fatalf("calls: %+v", *c)
 	}
@@ -309,7 +309,7 @@ func TestAssistantSaveAndUpdateControllerWithOneEnter(t *testing.T) {
 
 func TestAssistantChainSkipsCurrentController(t *testing.T) {
 	c := &assistantChain{}
-	m := assistantChainFixture(c)
+	m := assistantChainFixture(t, c)
 	m.actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
 		c.plans++
 		return domain.ControllerRebuildPlanReport{State: "current", Current: true, Revision: strings.Repeat("b", 40)}
@@ -320,7 +320,7 @@ func TestAssistantChainSkipsCurrentController(t *testing.T) {
 	}
 	// A controller already verified for the saved revision skips the review.
 	c2 := &assistantChain{}
-	m = assistantChainFixture(c2)
+	m = assistantChainFixture(t, c2)
 	m.controller.result = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", Revision: strings.Repeat("b", 40), Applied: true, Verified: true}
 	m = runChain(t, m)
 	if c2.plans != 0 || c2.applies != 0 || c2.deploys != 1 || m.screen != dashboardDeployReview {
@@ -330,7 +330,7 @@ func TestAssistantChainSkipsCurrentController(t *testing.T) {
 
 func TestAssistantChainStopsOnControllerPlanIssues(t *testing.T) {
 	c := &assistantChain{}
-	m := assistantChainFixture(c)
+	m := assistantChainFixture(t, c)
 	m.actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
 		c.plans++
 		return domain.ControllerRebuildPlanReport{State: "blocked", Issues: []domain.ValidationIssue{{Message: "dirty"}}}
@@ -347,7 +347,7 @@ func TestAssistantChainStopsOnControllerApplyFailure(t *testing.T) {
 		{Operation: "controller-apply", State: "recovery", Revision: strings.Repeat("b", 40), Applied: true},
 	} {
 		c := &assistantChain{}
-		m := assistantChainFixture(c)
+		m := assistantChainFixture(t, c)
 		m.actions.ApplyController = func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 			c.applies++
 			return report
@@ -361,7 +361,7 @@ func TestAssistantChainStopsOnControllerApplyFailure(t *testing.T) {
 
 func TestAssistantChainWithoutClientsShowsSavedResult(t *testing.T) {
 	c := &assistantChain{}
-	m := assistantChainFixture(c)
+	m := assistantChainFixture(t, c)
 	c.clients = nil
 	m = runChain(t, m)
 	if c.applies != 1 || c.deploys != 0 || m.screen != dashboardAssistantReview || m.message != "No client computers are configured." {
@@ -371,7 +371,7 @@ func TestAssistantChainWithoutClientsShowsSavedResult(t *testing.T) {
 
 func TestAssistantChainEscapeDuringControllerReviewReturnsToResult(t *testing.T) {
 	c := &assistantChain{}
-	m := assistantChainFixture(c)
+	m := assistantChainFixture(t, c)
 	updated, cmd := m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
 	updated, _ = m.Update(cmd()) // save result starts the controller review read
@@ -388,7 +388,7 @@ func TestAssistantChainEscapeDuringControllerReviewReturnsToResult(t *testing.T)
 
 func TestAssistantSaveOnlyReturnsToChat(t *testing.T) {
 	c := &assistantChain{}
-	m := assistantChainFixture(c)
+	m := assistantChainFixture(t, c)
 	updated, _ := m.Update(keyPress("down"))
 	m = updated.(dashboardModel)
 	m = runChain(t, m)
@@ -407,7 +407,7 @@ func TestAssistantSaveOnlyReturnsToChat(t *testing.T) {
 }
 
 func TestAssistantReviewOnlyForChangesAndCancellation(t *testing.T) {
-	m := assistantReviewFixture()
+	m := assistantReviewFixture(t)
 	m.screen = dashboardAssistant
 	calls := 0
 	m.actions.AssistantService = &AssistantActions{PlanSave: func(context.Context, string) domain.AssistantSavePlan {
@@ -438,7 +438,7 @@ func TestAssistantReviewOnlyForChangesAndCancellation(t *testing.T) {
 }
 
 func TestAssistantReviewLoadsControllerIdentity(t *testing.T) {
-	m := assistantReviewFixture()
+	m := assistantReviewFixture(t)
 	m.screen = dashboardAssistant
 	m.assistant.conversation.ID = "synthetic"
 	m.assistant.changedFiles = 1
@@ -471,7 +471,7 @@ func TestAssistantReviewLoadsControllerIdentity(t *testing.T) {
 
 func TestAssistantReviewWarnsAboutCoreOverrides(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 40}} {
-		m := assistantReviewFixture()
+		m := assistantReviewFixture(t)
 		m.width, m.height = size[0], size[1]
 		view := ansi.Strip(m.View().Content)
 		if strings.Contains(view, "Core override") {
@@ -501,7 +501,7 @@ func TestAssistantReviewWarnsAboutCoreOverrides(t *testing.T) {
 
 func TestAssistantSaveFlowIsUnchangedByCoreOverrideWarning(t *testing.T) {
 	c := &assistantChain{}
-	m := assistantChainFixture(c)
+	m := assistantChainFixture(t, c)
 	m.assistant.review.plan.CoreOverrideFiles = []string{"modules/force.nix"}
 	m = runChain(t, m)
 	if c.saves != 1 || c.plans != 1 || c.applies != 1 || m.screen != dashboardDeployReview {

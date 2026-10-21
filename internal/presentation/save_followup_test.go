@@ -10,8 +10,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func savedFollowupFixture(screen dashboardScreen) dashboardModel {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+func savedFollowupFixture(t testing.TB, screen dashboardScreen) dashboardModel {
+	m := newTestModel(t)
 	m.screen = screen
 	revision := strings.Repeat("a", 40)
 	m.settings.result = domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved", Revision: revision}
@@ -25,7 +25,7 @@ func savedFollowupFixture(screen dashboardScreen) dashboardModel {
 
 func TestSavedFollowupsRequireIndependentControllerReview(t *testing.T) {
 	for _, screen := range []dashboardScreen{dashboardSettings, dashboardTemplateReset, dashboardWorkspace} {
-		m := savedFollowupFixture(screen)
+		m := savedFollowupFixture(t, screen)
 		plans, applies := 0, 0
 		m.actions.PlanController = func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			plans++
@@ -83,7 +83,7 @@ func TestSavedFollowupsRequireIndependentControllerReview(t *testing.T) {
 }
 
 func TestSaveFollowupCancellationRecoveryAndStaleEvidence(t *testing.T) {
-	m := savedFollowupFixture(dashboardSettings)
+	m := savedFollowupFixture(t, dashboardSettings)
 	m.actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
 		return domain.ControllerRebuildPlanReport{State: "ready"}
 	}
@@ -114,7 +114,7 @@ func TestSaveFollowupCancellationRecoveryAndStaleEvidence(t *testing.T) {
 func TestSaveResultsShareThreeRowsAndFit(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		for _, screen := range []dashboardScreen{dashboardSettings, dashboardTemplateReset, dashboardWorkspace, dashboardSoftware, dashboardUpdate} {
-			m := savedFollowupFixture(screen)
+			m := savedFollowupFixture(t, screen)
 			m.width, m.height = size[0], size[1]
 			m.software.stage = softwareResult
 			m.software.result = domain.SoftwareChangeApplyReport{State: "saved", AffectedClients: []string{"pc01"}}

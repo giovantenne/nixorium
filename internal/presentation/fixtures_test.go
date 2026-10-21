@@ -1,8 +1,64 @@
 package presentation
 
 import (
+	"testing"
+
 	"github.com/giovantenne/nixorium/internal/domain"
 )
+
+// testModelConfig collects the inputs of newDashboardModel; the zero value is
+// an empty report, an empty setup report, no actions and the home screen.
+type testModelConfig struct {
+	report    domain.StatusReport
+	setup     domain.SetupReport
+	actions   DashboardActions
+	setupMode bool
+}
+
+type testModelOption func(*testModelConfig)
+
+func withReport(report domain.StatusReport) testModelOption {
+	return func(c *testModelConfig) { c.report = report }
+}
+
+func withSetup(setup domain.SetupReport) testModelOption {
+	return func(c *testModelConfig) { c.setup = setup }
+}
+
+func withActions(actions DashboardActions) testModelOption {
+	return func(c *testModelConfig) { c.actions = actions }
+}
+
+func withSetupMode() testModelOption {
+	return func(c *testModelConfig) { c.setupMode = true }
+}
+
+// withReadyLab is the common ready controller with a completed first setup.
+func withReadyLab() testModelOption {
+	return func(c *testModelConfig) {
+		c.report = testDashboardReport("ready")
+		c.setup = testSetupReport(true, true, true, true)
+	}
+}
+
+// newTestModel builds a dashboard model for tests from functional options.
+func newTestModel(t testing.TB, opts ...testModelOption) dashboardModel {
+	t.Helper()
+	var config testModelConfig
+	for _, opt := range opts {
+		opt(&config)
+	}
+	return newDashboardModel(config.report, config.setup, config.actions, config.setupMode)
+}
+
+// testActions returns an action set with no callbacks, adjusted by overrides.
+func testActions(overrides ...func(*DashboardActions)) DashboardActions {
+	var actions DashboardActions
+	for _, override := range overrides {
+		override(&actions)
+	}
+	return actions
+}
 
 func testDashboardReport(mode string) domain.StatusReport {
 	report := domain.StatusReport{

@@ -26,13 +26,13 @@ func TestHostTrustConfirmationIsExact(t *testing.T) {
 
 func TestHostTrustReadCancellationIgnoresLateResult(t *testing.T) {
 	var readContext context.Context
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{PlanHostTrust: func(ctx context.Context, _ string) domain.HostTrustPlan {
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withActions(DashboardActions{PlanHostTrust: func(ctx context.Context, _ string) domain.HostTrustPlan {
 		readContext = ctx
 		return trustPresentationPlan()
 	}, ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
 		t.Fatal("cancel triggered write")
 		return domain.HostTrustResult{}
-	}}, false)
+	}}))
 	model.screen = dashboardHosts
 	opened, read := model.openHostTrust("pc01")
 	model = opened.(dashboardModel)
@@ -51,10 +51,10 @@ func TestHostTrustReadCancellationIgnoresLateResult(t *testing.T) {
 
 func TestHostTrustTUIRequiresConfirmationAndProtectsMutation(t *testing.T) {
 	writes := 0
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{PlanHostTrust: func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() }, ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withActions(DashboardActions{PlanHostTrust: func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() }, ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
 		writes++
 		return domain.HostTrustResult{Operation: "host-key-apply", State: "saved", Message: "Reviewed trust saved"}
-	}}, false)
+	}}))
 	opened, read := model.openHostTrust("pc01")
 	model = opened.(dashboardModel)
 	updated, _ := model.Update(read())
@@ -118,7 +118,7 @@ func TestClassroomCannotOpenHostTrust(t *testing.T) {
 
 func TestSavedHostTrustChecksTheComputersAgain(t *testing.T) {
 	checks := 0
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withActions(DashboardActions{
 		PlanHostTrust: func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() },
 		ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
 			return domain.HostTrustResult{Operation: "host-key-apply", State: "saved", Host: "pc01", Message: "Reviewed trust saved"}
@@ -127,7 +127,7 @@ func TestSavedHostTrustChecksTheComputersAgain(t *testing.T) {
 			checks++
 			return domain.HostsReport{}, nil
 		},
-	}, false)
+	}))
 	opened, read := model.openHostTrust("pc01")
 	model = opened.(dashboardModel)
 	updated, _ := model.Update(read())
@@ -144,10 +144,10 @@ func TestSavedHostTrustChecksTheComputersAgain(t *testing.T) {
 
 func TestAComputerWithAChangedKeyIsNotOfferedForUpdate(t *testing.T) {
 	report := testDashboardReport("stopped")
-	model := newDashboardModel(report, domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withReport(report), withActions(DashboardActions{
 		PlanHostTrust:  func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() },
 		ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult { return domain.HostTrustResult{} },
-	}, false)
+	}))
 	model.screen = dashboardHosts
 	model.computers.hosts = domain.HostsReport{Hosts: []domain.HostStatus{{Name: "pc01", IP: "10.0.0.1", HostKeyCondition: domain.HostKeyChanged}}}
 	model.computers.hostDetail = true

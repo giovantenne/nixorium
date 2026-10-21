@@ -105,7 +105,7 @@ func assistantFlowFixture(t *testing.T, handler http.HandlerFunc) (dashboardMode
 	actions.AssistantService.PrepareConversation = func(string) (domain.AssistantConversation, error) {
 		return domain.AssistantConversation{ID: flowTurnID}, nil
 	}
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, actions, false)
+	m := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}), withActions(actions))
 	m.width, m.height = 120, 30
 	opened, _ := m.openAssistant()
 	m = opened.(dashboardModel)

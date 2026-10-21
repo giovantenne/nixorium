@@ -12,7 +12,7 @@ import (
 )
 
 func TestOverviewPendingRowsAndEmptyState(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "unchecked"}, DashboardActions{}, false)
+	m := newTestModel(t, withSetup(domain.SetupReport{State: "unchecked"}))
 	m.screen = dashboardHome
 	if view := m.View().Content; len(m.pendingTasks()) != 0 || strings.Contains(view, "No pending work") || strings.Contains(view, "Needs attention") {
 		t.Fatal("empty overview shows a pending-work line")
@@ -55,7 +55,7 @@ func TestOverviewPendingRowsAndEmptyState(t *testing.T) {
 }
 
 func TestOverviewRefreshIsLocalAndPreservesClientObservation(t *testing.T) {
-	m := savedFollowupFixture(dashboardHome)
+	m := savedFollowupFixture(t, dashboardHome)
 	m.computers.hosts = domain.HostsReport{GeneratedAt: time.Now().UTC(), Hosts: []domain.HostStatus{{Name: "pc01"}}}
 	m.actions.LoadInitial = func(context.Context) (domain.StatusReport, domain.SetupReport, error) {
 		return domain.StatusReport{}, domain.SetupReport{State: "unchecked"}, nil
@@ -83,12 +83,12 @@ func TestOverviewRefreshIsLocalAndPreservesClientObservation(t *testing.T) {
 
 func TestReturningToOverviewRereadsLocalState(t *testing.T) {
 	loads := 0
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		LoadInitial: func(context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			loads++
 			return domain.StatusReport{Repository: "/home/admin/nixorium-deployment"}, domain.SetupReport{}, nil
 		},
-	}, false)
+	}))
 	m.screen = dashboardAdministration
 	m.report.Git.Dirty = true
 	m.usbReserved = true

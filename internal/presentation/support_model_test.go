@@ -14,8 +14,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func supportUIFixture() dashboardModel {
-	m := experienceFixture(2)
+func supportUIFixture(t testing.TB) dashboardModel {
+	m := experienceFixture(t, 2)
 	m.screen = dashboardDiagnostics
 	m.actions.PreviewSupport = func(context.Context) (domain.SupportSnapshot, error) { return demoSupportSnapshot(), nil }
 	m.actions.ExportSupport = func(domain.SupportSnapshot) domain.SupportExportResult {
@@ -25,7 +25,7 @@ func supportUIFixture() dashboardModel {
 }
 
 func TestSupportUIExactPreviewAndSingleConfirmedSave(t *testing.T) {
-	m := supportUIFixture()
+	m := supportUIFixture(t)
 	saves := 0
 	m.actions.ExportSupport = func(snapshot domain.SupportSnapshot) domain.SupportExportResult {
 		saves++
@@ -73,7 +73,7 @@ func TestSupportUIExactPreviewAndSingleConfirmedSave(t *testing.T) {
 }
 
 func TestSupportUICancelAndStaleMessages(t *testing.T) {
-	m := supportUIFixture()
+	m := supportUIFixture(t)
 	var collectedContext context.Context
 	m.actions.PreviewSupport = func(ctx context.Context) (domain.SupportSnapshot, error) {
 		collectedContext = ctx
@@ -111,7 +111,7 @@ func TestSupportUICancelAndStaleMessages(t *testing.T) {
 }
 
 func TestSupportUINoPrivateErrorOrClassroomCapability(t *testing.T) {
-	m := supportUIFixture()
+	m := supportUIFixture(t)
 	m.actions.PreviewSupport = func(context.Context) (domain.SupportSnapshot, error) {
 		return domain.SupportSnapshot{}, errors.New("SECRET evaluator error")
 	}
@@ -124,7 +124,7 @@ func TestSupportUINoPrivateErrorOrClassroomCapability(t *testing.T) {
 	if command != nil {
 		t.Fatal("failed preview is exportable")
 	}
-	m = supportUIFixture()
+	m = supportUIFixture(t)
 	m.actions.ClassroomMode = true
 	m, command = workspaceKey(m, demoText("e"))
 	if command != nil || m.screen != dashboardDiagnostics || strings.Contains(m.View().Content, "Support report") {
@@ -137,7 +137,7 @@ func TestSupportUIRendering(t *testing.T) {
 		for _, dark := range []bool{false, true} {
 			for _, state := range []string{"preview", "end", "loading", "empty", "failed", "saving", "saved", "partial"} {
 				t.Run(fmt.Sprintf("%dx%d/dark%t/%s", size[0], size[1], dark, state), func(t *testing.T) {
-					m := supportUIFixture()
+					m := supportUIFixture(t)
 					m.screen = dashboardSupport
 					m.support.snapshot = demoSupportSnapshot()
 					m.width, m.height, m.isDark = size[0], size[1], dark

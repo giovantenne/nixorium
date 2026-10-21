@@ -30,7 +30,7 @@ func TestWorkspaceUpdateTextDistinguishesPinsAndRuntimeEvidence(t *testing.T) {
 func TestWorkspaceUpdateScrollableReviewKeepsCancelAndVersionComparison(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		for _, dark := range []bool{false, true} {
-			m := workspaceFixture()
+			m := workspaceFixture(t)
 			m.width, m.height, m.isDark = size[0], size[1], dark
 			m.screen = dashboardUpdateReview
 			m.updates.packageBase = true

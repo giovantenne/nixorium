@@ -11,7 +11,7 @@ import (
 
 func TestControllerResultIsShownBeforeTheStatusRefresh(t *testing.T) {
 	refreshed := make(chan struct{})
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 			return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Applied: true, Verified: true, Message: "Controller operation completed."}
 		},
@@ -19,7 +19,7 @@ func TestControllerResultIsShownBeforeTheStatusRefresh(t *testing.T) {
 			<-refreshed
 			return domain.StatusReport{Repository: "/home/admin/nixorium-deployment"}, nil
 		},
-	}, false)
+	}))
 	m.screen = dashboardControllerReview
 	m.controller.plan = domain.ControllerRebuildPlanReport{State: "ready"}
 	next, cmd := m.startReviewedControllerApply()
@@ -47,7 +47,7 @@ func TestControllerResultIsShownBeforeTheStatusRefresh(t *testing.T) {
 }
 
 func TestReopenedInterfaceShowsTheUpdateOutcome(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+	m := newTestModel(t)
 	m.reopenNotice = "Nixorium and this controller are updated. Next: Computers → Update computers."
 	next, _ := m.Update(dashboardInitialMsg{})
 	m = next.(dashboardModel)
@@ -61,7 +61,7 @@ func TestReopenedInterfaceShowsTheUpdateOutcome(t *testing.T) {
 }
 
 func TestLateControllerStatusIsDroppedAfterAnotherOperation(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{Repository: "fresh"}, domain.SetupReport{}, DashboardActions{}, false)
+	m := newTestModel(t, withReport(domain.StatusReport{Repository: "fresh"}))
 	m.screen = dashboardController
 	m.controller.progressID = 7
 	next, _ := m.Update(controllerStatusRefreshMsg{status: domain.StatusReport{Repository: "late"}, id: 6})

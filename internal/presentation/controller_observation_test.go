@@ -36,7 +36,7 @@ func TestControllerOverviewSupersedesOlderSaveAndObservations(t *testing.T) {
 		}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			model := savedFollowupFixture(dashboardHome)
+			model := savedFollowupFixture(t, dashboardHome)
 			model.actions.ApplyController = func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 				t.Fatal("observation authorized an apply")
 				return domain.ControllerRebuildExecutionReport{}
@@ -80,7 +80,7 @@ func TestControllerOverviewNewSavesInvalidateEarlierVerification(t *testing.T) {
 		"Git commit":       dashboardGitCommitResultMsg{report: domain.GitCommitReport{State: "committed", Committed: true, Revision: b}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			model := savedFollowupFixture(dashboardHome)
+			model := savedFollowupFixture(t, dashboardHome)
 			updated, _ := model.Update(dashboardControllerResultMsg{report: domain.ControllerRebuildExecutionReport{Operation: "controller-apply", Revision: a, Applied: true, Verified: true}})
 			model = updated.(dashboardModel)
 			if overviewHasControllerTask(model) {
@@ -110,7 +110,7 @@ func TestControllerOverviewRetainsFailedAndUnverifiedWork(t *testing.T) {
 		"blocked review":   dashboardControllerPlanMsg{report: domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "blocked", Current: true, Revision: revision, Issues: []domain.ValidationIssue{{Field: "controller", Message: "unavailable"}}}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			model := savedFollowupFixture(dashboardHome)
+			model := savedFollowupFixture(t, dashboardHome)
 			model.noteControllerSave(revision)
 			updated, _ := model.Update(message)
 			model = updated.(dashboardModel)
@@ -141,7 +141,7 @@ func TestControllerOverviewFreshDriftSupersedesPreviousSuccess(t *testing.T) {
 		}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			model := savedFollowupFixture(dashboardHome)
+			model := savedFollowupFixture(t, dashboardHome)
 			updated, _ := model.Update(dashboardControllerResultMsg{report: domain.ControllerRebuildExecutionReport{Operation: "controller-apply", Revision: revision, Applied: true, Verified: true}})
 			model = updated.(dashboardModel)
 			updated, _ = model.Update(message)
@@ -153,7 +153,7 @@ func TestControllerOverviewFreshDriftSupersedesPreviousSuccess(t *testing.T) {
 }
 
 func TestControllerOverviewCancelledReviewCannotClearNewSave(t *testing.T) {
-	model := savedFollowupFixture(dashboardHome)
+	model := savedFollowupFixture(t, dashboardHome)
 	model.noteControllerSave(strings.Repeat("a", 40))
 	model.actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
 		return domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "current", Current: true, Revision: strings.Repeat("b", 40)}
@@ -171,7 +171,7 @@ func TestControllerOverviewCancelledReviewCannotClearNewSave(t *testing.T) {
 
 func TestControllerOverviewRecoveryRefreshDoesNotRetainClearedDrift(t *testing.T) {
 	for _, saved := range []bool{false, true} {
-		model := savedFollowupFixture(dashboardHome)
+		model := savedFollowupFixture(t, dashboardHome)
 		if saved {
 			model.noteControllerSave(strings.Repeat("a", 40))
 		}
@@ -191,7 +191,7 @@ func TestControllerOverviewRecoveryCannotReviveSupersededSetup(t *testing.T) {
 	setup := domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageApply,
 		Stages: []domain.SetupStage{{ID: domain.SetupStageApply, State: domain.SetupStageCurrent}},
 	}
-	model := newDashboardModel(domain.StatusReport{}, setup, DashboardActions{}, false)
+	model := newTestModel(t, withSetup(setup))
 	if !overviewHasControllerTask(model) {
 		t.Fatal("initial setup application was not reported")
 	}
@@ -217,7 +217,7 @@ func TestControllerOverviewRecoveryCannotReviveSupersededSetup(t *testing.T) {
 }
 
 func TestControllerOverviewCancelledReviewDoesNotAdvertiseOlderSuccess(t *testing.T) {
-	model := savedFollowupFixture(dashboardHome)
+	model := savedFollowupFixture(t, dashboardHome)
 	updated, _ := model.Update(dashboardControllerResultMsg{report: domain.ControllerRebuildExecutionReport{
 		Operation: "controller-apply", Revision: strings.Repeat("a", 40), Applied: true, Verified: true,
 	}})
@@ -244,7 +244,7 @@ func TestControllerOverviewCancelledReviewDoesNotAdvertiseOlderSuccess(t *testin
 // the inventory of the new revision instead of reusing the old one.
 func TestSavedChangeReloadsTheInventoryBeforeClientSelection(t *testing.T) {
 	loads := 0
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		LoadInventory: func(context.Context) (domain.StatusReport, error) {
 			loads++
 			report := domain.StatusReport{}
@@ -252,7 +252,7 @@ func TestSavedChangeReloadsTheInventoryBeforeClientSelection(t *testing.T) {
 			report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}, {Name: "pc02"}, {Name: "pc03"}}
 			return report, nil
 		},
-	}, false)
+	}))
 	m.report.Meta.Controller.Name = "pc99"
 	m.report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}, {Name: "pc02"}}
 	m.noteControllerSave("0123456789abcdef0123456789abcdef01234567")

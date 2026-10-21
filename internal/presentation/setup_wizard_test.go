@@ -313,7 +313,7 @@ func TestSetupAsksForEnterToLeavePXEActive(t *testing.T) {
 }
 
 func TestSetupRendersBusyActivity(t *testing.T) {
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.screen = dashboardSetup
 	model.setupMode = true
 	model.busy = "Refreshing first-run progress"
@@ -325,7 +325,7 @@ func TestSetupRendersBusyActivity(t *testing.T) {
 
 func TestInstallComputersOpensSettingsWithoutSetupMenu(t *testing.T) {
 	setupLoads, settingsLoads := 0, 0
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withSetup(domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}), withActions(DashboardActions{
 		LoadSetup: func(ctx context.Context) domain.SetupReport {
 			setupLoads++
 			return domain.SetupReport{State: "ready"}
@@ -334,7 +334,7 @@ func TestInstallComputersOpensSettingsWithoutSetupMenu(t *testing.T) {
 			settingsLoads++
 			return wizardSettings(), nil
 		},
-	}, false)
+	}))
 	for index, task := range dashboardTasks {
 		if task.id == "installation" {
 			model.homeMenu.list.Select(index)
@@ -367,9 +367,9 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	settings := wizardSettings()
 	settings.Lab.DeploymentMode = "controller"
 	settings.Lab.PCCount = 0
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withSetup(domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}), withActions(DashboardActions{
 		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) { return settings, nil },
-	}, false)
+	}))
 	for index, task := range dashboardTasks {
 		if task.id == "installation" {
 			model.homeMenu.list.Select(index)
@@ -416,7 +416,7 @@ func TestPXEAndUSBPreparationReuseSavedAccountNames(t *testing.T) {
 			settings.Lab.DeploymentMode = "controller"
 			settings.Lab.PCCount = 0
 			settings.Lab.TeacherUser, settings.Lab.StudentUser = "professor", "pupil"
-			model := experienceFixture(2)
+			model := experienceFixture(t, 2)
 			model.actions.LoadSettings = func(context.Context) (domain.LabSettingsFile, error) { return settings, nil }
 			next, command := model.beginComputerInstallation(method)
 			model = workspaceComplete(t, next.(dashboardModel), command)
@@ -571,7 +571,7 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 
 func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 	loaded := 0
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
@@ -596,7 +596,7 @@ func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 }
 
 func TestSetupCredentialsFollowTheSameSettingsAndPasswordSequence(t *testing.T) {
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageCredentials}
@@ -629,7 +629,7 @@ func TestSetupCredentialsFollowTheSameSettingsAndPasswordSequence(t *testing.T) 
 
 func TestSetupValidationRetryKeepsAcceptedPasswords(t *testing.T) {
 	plans := 0
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageValidate}
@@ -661,7 +661,7 @@ func TestSetupValidationRetryKeepsAcceptedPasswords(t *testing.T) {
 
 func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 	reconciles, saves, installs, refreshes := 0, 0, 0, 0
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}
@@ -713,7 +713,7 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 
 func TestInstallComputersCreatesMissingKeysWithoutOpeningKeyChoices(t *testing.T) {
 	reconciles, saves, installs, setupLoads := 0, 0, 0, 0
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.installation.flow = true
 	model.screen = dashboardPXE
 	model.actions.ReconcileSetupKeys = func() (domain.KeyReconcileReport, error) {
@@ -751,7 +751,7 @@ func TestInstallComputersCreatesMissingKeysWithoutOpeningKeyChoices(t *testing.T
 
 func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 	loads := 0
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.screen = dashboardSettings
 	model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 	model.actions.LoadSetupKeys = func(ctx context.Context) domain.KeyReconcileReport {
@@ -790,7 +790,7 @@ func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 
 func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
 	importedName, importedPath := "", ""
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.screen = dashboardSetupKeys
 	model.setupKeyCursor = 1
 	model.setupKeys = domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{
@@ -823,7 +823,7 @@ func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
 
 func TestSetupPasswordCancellationNamesSetup(t *testing.T) {
 	for _, installation := range []bool{false, true} {
-		model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{}, false)
+		model := newTestModel(t, withReport(testDashboardReport("stopped")))
 		model.screen = dashboardSettingsPasswords
 		model.settings.returnScreen = dashboardSetup
 		model.installation.flow = installation
