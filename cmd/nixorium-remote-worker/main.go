@@ -1177,4 +1177,3 @@ func (worker *remoteWorker) releaseResolvedFailureLocked(session *domain.RemoteI
 	}
 	return nil
 }
-

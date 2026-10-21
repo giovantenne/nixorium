@@ -1,9 +1,6 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"time"
 )
 
@@ -60,9 +57,7 @@ func CollectReviewToken(p CollectPlan) string {
 	for i := range p.Targets {
 		p.Targets[i].Detail = ""
 	}
-	content, _ := json.Marshal(p)
-	sum := sha256.Sum256(content)
-	return "sha256:" + hex.EncodeToString(sum[:])
+	return reviewTokenDigest(p)
 }
 
 // Outcomes of one computer in a collection.
