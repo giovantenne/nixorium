@@ -131,7 +131,7 @@ func TestComputersAreaEnterOpensQueuedUpdates(t *testing.T) {
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardDeferredUpdates || command == nil || model.areaReturn != dashboardComputersArea {
+	if model.screen != dashboardDeferredUpdates || command == nil || model.navigation.areaReturn != dashboardComputersArea {
 		t.Fatalf("Enter did not open Queued updates: screen=%d command=%v", model.screen, command != nil)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -201,8 +201,8 @@ func TestEveryListedAreaTaskIsHandled(t *testing.T) {
 				model.screen = area.screen
 				model.homeMenu.list.Select(index)
 				model.computers.areaCursor = index
-				model.installationAreaCursor = index
-				model.adminCursor = index
+				model.navigation.installationAreaCursor = index
+				model.navigation.adminCursor = index
 				key := tea.KeyPressMsg{Code: []rune(task.shortcut)[0], Text: task.shortcut}
 				if viaEnter {
 					key = tea.KeyPressMsg{Code: tea.KeyEnter}

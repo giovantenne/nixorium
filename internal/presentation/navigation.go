@@ -19,8 +19,8 @@ func (model dashboardModel) taskMenu(tasks []dashboardTask, cursor int) string {
 	}
 	cursor = min(max(0, cursor), len(tasks)-1)
 	rows := len(tasks)
-	if model.menuRows > 0 {
-		rows = min(rows, model.menuRows)
+	if model.navigation.menuRows > 0 {
+		rows = min(rows, model.navigation.menuRows)
 	}
 	start, end := listWindow(len(tasks), cursor, rows)
 	lines := []string{}
@@ -79,12 +79,12 @@ func taskHelp(tasks []dashboardTask) []string {
 // counted by the same code that lays it out.
 func (model dashboardModel) fitMenu(count int, render func(dashboardModel) string) string {
 	if model.height == 0 || count == 0 {
-		model.menuRows = count
+		model.navigation.menuRows = count
 		return render(model)
 	}
 	out := ""
 	for rows := count; rows >= 1; rows-- {
-		model.menuRows = rows
+		model.navigation.menuRows = rows
 		out = render(model)
 		if !strings.Contains(out, "scroll · ? help") {
 			break

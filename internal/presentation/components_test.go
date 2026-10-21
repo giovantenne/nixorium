@@ -65,7 +65,7 @@ func TestTUIShellScrollsOnlyStructuredBodyRegions(t *testing.T) {
 	for index := 0; index < 20; index++ {
 		body = append(body, "body row")
 	}
-	model := dashboardModel{width: 80, height: 16, pageScroll: 4}
+	model := dashboardModel{width: 80, height: 16, navigation: navigationModel{pageScroll: 4}}
 	view := model.renderShell(tuiShell{
 		path:      []string{"Translated screen"},
 		body:      strings.Join(body, "\n"),

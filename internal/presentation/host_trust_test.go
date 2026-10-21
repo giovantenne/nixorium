@@ -64,7 +64,7 @@ func TestHostTrustTUIRequiresConfirmationAndProtectsMutation(t *testing.T) {
 	}
 	updated, help := model.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	model = updated.(dashboardModel)
-	if help != nil || !model.helpOpen {
+	if help != nil || !model.navigation.helpOpen {
 		t.Fatal("help invoked work")
 	}
 	updated, help = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

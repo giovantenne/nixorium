@@ -288,8 +288,8 @@ func TestUSBInstallPasswordConsumesGlobalShortcutCharacters(t *testing.T) {
 	if model.screen != dashboardUSBInstall || model.installation.remote.stage != remoteInstallPassword {
 		t.Fatal("password shortcut characters left the password form")
 	}
-	if model.helpOpen || model.installation.remote.password != "q?" {
-		t.Fatalf("help open=%t password=%q", model.helpOpen, model.installation.remote.password)
+	if model.navigation.helpOpen || model.installation.remote.password != "q?" {
+		t.Fatalf("help open=%t password=%q", model.navigation.helpOpen, model.installation.remote.password)
 	}
 }
 

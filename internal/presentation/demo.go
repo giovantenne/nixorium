@@ -638,7 +638,7 @@ func renderUSBInstallationDemo(revision string, width, height int) DemoScenario 
 	r.capture("Overview", 900)
 	r.model.screen = dashboardInstallationArea
 	r.model.installation = installationModel{flow: true}
-	r.model.installationAreaCursor = 1
+	r.model.navigation.installationAreaCursor = 1
 	r.capture("Choose USB over SSH", 1800)
 	r.model.screen = dashboardUSBInstall
 	r.model.installation.method = domain.RemoteInstallUSBSSH

@@ -339,8 +339,8 @@ func TestEvidenceScreensKeepNavigationVisible(t *testing.T) {
 			{
 				name: "diagnostics",
 				model: dashboardModel{
-					screen: dashboardDiagnostics,
-					doctor: domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}},
+					screen:      dashboardDiagnostics,
+					diagnostics: diagnosticsModel{report: domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}}},
 				},
 				expected: []string{"Maintenance  /  Diagnostics", "Check connection", "Enter", "Evidence", "Check again", "Esc", "Maintenance", "Help"},
 			},
@@ -498,7 +498,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 	m.deployment.plan = domain.DeploymentPlanReport{ColmenaSelector: "@lab"}
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	m = updated.(dashboardModel)
-	if !m.helpOpen {
+	if !m.navigation.helpOpen {
 		t.Fatal("F1 help not opened")
 	}
 	updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -508,7 +508,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 	}
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = updated.(dashboardModel)
-	if m.helpOpen || m.screen != dashboardDeployReview {
+	if m.navigation.helpOpen || m.screen != dashboardDeployReview {
 		t.Fatal("help back lost review")
 	}
 	updated, command = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
@@ -681,16 +681,16 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 	}
 	m = press(m, "down")
 	m = press(m, "enter")
-	if m.screen != dashboardDeploy || m.areaReturn != dashboardComputersArea {
-		t.Fatalf("computer task lost its area: screen=%d return=%d", m.screen, m.areaReturn)
+	if m.screen != dashboardDeploy || m.navigation.areaReturn != dashboardComputersArea {
+		t.Fatalf("computer task lost its area: screen=%d return=%d", m.screen, m.navigation.areaReturn)
 	}
 	m = press(m, "esc")
 	if m.screen != dashboardComputersArea {
 		t.Fatalf("computer task returned to %d", m.screen)
 	}
 	m = press(m, "esc")
-	if m.screen != dashboardHome || m.areaReturn != dashboardHome {
-		t.Fatalf("computers area did not return to overview: screen=%d return=%d", m.screen, m.areaReturn)
+	if m.screen != dashboardHome || m.navigation.areaReturn != dashboardHome {
+		t.Fatalf("computers area did not return to overview: screen=%d return=%d", m.screen, m.navigation.areaReturn)
 	}
 
 	m = press(m, "down")
@@ -704,8 +704,8 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 	}
 	updated, command := m.Update(tea.KeyPressMsg{Text: "p"})
 	m = updated.(dashboardModel)
-	if command == nil || m.screen != dashboardSettings || m.areaReturn != dashboardInstallationArea {
-		t.Fatalf("PXE method did not start the common settings flow: screen=%d return=%d", m.screen, m.areaReturn)
+	if command == nil || m.screen != dashboardSettings || m.navigation.areaReturn != dashboardInstallationArea {
+		t.Fatalf("PXE method did not start the common settings flow: screen=%d return=%d", m.screen, m.navigation.areaReturn)
 	}
 	updated, command = m.Update(command())
 	m = updated.(dashboardModel)
@@ -732,7 +732,7 @@ func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 		}
 
 		m.screen = dashboardSetupKeys
-		m.setupKeys = domain.KeyReconcileReport{State: "action-required"}
+		m.keys.report = domain.KeyReconcileReport{State: "action-required"}
 		view = m.View().Content
 		for _, expected := range []string{"Controller keys", "Create missing", "Esc", "Help"} {
 			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {

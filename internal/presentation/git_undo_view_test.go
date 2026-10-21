@@ -326,7 +326,7 @@ func TestDashboardUndoReviewFitsSmallTerminalsAndScrolls(t *testing.T) {
 func TestGitReviewHelpMentionsTheUndo(t *testing.T) {
 	applied := 0
 	model := openGitReviewFor(t, undoActions(t, undoTestPlan(), &applied), 160, 50)
-	model.helpOpen = true
+	model.navigation.helpOpen = true
 	view := model.View().Content
 	for _, expected := range []string{"u undo the last saved change", "saves a new change that puts the files", "Enter on the result opens Apply to controller; then update the computers"} {
 		if !strings.Contains(view, expected) {

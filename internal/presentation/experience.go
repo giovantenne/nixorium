@@ -187,7 +187,7 @@ func (model dashboardModel) computersView() string {
 }
 
 func (model dashboardModel) administrationView() string {
-	if model.menuRows == 0 {
+	if model.navigation.menuRows == 0 {
 		return model.fitMenu(len(administrationTasks), func(fitted dashboardModel) string { return fitted.administrationView() })
 	}
 	lines := []string{
@@ -195,7 +195,7 @@ func (model dashboardModel) administrationView() string {
 		tuiMuted("Configuration, controller operations and technical evidence", model.isDark),
 		"",
 	}
-	lines = append(lines, model.taskMenu(administrationTasks, model.adminCursor))
+	lines = append(lines, model.taskMenu(administrationTasks, model.navigation.adminCursor))
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
@@ -301,7 +301,7 @@ func (model dashboardModel) dynamicHelp() []string {
 				"x stops both network installation services instead and checks the normal address. d shows the technical text of a failed attempt.")
 		}
 	case dashboardRecoveryReview:
-		if model.recoveryReview.kind == "deploy" {
+		if model.recovery.review.kind == "deploy" {
 			lines = append(lines, "r check every computer again   c continue without the computers that do not answer (c again includes them)",
 				"Enter marks the update as reviewed once every computer was checked   d technical details of the failure   Esc back",
 				"Marking it as reviewed changes nothing on the computers: it archives the record and unblocks other operations. Then update the computers again.")
@@ -326,25 +326,25 @@ func (model dashboardModel) dynamicHelp() []string {
 
 func (model dashboardModel) diagnosticsView() string {
 	path := []string{"Maintenance", "Diagnostics"}
-	if model.diagnosticReturn == dashboardHosts {
+	if model.diagnostics.back == dashboardHosts {
 		path = []string{"Computers", "Inventory", "Diagnostics"}
 	}
 	lines := []string{tuiTitle("Diagnostics", model.isDark), ""}
 	if model.busy != "" {
 		return model.renderShell(tuiShell{path: path, body: strings.Join(append(lines, model.busyView()), "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
-	findings := model.doctor.Findings
+	findings := model.diagnostics.report.Findings
 	if len(findings) == 0 {
 		lines = append(lines, "No diagnostic observations available.", "Press r to run the laboratory checks.")
 	}
-	start, end := listWindow(len(findings), model.diagnosticCursor, max(2, (model.height-ctaRows(model.height)-12)/3))
+	start, end := listWindow(len(findings), model.diagnostics.cursor, max(2, (model.height-ctaRows(model.height)-12)/3))
 	for i := start; i < end; i++ {
 		f := findings[i]
-		lines = append(lines, tuiSelectionMarker(i == model.diagnosticCursor, model.isDark)+tuiStatus(f.Summary, statusLevel(f.Level), model.isDark))
+		lines = append(lines, tuiSelectionMarker(i == model.diagnostics.cursor, model.isDark)+tuiStatus(f.Summary, statusLevel(f.Level), model.isDark))
 		if f.Remediation != "" {
 			lines = append(lines, "  "+f.Remediation)
 		}
-		if model.diagnosticDetails && i == model.diagnosticCursor {
+		if model.diagnostics.details && i == model.diagnostics.cursor {
 			lines = append(lines, tuiMuted("  "+f.ID+": "+f.Evidence, model.isDark))
 		}
 		lines = append(lines, "")
@@ -358,7 +358,7 @@ func (model dashboardModel) diagnosticsView() string {
 		actions = append(actions, tuiAction{key: "↑/↓", label: "Select"}, tuiAction{key: "Enter", label: "Evidence"})
 	}
 	back := "Maintenance"
-	if model.diagnosticReturn == dashboardHosts {
+	if model.diagnostics.back == dashboardHosts {
 		back = "Inventory"
 	}
 	actions = append(actions, tuiAction{key: "r", label: "Check again"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
@@ -386,7 +386,7 @@ func (model dashboardModel) frame(content string) string {
 	}
 	height = max(2, height)
 	if len(lines) > height {
-		start := min(model.pageScroll, len(lines)-height+1)
+		start := min(model.navigation.pageScroll, len(lines)-height+1)
 		lines = append(lines[start:min(len(lines), start+height-1)], tuiMuted("Shift ↑/↓ scroll · ? help", model.isDark))
 	}
 	return lipgloss.NewStyle().Padding(1, 3).Render(strings.Join(lines, "\n"))
@@ -488,7 +488,7 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 		fixedHeight := len(compose(nil, true))
 		bodyHeight := height - fixedHeight
 		if bodyHeight > 0 {
-			start := min(model.pageScroll, max(0, len(body)-bodyHeight))
+			start := min(model.navigation.pageScroll, max(0, len(body)-bodyHeight))
 			lines = compose(body[start:min(len(body), start+bodyHeight)], true)
 		} else {
 			return model.frame(renderTUIShell(shell, model.width, model.isDark))
@@ -522,11 +522,11 @@ func (model dashboardModel) textEntry() bool {
 	if model.screen == dashboardUpdate && model.updates.packageBase && model.updates.baseEditing {
 		return true
 	}
-	if model.screen == dashboardSetupKeys && model.setupKeyImporting {
+	if model.screen == dashboardSetupKeys && model.keys.importing {
 		return true
 	}
-	if model.screen == dashboardRecoveryReview && model.recoveryReview.kind == "reset" && !model.recoveryReview.done {
-		ready, word := model.recoveryReview.ready()
+	if model.screen == dashboardRecoveryReview && model.recovery.review.kind == "reset" && !model.recovery.review.done {
+		ready, word := model.recovery.review.ready()
 		return ready && word != ""
 	}
 	switch model.screen {

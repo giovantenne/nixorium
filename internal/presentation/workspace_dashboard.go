@@ -107,9 +107,9 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 	}
 	if (key.String() == "shift+up" || key.String() == "shift+down") && !(model.workspace.stage == workspaceFieldEdit && model.workspace.field.kind == "favorites") {
 		if key.String() == "shift+up" {
-			model.pageScroll = max(0, model.pageScroll-1)
+			model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 		} else {
-			model.pageScroll++
+			model.navigation.pageScroll++
 		}
 		return model, nil
 	}

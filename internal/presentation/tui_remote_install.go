@@ -17,7 +17,7 @@ import (
 )
 
 func (model dashboardModel) installationAreaView() string {
-	if model.menuRows == 0 {
+	if model.navigation.menuRows == 0 {
 		return model.fitMenu(len(installationAreaTasks), func(fitted dashboardModel) string { return fitted.installationAreaView() })
 	}
 	lines := []string{
@@ -25,7 +25,7 @@ func (model dashboardModel) installationAreaView() string {
 		"Choose how to start the client PC. Both methods erase its chosen disk.",
 		"",
 	}
-	lines = append(lines, model.taskMenu(installationAreaTasks, model.installationAreaCursor))
+	lines = append(lines, model.taskMenu(installationAreaTasks, model.navigation.installationAreaCursor))
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
 	}

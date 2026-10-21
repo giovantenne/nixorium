@@ -34,7 +34,7 @@ func (model dashboardModel) openAssistantReview() (tea.Model, tea.Cmd) {
 		return model.loadInventoryThen(func(ready dashboardModel) (tea.Model, tea.Cmd) { return ready.openAssistantReview() })
 	}
 	model.assistant.review = assistantReviewModel{}
-	model.message, model.pageScroll = "", 0
+	model.message, model.navigation.pageScroll = "", 0
 	model.busy = "Checking the proposal"
 	ctx, id := model.beginRead(5 * time.Minute)
 	model.screen = dashboardAssistantReview
@@ -48,7 +48,7 @@ func (model dashboardModel) finishAssistantSave(msg assistantSaveResultMsg) (tea
 	model.assistant.review.saving = false
 	model.assistant.review.result = msg.result
 	model.busy, model.message = "", ""
-	model.pageScroll = 0
+	model.navigation.pageScroll = 0
 	if msg.result.State == "saved" && !msg.result.RecoveryRequired {
 		model.noteControllerSave(msg.result.Revision)
 		model.assistant.changedFiles = 0
@@ -67,7 +67,7 @@ func (model dashboardModel) finishAssistantSave(msg assistantSaveResultMsg) (tea
 func (model dashboardModel) assistantBackToChat() (tea.Model, tea.Cmd) {
 	model.screen = dashboardAssistant
 	model.message = ""
-	model.pageScroll = 0
+	model.navigation.pageScroll = 0
 	return model, model.assistant.input.Focus()
 }
 
@@ -86,7 +86,7 @@ func (model dashboardModel) updateAssistantReviewKey(key tea.KeyPressMsg) (tea.M
 	if key.String() == "esc" {
 		if r.details {
 			r.details = false
-			model.message, model.pageScroll = "", 0
+			model.message, model.navigation.pageScroll = "", 0
 			return model, nil
 		}
 		return model.assistantBackToChat()

@@ -51,8 +51,8 @@ func (model dashboardModel) handleStatusMessage(message tea.Msg) (tea.Model, tea
 		return model, nil
 	case dashboardDoctorMsg:
 		model.busy = ""
-		model.doctor = message.report
-		model.diagnosticCursor = 0
+		model.diagnostics.report = message.report
+		model.diagnostics.cursor = 0
 		if message.err != nil {
 			model.message = "Checks could not finish: " + message.err.Error()
 		} else {

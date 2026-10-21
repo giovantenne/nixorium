@@ -47,7 +47,7 @@ func TestAssistantMenuRequiresInstalledConfigAndAdministratorRole(t *testing.T) 
 				}
 			}
 			m.screen = dashboardHome
-			m.helpOpen = true
+			m.navigation.helpOpen = true
 			if strings.Contains(m.View().Content, "Assistant") != test.visible {
 				t.Fatal("help visibility mismatch")
 			}

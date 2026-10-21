@@ -184,7 +184,7 @@ func (model dashboardModel) homeView() string {
 			actions: []tuiAction{{key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
 		})
 	}
-	if model.menuRows == 0 {
+	if model.navigation.menuRows == 0 {
 		return model.fitMenu(len(model.overviewTasks()), func(fitted dashboardModel) string { return fitted.homeView() })
 	}
 	subtitle := "Choose an area with the arrows or its letter."
@@ -245,7 +245,7 @@ func setupOverviewNotice(setup domain.SetupReport) (tuiNotice, bool) {
 }
 
 func (model dashboardModel) areaView(path, title, description string, tasks []dashboardTask, cursor int) string {
-	if model.menuRows == 0 {
+	if model.navigation.menuRows == 0 {
 		return model.fitMenu(len(tasks), func(fitted dashboardModel) string {
 			return fitted.areaView(path, title, description, tasks, cursor)
 		})

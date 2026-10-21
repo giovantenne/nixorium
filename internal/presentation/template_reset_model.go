@@ -57,7 +57,7 @@ func (model dashboardModel) openTemplateReset() (tea.Model, tea.Cmd) {
 	id := model.templateReset.requestID
 	ctx, activityID := model.beginRead(dashboardReadTimeout)
 	model.templateReset = templateResetModel{requestID: id, cancel: model.read.cancel, stage: "select"}
-	model.screen, model.pageScroll, model.message = dashboardTemplateReset, 0, ""
+	model.screen, model.navigation.pageScroll, model.message = dashboardTemplateReset, 0, ""
 	model.busy = "Reading the template for your configured Nixorium version"
 	load := model.actions.LoadTemplateReset
 	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg { return templateResetCatalogMsg{id, load(ctx)} })
@@ -130,7 +130,7 @@ func (model dashboardModel) finishTemplateResetResult(msg templateResetResultMsg
 	if msg.result.State == "saved" && !msg.result.RecoveryRequired {
 		model.noteControllerSave(msg.result.Revision)
 	}
-	model.templateReset.scroll, model.pageScroll = 0, 0
+	model.templateReset.scroll, model.navigation.pageScroll = 0, 0
 	model.busy, model.message = "", ""
 	// Invalidate any in-memory activation review of the pre-reset revision.
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
@@ -146,15 +146,15 @@ func (model dashboardModel) updateTemplateResetKey(key tea.KeyPressMsg) (tea.Mod
 	}
 	if key.String() == "shift+down" || key.String() == "shift+up" {
 		if key.String() == "shift+down" {
-			model.pageScroll++
+			model.navigation.pageScroll++
 		} else {
-			model.pageScroll = max(0, model.pageScroll-1)
+			model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 		}
 		return model, nil
 	}
 	if key.String() == "esc" {
 		m.cancelRead()
-		model.busy, model.message, model.pageScroll = "", "", 0
+		model.busy, model.message, model.navigation.pageScroll = "", "", 0
 		if m.stage == "review" || m.stage == "planning" {
 			m.stage, m.confirmation, m.scroll = "select", "", 0
 			m.plan = domain.TemplateResetPlan{}

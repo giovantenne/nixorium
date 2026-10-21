@@ -447,7 +447,7 @@ func TestFreshLabOverviewOffersRestore(t *testing.T) {
 		RestoreLabArchive: func(string, string, []byte) domain.BackupReport { return domain.BackupReport{} },
 		LabComputerCount:  func() (int, bool) { return count, true },
 	}))
-	m.recovery = domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryBackupDue, Title: "This laboratory has no backup yet", Next: domain.NextStep{Code: "BACKUP-NONE"}}}}
+	m.recovery.report = domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryBackupDue, Title: "This laboratory has no backup yet", Next: domain.NextStep{Code: "BACKUP-NONE"}}}}
 	found := false
 	for _, task := range m.pendingTasks() {
 		found = found || task.id == "pending-restore"

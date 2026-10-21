@@ -172,7 +172,7 @@ func TestHomeFilesCancelLateReadsAndSourceCompletionPreserveDraft(t *testing.T) 
 		t.Fatal("late direct message accepted")
 	}
 	m.homeFiles.stage = "review"
-	m.helpOpen = true
+	m.navigation.helpOpen = true
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 	if cmd != nil || m.homeFiles.saving {
 		t.Fatal("help triggered save")

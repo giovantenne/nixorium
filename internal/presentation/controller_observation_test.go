@@ -43,7 +43,7 @@ func TestControllerOverviewSupersedesOlderSaveAndObservations(t *testing.T) {
 			}
 			// These independent cached sources used to retain the same warning.
 			model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageApply}
-			model.recovery.Conditions = []domain.BlockingCondition{{Kind: domain.RecoveryControllerChanged}, {Kind: domain.RecoveryBackupDue}}
+			model.recovery.report.Conditions = []domain.BlockingCondition{{Kind: domain.RecoveryControllerChanged}, {Kind: domain.RecoveryBackupDue}}
 			model.noteControllerSave(a)
 			updated, _ := model.Update(dashboardControllerPlanMsg{report: domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "ready", Revision: a}})
 			model = updated.(dashboardModel)

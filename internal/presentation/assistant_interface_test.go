@@ -130,7 +130,7 @@ func TestAssistantInputCommandsExamplesAndPaste(t *testing.T) {
 	m.assistant.input.SetValue("/he")
 	updated, _ = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
-	if m.assistant.input.Value() != "" || !m.helpOpen {
+	if m.assistant.input.Value() != "" || !m.navigation.helpOpen {
 		t.Fatal("Enter should run the highlighted command")
 	}
 	updated, _ = m.Update(keyPress("esc"))

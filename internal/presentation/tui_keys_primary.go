@@ -29,7 +29,7 @@ func (model dashboardModel) updateHomeKey(key tea.KeyPressMsg) (tea.Model, tea.C
 			}
 		case "d":
 			if model.actions.LoadDoctor != nil && !model.actions.ClassroomMode {
-				model.diagnosticReturn = dashboardHome
+				model.diagnostics.back = dashboardHome
 				model.screen = dashboardDiagnostics
 				return model.startDiagnostics()
 			}
@@ -133,16 +133,16 @@ func (model dashboardModel) updateComputersAreaKey(key tea.KeyPressMsg) (tea.Mod
 		if model.actions.ClassroomMode {
 			return model, nil
 		}
-		model.areaReturn = dashboardComputersArea
+		model.navigation.areaReturn = dashboardComputersArea
 		return model.openComputerTask(action)
 	case "h", "x", "i", "l", "s":
-		model.areaReturn = dashboardComputersArea
+		model.navigation.areaReturn = dashboardComputersArea
 		return model.openComputerTask(action)
 	case "u":
 		if model.actions.ClassroomMode {
 			return model, nil
 		}
-		model.areaReturn = dashboardComputersArea
+		model.navigation.areaReturn = dashboardComputersArea
 		return model.openComputerTask(action)
 	case "v":
 		return model.openComputerTask(action)
@@ -153,7 +153,7 @@ func (model dashboardModel) updateComputersAreaKey(key tea.KeyPressMsg) (tea.Mod
 func (model dashboardModel) updateInstallationAreaKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	action := key.String()
 	if action == "enter" {
-		action = installationAreaTasks[model.installationAreaCursor].shortcut
+		action = installationAreaTasks[model.navigation.installationAreaCursor].shortcut
 	}
 	switch action {
 	case "p":
@@ -164,9 +164,9 @@ func (model dashboardModel) updateInstallationAreaKey(key tea.KeyPressMsg) (tea.
 		model.installation.flow = false
 		model.screen = dashboardHome
 	case "up", "k":
-		model.installationAreaCursor = max(0, model.installationAreaCursor-1)
+		model.navigation.installationAreaCursor = max(0, model.navigation.installationAreaCursor-1)
 	case "down", "j":
-		model.installationAreaCursor = min(len(installationAreaTasks)-1, model.installationAreaCursor+1)
+		model.navigation.installationAreaCursor = min(len(installationAreaTasks)-1, model.navigation.installationAreaCursor+1)
 	case "r":
 		if model.installation.remote.operationID != "" {
 			model.screen = dashboardUSBInstall
@@ -194,7 +194,7 @@ func (model dashboardModel) updateSetupKey(key tea.KeyPressMsg) (tea.Model, tea.
 	}
 	switch model.setup.CurrentStage {
 	case domain.SetupStageInspectEnvironment:
-		model.diagnosticReturn = dashboardSetup
+		model.diagnostics.back = dashboardSetup
 		model.screen = dashboardDiagnostics
 		return model.startDiagnostics()
 	case domain.SetupStageNetwork:
@@ -209,7 +209,7 @@ func (model dashboardModel) updateSetupKey(key tea.KeyPressMsg) (tea.Model, tea.
 			return model, nil
 		}
 		model.screen = dashboardSetupKeys
-		model.setupKeysReturn = dashboardSetup
+		model.keys.back = dashboardSetup
 		model.busy = "Checking existing controller keys"
 		model.message = ""
 		return model.startRead(func(ctx context.Context) tea.Msg {
@@ -262,19 +262,19 @@ func (model dashboardModel) updateSetupKey(key tea.KeyPressMsg) (tea.Model, tea.
 }
 
 func (model dashboardModel) updateSetupKeysKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if model.setupKeyImporting {
+	if model.keys.importing {
 		switch key.String() {
 		case "esc":
-			model.setupKeyImporting = false
-			model.setupKeyPath = ""
+			model.keys.importing = false
+			model.keys.path = ""
 			model.message = "Import cancelled; no key was changed."
 		case "backspace":
-			value := []rune(model.setupKeyPath)
+			value := []rune(model.keys.path)
 			if len(value) > 0 {
-				model.setupKeyPath = string(value[:len(value)-1])
+				model.keys.path = string(value[:len(value)-1])
 			}
 		case "enter":
-			if strings.TrimSpace(model.setupKeyPath) == "" {
+			if strings.TrimSpace(model.keys.path) == "" {
 				model.message = "Enter the path to an existing private key."
 				return model, nil
 			}
@@ -283,7 +283,7 @@ func (model dashboardModel) updateSetupKeysKey(key tea.KeyPressMsg) (tea.Model, 
 				return model, nil
 			}
 			name := model.selectedSetupKeyName()
-			path := strings.TrimSpace(model.setupKeyPath)
+			path := strings.TrimSpace(model.keys.path)
 			model.busy = "Validating and importing the existing " + setupKeyShortLabel(name) + " key"
 			model.message = ""
 			return model, func() tea.Msg {
@@ -293,10 +293,10 @@ func (model dashboardModel) updateSetupKeysKey(key tea.KeyPressMsg) (tea.Model, 
 				return dashboardSetupKeyImportMsg{report: report, err: err, keys: model.actions.LoadSetupKeys(ctx)}
 			}
 		default:
-			if key.Text != "" && len(model.setupKeyPath) < 4096 {
+			if key.Text != "" && len(model.keys.path) < 4096 {
 				for _, character := range key.Text {
 					if unicode.IsPrint(character) && !unicode.In(character, unicode.Cf) {
-						model.setupKeyPath += string(character)
+						model.keys.path += string(character)
 					}
 				}
 			}
@@ -305,23 +305,23 @@ func (model dashboardModel) updateSetupKeysKey(key tea.KeyPressMsg) (tea.Model, 
 	}
 	switch key.String() {
 	case "esc", "left":
-		model.screen = model.setupKeysReturn
+		model.screen = model.keys.back
 		if model.screen == dashboardHome {
 			model.screen = dashboardSetup
 		}
 		model.message = ""
 	case "up", "k":
-		model.setupKeyCursor = max(0, model.setupKeyCursor-1)
+		model.keys.cursor = max(0, model.keys.cursor-1)
 	case "down", "j":
-		model.setupKeyCursor = min(max(0, len(model.setupKeys.Keys)-1), model.setupKeyCursor+1)
+		model.keys.cursor = min(max(0, len(model.keys.report.Keys)-1), model.keys.cursor+1)
 	case "i":
 		state, found := model.selectedSetupKey()
 		if !found || state.Ready() {
 			model.message = "This key is already ready; existing keys are never replaced here."
 			return model, nil
 		}
-		model.setupKeyImporting = true
-		model.setupKeyPath = ""
+		model.keys.importing = true
+		model.keys.path = ""
 		model.message = ""
 	case "c":
 		if !model.setupKeyActionsAvailable() {
@@ -332,7 +332,7 @@ func (model dashboardModel) updateSetupKeysKey(key tea.KeyPressMsg) (tea.Model, 
 		model.message = ""
 		return model, model.prepareSetupKeys()
 	case "enter":
-		if model.setupKeys.State != "ready" {
+		if model.keys.report.State != "ready" {
 			model.message = "Import an existing key or create the missing keys before continuing."
 			return model, nil
 		}
@@ -399,7 +399,7 @@ func (model dashboardModel) updateSettingsKey(key tea.KeyPressMsg) (tea.Model, t
 			model.message = "Controller key management is not available in this session."
 			return model, nil
 		}
-		model.setupKeysReturn = dashboardSettings
+		model.keys.back = dashboardSettings
 		model.screen = dashboardSetupKeys
 		model.busy = "Checking existing controller keys"
 		model.message = ""

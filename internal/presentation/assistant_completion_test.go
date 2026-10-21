@@ -20,7 +20,7 @@ func TestAssistantCompleteHelpAndScrolling(t *testing.T) {
 	m.assistant.input.SetValue("/help")
 	updated, _ := m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
-	if !m.helpOpen {
+	if !m.navigation.helpOpen {
 		t.Fatal("help did not open")
 	}
 	text := m.helpView()
@@ -46,12 +46,12 @@ func TestAssistantCompleteHelpAndScrolling(t *testing.T) {
 	}
 	updated, _ = m.Update(keyPress("esc"))
 	m = updated.(dashboardModel)
-	if m.helpOpen || m.screen != dashboardAssistant {
+	if m.navigation.helpOpen || m.screen != dashboardAssistant {
 		t.Fatal("help Esc changed screen")
 	}
 	updated, _ = m.Update(keyPress("f1"))
 	m = updated.(dashboardModel)
-	if !m.helpOpen || m.helpView() != text {
+	if !m.navigation.helpOpen || m.helpView() != text {
 		t.Fatal("F1 differs from /help")
 	}
 }

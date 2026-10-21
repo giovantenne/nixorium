@@ -137,7 +137,7 @@ func (model dashboardModel) openSavedDeployment(auto bool) (tea.Model, tea.Cmd) 
 		}
 		ready.screen = dashboardDeploy
 		ready.deployment = deploymentModel{chosen: map[string]bool{}, origin: origin, context: "Saved configuration: select computers, review again and confirm. Student-home and keyboard changes may require the next computer start."}
-		ready.confirmation, ready.message, ready.pageScroll = "", "", 0
+		ready.confirmation, ready.message, ready.navigation.pageScroll = "", "", 0
 		if !auto {
 			return ready, nil
 		}

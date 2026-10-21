@@ -56,7 +56,7 @@ func (model dashboardModel) setupView() string {
 		)
 	}
 	backLabel := "Overview"
-	if model.areaReturn == dashboardInstallationArea {
+	if model.navigation.areaReturn == dashboardInstallationArea {
 		backLabel = "Installation"
 	}
 	shell := tuiShell{
@@ -74,7 +74,7 @@ func (model dashboardModel) setupKeysView() string {
 	path := []string{"Installation", "Setup", "Controller keys"}
 	backLabel := "Setup"
 	readyLabel := "Save and continue"
-	if model.setupKeysReturn == dashboardSettings {
+	if model.keys.back == dashboardSettings {
 		path = []string{"Maintenance", "Settings", "Advanced", "Controller keys"}
 		backLabel = "Settings"
 		readyLabel = "Install verified keys"
@@ -99,7 +99,7 @@ func (model dashboardModel) setupKeysView() string {
 		{name: "ssh", label: "Administrator SSH", purpose: "Lets the controller manage enrolled computers without a password prompt."},
 	}
 	states := map[string]domain.KeyMaterialState{}
-	for _, state := range model.setupKeys.Keys {
+	for _, state := range model.keys.report.Keys {
 		states[state.Name] = state
 	}
 	for index, definition := range definitions {
@@ -110,9 +110,9 @@ func (model dashboardModel) setupKeysView() string {
 		} else if state.Problem != "" {
 			status += " — " + state.Problem
 		}
-		lines = append(lines, tuiSelection(definition.label+"  ·  "+status, index == model.setupKeyCursor, model.isDark), "    "+definition.purpose)
+		lines = append(lines, tuiSelection(definition.label+"  ·  "+status, index == model.keys.cursor, model.isDark), "    "+definition.purpose)
 	}
-	if model.setupKeyImporting {
+	if model.keys.importing {
 		name := model.selectedSetupKeyName()
 		lines = append(lines,
 			"",
@@ -121,11 +121,11 @@ func (model dashboardModel) setupKeysView() string {
 			"Nixorium validates it, derives the public key, and leaves the source unchanged.",
 			"Encrypted or hardware-backed SSH keys are not supported for unattended controller operations.",
 			"",
-			"> "+model.setupKeyPath+"_",
+			"> "+model.keys.path+"_",
 		)
 	} else {
 		lines = append(lines, "")
-		if model.setupKeys.State == "ready" {
+		if model.keys.report.State == "ready" {
 			lines = append(lines, tuiStatus("All controller keys are ready", tuiStatusSuccess, model.isDark))
 		} else {
 			lines = append(lines,
@@ -134,9 +134,9 @@ func (model dashboardModel) setupKeysView() string {
 		}
 	}
 	var actions []tuiAction
-	if model.setupKeyImporting {
+	if model.keys.importing {
 		actions = []tuiAction{{key: "Enter", label: "Import"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
-	} else if model.setupKeys.State == "ready" {
+	} else if model.keys.report.State == "ready" {
 		actions = []tuiAction{{key: "Enter", label: readyLabel}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}
 	} else {
 		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "i", label: "Import"}, {key: "c", label: "Create missing"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}
@@ -154,7 +154,7 @@ func (model dashboardModel) setupKeysView() string {
 
 func (model dashboardModel) selectedSetupKey() (domain.KeyMaterialState, bool) {
 	name := model.selectedSetupKeyName()
-	for _, state := range model.setupKeys.Keys {
+	for _, state := range model.keys.report.Keys {
 		if state.Name == name {
 			return state, true
 		}
@@ -164,10 +164,10 @@ func (model dashboardModel) selectedSetupKey() (domain.KeyMaterialState, bool) {
 
 func (model dashboardModel) selectedSetupKeyName() string {
 	names := []string{"cache", "ssh"}
-	if model.setupKeyCursor < 0 || model.setupKeyCursor >= len(names) {
+	if model.keys.cursor < 0 || model.keys.cursor >= len(names) {
 		return ""
 	}
-	return names[model.setupKeyCursor]
+	return names[model.keys.cursor]
 }
 
 func setupKeyShortLabel(name string) string {

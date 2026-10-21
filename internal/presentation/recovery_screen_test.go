@@ -20,7 +20,7 @@ func TestSafeModeOffersReadOnlyTools(t *testing.T) {
 		LoadDoctor:     func(context.Context) (domain.DoctorReport, error) { return domain.DoctorReport{}, nil },
 		PreviewSupport: func(context.Context) (domain.SupportSnapshot, error) { return domain.SupportSnapshot{}, nil },
 	}
-	model := dashboardModel{actions: actions, initialError: true, message: "unfinished deployment template reset", recovery: blockedRecovery(), width: 120, height: 30}
+	model := dashboardModel{actions: actions, initialError: true, message: "unfinished deployment template reset", recovery: recoveryModel{report: blockedRecovery()}, width: 120, height: 30}
 	view := model.View().Content
 	for _, want := range []string{"Safe mode", "A reset of the configuration template was interrupted", "What blocks", "Diagnostics", "Support report", "Try again"} {
 		if !strings.Contains(view, want) {
@@ -40,7 +40,7 @@ func TestSafeModeOffersReadOnlyTools(t *testing.T) {
 }
 
 func TestOverviewListsPersistentBlockers(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("ready"), recovery: blockedRecovery(), width: 120, height: 30}
+	model := dashboardModel{report: testDashboardReport("ready"), recovery: recoveryModel{report: blockedRecovery()}, width: 120, height: 30}
 	found := false
 	for _, task := range model.pendingTasks() {
 		found = found || task.id == "pending-reset-recovery"

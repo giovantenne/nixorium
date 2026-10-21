@@ -15,7 +15,7 @@ type dashboardPXEOverviewMsg struct {
 // Opening PXE observes current state. Preparation and network changes remain
 // explicit actions, with the existing guided setup and reviewed start boundary.
 func (model dashboardModel) openNetworkInstallation() (tea.Model, tea.Cmd) {
-	model.areaReturn = dashboardInstallationArea
+	model.navigation.areaReturn = dashboardInstallationArea
 	model.screen = dashboardPXE
 	model.installation.flow = false
 	model.installation.failed = false

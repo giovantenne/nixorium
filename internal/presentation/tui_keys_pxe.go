@@ -93,14 +93,14 @@ func (model dashboardModel) updateDiagnosticsKey(key tea.KeyPressMsg) (tea.Model
 	case "e":
 		return model.openSupportPreview()
 	case "esc", "left":
-		model.screen = model.diagnosticReturn
+		model.screen = model.diagnostics.back
 		model.message = ""
 	case "up", "k":
-		model.diagnosticCursor = max(0, model.diagnosticCursor-1)
+		model.diagnostics.cursor = max(0, model.diagnostics.cursor-1)
 	case "down", "j":
-		model.diagnosticCursor = max(0, min(len(model.doctor.Findings)-1, model.diagnosticCursor+1))
+		model.diagnostics.cursor = max(0, min(len(model.diagnostics.report.Findings)-1, model.diagnostics.cursor+1))
 	case "enter":
-		model.diagnosticDetails = !model.diagnosticDetails
+		model.diagnostics.details = !model.diagnostics.details
 	case "r":
 		return model.startDiagnostics()
 	}

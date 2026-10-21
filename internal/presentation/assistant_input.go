@@ -182,8 +182,8 @@ func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd
 		return model.openAssistantSharing()
 	case "/help":
 		model.assistant.input.Reset()
-		model.helpOpen = true
-		model.pageScroll = 0
+		model.navigation.helpOpen = true
+		model.navigation.pageScroll = 0
 		return model, nil
 	case "/name":
 		model.assistant.input.Reset()

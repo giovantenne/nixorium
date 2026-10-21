@@ -30,7 +30,7 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 			add("pending-jobs", managedJobTitle(job.Operation)+" — "+job.State, "View observed progress and its journal. No job will be started.")
 		}
 	}
-	for _, condition := range model.recovery.Conditions {
+	for _, condition := range model.recovery.report.Conditions {
 		switch condition.Kind {
 		case domain.RecoveryDeploymentPending:
 			add("pending-deploy-recovery", condition.Title, condition.Detail)
@@ -245,7 +245,7 @@ func (model dashboardModel) freshLabOffersRestore() bool {
 		return false
 	}
 	never := false
-	for _, condition := range model.recovery.Conditions {
+	for _, condition := range model.recovery.report.Conditions {
 		if condition.Kind == domain.RecoveryBackupDue && condition.Next.Code == "BACKUP-NONE" {
 			never = true
 		}

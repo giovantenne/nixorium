@@ -171,7 +171,7 @@ func TestOverviewShowsANetworkChangeInProgress(t *testing.T) {
 	model := networkChangeModelFor(t, fixture)
 	model.screen = dashboardHome
 	step, _ := domain.NextStepByCode("NETWORK-CHANGING")
-	model.recovery = domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryNetworkChanging, Title: step.Title, Detail: "From 10.0.0.0/24 to 10.1.0.0/24. Next: Apply to controller, so it answers on both networks.", Next: step}}}
+	model.recovery.report = domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryNetworkChanging, Title: step.Title, Detail: "From 10.0.0.0/24 to 10.1.0.0/24. Next: Apply to controller, so it answers on both networks.", Next: step}}}
 	tasks := model.pendingTasks()
 	if len(tasks) != 1 || tasks[0].id != "pending-network" || tasks[0].title != "The laboratory network is being changed" {
 		t.Fatalf("tasks = %+v", tasks)

@@ -103,7 +103,7 @@ func (model dashboardModel) offerControllerInterfaceReload() (dashboardModel, te
 
 // reloadScreenVisible reports whether a controller result is still on screen.
 func (model dashboardModel) reloadScreenVisible() bool {
-	if model.helpOpen || model.busy != "" {
+	if model.navigation.helpOpen || model.busy != "" {
 		return false
 	}
 	switch model.screen {

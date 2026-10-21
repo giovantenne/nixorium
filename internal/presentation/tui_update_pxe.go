@@ -46,7 +46,7 @@ func (model dashboardModel) handlePxeMessage(message tea.Msg) (tea.Model, tea.Cm
 			model.installation.flow = false
 			model.installation.failed = false
 			model.setupMode = false
-			model.areaReturn = dashboardInstallationArea
+			model.navigation.areaReturn = dashboardInstallationArea
 		}
 		if preparationFinished && model.actions.LoadPXEProgress != nil {
 			return model, model.loadPXEProgress(model.installation.pxeProgressID)

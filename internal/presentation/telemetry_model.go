@@ -28,7 +28,7 @@ type telemetryMsg struct {
 }
 
 func (model dashboardModel) checkTelemetryOffer() tea.Cmd {
-	if model.actions.ClassroomMode || model.actions.Telemetry == nil || model.screen != dashboardHome || model.managedJobConflict() != "" || model.usbReserved || len(model.recovery.Conditions) > 0 {
+	if model.actions.ClassroomMode || model.actions.Telemetry == nil || model.screen != dashboardHome || model.managedJobConflict() != "" || model.usbReserved || len(model.recovery.report.Conditions) > 0 {
 		return nil
 	}
 	action := model.actions.Telemetry
@@ -53,7 +53,7 @@ func (model dashboardModel) openTelemetry() (tea.Model, tea.Cmd) {
 	model.telemetry.firstOffer = false
 	model.telemetry.loadingOffer = false
 	model.telemetry.detail = ""
-	model.pageScroll = 0
+	model.navigation.pageScroll = 0
 	model.message = ""
 	model.busy = "Reading local telemetry settings; no upload"
 	id, action := model.telemetry.id, model.actions.Telemetry
@@ -82,7 +82,7 @@ func (model dashboardModel) finishTelemetry(msg telemetryMsg) (tea.Model, tea.Cm
 		model.screen = dashboardTelemetry
 		model.telemetry.firstOffer = true
 		model.telemetry.detail = ""
-		model.pageScroll = 0
+		model.navigation.pageScroll = 0
 	} else if model.screen != dashboardTelemetry || msg.id != model.telemetry.id {
 		return model, nil
 	}
@@ -116,7 +116,7 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 	case "esc":
 		if model.telemetry.detail != "" {
 			model.telemetry.detail = ""
-			model.pageScroll = 0
+			model.navigation.pageScroll = 0
 			model.message = ""
 			return model, nil
 		}
@@ -146,7 +146,7 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 		} else {
 			model.telemetry.detail = key.String()
 		}
-		model.pageScroll = 0
+		model.navigation.pageScroll = 0
 		model.message = ""
 	case "e", "enter", "n", "d":
 		// Enter invokes the displayed primary action only on the overview.
@@ -171,9 +171,9 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 			return telemetryMsg{report: r, err: e, id: id, choice: true}
 		}
 	case "down", "j":
-		model.pageScroll++
+		model.navigation.pageScroll++
 	case "up", "k":
-		model.pageScroll = max(0, model.pageScroll-1)
+		model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 	}
 	return model, nil
 }

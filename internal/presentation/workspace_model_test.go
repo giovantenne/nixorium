@@ -93,7 +93,7 @@ func TestWorkspaceFieldSelectionOrderInheritanceAndNumericInput(t *testing.T) {
 	m, _ = workspaceKey(m, demoCode(tea.KeyDown))
 	m, _ = workspaceKey(m, demoCode(tea.KeySpace))
 	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
-	if !reflect.DeepEqual(m.workspace.selected, []string{"code.desktop", "firefox.desktop"}) || m.pageScroll != 0 {
+	if !reflect.DeepEqual(m.workspace.selected, []string{"code.desktop", "firefox.desktop"}) || m.navigation.pageScroll != 0 {
 		t.Fatal("ordered favorites escaped their field")
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyEnter))
@@ -205,7 +205,7 @@ func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) 
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyF1))
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
-	if !m.helpOpen || cmd != nil || saves != 0 {
+	if !m.navigation.helpOpen || cmd != nil || saves != 0 {
 		t.Fatal("help triggered a save")
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyEsc))

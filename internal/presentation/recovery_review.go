@@ -46,20 +46,20 @@ type recoveryResultMsg struct {
 }
 
 func (model dashboardModel) openDeploymentRecovery() (tea.Model, tea.Cmd) {
-	model.recoveryReview = recoveryReview{kind: "deploy"}
+	model.recovery.review = recoveryReview{kind: "deploy"}
 	return model.planRecoveryReview()
 }
 
 func (model dashboardModel) openResetRecovery() (tea.Model, tea.Cmd) {
-	model.recoveryReview = recoveryReview{kind: "reset"}
+	model.recovery.review = recoveryReview{kind: "reset"}
 	return model.planRecoveryReview()
 }
 
 func (model dashboardModel) planRecoveryReview() (tea.Model, tea.Cmd) {
-	review := model.recoveryReview
+	review := model.recovery.review
 	model.screen = dashboardRecoveryReview
 	model.message = ""
-	model.recoveryReview.confirmation = ""
+	model.recovery.review.confirmation = ""
 	if review.kind == "deploy" {
 		if model.actions.PlanDeploymentRecovery == nil {
 			model.message = "Recovery is not available in this session."
@@ -122,7 +122,7 @@ func (review recoveryReview) ready() (bool, string) {
 }
 
 func (model dashboardModel) leaveRecoveryReview() (tea.Model, tea.Cmd) {
-	review := model.recoveryReview
+	review := model.recovery.review
 	if review.returnSet {
 		model.screen = review.returnTo
 		model.message = review.returnMessage
@@ -134,7 +134,7 @@ func (model dashboardModel) leaveRecoveryReview() (tea.Model, tea.Cmd) {
 }
 
 func (model dashboardModel) updateRecoveryReview(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	review := &model.recoveryReview
+	review := &model.recovery.review
 	if review.done {
 		switch key.String() {
 		case "enter", "esc":
@@ -159,7 +159,7 @@ func (model dashboardModel) updateRecoveryReview(key tea.KeyPressMsg) (tea.Model
 // updateResetRecoveryReview: r checks again, Enter confirms (after RESTORE
 // for a mixed checkout), Esc goes back without changing anything.
 func (model dashboardModel) updateResetRecoveryReview(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	review := &model.recoveryReview
+	review := &model.recovery.review
 	ready, word := review.ready()
 	typing := ready && word != ""
 	switch key.String() {
@@ -205,7 +205,7 @@ func (model dashboardModel) updateResetRecoveryReview(key tea.KeyPressMsg) (tea.
 // continues without the computers that do not answer, Enter marks the
 // update as reviewed when every computer was checked, Esc goes back.
 func (model dashboardModel) updateDeploymentRecoveryReview(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	review := &model.recoveryReview
+	review := &model.recovery.review
 	ready, _ := review.ready()
 	switch key.String() {
 	case "esc", "left":
@@ -233,7 +233,7 @@ func (model dashboardModel) updateDeploymentRecoveryReview(key tea.KeyPressMsg) 
 }
 
 func (model dashboardModel) recoveryReviewView() string {
-	review := model.recoveryReview
+	review := model.recovery.review
 	title := "Review the interrupted update"
 	if review.kind == "reset" {
 		title = "Finish or undo the " + resetRecoveryNoun(review.resetPlan)
@@ -272,7 +272,7 @@ func (model dashboardModel) recoveryReviewView() string {
 }
 
 func (model dashboardModel) deploymentRecoveryReviewView(shell tuiShell, title string) string {
-	review := model.recoveryReview
+	review := model.recovery.review
 	lines := []string{tuiTitle(title, model.isDark), ""}
 	if review.failure != "" && !review.done {
 		notice := tuiNotice{kind: tuiStatusAttention, title: review.failure, code: "DEPLOY-PENDING",

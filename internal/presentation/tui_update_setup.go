@@ -48,7 +48,7 @@ func (model dashboardModel) handleSetupMessage(message tea.Msg) (tea.Model, tea.
 	case dashboardInitialMsg:
 		model.jobs.items, model.jobs.err, model.jobs.id = message.jobs, message.jobsErr, message.jobsID
 		model.usbReserved = message.usbReserved
-		model.recovery = message.recovery
+		model.recovery.report = message.recovery
 		poll := model.scheduleManagedJobsTick()
 		model.busy = ""
 		model.initializing = false
@@ -89,14 +89,14 @@ func (model dashboardModel) handleSetupMessage(message tea.Msg) (tea.Model, tea.
 		return model, nil
 	case dashboardSetupKeyStatusMsg:
 		model.busy = ""
-		model.setupKeys = message.report
-		model.setupKeyCursor = min(model.setupKeyCursor, max(0, len(message.report.Keys)-1))
+		model.keys.report = message.report
+		model.keys.cursor = min(model.keys.cursor, max(0, len(message.report.Keys)-1))
 		model.screen = dashboardSetupKeys
 		return model, nil
 	case dashboardSetupKeyImportMsg:
 		model.busy = ""
-		model.setupKeyImporting = false
-		model.setupKeys = message.keys
+		model.keys.importing = false
+		model.keys.report = message.keys
 		if message.err != nil {
 			model.message = message.report.Message + " " + firstValidationIssue(message.report.Issues)
 		} else {
@@ -123,7 +123,7 @@ func (model dashboardModel) handleSetupMessage(message tea.Msg) (tea.Model, tea.
 			model.busy = "Checking saved laboratory configuration"
 			return model.loadSetup()
 		}
-		if model.setupKeysReturn == dashboardSettings {
+		if model.keys.back == dashboardSettings {
 			switch {
 			case message.keyErr != nil:
 				model.message = "Key preparation needs attention: " + message.keyErr.Error()
@@ -136,7 +136,7 @@ func (model dashboardModel) handleSetupMessage(message tea.Msg) (tea.Model, tea.
 			default:
 				model.message = "Controller keys are ready and installed."
 			}
-			model.setupKeys = message.keys
+			model.keys.report = message.keys
 			model.screen = dashboardSettings
 			return model, nil
 		}

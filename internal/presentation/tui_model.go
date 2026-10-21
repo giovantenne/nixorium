@@ -292,52 +292,76 @@ type computersModel struct {
 	refreshReturn dashboardScreen
 }
 
-type dashboardModel struct {
+// setupKeysModel is the key reconciliation screen of the setup flow.
+type setupKeysModel struct {
+	report    domain.KeyReconcileReport
+	back      dashboardScreen
+	cursor    int
+	importing bool
+	path      string
+}
+
+// diagnosticsModel is the diagnostics screen.
+type diagnosticsModel struct {
+	report  domain.DoctorReport
+	cursor  int
+	details bool
+	back    dashboardScreen
+}
+
+// recoveryModel is the persistent-blockers recovery state.
+type recoveryModel struct {
+	// report is the last observation of persistent blockers.
+	report domain.RecoveryReport
+	cursor int
+	review recoveryReview
+}
+
+// navigationModel holds cursors, scrolling and paging shared by screens.
+type navigationModel struct {
 	menuRows               int // set while fitting the task menu to the terminal; 0 means not yet fitted
-	assistantNoColors      bool
-	backupSync             backupSyncState
-	controllerObservation  controllerOverviewObservation
-	jobs                   managedJobsModel
-	read                   readActivity
-	busyStarted            time.Time
-	hostTrust              hostTrustModel
-	updateDetails          bool
-	returnAdmin            bool
-	disclaimerChecking     bool
-	computerSetup          string
-	computers              computersModel
 	installationAreaCursor int
 	areaReturn             dashboardScreen
-	diagnosticReturn       dashboardScreen
 	adminCursor            int
 	helpOpen               bool
 	pageScroll             int
-	setupDetails           bool
-	setupKeys              domain.KeyReconcileReport
-	setupKeysReturn        dashboardScreen
-	setupKeyCursor         int
-	setupKeyImporting      bool
-	setupKeyPath           string
-	progressDetails        bool
-	doctor                 domain.DoctorReport
-	diagnosticCursor       int
-	diagnosticDetails      bool
-	report                 domain.StatusReport
-	setup                  domain.SetupReport
-	setupMode              bool
-	homeMenu               dashboardTaskMenu
-	actions                DashboardActions
-	assistant              assistantModel
-	screen                 dashboardScreen
-	busy                   string
-	message                string
-	confirmation           string
-	installation           installationModel
-	deployment             deploymentModel
-	deferred               deferredModel
-	networkChange          networkChangeModel
-	controller             controllerModel
-	reload                 interfaceReloadModel
+}
+
+type dashboardModel struct {
+	keys                  setupKeysModel
+	diagnostics           diagnosticsModel
+	recovery              recoveryModel
+	navigation            navigationModel
+	assistantNoColors     bool
+	backupSync            backupSyncState
+	controllerObservation controllerOverviewObservation
+	jobs                  managedJobsModel
+	read                  readActivity
+	busyStarted           time.Time
+	hostTrust             hostTrustModel
+	updateDetails         bool
+	returnAdmin           bool
+	disclaimerChecking    bool
+	computerSetup         string
+	computers             computersModel
+	setupDetails          bool
+	progressDetails       bool
+	report                domain.StatusReport
+	setup                 domain.SetupReport
+	setupMode             bool
+	homeMenu              dashboardTaskMenu
+	actions               DashboardActions
+	assistant             assistantModel
+	screen                dashboardScreen
+	busy                  string
+	message               string
+	confirmation          string
+	installation          installationModel
+	deployment            deploymentModel
+	deferred              deferredModel
+	networkChange         networkChangeModel
+	controller            controllerModel
+	reload                interfaceReloadModel
 	// overviewReads numbers Overview reads; a background result older than
 	// the last read is dropped.
 	overviewReads uint64
@@ -370,10 +394,7 @@ type dashboardModel struct {
 	// usbReserved is the last local observation of an unfinished USB
 	// installation; the worker is consulted only when it is opened.
 	usbReserved bool
-	// recovery is the last observation of persistent blockers.
-	recovery       domain.RecoveryReport
-	recoveryCursor int
-	recoveryReview recoveryReview
+	// recovery.report is the last observation of persistent blockers.
 	// noticeDetails shows the technical text of a situation notice on a
 	// result screen (d); it resets when the screen or its message changes.
 	noticeDetails bool

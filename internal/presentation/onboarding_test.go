@@ -242,7 +242,7 @@ func TestUSBConsoleInstructionsScrollWithInputVisible(t *testing.T) {
 	m.installation.remote = remoteInstallationModel{stage: remoteInstallConsole, host: "pc01", address: "192.0.2.20"}
 	var seen strings.Builder
 	for offset := 0; offset < 24; offset++ {
-		m.pageScroll = offset
+		m.navigation.pageScroll = offset
 		view := demoANSI.ReplaceAllString(m.View().Content, "")
 		if !strings.Contains(view, "IP address of the PC") || !strings.Contains(view, "192.0.2.20") || !strings.Contains(view, "Check PC identity") {
 			t.Fatal("input or action scrolled away", view)
@@ -253,7 +253,7 @@ func TestUSBConsoleInstructionsScrollWithInputVisible(t *testing.T) {
 		seen.WriteString(view)
 	}
 	// At 80x24 the three commands and the address field fit without scrolling.
-	m.pageScroll = 0
+	m.navigation.pageScroll = 0
 	first := demoANSI.ReplaceAllString(m.View().Content, "")
 	for _, command := range []string{"passwd", "systemctl is-active sshd", "ip -4 -br address show scope global"} {
 		if !strings.Contains(first, command) {

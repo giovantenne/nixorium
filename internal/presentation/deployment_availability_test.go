@@ -105,7 +105,7 @@ func TestDeploymentPerComputerResultsAndRecoveryRemainScrollable(t *testing.T) {
 				t.Fatalf("%v missing %q", size, want)
 			}
 		}
-		model.pageScroll = 0
+		model.navigation.pageScroll = 0
 		model.deployment.result.RecoveryRequired = true
 		model.deployment.result.ApplyCompleted = false
 		model.deployment.result.State = "failed"

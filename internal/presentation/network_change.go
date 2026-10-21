@@ -249,7 +249,7 @@ func (model dashboardModel) openNetworkChangeDeployment() (tea.Model, tea.Cmd) {
 		for _, host := range ready.report.Meta.Clients.Hosts {
 			ready.deployment.chosen[host.Name] = true
 		}
-		ready.confirmation, ready.message, ready.pageScroll = "", "", 0
+		ready.confirmation, ready.message, ready.navigation.pageScroll = "", "", 0
 		return ready, nil
 	})
 }

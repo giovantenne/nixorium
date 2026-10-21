@@ -342,7 +342,7 @@ func TestControllerResultPastUSBReservationShowsItWithoutTheClientLine(t *testin
 		t.Fatalf("controller result does not show the USB reservation:\n%s", view)
 	}
 	// Without a record the result stays as before.
-	model.recovery = domain.RecoveryReport{}
+	model.recovery.report = domain.RecoveryReport{}
 	if view := plainView(model); contains(view, "USB installation was not finished") || contains(view, heldDeploymentLine) {
 		t.Fatalf("controller result shows a record that is not there:\n%s", view)
 	}

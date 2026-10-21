@@ -46,7 +46,7 @@ func (model dashboardModel) openSupportPreview() (tea.Model, tea.Cmd) {
 	model.support.snapshot = domain.SupportSnapshot{}
 	model.support.result = domain.SupportExportResult{}
 	model.support.scroll = 0
-	model.pageScroll = 0
+	model.navigation.pageScroll = 0
 	model.message = ""
 	model.screen = dashboardSupport
 	model.busy = "Collecting local diagnostics; no build or upload"

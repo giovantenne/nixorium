@@ -59,7 +59,7 @@ func TestAssistantSharingCheckboxAndSettingsAreExplicitAndPersistent(t *testing.
 	if saved, _ := store.ReadSharing(); !saved {
 		t.Fatal("Esc changed setting")
 	}
-	m.helpOpen = true
+	m.navigation.helpOpen = true
 	view := m.View().Content
 	if !strings.Contains(view, "/share") || !strings.Contains(view, "/report") {
 		t.Fatal("missing help")

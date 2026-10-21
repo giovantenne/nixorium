@@ -40,7 +40,7 @@ func TestSupportUIExactPreviewAndSingleConfirmedSave(t *testing.T) {
 	}
 	m = workspaceComplete(t, m, command)
 	m, command = workspaceKey(m, demoText("?"))
-	if !m.helpOpen || command != nil {
+	if !m.navigation.helpOpen || command != nil {
 		t.Fatal("help failed")
 	}
 	m, command = workspaceKey(m, demoCode(tea.KeyEnter))

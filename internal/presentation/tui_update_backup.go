@@ -11,11 +11,11 @@ func (model dashboardModel) handleBackupMessage(message tea.Msg) (tea.Model, tea
 	switch message := message.(type) {
 	case recoveryPlanMsg:
 		model.busy = ""
-		if model.recoveryReview.kind == "deploy" {
-			model.recoveryReview.deployPlan = message.deploy
-			model.recoveryReview.usbHost = message.usbHost
+		if model.recovery.review.kind == "deploy" {
+			model.recovery.review.deployPlan = message.deploy
+			model.recovery.review.usbHost = message.usbHost
 		} else {
-			model.recoveryReview.resetPlan = message.reset
+			model.recovery.review.resetPlan = message.reset
 		}
 		return model, nil
 	case gitBackupPlanMsg:
@@ -54,13 +54,13 @@ func (model dashboardModel) handleBackupMessage(message tea.Msg) (tea.Model, tea
 		return model.finishBackupSync(message)
 	case recoveryResultMsg:
 		model.busy = ""
-		model.recoveryReview.done = true
-		model.recoveryReview.deployResult, model.recoveryReview.resetResult = message.deploy, message.reset
+		model.recovery.review.done = true
+		model.recovery.review.deployResult, model.recovery.review.resetResult = message.deploy, message.reset
 		return model, nil
 	case recoveryMsg:
 		model.busy = ""
 		model.observeRecoveryController(message.report)
-		model.recoveryCursor = min(model.recoveryCursor, max(0, len(message.report.Conditions)-1))
+		model.recovery.cursor = min(model.recovery.cursor, max(0, len(message.report.Conditions)-1))
 		return model, nil
 	case recoveryObservedMsg:
 		model.observeRecoveryController(message.report)

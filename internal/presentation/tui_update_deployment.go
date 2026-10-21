@@ -70,8 +70,8 @@ func (model dashboardModel) handleDeploymentMessage(message tea.Msg) (tea.Model,
 		if message.report.RecoveryRequired && model.actions.PlanDeploymentRecovery != nil {
 			next, command := model.openDeploymentRecovery()
 			opened := next.(dashboardModel)
-			opened.recoveryReview.failure = message.report.Message
-			opened.recoveryReview.returnTo, opened.recoveryReview.returnMessage, opened.recoveryReview.returnSet = dashboardDeploy, message.report.Message, true
+			opened.recovery.review.failure = message.report.Message
+			opened.recovery.review.returnTo, opened.recovery.review.returnMessage, opened.recovery.review.returnSet = dashboardDeploy, message.report.Message, true
 			return opened, tea.Batch(command, model.observeRecoveryInBackground())
 		}
 		// Updates queued for switched-off computers appear on the overview now,

@@ -95,14 +95,14 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if next.busy != "" && model.busy == "" {
 		next.busyStarted = time.Now()
 	}
-	if model.areaReturn != dashboardHome && model.screen != model.areaReturn && next.screen == dashboardHome {
-		next.screen = model.areaReturn
+	if model.navigation.areaReturn != dashboardHome && model.screen != model.navigation.areaReturn && next.screen == dashboardHome {
+		next.screen = model.navigation.areaReturn
 	}
 	if model.returnAdmin && model.screen != dashboardAdministration && next.screen == dashboardHome {
 		next.screen = dashboardAdministration
 	}
 	if next.screen != model.screen {
-		next.pageScroll = 0
+		next.navigation.pageScroll = 0
 	}
 	if next.screen == dashboardHome && !next.initializing && !next.initialError {
 		switch message.(type) {
@@ -117,7 +117,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if next.screen == dashboardHome {
 		next.returnAdmin = false
-		next.areaReturn = dashboardHome
+		next.navigation.areaReturn = dashboardHome
 	}
 	return next, command
 }
@@ -172,7 +172,7 @@ func (model dashboardModel) openUSBInstallation() (tea.Model, tea.Cmd) {
 	if model.actions.LoadRemoteInstall == nil {
 		return model.beginComputerInstallation(domain.RemoteInstallUSBSSH)
 	}
-	model.areaReturn = dashboardInstallationArea
+	model.navigation.areaReturn = dashboardInstallationArea
 	model.busy = "Checking for an existing USB installation operation"
 	model.message = ""
 	return model.startRead(func(ctx context.Context) tea.Msg {
@@ -205,7 +205,7 @@ func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstal
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	model.installation.pxeProgress = domain.OperationProgress{}
-	model.areaReturn = dashboardInstallationArea
+	model.navigation.areaReturn = dashboardInstallationArea
 	model.screen = dashboardSettings
 	model.busy = "Loading laboratory settings"
 	model.message = ""
@@ -511,7 +511,7 @@ func (model dashboardModel) loadControllerProgress(id uint64) tea.Cmd {
 }
 
 func (model dashboardModel) View() tea.View {
-	if model.inventory.cancel != nil && !model.helpOpen {
+	if model.inventory.cancel != nil && !model.navigation.helpOpen {
 		view := tea.NewView(model.frame(model.renderShell(tuiShell{
 			path:    []string{"Computers"},
 			body:    model.busyView(),
@@ -520,7 +520,7 @@ func (model dashboardModel) View() tea.View {
 		view.AltScreen = true
 		return view
 	}
-	if model.helpOpen {
+	if model.navigation.helpOpen {
 		view := tea.NewView(model.frame(model.helpView()))
 		view.AltScreen = true
 		return view

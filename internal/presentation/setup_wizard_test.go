@@ -764,8 +764,8 @@ func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 
 	updated, command := model.Update(tea.KeyPressMsg{Text: "y"})
 	model = updated.(dashboardModel)
-	if command == nil || model.setupKeysReturn != dashboardSettings {
-		t.Fatalf("advanced key settings did not open: return=%d", model.setupKeysReturn)
+	if command == nil || model.keys.back != dashboardSettings {
+		t.Fatalf("advanced key settings did not open: return=%d", model.keys.back)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -773,10 +773,10 @@ func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 	if loads != 1 || model.screen != dashboardSetupKeys || !strings.Contains(demoANSI.ReplaceAllString(view, ""), "Maintenance  /  Settings  /  Advanced  /  Controller keys") || !strings.Contains(view, "Import") {
 		t.Fatalf("existing-key import is not in advanced settings: loads=%d screen=%d\n%s", loads, model.screen, view)
 	}
-	model.setupKeyCursor = 1
+	model.keys.cursor = 1
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "i"})
 	model = updated.(dashboardModel)
-	if !model.setupKeyImporting || !strings.Contains(model.View().Content, "Import existing administrator SSH private key") {
+	if !model.keys.importing || !strings.Contains(model.View().Content, "Import existing administrator SSH private key") {
 		t.Fatalf("advanced import did not start:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -792,8 +792,8 @@ func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
 	importedName, importedPath := "", ""
 	model := experienceFixture(t, 2)
 	model.screen = dashboardSetupKeys
-	model.setupKeyCursor = 1
-	model.setupKeys = domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{
+	model.keys.cursor = 1
+	model.keys.report = domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{
 		{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
 		{Name: "ssh", Problem: "private and public keys are missing"},
 	}}
@@ -807,7 +807,7 @@ func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
 
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "i"})
 	model = updated.(dashboardModel)
-	if !model.setupKeyImporting || !strings.Contains(model.View().Content, "leaves the source unchanged") {
+	if !model.keys.importing || !strings.Contains(model.View().Content, "leaves the source unchanged") {
 		t.Fatalf("import explanation missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "/secure/existing-admin-key"})

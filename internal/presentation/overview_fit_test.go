@@ -10,7 +10,7 @@ import (
 func overviewFitFixture(t testing.TB, width, height int) dashboardModel {
 	m := experienceFixture(t, 2)
 	m.actions.Assistant = domain.AssistantConfig{Enabled: true}
-	m.recovery.Conditions = []domain.BlockingCondition{
+	m.recovery.report.Conditions = []domain.BlockingCondition{
 		{Kind: domain.RecoveryBackupDue, Title: "A backup of this laboratory is due", Detail: "No backup has been made yet."},
 		{Kind: domain.RecoveryDeferredUpdates, Title: "Queued updates: 1 computer needs attention", Detail: "Their configuration changed after queueing, or the last attempt failed; open the queue to review them."},
 	}
@@ -31,7 +31,7 @@ func TestOverviewShowsEveryAreaWhenItFits(t *testing.T) {
 		}
 	}
 	m := overviewFitFixture(t, 90, 30)
-	m.recovery.Conditions = nil
+	m.recovery.report.Conditions = nil
 	view := demoANSI.ReplaceAllString(m.View().Content, "")
 	if !strings.Contains(view, "Choose an area with the arrows or its letter.") {
 		t.Fatalf("overview lacks the generic subtitle:\n%s", view)

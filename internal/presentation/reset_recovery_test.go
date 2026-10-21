@@ -192,7 +192,7 @@ func TestUpdateResultOffersTheResetRecovery(t *testing.T) {
 		t.Fatalf("d did not reveal the raw text:\n%s", view)
 	}
 	review := runRead(model.Update(keyPress("enter")))
-	if review.screen != dashboardRecoveryReview || review.recoveryReview.kind != "reset" || !contains(plainView(review), "Only the branch move is missing") {
+	if review.screen != dashboardRecoveryReview || review.recovery.review.kind != "reset" || !contains(plainView(review), "Only the branch move is missing") {
 		t.Fatalf("Enter did not open the reset review (screen %d):\n%s", review.screen, plainView(review))
 	}
 	back := cleanupPress(t, review, keyPress("esc"))

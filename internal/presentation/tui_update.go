@@ -21,13 +21,13 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model.updateDisclaimer(key)
 	}
 	if !ok {
-		if model.screen == dashboardAssistant && !model.helpOpen && model.assistant.state == "chat" {
+		if model.screen == dashboardAssistant && !model.navigation.helpOpen && model.assistant.state == "chat" {
 			var command tea.Cmd
 			model.assistant.input, command = model.assistant.input.Update(message)
 			return model, command
 		}
 		if paste, pasted := message.(tea.PasteMsg); pasted && model.screen == dashboardAssistant &&
-			!model.helpOpen && model.assistant.state == "name" {
+			!model.navigation.helpOpen && model.assistant.state == "name" {
 			var command tea.Cmd
 			model.assistant.labName, command = model.assistant.labName.Update(tea.PasteMsg{Content: strings.Join(strings.Fields(paste.Content), " ")})
 			return model, command
@@ -35,7 +35,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		// Activation codes are usually pasted from the email: accept the paste,
 		// without surrounding spaces or line breaks.
 		if paste, pasted := message.(tea.PasteMsg); pasted && model.screen == dashboardAssistant &&
-			!model.helpOpen && model.assistant.state == "activate" {
+			!model.navigation.helpOpen && model.assistant.state == "activate" {
 			var command tea.Cmd
 			model.assistant.codeStep = true
 			focus := model.assistant.code.Focus()
@@ -52,7 +52,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			model.ensureHomeMenu()
 			model.homeMenu, _ = model.homeMenu.update(message)
 		}
-		if paste, pasted := message.(tea.PasteMsg); pasted && model.screen == dashboardWorkspace && !model.helpOpen &&
+		if paste, pasted := message.(tea.PasteMsg); pasted && model.screen == dashboardWorkspace && !model.navigation.helpOpen &&
 			model.workspace.stage == workspaceFieldEdit && model.workspace.field.kind == "settings" {
 			model.message = model.workspace.settings.paste(paste.Content)
 		}
@@ -72,43 +72,43 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		}
 		return model, nil
 	}
-	if model.busy == "" && !model.helpOpen && model.screen == dashboardSettings && key.String() != "f1" && (model.settings.menu.list.FilterState() == list.Filtering || (model.settings.menu.list.FilterState() == list.FilterApplied && key.String() == "esc")) {
+	if model.busy == "" && !model.navigation.helpOpen && model.screen == dashboardSettings && key.String() != "f1" && (model.settings.menu.list.FilterState() == list.Filtering || (model.settings.menu.list.FilterState() == list.FilterApplied && key.String() == "esc")) {
 		var command tea.Cmd
 		model.settings.menu, command = model.settings.menu.update(key)
 		return model, command
 	}
-	if model.helpOpen {
+	if model.navigation.helpOpen {
 		if model.screen == dashboardAssistant && (model.assistant.state == "chat" || model.assistant.state == "running") {
 			switch key.String() {
 			case "down":
-				model.pageScroll++
+				model.navigation.pageScroll++
 			case "up":
-				model.pageScroll = max(0, model.pageScroll-1)
+				model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 			case "pgdown":
-				model.pageScroll += max(1, model.height-5)
+				model.navigation.pageScroll += max(1, model.height-5)
 			case "pgup":
-				model.pageScroll = max(0, model.pageScroll-max(1, model.height-5))
+				model.navigation.pageScroll = max(0, model.navigation.pageScroll-max(1, model.height-5))
 			case "home":
-				model.pageScroll = 0
+				model.navigation.pageScroll = 0
 			case "end":
-				model.pageScroll = len(strings.Split(assistantHelpText, "\n"))
+				model.navigation.pageScroll = len(strings.Split(assistantHelpText, "\n"))
 			}
 		}
 		if key.String() == "?" || key.String() == "f1" || key.String() == "esc" {
-			model.helpOpen = false
-			model.pageScroll = 0
+			model.navigation.helpOpen = false
+			model.navigation.pageScroll = 0
 		}
 		if key.String() == "shift+down" {
-			model.pageScroll++
+			model.navigation.pageScroll++
 		}
 		if key.String() == "shift+up" {
-			model.pageScroll = max(0, model.pageScroll-1)
+			model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 		}
 		return model, nil
 	}
 	if key.String() == "f1" || (key.String() == "?" && !model.textEntry()) {
-		model.helpOpen = true
-		model.pageScroll = 0
+		model.navigation.helpOpen = true
+		model.navigation.pageScroll = 0
 		return model, nil
 	}
 	if next, command, handled := model.updateInterfaceReloadKey(key); handled {
@@ -130,11 +130,11 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model.updateTemplateResetKey(key)
 	}
 	if key.String() == "shift+down" {
-		model.pageScroll++
+		model.navigation.pageScroll++
 		return model, nil
 	}
 	if key.String() == "shift+up" {
-		model.pageScroll = max(0, model.pageScroll-1)
+		model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 		return model, nil
 	}
 	if model.read.cancel != nil {
@@ -206,7 +206,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		// With nothing to expand the key is inert: no toggle, no empty view.
 		if model.progressDetailsAvailable() {
 			model.progressDetails = !model.progressDetails
-			model.pageScroll = 0
+			model.navigation.pageScroll = 0
 		}
 		return model, nil
 	}
@@ -290,19 +290,19 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			model.screen = dashboardHome
 			return model, nil
 		case "up", "k":
-			model.adminCursor = max(0, model.adminCursor-1)
+			model.navigation.adminCursor = max(0, model.navigation.adminCursor-1)
 			return model, nil
 		case "down", "j":
-			model.adminCursor = min(len(administrationTasks)-1, model.adminCursor+1)
+			model.navigation.adminCursor = min(len(administrationTasks)-1, model.navigation.adminCursor+1)
 			return model, nil
 		case "enter":
-			key = tea.KeyPressMsg{Code: []rune(administrationTasks[model.adminCursor].shortcut)[0], Text: administrationTasks[model.adminCursor].shortcut}
+			key = tea.KeyPressMsg{Code: []rune(administrationTasks[model.navigation.adminCursor].shortcut)[0], Text: administrationTasks[model.navigation.adminCursor].shortcut}
 		}
 		if key.String() == "c" {
 			return model.openControllerReview()
 		}
 		if key.String() == "i" {
-			model.diagnosticReturn = dashboardAdministration
+			model.diagnostics.back = dashboardAdministration
 			model.screen = dashboardDiagnostics
 			return model.startDiagnostics()
 		}
@@ -319,7 +319,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model.openMaintenanceTask(key.String())
 	}
 	if key.String() == "i" && model.screen == dashboardHosts && !model.actions.ClassroomMode {
-		model.diagnosticReturn = model.screen
+		model.diagnostics.back = model.screen
 		model.screen = dashboardDiagnostics
 		return model.startDiagnostics()
 	}
