@@ -11,8 +11,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 // Compiled separately from the product; documentation is read at runtime so
