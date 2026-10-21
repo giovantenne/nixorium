@@ -216,11 +216,22 @@ func (model dashboardModel) helpView() string {
 		return assistantHelpText
 	}
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm what is on screen", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
+	text, known := screenHelp[model.screen]
+	if !known {
+		text = helpText{head: []string{"Follow the contextual controls and review before applying.", "Text fields keep their normal typing keys; F1 opens help."}}
+	}
+	lines = append(lines, text.head...)
+	lines = append(lines, model.dynamicHelp()...)
+	lines = append(lines, text.tail...)
+	lines = append(lines, "", tuiMuted("Questions or feedback: hello@nixorium.org · nixorium.org", model.isDark))
+	return strings.Join(append(lines, "", "Esc / ? / F1 close help"), "\n")
+}
+
+// dynamicHelp returns the help lines that depend on model state; the static
+// text of every screen lives in screenHelp.
+func (model dashboardModel) dynamicHelp() []string {
+	lines := []string{}
 	switch model.screen {
-	case dashboardManagedJobs:
-		lines = append(lines, "Tab switches between controller and PXE jobs; status refreshes automatically.", "Esc leaves this read-only view; quitting does not cancel a managed job.", "Interrupted means a running progress record has no running unit.", "Inspect the named journal unit, then request a fresh review before retrying.", "Completion here is not verification of the current configuration.")
-	case dashboardHostTrust:
-		lines = append(lines, "Compare the offered fingerprint with this computer's physical console.", "Only a deliberately reinstalled client is eligible for reviewed key rotation.", "Esc cancels the read or review without changes; saving cannot be interrupted.")
 	case dashboardHome:
 		lines = append(lines, taskHelp(model.homeAreas())...)
 		if model.updateNotification.Key != "" {
@@ -229,9 +240,6 @@ func (model dashboardModel) helpView() string {
 		if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
 			lines = append(lines, "v  See work already running or finished (nothing is started)")
 		}
-	case dashboardAssistantReview:
-		lines = append(lines, "Choose Technical details to scroll the full comparison.", "Save and update the controller (Ctrl+R, then Enter) saves a local commit and a backup, updates this controller, then lets you choose the computers.", "Save only keeps the change; update computers later from Computers → Update computers. Esc goes back.")
-		lines = append(lines, "After saving, update one computer first and check it before the others.")
 	case dashboardAssistant:
 		switch model.assistant.state {
 		case "welcome":
@@ -253,28 +261,18 @@ func (model dashboardModel) helpView() string {
 		default:
 			lines = append(lines, "Enter Send; Alt+Enter or Ctrl+J New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back", "/review Review proposal; /new New chat; /report Report this answer", "/share Save conversations; /name Laboratory name; /help Help; /code Activation code")
 		}
-		lines = append(lines, "Messages and files leave the controller only after subscription and consent checks.")
 	case dashboardComputersArea:
 		lines = append(lines, taskHelp(model.availableComputerTasks())...)
 	case dashboardInstallationArea:
 		lines = append(lines, taskHelp(installationAreaTasks)...)
-		lines = append(lines, "r  Reattach the recorded USB operation when available")
-	case dashboardUSBInstall:
-		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.",
-			"An unfinished installation says what Nixorium found (does the computer answer, was the disk touched) and what you can do: a resumes it, n checks how far it got, b restarts the installed computer, v checks the installed system.",
-			"x cancels safely and c closes the record; both ask only for Enter when the disk was not touched. Closing after the disk was written asks you to type CLOSE.")
-		lines = append(lines, "While the installer job runs the view refreshes by itself with read-only status requests. d shows the raw result fields.")
-		lines = append(lines, "A failed connection's original error remains visible across status refreshes in this TUI session.")
 	case dashboardAdministration:
 		lines = append(lines, taskHelp(administrationTasks)...)
 	case dashboardHosts:
-		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail", "Search owns all text keys until Enter or Esc.")
 		if !model.actions.ClassroomMode {
 			lines = append(lines, "d review a deployment for the focused computer", "u review updating every computer that needed it at the last check")
 			lines = append(lines, "h review changed SSH trust in a computer's details, after verifying its physical fingerprint")
 		}
 	case dashboardDeploy:
-		lines = append(lines, "Review probes only selected computers; it does not prove power state or authenticated identity.", "Results list each computer; Shift+arrows scroll long results and l opens private logs.")
 		if model.deployment.usbRecovery != nil {
 			lines = append(lines, "Enter runs the visible recovery action; it never starts deployment.",
 				"For an installed computer awaiting its final check: turn it on, boot from its disk, and connect the network cable.",
@@ -283,112 +281,25 @@ func (model dashboardModel) helpView() string {
 			break
 		}
 		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details when there are any; s review stopping local supervision; q cannot interrupt", "Stopping asks for Enter on its own review; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers, or the review of an interrupted update   d technical details")
-	case dashboardBackup:
-		lines = append(lines, "Backup is optional and never blocks installation or updates. Choose an encrypted file or a private Git repository.",
-			"An encrypted file contains the entire deployment and Git history. Mount the USB first, choose an existing folder outside the deployment, and enter a passphrase of at least 12 characters. Review, then Enter creates the archive.",
-			"For Git, use the SSH URL of a PRIVATE GitHub/GitLab repository. Configure an independent SSH key/agent and verify the host fingerprint outside Nixorium first.",
-			"The first Git backup reviews committed files, encrypts recovery keys, then pushes when you press Enter after confirming the repository is private. The remote branch is verified after sending; rejected or uncertain pushes are not backups.",
-			"Afterwards saved changes are pushed automatically while Nixorium is open, without the passphrase. Back up now pushes immediately. When keys, account passwords or trusted computers change, the passphrase is asked again.",
-			"For Git backups, configuration and Git history remain readable; private keys and managed account password hashes are encrypted. Other ignored files are excluded. Review custom files for credentials before committing.",
-			"Keep the passphrase and Git access separately. Changing the passphrase does not re-encrypt older Git history.",
-			"Restore lab needs a NEW absolute directory and preserves original keys. Existing trusted keys must match; empty stores are filled. It never activates the restored configuration.",
-			"Restore lab accepts a backup file or a Git backup. Without an existing deployment, nixorium backup clone opens the same screen.")
 	case dashboardCleanup:
-		lines = append(lines, "Space select   a select all   Enter review   Esc Maintenance",
-			fmt.Sprintf("Each computer keeps its newest %d system versions plus the running and booted ones; the review lists what goes.", domain.CleanupKeepGenerations),
-			"Type CLEAN on the review to start. Computers that are off are never queued. After the result: n new review.")
-	case dashboardShare:
-		lines = append(lines, "Type the path of a file or folder (it starts at your home), Enter; then Space selects clients, a selects all, Enter reviews and Enter sends.", "A folder arrives with its name and contents; hidden files and links inside it are left out; at most 2000 items and 500 MB. Students get their own copy, never executable; existing names are kept as \"name (2)\".", "Computers that are off or have nobody signed in are listed and skipped. A restart empties the student's home.")
-	case dashboardNetworkChange:
-		lines = append(lines, "Type the new network as address/prefix, for example 10.1.0.0/24, then Enter reviews it. Every computer keeps its number.",
-			"The review checks every computer: c continues without those that are off (they move when they are next updated, or are queued). Enter saves the step; no computer changes yet.",
-			"Then apply to the controller (it answers on both networks) and update the computers (each moves to its new address), each with its own review confirmed with Enter.",
-			"During the change Enter opens the next step; f finishes when every computer is on the new network; u undoes the change, which is possible until it is finished.",
-			"After finishing, prepare network installation again before installing a computer by PXE.")
-	case dashboardDeferredUpdates:
-		lines = append(lines, "These computers were off when an update was reviewed. Every minute the controller updates those that answer, together, with the same build, check and record as Update computers.", "A computer marked as changed is not updated: the configuration moved on after queueing. Review the update again.", "x removes the selected computer, X removes all; they keep their current system. r refreshes.")
-	case dashboardLock:
-		lines = append(lines, "Space select clients; a select all; Tab choose lock or unlock; Enter review, then Enter applies.", "A locked screen shows \"Eyes on the teacher\" and ignores keyboard and mouse; logging out or restarting unlocks it.", "Computers that are off or have nobody signed in are listed and skipped.")
-	case dashboardInternet:
-		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "r checks Internet access on all clients (read-only); n selects those the chosen action would change.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
-	case dashboardDeployReview:
-		lines = append(lines, "The availability shown is a brief SSH-port check, not authenticated identity or proof of power state.", "A failed or interrupted update may require recovery before another operation.", "F3, when some computers did not answer, chooses whether they update automatically when switched on (Computers → Queued updates) or are skipped.", "F2, when offered, creates a new review for only the reachable computers with an open SSH port.", "The new review requires a fresh DEPLOY confirmation; it never starts automatically.", "Esc during replanning keeps the original review and clears its confirmation.")
+		lines = append(lines, fmt.Sprintf("Each computer keeps its newest %d system versions plus the running and booted ones; the review lists what goes.", domain.CleanupKeepGenerations))
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
-		lines = append(lines, "Space select   a select/deselect all   n select those on at the last check   r check computers   Tab shutdown/restart   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state or a completed restart.")
 		if model.actions.PlanWake != nil {
 			lines = append(lines, "Tab also chooses Switch on: a Wake-on-LAN packet for the selected computers that are off and whose network address the controller has learned; n then selects those off at the last check.", "A sent packet does not prove that a computer starts: Wake-on-LAN must be allowed in its firmware.")
 		}
-	case dashboardSetup:
-		lines = append(lines, "Enter continue the observed stage   t full checklist")
 	case dashboardSettings:
 		for _, group := range routineSettingsGroups {
 			lines = append(lines, group.shortcut+"  "+group.label)
 		}
-		lines = append(lines, "y  Controller keys", "/  Search categories; Esc clears the search before leaving")
-		lines = append(lines, "Accounts opens a small menu: n changes the teacher and student user names, p changes account passwords.")
-		lines = append(lines, "After saving, Enter opens a separate controller review; after verified application it opens client selection. Esc leaves the result.")
-	case dashboardWorkspace:
-		lines = append(lines,
-			"Choose Desktop, Dock, VSCode or Browser, then a supported field. Initial files opens the shared student-home content editor.",
-			"Inherit keeps the deployment baseline; Clear means an explicit empty list.",
-			"In a list: Space toggles, i inherits, c clears; Shift arrows reorder favorites.",
-			"Extensions: / searches all extensions available in this laboratory’s package versions.",
-			"Dependencies of searched extensions are checked when the system is built.",
-			"m downloads one Marketplace extension (publisher.name) into the controller's store and shows it before adding;",
-			"u looks for Marketplace extension updates compatible with your VS Code version. Both actions need Internet.",
-			"Enter keeps a field in the draft; Esc cancels that field edit.",
-			"Other settings: a adds a name and value, e edits, d removes, p takes a pasted settings file.",
-			"Guided fields, update settings and settings that can start programs cannot be added there.",
-			"v reviews the complete draft, dependencies and student destinations.",
-			"Enter on the review saves and records just the workspace profile locally.",
-			"Enter then opens a separate controller review. Runtime opt-in, deployment and home reset are never automatic.",
-			"A partial save opens Git review for inspection; do not replay the old save or apply systems before recovery.")
-		lines = append(lines, "Packaged extension updates use Maintenance → Update system and packages, which can also change the editor, desktop and operating system.")
-	case dashboardHomeFiles:
-		lines = append(lines,
-			"a imports a local controller file or directory; Tab completes the source path. Destinations are relative to the student's home.",
-			"Choose non-secret educational materials. Imported copies enter the configuration, Nix store, installer and cache; never import keys or credentials.",
-			"Review every captured file and empty directory. Space changes executability for the selected file; the default is off.",
-			"u chooses a source again for the selected file or directory; d removes its declaration. The original source path is never saved.",
-			"Files are owned by the student: 0600 normally, 0700 when executable; directories 0700. Source permissions, ACLs, attributes and links are not inherited.",
-			"The student can edit these files and their modes during the session. Saving records only the reviewed copies locally.",
-			"v reviews the complete draft; Enter on the review saves and records it. Computer application is separate, and the home is restored on the next boot.",
-			"Esc cancels reads and drafts. Cancelled or late reads cannot save. A partial save requires Git inspection before system application.")
-	case dashboardTemplateReset:
-		lines = append(lines,
-			"Choose a software preset from the exact framework revision already locked in this deployment.",
-			"Review all removed/replaced paths with arrows or Page Up/Down; no file contents are exposed.",
-			"Existing custom software, home preferences, assets and modules are replaced, not merged.",
-			"Settings, lock, keys, ignore rules and untracked files are preserved; collisions block the reset.",
-			"Type RESET DEPLOYMENT and Enter to create a backup and a local reset commit. Esc cancels review.",
-			"The guided home is enabled in configuration only. Apply systems and reboot separately; no push.",
-			"The result offers a separate controller review, then client selection after verified application. Esc leaves without applying.",
-			"An interrupted reset requires recovery; preserve the backup ref and .git/nixorium-template-reset.json.")
-	case dashboardSettingsReview:
-		lines = append(lines,
-			"Enter saves the reviewed settings; Esc cancels without changing any file.",
-			"Network check: after a change of network device or controller DHCP address, Nixorium reads the controller's devices and asks each computer that answers whether it has the named device. Nothing is changed.",
-			"A device the controller does not have blocks the save. A device missing on a computer that answers blocks it until you press c to save anyway for the computers listed; c again undoes that.",
-			"Computers that do not answer are listed: check them at their screen. Update one computer first and check it answers before updating the others.")
-	case dashboardSettingsAccounts:
-		lines = append(lines,
-			"n  Change account names: edit the teacher and student user names, then review and save.",
-			"p  Change account passwords: choose the administrator, teacher or student account.",
-			"A new password takes effect only after you apply the configuration to this controller and then update the computers.",
-			"Esc returns to Settings.")
 	case dashboardSettingsPasswords:
-		lines = append(lines, "a  Administrator", "t  Teacher", "s  Student", "Selecting an account opens protected password input; it does not save changes.")
 		if model.settings.returnScreen != dashboardSetup && !model.installation.flow {
 			lines = append(lines, "After review and save, apply the configuration to this controller, then update the computers. Esc returns to Accounts.")
 		}
 	case dashboardPXE:
-		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   r refresh", "l progress details while preparing, when there are details; q closes only the view")
 		if pxeRecoveryMode(model.report.PXE.Mode) {
 			lines = append(lines, "After an interrupted network installation, Enter recovers the network: it puts back the controller's normal address and turns network installation off. Nothing changes on the student computers, so no word needs typing.",
 				"x stops both network installation services instead and checks the normal address. d shows the technical text of a failed attempt.")
 		}
-	case dashboardController:
-		lines = append(lines, "n new review   d result details   l logs / progress detail", "q closes the view; systemd-owned work continues")
 	case dashboardRecoveryReview:
 		if model.recoveryReview.kind == "deploy" {
 			lines = append(lines, "r check every computer again   c continue without the computers that do not answer (c again includes them)",
@@ -399,41 +310,18 @@ func (model dashboardModel) helpView() string {
 				"When the reset had finished, only the branch move is missing, or nothing was replaced, Enter confirms: no file changes and the marker is archived.",
 				"When files from before and after the reset are mixed, type RESTORE: the current files are saved under a recovery reference and the previous configuration comes back; untracked and ignored files are not removed.")
 		}
-	case dashboardServices:
-		lines = append(lines, "c review cache restart   r refresh   l logs after result")
-	case dashboardLogs, dashboardLogDetail:
-		lines = append(lines, "Enter open log   r refresh list   ↑/↓/pg scroll detail")
-	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview, dashboardGitUndoReview:
-		lines = append(lines, "c select commit paths   x discard changes   u undo the last saved change   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "Enter on a commit review creates a local commit; DISCARD (typed) restores files after saving their content; Enter on the undo review saves a new change that puts the files of the last saved change back. Nothing is pushed and no computer changes.", "After an undo, Enter on the result opens Apply to controller; then update the computers.")
 	case dashboardUpdate, dashboardUpdateReview:
-		lines = append(lines, "During validation: l expands or collapses current check details in place, when there are details.")
 		if model.updates.packageBase {
 			lines = append(lines, "Enter check current channel   m change channel   r inspect pin", "In the channel form, type nixos-YY.MM and Space to acknowledge unverified compatibility.", "Review/build precedes saving and controller activation. Client distribution is separate.", "Build success does not verify runtime or hardware; check boot and services afterwards.")
 		} else {
 			lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation prepares the selected version, checks the lab configuration and tests required systems without saving it.", "On the review, Enter saves and activates; Esc cancels.", "After result: n new update; s completes an interrupted save")
 		}
 	case dashboardDiagnostics:
-		lines = append(lines, "↑/↓ move   Enter technical evidence   r run checks again")
 		if model.actions.PreviewSupport != nil && !model.actions.ClassroomMode {
 			lines = append(lines, "e  Preview a minimized support report; no save or upload yet")
 		}
-	case dashboardTelemetry:
-		lines = append(lines, "Optional daily adoption statistics. e or Enter on the overview shares statistics; n declines or disables sharing.", "p opens the local exact report; i opens Privacy & retention. Arrow keys scroll; r refreshes local settings.", "Esc returns from details, or skips the first invitation to the menu without deciding. It returns next launch until you accept or decline. q exits. Opening this screen uploads no adoption report.", "After the first invitation, change your choice in Maintenance → Adoption statistics.")
-	case dashboardSupport:
-		lines = append(lines, "↑/↓, PgUp/PgDown, Home/End scroll the exact filtered JSON.",
-			"Enter saves this preview to a private local file; nothing is uploaded.",
-			"Esc cancels collection or leaves without saving. r collects a fresh preview.",
-			"Versions, revision, time and counts remain visible. Review before sharing.",
-			"Unavailable sections are not healthy results. Detailed logs are not included.")
-	case dashboardSoftware:
-		lines = append(lines, "F2 selected   F3 package search   F4 suggestions   Tab next view", "p add a deployment-owned profile   / search",
-			"Configured software: Enter opens details; from there, c changes its computers and x reviews removal.", "Profile packages: Space include/exclude   Enter choose computers and review", "A profile adds a group of packages; existing packages keep their destinations.")
-		lines = append(lines, "After saving: Enter takes the displayed next step; Esc leaves it for later. Client deployment always has its own review and confirmation.")
-	default:
-		lines = append(lines, "Follow the contextual controls and review before applying.", "Text fields keep their normal typing keys; F1 opens help.")
 	}
-	lines = append(lines, "", tuiMuted("Questions or feedback: hello@nixorium.org · nixorium.org", model.isDark))
-	return strings.Join(append(lines, "", "Esc / ? / F1 close help"), "\n")
+	return lines
 }
 
 func (model dashboardModel) diagnosticsView() string {
