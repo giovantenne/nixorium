@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -55,4 +56,17 @@ func runCleanupCommand(ctx context.Context, repository string, options options, 
 		return 1
 	}
 	return 0
+}
+
+// validateCleanup rejects option combinations that do not belong to the command.
+func validateCleanup(result *options) error {
+	if result.command == "cleanup" {
+		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" {
+			return errors.New("cleanup requires plan or apply and --on <controller,pcNN,...|@lab>")
+		}
+		if result.subcommand == "apply" && result.expect == "" {
+			return errors.New("cleanup apply requires --expect from cleanup plan")
+		}
+	}
+	return nil
 }

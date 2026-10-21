@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -164,4 +165,21 @@ func runGitDiscardApply(ctx context.Context, manager *app.GitDiscardManager, rep
 		return 1
 	}
 	return 0
+}
+
+// parseRecoveryWord reads the words that only mean something after recovery.
+func parseRecoveryWord(result *options, word string) (bool, error) {
+	if word == "status" && result.command == "recovery" && result.subcommand == "" {
+		result.subcommand = "status"
+		return true, nil
+	}
+	return false, nil
+}
+
+// validateRecoveryCommand rejects option combinations that do not belong to the command.
+func validateRecoveryCommand(result *options) error {
+	if result.command == "recovery" && result.subcommand != "status" {
+		return errors.New("recovery accepts only the status subcommand")
+	}
+	return nil
 }

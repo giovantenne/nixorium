@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -53,4 +54,17 @@ func runSendCommand(ctx context.Context, options options, stdout, stderr io.Writ
 		return 1
 	}
 	return 0
+}
+
+// validateSend rejects option combinations that do not belong to the command.
+func validateSend(result *options) error {
+	if result.command == "send" {
+		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" || result.file == "" {
+			return errors.New("send requires plan/apply, --file and --on")
+		}
+		if result.subcommand == "apply" && result.expect == "" {
+			return errors.New("send apply requires --expect from send plan")
+		}
+	}
+	return nil
 }

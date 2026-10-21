@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -153,4 +154,73 @@ func runPXECommand(ctx context.Context, repository string, options options, stdo
 		}
 	}
 	return commandOutputError(err, stderr)
+}
+
+// parseSetupFlags reads the setup flags.
+func parseSetupFlags(result *options, arguments []string, index int) (int, bool, error) {
+	switch arguments[index] {
+	case "--verify-only":
+		result.verifyOnly = true
+	default:
+		return index, false, nil
+	}
+	return index, true, nil
+}
+
+// parseSetupWord reads the words that only mean something after setup.
+func parseSetupWord(result *options, word string) (bool, error) {
+	switch word {
+	case "keys":
+		if result.command != "setup" || result.subcommand != "" {
+			return true, errors.New("keys must follow setup")
+		}
+		result.subcommand = "keys"
+		return true, nil
+	case "configure":
+		if result.command != "setup" || result.subcommand != "" {
+			return true, errors.New("configure must follow setup")
+		}
+		result.subcommand = "configure"
+		return true, nil
+	case "install-secrets":
+		if result.command != "setup" || result.subcommand != "" {
+			return true, errors.New("install-secrets must follow setup")
+		}
+		result.subcommand = "install-secrets"
+		return true, nil
+	case "status":
+		if result.command == "setup" && result.subcommand == "" {
+			result.subcommand = "status"
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// validateVerifyOnly rejects option combinations that do not belong to the command.
+func validateVerifyOnly(result *options) error {
+	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
+		return errors.New("--verify-only is only valid with setup keys")
+	}
+	return nil
+}
+
+// validateSetupCommand rejects option combinations that do not belong to the command.
+func validateSetupCommand(result *options) error {
+	if result.command == "setup" && result.subcommand == "" {
+		result.subcommand = "configure"
+		result.guided = true
+	}
+	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" && result.subcommand != "configure" && result.subcommand != "install-secrets" && result.subcommand != "apply" {
+		return errors.New("setup requires configure, status, keys, install-secrets, or apply")
+	}
+	return nil
+}
+
+// validateSetupInteractive rejects option combinations that do not belong to the command.
+func validateSetupInteractive(result *options) error {
+	if result.command == "setup" && result.subcommand == "configure" && result.json {
+		return errors.New("--json is not valid with interactive setup configure")
+	}
+	return nil
 }

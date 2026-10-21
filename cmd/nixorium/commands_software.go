@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -169,4 +170,131 @@ func runSoftwareCommand(ctx context.Context, repository string, options options,
 		return 1
 	}
 	return 0
+}
+
+// parseSoftwareFlags reads the software plan/apply flags.
+func parseSoftwareFlags(result *options, arguments []string, index int) (int, bool, error) {
+	switch arguments[index] {
+	case "--package":
+		index++
+		if index >= len(arguments) || arguments[index] == "" {
+			return index, true, errors.New("--package requires a catalog identifier")
+		}
+		result.softwarePackage = arguments[index]
+	case "--preset":
+		index++
+		if index >= len(arguments) || arguments[index] == "" {
+			return index, true, errors.New("--preset requires a software profile id")
+		}
+		result.softwarePreset = arguments[index]
+	case "--exclude":
+		index++
+		if index >= len(arguments) || arguments[index] == "" {
+			return index, true, errors.New("--exclude requires comma-separated package ids")
+		}
+		result.softwareExclude = arguments[index]
+	case "--query":
+		index++
+		if index >= len(arguments) || arguments[index] == "" {
+			return index, true, errors.New("--query requires a package-name fragment")
+		}
+		result.softwareQuery = arguments[index]
+	case "--scope":
+		index++
+		if index >= len(arguments) || arguments[index] == "" {
+			return index, true, errors.New("--scope requires shared, controller, all-clients, group:NAME, or clients:pcNN,...")
+		}
+		result.softwareScope = arguments[index]
+	case "--remove":
+		result.remove = true
+	default:
+		return index, false, nil
+	}
+	return index, true, nil
+}
+
+// parseSoftwareWord reads the words that only mean something after software.
+func parseSoftwareWord(result *options, word string) (bool, error) {
+	switch word {
+	case "catalog":
+		if result.command != "software" || result.subcommand != "" {
+			return true, errors.New("catalog must follow software")
+		}
+		result.subcommand = "catalog"
+		return true, nil
+	case "presets":
+		if result.command != "software" || result.subcommand != "" {
+			return true, errors.New("presets must follow software")
+		}
+		result.subcommand = "presets"
+		return true, nil
+	case "preset":
+		if result.command != "software" || result.subcommand != "" {
+			return true, errors.New("preset must follow software")
+		}
+		result.subcommand = "preset"
+		return true, nil
+	case "search":
+		if result.command != "software" || result.subcommand != "" {
+			return true, errors.New("search must follow software")
+		}
+		result.subcommand = "search"
+		return true, nil
+	case "plan":
+		if result.command == "software" && result.subcommand == "preset" {
+			result.subcommand = "preset-plan"
+			return true, nil
+		}
+	case "apply":
+		if result.command == "software" && result.subcommand == "preset" {
+			result.subcommand = "preset-apply"
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// validateSoftware rejects option combinations that do not belong to the command.
+func validateSoftware(result *options) error {
+	if result.command == "software" && result.subcommand != "catalog" && result.subcommand != "search" && result.subcommand != "presets" && result.subcommand != "plan" && result.subcommand != "apply" && result.subcommand != "preset-plan" && result.subcommand != "preset-apply" {
+		return errors.New("software requires catalog, search, presets, plan, apply, preset plan, or preset apply")
+	}
+	if result.command == "software" && result.subcommand == "search" && result.softwareQuery == "" {
+		return errors.New("software search requires --query")
+	}
+	if result.command == "software" && (result.subcommand == "plan" || result.subcommand == "apply") && (result.softwarePackage == "" || result.softwareScope == "") {
+		return fmt.Errorf("software %s requires --package and --scope", result.subcommand)
+	}
+	if result.command == "software" && (result.subcommand == "plan" || result.subcommand == "apply") {
+		if _, err := parseSoftwareScope(result.softwareScope); err != nil {
+			return err
+		}
+	}
+	if result.command == "software" && (result.subcommand == "preset-plan" || result.subcommand == "preset-apply") && (result.softwarePreset == "" || result.softwareScope == "") {
+		return fmt.Errorf("software %s requires --preset and --scope", strings.ReplaceAll(result.subcommand, "-", " "))
+	}
+	if result.command == "software" && (result.subcommand == "preset-plan" || result.subcommand == "preset-apply") {
+		if _, err := parseSoftwareScope(result.softwareScope); err != nil {
+			return err
+		}
+	}
+	if (result.softwarePackage != "" || result.remove) && (result.command != "software" || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return errors.New("--package and --remove are only valid with software plan or apply")
+	}
+	if result.softwareScope != "" && (result.command != "software" || (result.subcommand != "plan" && result.subcommand != "apply" && result.subcommand != "preset-plan" && result.subcommand != "preset-apply")) {
+		return errors.New("--scope is only valid with software plan/apply or software preset plan/apply")
+	}
+	if (result.softwarePreset != "" || result.softwareExclude != "") && (result.command != "software" || (result.subcommand != "preset-plan" && result.subcommand != "preset-apply")) {
+		return errors.New("--preset and --exclude are only valid with software preset plan or apply")
+	}
+	if result.softwareQuery != "" && (result.command != "software" || result.subcommand != "search") {
+		return errors.New("--query is only valid with software search")
+	}
+	if result.command == "software" && result.subcommand == "apply" && result.expect == "" {
+		return errors.New("software apply requires --expect from software plan")
+	}
+	if result.command == "software" && result.subcommand == "preset-apply" && result.expect == "" {
+		return errors.New("software preset apply requires --expect from software preset plan")
+	}
+	return nil
 }

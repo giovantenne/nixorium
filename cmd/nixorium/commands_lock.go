@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -72,4 +73,19 @@ func runLockCommand(ctx context.Context, repository string, options options, std
 		return 1
 	}
 	return 0
+}
+
+// validateLock rejects option combinations that do not belong to the command.
+func validateLock(result *options) error {
+	if result.command == "lock" {
+		// --action is parsed once; lock reads it as lock or unlock.
+		result.lockAction, result.internetAction = domain.LockAction(result.internetAction), ""
+		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" || !result.lockAction.Valid() {
+			return errors.New("lock requires plan/apply, --on and --action lock/unlock")
+		}
+		if result.subcommand == "apply" && result.expect == "" {
+			return errors.New("lock apply requires --expect from lock plan")
+		}
+	}
+	return nil
 }

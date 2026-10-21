@@ -78,3 +78,29 @@ func runSupportWithManager(ctx context.Context, manager supportCommandManager, r
 	}
 	return 0
 }
+
+// parseSupportWord reads the words that only mean something after support.
+func parseSupportWord(result *options, word string) (bool, error) {
+	switch word {
+	case "preview", "export":
+		if result.command != "support" || result.subcommand != "" {
+			return true, errors.New("preview/export must follow support")
+		}
+		result.subcommand = word
+		return true, nil
+	}
+	return false, nil
+}
+
+// validateSupport rejects option combinations that do not belong to the command.
+func validateSupport(result *options) error {
+	if result.command == "support" {
+		if result.subcommand != "preview" && result.subcommand != "export" {
+			return errors.New("support requires preview or export")
+		}
+		if result.subcommand == "export" && result.json {
+			return errors.New("support export requires interactive review; use support preview --json for machine-readable output")
+		}
+	}
+	return nil
+}
