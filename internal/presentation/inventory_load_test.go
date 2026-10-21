@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -132,5 +133,53 @@ func TestFocusedDeploymentChecksFreshInventory(t *testing.T) {
 		if name == "pc03" && (ready.screen != dashboardHosts || ready.message == "") {
 			t.Fatal("removed identity entered deployment")
 		}
+	}
+}
+
+func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
+	loads := 0
+	actions := DashboardActions{
+		LoadHosts: func(ctx context.Context) (domain.HostsReport, error) {
+			loads++
+			report := domain.HostsReport{State: "partial", Deployment: domain.HostDeploymentSummary{Current: 1, Unknown: 1}, Hosts: []domain.HostStatus{
+				{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent, LastSuccessfulDeploy: &domain.LastSuccessfulDeployment{Revision: "0123456789abcdef", VerifiedAt: time.Date(2026, 9, 14, 10, 30, 0, 0, time.UTC)}},
+				{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown, Deployment: domain.DeploymentUnknown},
+			}}
+			if loads > 1 {
+				report.State = "available"
+				report.Deployment = domain.HostDeploymentSummary{Current: 2}
+				report.Hosts[1].Reachability = domain.ReachabilityReachable
+				report.Hosts[1].SSH = domain.SSHAvailable
+				report.Hosts[1].Deployment = domain.DeploymentCurrent
+			}
+			return report, nil
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	if strings.Contains(model.View().Content, "2 computers configured") || !strings.Contains(model.View().Content, "Maintenance") {
+		t.Fatalf("home should not scan or summarise computers:\n%s", model.View().Content)
+	}
+
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Text: "h"})
+	model = updated.(dashboardModel)
+	if command == nil || !strings.Contains(model.View().Content, "Checking configured computers") {
+		t.Fatalf("opening inventory did not start explicit probe:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHosts || !strings.Contains(model.View().Content, "pc02") || !strings.Contains(model.View().Content, "Could not be reached") || !strings.Contains(model.View().Content, "1 up to date") {
+		t.Fatalf("computer inventory is incomplete:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "r"})
+	model = updated.(dashboardModel)
+	if command == nil || !strings.Contains(model.View().Content, "Refreshing computer status") {
+		t.Fatalf("refresh did not enter busy state:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if loads != 2 || model.screen != dashboardHosts || !strings.Contains(model.View().Content, "2 / 2 reachable") {
+		t.Fatalf("load count = %d, screen = %d:\n%s", loads, model.screen, model.View().Content)
 	}
 }

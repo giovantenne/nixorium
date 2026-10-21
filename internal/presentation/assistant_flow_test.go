@@ -531,19 +531,24 @@ type assistantFlowStore struct {
 func (s *assistantFlowStore) ReadTranscript(domain.AssistantConversation) ([]domain.AssistantMessage, error) {
 	return s.messages, nil
 }
+
 func (s *assistantFlowStore) WriteTranscript(_ domain.AssistantConversation, m []domain.AssistantMessage) error {
 	s.messages = m
 	return nil
 }
+
 func (s *assistantFlowStore) CompleteTurn(domain.AssistantConversation, []domain.AssistantMessage, *string) error {
 	return nil
 }
+
 func (s *assistantFlowStore) VisibleFiles(domain.AssistantConversation) ([]string, error) {
 	return []string{}, nil
 }
+
 func (s *assistantFlowStore) CoreIdentity(domain.AssistantConversation) (*domain.AssistantCore, error) {
 	return nil, nil
 }
+
 func (s *assistantFlowStore) Execute(context.Context, domain.AssistantConversation, domain.AssistantToolCall) string {
 	panic("unexpected tool call in HTTP-only flow test")
 }
@@ -563,6 +568,35 @@ func TestAssistantProposalReadyUsesActualChangeCount(t *testing.T) {
 			if !strings.Contains(m.View().Content, want) || !strings.Contains(m.View().Content, "Ctrl+R to review") {
 				t.Fatal(m.View().Content)
 			}
+		}
+	}
+}
+
+func TestAssistantQuotaHeaderUsesServiceStateAndRecovers(t *testing.T) {
+	for _, test := range []struct{ plan, code, want string }{
+		{"trial", "subscription_inactive", "Free trial ended"},
+		{"trial", "quota_exhausted", "Free trial ended"},
+		{"annual", "subscription_inactive", "Subscription inactive"},
+		{"annual", "quota_exhausted", "No requests left"},
+	} {
+		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("state update sent HTTP") })
+		m.assistant.account = domain.AssistantAccount{Plan: test.plan, Status: "active", TurnsRemaining: 3}
+		updated, _ := m.finishAssistantAccess(assistantAccessMsg{id: m.assistant.id, err: &domain.AssistantError{Code: test.code}})
+		m = updated.(dashboardModel)
+		header := ansi.Strip(m.assistantHeader(76))
+		if !strings.Contains(header, test.want) || strings.Contains(header, "3") || m.assistant.input.Value() != "Synthetic private request" {
+			t.Fatal("header contradicts the unavailable service state", header)
+		}
+		updated, _ = m.newAssistantChat()
+		m = updated.(dashboardModel)
+		if !strings.Contains(m.assistantHeader(76), test.want) {
+			t.Fatal("new chat forgot the known quota state")
+		}
+		account := domain.AssistantAccount{Plan: "annual", Status: "active", TurnsRemaining: 1000}
+		updated, _ = m.finishAssistantAccount(assistantAccountMsg{id: m.assistant.id, token: flowToken, account: &account})
+		m = updated.(dashboardModel)
+		if !strings.Contains(m.assistantHeader(76), "1000 requests left") || m.assistant.accessError != "" {
+			t.Fatal("fresh account did not restore the quota")
 		}
 	}
 }

@@ -357,3 +357,159 @@ func TestHelpShowsContactAddressOnEveryScreen(t *testing.T) {
 		}
 	}
 }
+
+func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
+	current := wizardSettings()
+	planned := 0
+	applied := 0
+	actions := DashboardActions{
+		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
+			return current, nil
+		},
+		PlanSettings: func(ctx context.Context, candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+			planned++
+			if candidate.Lab.StudentGitName != "Lab Student" {
+				t.Fatalf("unexpected settings candidate: %+v", candidate.Lab)
+			}
+			return domain.ConfigPlanReport{
+				Operation:       "config-plan",
+				State:           "valid",
+				BaseFingerprint: "sha256:reviewed",
+				Changes: []domain.SettingChange{{
+					Field:  "lab.studentGitName",
+					Before: current.Lab.StudentGitName,
+					After:  candidate.Lab.StudentGitName,
+				}},
+			}
+		},
+		SaveSettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
+			applied++
+			if candidate.Lab.StudentGitName != "Lab Student" || plan.BaseFingerprint != "sha256:reviewed" {
+				t.Fatalf("unexpected reviewed apply: candidate=%+v plan=%+v", candidate.Lab, plan)
+			}
+			return domain.ConfigurationSaveReport{
+				Operation: "configuration-save",
+				State:     "saved",
+				Changes:   plan.Changes,
+				Message:   "Configuration saved locally. No computer was changed.",
+			}
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions, width: 100, height: 30}
+	if !strings.Contains(model.View().Content, "Maintenance") {
+		t.Fatalf("home omits settings task:\n%s", model.View().Content)
+	}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Text: "e"})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("settings load did not start: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettings || len(model.settings.menu.list.Items()) != len(routineSettingsGroups) || !strings.Contains(model.View().Content, "Regional") {
+		t.Fatalf("settings categories missing:\n%s", model.View().Content)
+	}
+	model.settings.menu.list.Select(5)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettingsEdit || !strings.Contains(demoANSI.ReplaceAllString(model.View().Content, ""), "Settings  /  Git") {
+		t.Fatalf("Git settings editor missing:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "Lab Student"})
+	model = updated.(dashboardModel)
+	for range 3 {
+		updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		model = updated.(dashboardModel)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("settings plan did not start: %+v", model)
+	}
+	if !strings.Contains(model.View().Content, "Checking that the proposed settings") {
+		t.Fatalf("settings editor could not render while validation starts:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if planned != 1 || model.screen != dashboardSettingsReview || !strings.Contains(model.View().Content, "Student Git author name: Student → Lab Student") || !strings.Contains(model.View().Content, "Only the lab settings file") {
+		t.Fatalf("settings review missing: planned=%d\n%s", planned, model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "y"})
+	model = updated.(dashboardModel)
+	if command == nil || !model.settings.applying {
+		t.Fatalf("settings apply did not start: %+v", model)
+	}
+	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
+	model = updated.(dashboardModel)
+	if quitCommand != nil || !strings.Contains(model.message, "Wait for the result") {
+		t.Fatal("dashboard allowed quit while settings apply was running")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if applied != 1 || model.settings.applying || model.screen != dashboardSettings || model.settings.current.Lab.StudentGitName != "Lab Student" || !strings.Contains(model.View().Content, "Configuration saved") || strings.Contains(model.View().Content, "Git") {
+		t.Fatalf("settings result missing: applied=%d model=%+v\n%s", applied, model, model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "e"})
+	model = updated.(dashboardModel)
+	if model.settings.result.Operation != "" || !strings.Contains(model.View().Content, "Choose one area to edit") {
+		t.Fatalf("settings result did not open another edit:\n%s", model.View().Content)
+	}
+}
+
+func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
+	restarts := 0
+	serviceReport := domain.ServicesReport{
+		Operation: "services",
+		State:     "healthy",
+		Services: []domain.ManagedService{
+			{ID: "cache", Name: "Binary cache", State: "healthy", Detail: "HTTP-ready", Units: []domain.ServiceState{{Name: "nixorium-harmonia.service", Loaded: true, Active: true, State: "active"}}},
+			{ID: "pxe", Name: "PXE installation mode", State: "ready", Detail: "prepared", Units: []domain.ServiceState{{Name: "nixorium-pxe.service", Loaded: true, State: "inactive"}}},
+		},
+	}
+	actions := DashboardActions{
+		LoadServices: func(ctx context.Context) domain.ServicesReport { return serviceReport },
+		RestartService: func(service string) domain.ServiceActionReport {
+			restarts++
+			if service != "cache" {
+				t.Fatalf("restarted unexpected service %q", service)
+			}
+			return domain.ServiceActionReport{Operation: "service-restart", State: "completed", Service: service, Verified: true, Message: "cache healthy"}
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "m"})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Text: "s"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "healthy") || !strings.Contains(model.View().Content, "Installation → Network boot (PXE)") {
+		t.Fatalf("services screen missing:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View().Content, "Enter restarts the software cache") {
+		t.Fatalf("restart review missing:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if command != nil || restarts != 0 || model.screen != dashboardServices {
+		t.Fatalf("cancelled restart changed something: restarts=%d screen=%d", restarts, model.screen)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View().Content, "Binary cache restarted and verified") || !strings.Contains(model.View().Content, "cache healthy") || !strings.Contains(model.View().Content, "Restart again") {
+		t.Fatalf("verified restart result missing: restarts=%d\n%s", restarts, model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardAdministration {
+		t.Fatalf("service result did not return to Maintenance: screen=%d", model.screen)
+	}
+}

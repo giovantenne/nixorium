@@ -13,6 +13,7 @@ import (
 func trustPresentationPlan() domain.HostTrustPlan {
 	return domain.HostTrustPlan{State: "ready", Host: domain.HostMeta{Name: "pc01", IP: "10.0.0.1"}, Inspection: domain.HostTrustInspection{Recorded: []string{"SHA256:old"}, Offered: "SHA256:new"}, Confirmation: "ROTATE HOST KEY"}
 }
+
 func TestHostTrustConfirmationIsExact(t *testing.T) {
 	for _, input := range []string{"ROTATE HOST KEY\n", "rotate host key\n", "yes\n", "ROTATE HOST\n"} {
 		var output bytes.Buffer
@@ -22,6 +23,7 @@ func TestHostTrustConfirmationIsExact(t *testing.T) {
 		}
 	}
 }
+
 func TestHostTrustReadCancellationIgnoresLateResult(t *testing.T) {
 	var readContext context.Context
 	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{PlanHostTrust: func(ctx context.Context, _ string) domain.HostTrustPlan {
@@ -46,6 +48,7 @@ func TestHostTrustReadCancellationIgnoresLateResult(t *testing.T) {
 		t.Fatal("late reply resumed cancelled action")
 	}
 }
+
 func TestHostTrustTUIRequiresConfirmationAndProtectsMutation(t *testing.T) {
 	writes := 0
 	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{PlanHostTrust: func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() }, ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
@@ -98,6 +101,7 @@ func TestHostTrustTUIRequiresConfirmationAndProtectsMutation(t *testing.T) {
 		t.Fatal("successful write described as cancelled")
 	}
 }
+
 func TestClassroomCannotOpenHostTrust(t *testing.T) {
 	model := dashboardModel{actions: DashboardActions{ClassroomMode: true, PlanHostTrust: func(context.Context, string) domain.HostTrustPlan {
 		t.Fatal("classroom observed key")
@@ -154,5 +158,13 @@ func TestAComputerWithAChangedKeyIsNotOfferedForUpdate(t *testing.T) {
 	updated, _ := model.Update(demoText("d"))
 	if next := updated.(dashboardModel); next.screen != dashboardHosts || !strings.Contains(next.message, "Review it first") {
 		t.Fatalf("d opened %v with %q", next.screen, next.message)
+	}
+}
+
+func TestChangedHostKeyHasTheSameWordsInUpdateComputersAndInventory(t *testing.T) {
+	host := domain.HostStatus{HostKeyCondition: domain.HostKeyChanged, Reachability: domain.ReachabilityReachable}
+	_, inventory, _ := domain.ComputerCondition(host)
+	if got := deploymentStateLabel(host, true); got != inventory || got != "SSH key changed" {
+		t.Errorf("update computers = %q, inventory = %q", got, inventory)
 	}
 }

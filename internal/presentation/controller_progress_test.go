@@ -189,3 +189,139 @@ func TestControllerReviewStatesChangesOrUpToDate(t *testing.T) {
 		t.Fatal("Esc did not leave the up-to-date review")
 	}
 }
+
+func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
+	revision := "0123456789abcdef0123456789abcdef01234567"
+	applied := 0
+	refreshed := 0
+	actions := DashboardActions{
+		Refresh: func(ctx context.Context) (domain.StatusReport, error) {
+			refreshed++
+			return domain.StatusReport{Deployment: domain.DeploymentStatus{Ready: true}}, nil
+		},
+		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
+			return domain.ControllerRebuildPlanReport{
+				SchemaVersion: domain.SchemaVersion,
+				Operation:     "controller-plan",
+				State:         "ready",
+				Controller:    "pc99",
+				Revision:      revision,
+				Confirmation:  "REBUILD",
+				Issues:        []domain.ValidationIssue{},
+			}
+		},
+		ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			applied++
+			return domain.ControllerRebuildExecutionReport{
+				SchemaVersion: domain.SchemaVersion,
+				Operation:     "controller-apply",
+				State:         "completed",
+				Controller:    plan.Controller,
+				Revision:      plan.Revision,
+				Phase:         domain.ControllerRebuildPhaseComplete,
+				Applied:       true,
+				Verified:      true,
+			}
+		},
+		LoadControllerProgress: func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{}, nil
+		},
+	}
+	model := dashboardModel{actions: actions}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "m"})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardAdministration {
+		t.Fatalf("maintenance did not open: screen=%d", model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("controller plan did not start: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardControllerReview || !strings.Contains(model.View().Content, revision) || strings.Contains(model.View().Content, "REBUILD pc99") || !strings.Contains(model.View().Content, "Press Enter") {
+		t.Fatalf("controller review missing:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("controller apply did not start: %+v", model)
+	}
+	if !strings.Contains(model.View().Content, "Waiting for managed progress") {
+		t.Fatalf("controller apply omits managed progress feedback:\n%s", model.View().Content)
+	}
+	batch, ok := command().(tea.BatchMsg)
+	if !ok || len(batch) != 2 {
+		t.Fatalf("controller apply did not schedule action and progress polling")
+	}
+	operation, ok := batch[0]().(tea.BatchMsg)
+	if !ok || len(operation) != 2 {
+		t.Fatal("controller result and status refresh are not separate")
+	}
+	updated, _ = model.Update(operation[0]())
+	model = updated.(dashboardModel)
+	if refreshed != 0 || model.busy != "" {
+		t.Fatal("result waited for the status refresh")
+	}
+	updated, _ = model.Update(operation[1]())
+	model = updated.(dashboardModel)
+	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Applied to this controller and verified") || !strings.Contains(model.View().Content, "Enter") || !strings.Contains(model.View().Content, "Maintenance") {
+		t.Fatalf("controller result missing: applied=%d refreshed=%d\n%s", applied, refreshed, model.View().Content)
+	}
+	model.controller.progress = domain.OperationProgress{
+		Operation: "controller-apply", State: "completed", Phase: "complete",
+		Current: 4, Total: 4, Recent: []string{"Controller revision activated and verified"},
+	}
+	if strings.Contains(model.View().Content, "progress details") {
+		t.Fatalf("completed controller details should start collapsed:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "d"})
+	model = updated.(dashboardModel)
+	if !strings.Contains(model.View().Content, "Recent activity") || !strings.Contains(model.View().Content, "Hide details") {
+		t.Fatalf("controller details did not expand:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardAdministration {
+		t.Fatalf("controller completion did not return to Maintenance: screen=%d", model.screen)
+	}
+}
+
+func TestDashboardControllerProgressShowsTypedBuildState(t *testing.T) {
+	started := time.Now().UTC().Add(-2 * time.Second)
+	model := dashboardModel{
+		screen: dashboardController,
+		busy:   "Building and activating the reviewed controller revision",
+		controller: controllerModel{
+			applying:   true,
+			started:    started,
+			progressID: 3,
+		},
+		width: 90,
+		actions: DashboardActions{LoadControllerProgress: func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{}, nil
+		}},
+	}
+	updated, command := model.Update(dashboardControllerProgressMsg{
+		id: 3,
+		progress: domain.OperationProgress{
+			Operation: "controller-apply", State: "running", Phase: "build",
+			StartedAt: started, UpdatedAt: time.Now().UTC(), Current: 1, Total: 4,
+			Recent: []string{"Validated configuration and installed keys", "Building the reviewed controller system"},
+		},
+	})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("controller apply did not schedule another progress poll")
+	}
+	view := model.View().Content
+	for _, expected := range []string{"Building system", "1/4", "Progress details", "Building the reviewed controller system", "Elapsed:"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("controller progress omits %q:\n%s", expected, view)
+		}
+	}
+	if strings.Count(view, "Progress details") != 1 || strings.Contains(view, "l progress details") {
+		t.Fatalf("controller progress duplicates the contextual action bar:\n%s", view)
+	}
+}
