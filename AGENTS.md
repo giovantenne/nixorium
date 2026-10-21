@@ -87,7 +87,9 @@ scripts/
   create-home-template.sh  # Builds clean home directory template
   validate.sh              # Tiered upstream validation entry point
   security-check.sh        # Pinned staticcheck and govulncheck entry point
-  lint.sh                  # Pinned ShellCheck and errcheck entry point
+  lint.sh                  # Pinned ShellCheck, gofmt and errcheck entry point
+  apply-controller.sh      # Body of nixorium-apply-controller (filled in by modules/management.nix)
+  prepare-pxe.sh           # Body of nixorium-prepare-pxe (filled in by modules/management.nix)
 assets/
   empty-*                  # Neutral fallbacks for optional deployment assets
 templates/site/            # Private deployment repository template
