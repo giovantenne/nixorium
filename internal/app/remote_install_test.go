@@ -95,7 +95,7 @@ func TestRemoteInstallPlanBindsVerifiedPreparation(t *testing.T) {
 	preparation, source := remoteTestPreparation()
 	manager := NewRemoteInstallManager(source)
 	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-	report := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+	report := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false)
 	if report.HasErrors() || report.Plan.Disk.Path != "/dev/sda" || report.Plan.BootID != preparation.Facts.BootID {
 		t.Fatalf("plan not ready: %#v", report)
 	}
@@ -115,12 +115,12 @@ func TestRemoteInstallPlanAcceptsObservedCardWithoutExplicitName(t *testing.T) {
 	source.meta.Clients.Hosts[0].InterfaceExplicit = &notExplicit
 	manager := NewRemoteInstallManager(source)
 	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-	if report := manager.PlanReserved(context.Background(), preparation, "/dev/sda"); report.HasErrors() {
+	if report := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false); report.HasErrors() {
 		t.Fatalf("observed card rejected without an explicit name: %#v", report)
 	}
 	explicit := true
 	source.meta.Clients.Hosts[0].InterfaceExplicit = &explicit
-	if report := manager.PlanReserved(context.Background(), preparation, "/dev/sda"); !report.HasErrors() {
+	if report := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false); !report.HasErrors() {
 		t.Fatal("a differing explicit interface name was accepted")
 	}
 }
@@ -131,7 +131,7 @@ func TestRemoteInstallPlanRequiresExplicitKnownHostRotation(t *testing.T) {
 	manager := NewRemoteInstallManager(source)
 	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
 
-	blocked := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+	blocked := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false)
 	if !blocked.HasErrors() || len(blocked.Issues) == 0 || blocked.Issues[0].Field != "hostKeyRotation" {
 		t.Fatalf("known-host conflict did not require separate review: %#v", blocked)
 	}
@@ -182,7 +182,7 @@ func TestRemoteInstallPlanRejectsUnsafeStateWithoutMutation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			preparation, source := remoteTestPreparation()
 			mutate(&preparation, source)
-			report := NewRemoteInstallManager(source).PlanReserved(context.Background(), preparation, "/dev/sda")
+			report := NewRemoteInstallManager(source).PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false)
 			if !report.HasErrors() {
 				t.Fatalf("unsafe plan accepted: %#v", report)
 			}
@@ -195,7 +195,7 @@ func TestRemoteInstallApplyInstallsTheReviewedPlan(t *testing.T) {
 	manager := NewRemoteInstallManager(source)
 	now := time.Unix(2000, 0).UTC()
 	manager.now = func() time.Time { return now }
-	plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+	plan := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false)
 	report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken)
 	if report.HasErrors() || !report.Installed || report.Phase != domain.RemoteInstallPhaseReadyToReboot {
 		t.Fatalf("apply failed: %#v", report)
@@ -210,7 +210,7 @@ func TestRemoteInstallApplyRejectsStaleOrChangedPlan(t *testing.T) {
 	manager := NewRemoteInstallManager(source)
 	now := time.Unix(2000, 0).UTC()
 	manager.now = func() time.Time { return now }
-	plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+	plan := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false)
 
 	if report := manager.ApplyReserved(context.Background(), plan, "sha256:stale"); !report.HasErrors() || source.dispatched != 0 {
 		t.Fatal("stale token reached dispatch")
@@ -231,7 +231,7 @@ func TestRemoteInstallApplyFailureSemantics(t *testing.T) {
 		preparation, source := remoteTestPreparation()
 		manager := NewRemoteInstallManager(source)
 		manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-		plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+		plan := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false)
 		source.revalidateErr = errors.New("disk changed")
 		report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken)
 		if !report.HasErrors() || source.dispatched != 0 || report.DiskMayBeModified {
@@ -243,7 +243,7 @@ func TestRemoteInstallApplyFailureSemantics(t *testing.T) {
 		preparation, source := remoteTestPreparation()
 		manager := NewRemoteInstallManager(source)
 		manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-		plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+		plan := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", false)
 		source.dispatch = RemoteInstallDispatch{Uncertain: true, LogID: "usb-install-test.log"}
 		source.dispatchErr = errors.New("connection lost")
 		report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken)

@@ -38,15 +38,11 @@ func NewRemoteInstallManager(source RemoteInstallSource) *RemoteInstallManager {
 	return &RemoteInstallManager{source: source, now: time.Now}
 }
 
-// PlanReserved validates a session whose persistent global reservation is
-// already owned by the long-running worker, which is the only caller: the
-// worker, not this manager, reserves the controller and releases it.
-func (m *RemoteInstallManager) PlanReserved(ctx context.Context, preparation domain.RemoteInstallPreparation, diskPath string) domain.RemoteInstallPlanReport {
-	return m.plan(ctx, preparation, diskPath, false)
-}
-
-// PlanReservedWithHostKeyRotation creates a destructive plan only after the
-// caller has separately confirmed replacement of a conflicting static host key.
+// PlanReservedWithHostKeyRotation validates a session whose persistent global
+// reservation is already owned by the long-running worker, the only caller:
+// the worker, not this manager, reserves the controller and releases it. The
+// plan replaces a conflicting static host key only when the caller has
+// separately confirmed it.
 func (m *RemoteInstallManager) PlanReservedWithHostKeyRotation(ctx context.Context, preparation domain.RemoteInstallPreparation, diskPath string, allowHostKeyRotation bool) domain.RemoteInstallPlanReport {
 	return m.plan(ctx, preparation, diskPath, allowHostKeyRotation)
 }

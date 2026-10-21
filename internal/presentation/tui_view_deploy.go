@@ -276,8 +276,6 @@ func (model dashboardModel) deploymentProgressView() []string {
 	return lines
 }
 
-func (model dashboardModel) hostsView() string { return model.computersView() }
-
 func hostAvailability(hosts []domain.HostStatus) (int, int) {
 	available := 0
 	for _, host := range hosts {

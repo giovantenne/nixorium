@@ -843,7 +843,7 @@ func TestDashboardAreaNavigationUsesVisibleSelection(t *testing.T) {
 func TestRoutineScreensShareVisualTitleHierarchy(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), isDark: true, width: 100, height: 30}
 	screens := map[string]string{
-		"computers":  model.hostsView(),
+		"computers":  model.computersView(),
 		"deploy":     model.deployView(),
 		"controller": model.controllerView(),
 		"services":   model.servicesView(),
