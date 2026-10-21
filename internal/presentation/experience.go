@@ -30,7 +30,7 @@ func listWindow(total, cursor, capacity int) (int, int) {
 	return start, min(total, start+capacity)
 }
 
-func (model dashboardModel) rowCapacity() int { return max(3, model.height-15) }
+func (model dashboardModel) rowCapacity() int { return max(3, model.height-ctaRows(model.height)-15) }
 
 func (model dashboardModel) filteredHosts() []domain.HostStatus {
 	result := []domain.HostStatus{}
@@ -134,7 +134,7 @@ func (model dashboardModel) computersView() string {
 		if model.computers.hostSearching || model.computers.hostQuery != "" {
 			lines = append(lines, "Search  / "+model.computers.hostQuery+"_")
 		}
-		start, end := listWindow(len(hosts), model.computers.hostCursor, max(3, model.height-18))
+		start, end := listWindow(len(hosts), model.computers.hostCursor, max(3, model.height-ctaRows(model.height)-18))
 		rows := []string{}
 		for index := start; index < end; index++ {
 			h := hosts[index]
@@ -449,7 +449,7 @@ func (model dashboardModel) diagnosticsView() string {
 	if len(findings) == 0 {
 		lines = append(lines, "No diagnostic observations available.", "Press r to run the laboratory checks.")
 	}
-	start, end := listWindow(len(findings), model.diagnosticCursor, max(2, (model.height-12)/3))
+	start, end := listWindow(len(findings), model.diagnosticCursor, max(2, (model.height-ctaRows(model.height)-12)/3))
 	for i := start; i < end; i++ {
 		f := findings[i]
 		lines = append(lines, tuiSelectionMarker(i == model.diagnosticCursor, model.isDark)+tuiStatus(f.Summary, statusLevel(f.Level), model.isDark))
@@ -556,7 +556,7 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 	if model.width == 0 {
 		width = 100
 	}
-	shell.compactPrimary = model.height > 0 && model.height < 30
+	shell.compactPrimary = compactTerminal(model.height)
 	regions := buildTUIShellRegions(shell, model.width, model.isDark)
 	wrappedLines := func(content string) []string {
 		if content == "" {

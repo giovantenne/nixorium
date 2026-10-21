@@ -172,7 +172,7 @@ func (model dashboardModel) lockView() string {
 	default:
 		lines = append(lines, "Action: "+string(m.action)+" screens", "")
 		hosts := model.report.Meta.Clients.Hosts
-		count := max(1, model.height-17)
+		count := max(1, model.height-ctaRows(model.height)-17)
 		start, end := listWindow(len(hosts), m.cursor, count)
 		for i := start; i < end; i++ {
 			h := hosts[i]

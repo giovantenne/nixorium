@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The next step on each screen is now drawn as a button with a rounded border
+  (red when the action erases or replaces data) instead of a highlighted bar,
+  so it no longer looks like a selected row. On short terminals it stays a
+  single bold line in the key footer.
+
 ### Added
 
 - While you control a student computer from the classroom view, copy and

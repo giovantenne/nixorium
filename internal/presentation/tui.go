@@ -2022,7 +2022,7 @@ func (model dashboardModel) updateView() string {
 		"",
 		tuiSection("Available updates", model.isDark),
 	)
-	start, end := listWindow(len(releases), model.updates.cursor, max(4, model.height-15))
+	start, end := listWindow(len(releases), model.updates.cursor, max(4, model.height-ctaRows(model.height)-15))
 	latestStable := ""
 	if len(model.updates.check.Stable) > 0 {
 		latestStable = model.updates.check.Stable[0].Tag
@@ -2233,13 +2233,13 @@ func (model dashboardModel) updateReviewHeight() int {
 		return 10
 	}
 	if model.updates.plan.Workspace != nil {
-		height := model.height - 16
+		height := model.height-ctaRows(model.height)-16
 		if model.message != "" {
 			height -= 4
 		}
 		return max(1, height)
 	}
-	height := model.height - 21
+	height := model.height-ctaRows(model.height)-21
 	if model.updates.packageBase {
 		height -= 4
 	}
@@ -2285,7 +2285,7 @@ func (model dashboardModel) gitReviewHeight() int {
 	if model.height <= 0 {
 		return 14
 	}
-	height := model.height - 13
+	height := model.height-ctaRows(model.height)-13
 	if height < 4 {
 		return 4
 	}
@@ -2510,7 +2510,7 @@ func (model dashboardModel) logsView() string {
 	if len(model.maintenance.logs.Logs) == 0 {
 		lines = append(lines, "No deployment operation logs are available.")
 	}
-	start, end := listWindow(len(model.maintenance.logs.Logs), model.maintenance.logCursor, max(1, (model.height-16)/2))
+	start, end := listWindow(len(model.maintenance.logs.Logs), model.maintenance.logCursor, max(1, (model.height-ctaRows(model.height)-16)/2))
 	for index := start; index < end; index++ {
 		entry := model.maintenance.logs.Logs[index]
 		row := fmt.Sprintf("%s  %-10s %-11s %d bytes", entry.StartedAt.UTC().Format("2006-01-02 15:04Z"), entry.Kind, entry.State, entry.SizeBytes)
@@ -2568,7 +2568,7 @@ func (model dashboardModel) logDetailHeight() int {
 	if model.height <= 0 {
 		return 12
 	}
-	height := model.height - 15
+	height := model.height-ctaRows(model.height)-15
 	if height < 1 {
 		return 1
 	}
@@ -2754,7 +2754,7 @@ func (model dashboardModel) deployView() string {
 		}
 	}
 	lines = append(lines, "Choose where to apply the saved configuration.", tuiMuted(observationHeading(model.computers.hosts.GeneratedAt), model.isDark), "", fmt.Sprintf("%d of %d computers selected", selected, len(hosts)), "")
-	start, end := listWindow(len(hosts), model.deployment.cursor, max(3, model.height-20))
+	start, end := listWindow(len(hosts), model.deployment.cursor, max(3, model.height-ctaRows(model.height)-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
 		checked := " "

@@ -157,7 +157,7 @@ func (model dashboardModel) assistantGateView() string {
 	}
 	body = lipgloss.NewStyle().Width(width).Render(assistantLinkify(body))
 	header := model.assistantHeader(width) + "\n\n" + tuiTitle(title, model.isDark) + "\n\n"
-	capacity := max(1, model.height-2-lipgloss.Height(header)-2)
+	capacity := max(1, model.height-ctaRows(model.height)-2-lipgloss.Height(header)-2)
 	body = lipgloss.NewStyle().MaxHeight(capacity).Render(body)
 	return lipgloss.NewStyle().Padding(1, 2).Render(header + body + "\n" + tuiMuted(hint, model.isDark))
 }

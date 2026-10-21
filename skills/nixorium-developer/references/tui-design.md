@@ -84,13 +84,16 @@ Review both light and dark backgrounds and ASCII, ANSI, and ANSI-256 output.
 Owner decision 2026-10-20: a novice must see at once what to do next.
 
 - One primary action per screen. When the footer contains an Enter action
-  that does more than navigate, the shell draws it as the next step: on its
-  own line between the notices and the key footer, an arrow and the key with
-  its label on the selection colour (red for an action that erases or
-  replaces data; its typed word stays). The footer then lists only the other,
-  secondary keys, in muted text. Short terminals (under 30 rows) keep it in
-  its footer place with the same colour, so nothing else is pushed off the
-  screen. Navigation labels (Open, Details, Select, Return, Back and area
+  that does more than navigate, the shell draws it as a button: a rounded
+  border in the accent colour around `⏎ Enter  label` (bold, no background,
+  so it never looks like a selected row), directly above the key footer and
+  after the notices. An action that erases or replaces data uses the failure
+  red for border and key; its typed word stays. The footer then lists only
+  the other, secondary keys, in muted text. Terminals under 32 rows keep it
+  inline in its footer place as bold accent text with the `⏎` prefix and no
+  border (the border costs two rows), so nothing else is pushed off the
+  screen; list budgets subtract `ctaRows(height)` for the border. Navigation
+  labels (Open, Details, Select, Return, Back and area
   names) stay ordinary footer keys. A screen may name another key as its
   primary (`tuiShell.primary`).
 - Enter does what the next step says. When the text says "Next: …", Enter

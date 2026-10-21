@@ -488,7 +488,7 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	body := lipgloss.NewStyle().Width(width).Render(assistantLinkify(strings.Join(lines, "\n")))
 	bodyLines = strings.Split(body, "\n")
 	fixedText = strings.Join(fixed, "\n")
-	capacity = max(1, model.height-2-1-2-lipgloss.Height(fixedText)-1)
+	capacity = max(1, model.height-ctaRows(model.height)-2-1-2-lipgloss.Height(fixedText)-1)
 	if model.height == 0 {
 		capacity = len(bodyLines)
 	}

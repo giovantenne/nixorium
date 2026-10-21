@@ -109,7 +109,7 @@ func (model dashboardModel) remoteInstallView() string {
 			lines = append(lines, tuiStatus("No client computers are configured yet", tuiStatusFailure, model.isDark), "Set the number of computers in Maintenance → Change settings → Computers.")
 		} else {
 			// Each identity takes two rows; keep the focused one visible.
-			start, end := listWindow(len(hosts), remote.hostCursor, max(2, (model.height-16)/2))
+			start, end := listWindow(len(hosts), remote.hostCursor, max(2, (model.height-ctaRows(model.height)-16)/2))
 			for index := start; index < end; index++ {
 				host := hosts[index]
 				detail := fmt.Sprintf("address %s · network card %s", host.IP, host.Interface)

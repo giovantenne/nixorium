@@ -138,7 +138,7 @@ func (model dashboardModel) updateSupportKey(key tea.KeyPressMsg) (tea.Model, te
 	return model, nil
 }
 
-func (model dashboardModel) supportViewportHeight() int { return max(3, model.height-16) }
+func (model dashboardModel) supportViewportHeight() int { return max(3, model.height-ctaRows(model.height)-16) }
 
 func (model dashboardModel) supportLines() []string {
 	width := min(116, max(20, model.width-6))

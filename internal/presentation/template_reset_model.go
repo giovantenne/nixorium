@@ -221,7 +221,7 @@ func (model dashboardModel) updateTemplateResetKey(key tea.KeyPressMsg) (tea.Mod
 	return model, nil
 }
 
-func (model dashboardModel) templateResetViewport() int { return max(3, model.height-16) }
+func (model dashboardModel) templateResetViewport() int { return max(3, model.height-ctaRows(model.height)-16) }
 
 func (model dashboardModel) templateResetLines() []string {
 	p := model.templateReset.plan
@@ -295,8 +295,8 @@ func (model dashboardModel) templateResetView() string {
 		actions = append([]tuiAction{{key: "r", label: "Retry"}}, actions...)
 	default:
 		lines = append(lines, "Upstream: "+m.catalog.UpstreamRevision, "", "Choose the replacement software preset:")
-		start := max(0, m.cursor-max(2, model.height-17)+1)
-		end := min(len(m.catalog.Catalog.Presets), start+max(2, model.height-17))
+		start := max(0, m.cursor-max(2, model.height-ctaRows(model.height)-17)+1)
+		end := min(len(m.catalog.Catalog.Presets), start+max(2, model.height-ctaRows(model.height)-17))
 		for i := start; i < end; i++ {
 			entry := m.catalog.Catalog.Presets[i]
 			lines = append(lines, tuiSelection(entry.Label, i == m.cursor, model.isDark))

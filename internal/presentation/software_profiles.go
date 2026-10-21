@@ -202,7 +202,7 @@ func (model softwareModel) profilesView(context softwareViewContext) []string {
 		tuiMuted("Packages already configured keep their destinations. Nothing is removed.", context.dark),
 		"",
 	}
-	capacity := max(1, (context.height-len(lines)-9)/2)
+	capacity := max(1, (context.height-ctaRows(context.height)-len(lines)-9)/2)
 	start, end := listWindow(len(presets), model.profileCursor, capacity)
 	for index := start; index < end; index++ {
 		preset := presets[index]
@@ -232,7 +232,7 @@ func (model softwareModel) profilePackagesView(context softwareViewContext) []st
 		tuiMuted("Space excludes or restores the highlighted package before review.", context.dark),
 		"",
 	}
-	capacity := max(1, context.height-len(lines)-11)
+	capacity := max(1, context.height-ctaRows(context.height)-len(lines)-11)
 	start, end := listWindow(len(preset.Packages), model.profilePackageCursor, capacity)
 	for index := start; index < end; index++ {
 		packageID := preset.Packages[index]
@@ -266,7 +266,7 @@ func (model softwareModel) profileScopeView(context softwareViewContext) []strin
 	}
 	if len(options) > 0 && options[model.scopeCursor].scope.Kind == domain.SoftwareScopeClients {
 		lines = append(lines, "")
-		start, end := listWindow(len(model.catalog.Clients), model.clientCursor, max(2, context.height-len(lines)-14))
+		start, end := listWindow(len(model.catalog.Clients), model.clientCursor, max(2, context.height-ctaRows(context.height)-len(lines)-14))
 		for index := start; index < end; index++ {
 			name := model.catalog.Clients[index]
 			checked := "[ ]"
@@ -321,7 +321,7 @@ func (model softwareModel) profileReviewView(context softwareViewContext) []stri
 		"",
 		tuiStatus("Selected packages passed the configuration checks", tuiStatusSuccess, context.dark),
 	}
-	capacity := max(1, context.height-len(lines)-12)
+	capacity := max(1, context.height-ctaRows(context.height)-len(lines)-12)
 	start, end := listWindow(len(rows), model.profileReviewCursor, capacity)
 	for index := start; index < end; index++ {
 		lines = append(lines, tuiSelection(rows[index], index == model.profileReviewCursor, context.dark))

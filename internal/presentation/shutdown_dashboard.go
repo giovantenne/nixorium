@@ -330,7 +330,7 @@ func (model shutdownModel) selectionView(hosts []domain.HostMeta, context shutdo
 		heading, note = "Which client computers should be switched on?", "Computers already on are found again when you continue. The controller is never included."
 	}
 	lines := []string{tuiSection(heading, context.dark), tuiMuted(note, context.dark), tuiMuted(observationHeading(context.observedAt), context.dark), "", "Action  " + actionLabel, fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
-	start, end := listWindow(len(hosts), model.cursor, max(3, context.height-20))
+	start, end := listWindow(len(hosts), model.cursor, max(3, context.height-ctaRows(context.height)-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
 		checked := " "
@@ -372,7 +372,7 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 		[2]string{"Session safety", shutdownPolicyLabel(plan.Policy)},
 	)...)
 	lines = append(lines, "")
-	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-20))
+	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-ctaRows(context.height)-20))
 	for _, target := range plan.Targets[start:end] {
 		lines = append(lines, shutdownTargetStatus(target, context.dark))
 	}

@@ -199,9 +199,9 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 		case "down":
 			model.workspace.scroll++
 		case "pgup":
-			model.workspace.scroll = max(0, model.workspace.scroll-max(1, model.height-17))
+			model.workspace.scroll = max(0, model.workspace.scroll-max(1, model.height-ctaRows(model.height)-17))
 		case "pgdown":
-			model.workspace.scroll += max(1, model.height-17)
+			model.workspace.scroll += max(1, model.height-ctaRows(model.height)-17)
 		case "enter":
 			if model.workspace.plan.State == "unchanged" {
 				model.workspace.stage = workspaceOverview
@@ -242,7 +242,7 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 func (model dashboardModel) workspaceView() string {
 	w := model.workspace
 	width := min(110, max(24, model.width-10))
-	capacity := max(2, model.height-17)
+	capacity := max(2, model.height-ctaRows(model.height)-17)
 	if model.height == 0 {
 		capacity = 8
 	}

@@ -270,7 +270,7 @@ func (model dashboardModel) cleanupView() string {
 		shell.actions = append(shell.actions, tuiAction{key: "F1", label: "Help"})
 	default:
 		rows := model.cleanupRows()
-		count := max(1, model.height-17)
+		count := max(1, model.height-ctaRows(model.height)-17)
 		start, end := listWindow(len(rows), m.cursor, count)
 		for i := start; i < end; i++ {
 			mark := "[ ]"

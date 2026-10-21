@@ -110,7 +110,7 @@ func (model shutdownModel) wakeReviewView(context shutdownViewContext) ([]string
 		[2]string{"Controller", "excluded"},
 	)...)
 	lines = append(lines, "")
-	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-22))
+	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-ctaRows(context.height)-22))
 	for _, target := range plan.Targets[start:end] {
 		lines = append(lines, wakeTargetStatus(target, context.dark))
 	}

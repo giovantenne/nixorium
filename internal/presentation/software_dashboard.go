@@ -890,6 +890,9 @@ func (model softwareModel) catalogListCapacity(context softwareViewContext, pref
 	}
 	prefixHeight := lipgloss.Height(lipgloss.NewStyle().Width(width).Render(strings.Join(prefix, "\n")))
 	actionHeight := lipgloss.Height(tuiActionBar(context.width, context.dark, model.actions(context)...))
+	if !compactTerminal(context.height) && context.height > 0 {
+		actionHeight += 2 // the next-step button border
+	}
 	available := context.height - 4 // frame padding
 	available -= 2                  // shell breadcrumb and following blank line
 	available -= prefixHeight
@@ -964,7 +967,7 @@ func (model softwareModel) scopeView(context softwareViewContext) []string {
 	}
 	if options[model.scopeCursor].scope.Kind == domain.SoftwareScopeClients {
 		lines = append(lines, "")
-		start, end := listWindow(len(model.catalog.Clients), model.clientCursor, max(2, context.height-len(lines)-16))
+		start, end := listWindow(len(model.catalog.Clients), model.clientCursor, max(2, context.height-ctaRows(context.height)-len(lines)-16))
 		for index := start; index < end; index++ {
 			name := model.catalog.Clients[index]
 			checked := "[ ]"

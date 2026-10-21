@@ -100,21 +100,27 @@ func TestTUIShellUsesBoundedFallbackWhenFixedRegionsExceedHeight(t *testing.T) {
 func TestShellShowsTheNextStepAboveTheFooter(t *testing.T) {
 	shell := tuiShell{path: []string{"Computers"}, body: "Two computers selected.", actions: []tuiAction{{key: "Esc", label: "Selection"}, {key: "Enter", label: "Update computers"}, {key: "F1", label: "Help"}}}
 	lines := strings.Split(demoANSI.ReplaceAllString(renderTUIShell(shell, 100, false), ""), "\n")
-	primary, footer := -1, -1
+	top, label, bottom, footer := -1, -1, -1, -1
 	for index, line := range lines {
-		if strings.Contains(line, "▶ Enter Update computers") {
-			primary = index
+		if strings.HasPrefix(line, "╭") {
+			top = index
+		}
+		if strings.Contains(line, "│ ⏎ Enter  Update computers │") {
+			label = index
+		}
+		if strings.HasPrefix(line, "╰") {
+			bottom = index
 		}
 		if strings.Contains(line, "Esc Selection") {
 			footer = index
 		}
 	}
-	if primary < 0 || footer != primary+1 || strings.Contains(lines[footer], "Enter") {
-		t.Fatalf("next step not above the footer:\n%s", strings.Join(lines, "\n"))
+	if top < 0 || label != top+1 || bottom != top+2 || footer != bottom+1 || strings.Contains(lines[footer], "Enter") {
+		t.Fatalf("next step button not above the footer:\n%s", strings.Join(lines, "\n"))
 	}
 	shell.compactPrimary = true
 	compact := demoANSI.ReplaceAllString(renderTUIShell(shell, 100, false), "")
-	if strings.Contains(compact, "▶") || !strings.Contains(compact, "Esc Selection  ·  Enter Update computers") {
+	if strings.Contains(compact, "╭") || !strings.Contains(compact, "Esc Selection  ·  ⏎ Enter Update computers") {
 		t.Fatalf("short terminal moved the next step:\n%s", compact)
 	}
 	navigation := tuiShell{actions: []tuiAction{{key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}}}

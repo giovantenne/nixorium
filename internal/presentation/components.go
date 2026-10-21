@@ -247,22 +247,27 @@ func destructiveAction(label string) bool {
 	return false
 }
 
-// tuiPrimaryAction renders the next step of a screen: an arrow, then the key
-// and its label on the selection colour, so it stays visible without colour.
+// tuiPrimaryActionStyled renders the next step of a screen as a button: a
+// rounded border in the accent colour (red for danger) around "⏎ Enter  label".
+// It has no background, so it never resembles a selected row. Short terminals
+// (compact) keep it inline in the footer without the border, which would cost
+// two lines.
 func tuiPrimaryActionStyled(action tuiAction, darkBackground, compact, danger bool) string {
 	theme := newTUITheme(darkBackground)
-	arrow := lipgloss.NewStyle().Bold(true).Foreground(theme.accent).Render("▶ ")
-	if compact {
-		// Short terminals keep it in the footer; the colour and bold mark it.
-		arrow = ""
-	}
-	background := theme.selectionBackground
+	colour := theme.accent
 	if danger {
-		// Red marks what erases or replaces data; its typed word stays.
-		background = lipgloss.LightDark(darkBackground)(lipgloss.Color("#B91C1C"), lipgloss.Color("#9F1239"))
+		colour = theme.failure
 	}
-	button := lipgloss.NewStyle().Bold(true).Foreground(theme.selectionText).Background(background).Render(action.key + " " + action.label)
-	return arrow + button
+	if compact {
+		return lipgloss.NewStyle().Bold(true).Foreground(colour).Render("⏎ " + action.key + " " + action.label)
+	}
+	content := lipgloss.NewStyle().Bold(true).Foreground(colour).Render("⏎ "+action.key) +
+		lipgloss.NewStyle().Bold(true).Foreground(theme.text).Render("  "+action.label)
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colour).
+		Padding(0, 1).
+		Render(content)
 }
 
 func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShellRegions {
@@ -499,4 +504,17 @@ func tuiNoticeTitle(title string, kind tuiStatusKind, dark bool) string {
 		return tuiStatus(title, kind, dark)
 	}
 	return tuiNoticeText("○ "+title, kind, dark)
+}
+
+// compactTerminal reports a terminal too short for the bordered next-step
+// button: the 30-row layouts keep their content, so they get the inline form.
+func compactTerminal(height int) bool { return height > 0 && height < 32 }
+
+// ctaRows is the height of the next-step button border, which only taller
+// terminals can afford; list budgets subtract it from the screen.
+func ctaRows(height int) int {
+	if height >= 32 {
+		return 2
+	}
+	return 0
 }

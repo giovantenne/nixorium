@@ -206,7 +206,7 @@ func (model settingsWizardModel) choiceWidth() int {
 }
 
 func (model settingsWizardModel) choiceHeight() int {
-	height := model.height - 14
+	height := model.height-ctaRows(model.height)-14
 	if height < 4 {
 		return 4
 	}
@@ -473,7 +473,9 @@ func (model settingsWizardModel) View() tea.View {
 			"/ searches suggested values.", "", "Esc / F1 closes help.")
 		return tea.NewView(lipgloss.NewStyle().Width(max(20, model.width-4)).Render(strings.Join(lines, "\n")))
 	}
-	view := tea.NewView(renderTUIShell(model.shell(), model.width, model.isDark))
+	shell := model.shell()
+	shell.compactPrimary = compactTerminal(model.height)
+	view := tea.NewView(renderTUIShell(shell, model.width, model.isDark))
 	view.AltScreen = true
 	return view
 }

@@ -387,9 +387,9 @@ func (model dashboardModel) updateHomeFilesKey(key tea.KeyPressMsg) (tea.Model, 
 		case "down":
 			m.scroll++
 		case "pgup":
-			m.scroll = max(0, m.scroll-max(1, model.height-17))
+			m.scroll = max(0, m.scroll-max(1, model.height-ctaRows(model.height)-17))
 		case "pgdown":
-			m.scroll += max(1, model.height-17)
+			m.scroll += max(1, model.height-ctaRows(model.height)-17)
 		case "enter":
 			if m.plan.State == "unchanged" {
 				m.stage = "overview"

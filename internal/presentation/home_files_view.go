@@ -13,7 +13,7 @@ import (
 func (model dashboardModel) homeFilesView() string {
 	m := model.homeFiles
 	width := min(110, max(24, model.width-10))
-	capacity := max(2, model.height-16)
+	capacity := max(2, model.height-ctaRows(model.height)-16)
 	lines := []string{tuiTitle("Initial files", model.isDark)}
 	actions := []tuiAction{{key: "Esc", label: "Workspace"}, {key: "F1", label: "Help"}}
 	fixed := ""

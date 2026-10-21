@@ -230,7 +230,7 @@ func (model dashboardModel) assistantResumeView() string {
 	if model.assistant.resumeLoading {
 		lines = append(lines, model.activitySpinner.View()+" Opening conversation…")
 	} else {
-		capacity := max(1, model.height-8)
+		capacity := max(1, model.height-ctaRows(model.height)-8)
 		start := max(0, model.assistant.resumeCursor-capacity+1)
 		for i := start; i < min(len(model.assistant.resumeItems), start+capacity); i++ {
 			item := model.assistant.resumeItems[i]
