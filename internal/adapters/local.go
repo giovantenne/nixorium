@@ -283,12 +283,18 @@ func (Local) CurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeou
 }
 
 func probeCurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration, probe func(context.Context, domain.HostMeta, time.Duration) domain.HostSystemProbe) map[string]domain.HostSystemProbe {
+	return probeHosts(ctx, hosts, timeout, probe)
+}
+
+// probeHosts runs probe for every host on a bounded worker pool and returns
+// the results by host name.
+func probeHosts[T any](ctx context.Context, hosts []domain.HostMeta, timeout time.Duration, probe func(context.Context, domain.HostMeta, time.Duration) T) map[string]T {
 	type result struct {
 		name  string
-		probe domain.HostSystemProbe
+		probe T
 	}
 	if len(hosts) == 0 {
-		return map[string]domain.HostSystemProbe{}
+		return map[string]T{}
 	}
 	workerCount := min(len(hosts), maximumConcurrentSSHProbes)
 	jobs := make(chan domain.HostMeta)
@@ -311,7 +317,7 @@ func probeCurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout t
 		workers.Wait()
 		close(results)
 	}()
-	probes := make(map[string]domain.HostSystemProbe, len(hosts))
+	probes := make(map[string]T, len(hosts))
 	for range hosts {
 		result := <-results
 		probes[result.name] = result.probe
@@ -470,42 +476,7 @@ func validGitRevision(revision string) bool {
 }
 
 func probeSSHStatuses(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration, probe func(context.Context, domain.HostMeta, time.Duration) domain.SSHProbe) map[string]domain.SSHProbe {
-	type result struct {
-		name  string
-		probe domain.SSHProbe
-	}
-	if len(hosts) == 0 {
-		return map[string]domain.SSHProbe{}
-	}
-
-	workerCount := min(len(hosts), maximumConcurrentSSHProbes)
-	jobs := make(chan domain.HostMeta)
-	results := make(chan result, len(hosts))
-	var workers sync.WaitGroup
-	workers.Add(workerCount)
-	for range workerCount {
-		go func() {
-			defer workers.Done()
-			for host := range jobs {
-				results <- result{name: host.Name, probe: probe(ctx, host, timeout)}
-			}
-		}()
-	}
-	go func() {
-		for _, host := range hosts {
-			jobs <- host
-		}
-		close(jobs)
-		workers.Wait()
-		close(results)
-	}()
-
-	statuses := make(map[string]domain.SSHProbe, len(hosts))
-	for range hosts {
-		result := <-results
-		statuses[result.name] = result.probe
-	}
-	return statuses
+	return probeHosts(ctx, hosts, timeout, probe)
 }
 
 // probeHostSSH checks the SSH port of the computer. During a change of
