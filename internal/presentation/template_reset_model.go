@@ -221,7 +221,9 @@ func (model dashboardModel) updateTemplateResetKey(key tea.KeyPressMsg) (tea.Mod
 	return model, nil
 }
 
-func (model dashboardModel) templateResetViewport() int { return max(3, model.height-ctaRows(model.height)-16) }
+func (model dashboardModel) templateResetViewport() int {
+	return max(3, model.height-ctaRows(model.height)-16)
+}
 
 func (model dashboardModel) templateResetLines() []string {
 	p := model.templateReset.plan

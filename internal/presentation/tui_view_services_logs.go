@@ -194,7 +194,7 @@ func (model dashboardModel) logDetailHeight() int {
 	if model.height <= 0 {
 		return 12
 	}
-	height := model.height-ctaRows(model.height)-15
+	height := model.height - ctaRows(model.height) - 15
 	if height < 1 {
 		return 1
 	}

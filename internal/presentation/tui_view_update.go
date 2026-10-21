@@ -355,13 +355,13 @@ func (model dashboardModel) updateReviewHeight() int {
 		return 10
 	}
 	if model.updates.plan.Workspace != nil {
-		height := model.height-ctaRows(model.height)-16
+		height := model.height - ctaRows(model.height) - 16
 		if model.message != "" {
 			height -= 4
 		}
 		return max(1, height)
 	}
-	height := model.height-ctaRows(model.height)-21
+	height := model.height - ctaRows(model.height) - 21
 	if model.updates.packageBase {
 		height -= 4
 	}

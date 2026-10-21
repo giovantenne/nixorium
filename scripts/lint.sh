@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ShellCheck over every shell script and errcheck over unchecked Go error
-# returns, with the tools pinned by the lint shell of tests/source-checks.nix.
+# ShellCheck over every shell script, gofmt over the Go sources and errcheck
+# over unchecked Go error returns, with the tools pinned by the lint shell of
+# tests/source-checks.nix.
 # ./scripts/validate.sh runs it there; to run it alone:
 #   nix develop --file tests/source-checks.nix lint-shell --command ./scripts/lint.sh
 
@@ -27,6 +28,14 @@ done < <(git ls-files -z --cached --others --exclude-standard -- '*.sh')
 
 echo "Running shellcheck on ${#SCRIPTS[@]} scripts..."
 shellcheck --severity=warning "${SCRIPTS[@]}"
+
+echo "Running gofmt..."
+UNFORMATTED=$(gofmt -l cmd internal)
+if [[ -n "$UNFORMATTED" ]]; then
+  echo "Error: these Go files need gofmt -w:" >&2
+  echo "$UNFORMATTED" >&2
+  exit 1
+fi
 
 echo "Running errcheck..."
 errcheck -ignoretests -exclude .errcheck-exclude ./...

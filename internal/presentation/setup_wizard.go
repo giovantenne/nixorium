@@ -206,7 +206,7 @@ func (model settingsWizardModel) choiceWidth() int {
 }
 
 func (model settingsWizardModel) choiceHeight() int {
-	height := model.height-ctaRows(model.height)-14
+	height := model.height - ctaRows(model.height) - 14
 	if height < 4 {
 		return 4
 	}

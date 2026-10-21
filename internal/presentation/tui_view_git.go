@@ -240,7 +240,7 @@ func (model dashboardModel) gitReviewHeight() int {
 	if model.height <= 0 {
 		return 14
 	}
-	height := model.height-ctaRows(model.height)-13
+	height := model.height - ctaRows(model.height) - 13
 	if height < 4 {
 		return 4
 	}

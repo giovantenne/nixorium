@@ -141,7 +141,9 @@ func (model dashboardModel) updateAssistantReviewKey(key tea.KeyPressMsg) (tea.M
 	r.scroll = max(0, min(r.scroll, len(model.assistantReviewLines())-model.assistantReviewHeight()))
 	return model, nil
 }
-func (model dashboardModel) assistantReviewHeight() int { return max(3, model.height-ctaRows(model.height)-10) }
+func (model dashboardModel) assistantReviewHeight() int {
+	return max(3, model.height-ctaRows(model.height)-10)
+}
 
 func assistantProposalChanges(summary string, plan domain.AssistantSavePlan) []string {
 	lines := strings.Split(assistantDisplayText(summary), "\n")

@@ -719,7 +719,6 @@ func (source *workerInstallSource) CurrentRevision(ctx context.Context, reposito
 	return source.local.GitRevision(ctx, repository)
 }
 
-
 func (source *workerInstallSource) ServiceState(ctx context.Context, name string) domain.ServiceState {
 	return source.local.ServiceState(ctx, name)
 }
