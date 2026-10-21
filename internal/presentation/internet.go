@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -32,13 +31,10 @@ func InternetReportText(w io.Writer, r domain.InternetReport) {
 	}
 }
 func ConfirmInternet(input io.Reader, output io.Writer, p domain.InternetPlan) (bool, error) {
-	InternetPlanText(output, p)
-	fmt.Fprint(output, "Apply this change? [y/N] ")
-	line, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(line) == 0 {
-		return false, err
-	}
-	return strings.EqualFold(strings.TrimSpace(line), "y"), nil
+	return confirmYesNo(input, output, func(w io.Writer) {
+		InternetPlanText(w, p)
+		fmt.Fprint(w, "Apply this change? [y/N] ")
+	})
 }
 
 type internetModel struct {

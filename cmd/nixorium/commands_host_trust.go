@@ -61,19 +61,10 @@ func runHostTrustCommand(ctx context.Context, repository string, options options
 		fmt.Fprintln(stderr, "Host-key review changed; create a fresh plan.")
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Host-key apply requires interactive confirmation or --yes.")
-			return 2
-		}
-		approved, err := presentation.ConfirmHostTrust(os.Stdin, stderr, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		if !approved {
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Host-key apply requires interactive confirmation or --yes."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmHostTrust(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.Apply(ctx, plan, options.expect)
 	report.Message = operationRecordMessage(report.Message, report)

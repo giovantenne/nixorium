@@ -30,20 +30,10 @@ func runCleanupCommand(ctx context.Context, repository string, options options, 
 		fmt.Fprintln(stderr, "The computers changed after review; create a fresh cleanup plan.")
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "cleanup apply requires an interactive terminal or --yes.")
-			return 2
-		}
-		approved, err := presentation.ConfirmCleanup(os.Stdin, stderr, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(stderr, "Confirmation did not match; nothing was removed.")
-			return 1
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "cleanup apply requires an interactive terminal or --yes.", cancelled: "Confirmation did not match; nothing was removed.", cancelCode: 1}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmCleanup(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.Apply(ctx, plan, options.expect)
 	report.Message = operationRecordMessage(report.Message, report)

@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"strings"
@@ -31,11 +30,8 @@ func CollectReportText(w io.Writer, r domain.CollectReport) {
 }
 
 func ConfirmCollect(input io.Reader, output io.Writer, p domain.CollectPlan) (bool, error) {
-	CollectPlanText(output, p)
-	fmt.Fprint(output, "Collect these desktops? [y/N] ")
-	line, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(line) == 0 {
-		return false, err
-	}
-	return strings.EqualFold(strings.TrimSpace(line), "y"), nil
+	return confirmYesNo(input, output, func(w io.Writer) {
+		CollectPlanText(w, p)
+		fmt.Fprint(w, "Collect these desktops? [y/N] ")
+	})
 }

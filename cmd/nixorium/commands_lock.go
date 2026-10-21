@@ -49,19 +49,10 @@ func runLockCommand(ctx context.Context, repository string, options options, std
 		fmt.Fprintln(stderr, "The computers changed since the review; create a fresh plan.")
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Lock apply requires an interactive terminal or --yes.")
-			return 2
-		}
-		approved, err := presentation.ConfirmLock(os.Stdin, stderr, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		if !approved {
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Lock apply requires an interactive terminal or --yes."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmLock(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.Apply(ctx, plan, options.expect)
 	if options.json {

@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -34,13 +33,10 @@ func ShareReportText(w io.Writer, r domain.ShareReport) {
 }
 
 func ConfirmShare(input io.Reader, output io.Writer, p domain.SharePlan) (bool, error) {
-	SharePlanText(output, p)
-	fmt.Fprint(output, "Send these files? [y/N] ")
-	line, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(line) == 0 {
-		return false, err
-	}
-	return strings.EqualFold(strings.TrimSpace(line), "y"), nil
+	return confirmYesNo(input, output, func(w io.Writer) {
+		SharePlanText(w, p)
+		fmt.Fprint(w, "Send these files? [y/N] ")
+	})
 }
 
 // Send files: choose a file or folder (the path starts at the user's home),

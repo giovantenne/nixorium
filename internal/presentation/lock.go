@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -40,13 +39,10 @@ func LockReportText(w io.Writer, r domain.LockReport) {
 }
 
 func ConfirmLock(input io.Reader, output io.Writer, p domain.LockPlan) (bool, error) {
-	LockPlanText(output, p)
-	fmt.Fprint(output, "Apply this change? [y/N] ")
-	line, err := bufio.NewReader(input).ReadString('\n')
-	if err != nil && len(line) == 0 {
-		return false, err
-	}
-	return strings.EqualFold(strings.TrimSpace(line), "y"), nil
+	return confirmYesNo(input, output, func(w io.Writer) {
+		LockPlanText(w, p)
+		fmt.Fprint(w, "Apply this change? [y/N] ")
+	})
 }
 
 type lockModel struct {

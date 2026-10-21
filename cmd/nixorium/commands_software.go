@@ -80,24 +80,10 @@ func runSoftwareCommand(ctx context.Context, repository string, options options,
 			}
 			return 1
 		}
-		if !options.yes {
-			if !presentation.IsInteractive(os.Stdin) {
-				fmt.Fprintln(stderr, "Error: software preset apply requires an interactive terminal or explicit --yes")
-				return 2
-			}
-			confirmationOutput := stdout
-			if options.json {
-				confirmationOutput = stderr
-			}
-			approved, confirmErr := presentation.ConfirmSoftwarePreset(os.Stdin, confirmationOutput, plan)
-			if confirmErr != nil {
-				fmt.Fprintln(stderr, "Error: read confirmation:", confirmErr)
-				return 1
-			}
-			if !approved {
-				fmt.Fprintln(confirmationOutput, "Software profile cancelled; lab-software.json was not changed.")
-				return 0
-			}
+		if code, proceed := confirmReviewedApply(options.yes, stderr, confirmationStream(stdout, stderr, options.json), applyConfirmation{noTerminal: "Error: software preset apply requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Software profile cancelled; lab-software.json was not changed."}, func(output io.Writer) (bool, error) {
+			return presentation.ConfirmSoftwarePreset(os.Stdin, output, plan)
+		}); !proceed {
+			return code
 		}
 		report := manager.ApplyPresetPlan(ctx, plan, options.expect)
 		if options.json {
@@ -136,24 +122,10 @@ func runSoftwareCommand(ctx context.Context, repository string, options options,
 			}
 			return 1
 		}
-		if !options.yes {
-			if !presentation.IsInteractive(os.Stdin) {
-				fmt.Fprintln(stderr, "Error: software apply requires an interactive terminal or explicit --yes")
-				return 2
-			}
-			confirmationOutput := stdout
-			if options.json {
-				confirmationOutput = stderr
-			}
-			approved, confirmErr := presentation.ConfirmSoftwareChange(os.Stdin, confirmationOutput, plan)
-			if confirmErr != nil {
-				fmt.Fprintln(stderr, "Error: read confirmation:", confirmErr)
-				return 1
-			}
-			if !approved {
-				fmt.Fprintln(confirmationOutput, "Software change cancelled; lab-software.json was not changed.")
-				return 0
-			}
+		if code, proceed := confirmReviewedApply(options.yes, stderr, confirmationStream(stdout, stderr, options.json), applyConfirmation{noTerminal: "Error: software apply requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Software change cancelled; lab-software.json was not changed."}, func(output io.Writer) (bool, error) {
+			return presentation.ConfirmSoftwareChange(os.Stdin, output, plan)
+		}); !proceed {
+			return code
 		}
 		report := manager.ApplyPlan(ctx, plan, options.expect)
 		if options.json {

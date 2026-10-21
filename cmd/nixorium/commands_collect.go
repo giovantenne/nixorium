@@ -93,19 +93,10 @@ func runCollectCommand(ctx context.Context, options options, stdout, stderr io.W
 		fmt.Fprintln(stderr, "The computers or the folder changed since the review; create a fresh plan.")
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Collect apply requires an interactive terminal or --yes.")
-			return 2
-		}
-		approved, err := presentation.ConfirmCollect(os.Stdin, stderr, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		if !approved {
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Collect apply requires an interactive terminal or --yes."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmCollect(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := applyCollect(ctx, plan)
 	if options.json {

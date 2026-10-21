@@ -102,24 +102,10 @@ func runGitUndoCommand(ctx context.Context, repository string, options options, 
 		}
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: git undo apply requires an interactive terminal or explicit --yes")
-			return 2
-		}
-		confirmationOutput := stdout
-		if options.json {
-			confirmationOutput = stderr
-		}
-		approved, err := presentation.ConfirmGitUndo(os.Stdin, confirmationOutput, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Nothing was undone; HEAD, the index and the files were not changed.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, confirmationStream(stdout, stderr, options.json), applyConfirmation{noTerminal: "Error: git undo apply requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Nothing was undone; HEAD, the index and the files were not changed."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmGitUndo(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.Apply(ctx, repository, options.expect)
 	report.Message = operationRecordMessage(report.Message, report)

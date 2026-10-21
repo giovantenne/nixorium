@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -142,4 +143,15 @@ func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPl
 		return ConfirmYesNo(input, output, continuePrompt)
 	}
 	return ConfirmWord(input, output, report.Action.Confirmation())
+}
+
+// confirmYesNo renders a plan and its prompt, then reads one line; "y" in any
+// case approves, anything else declines.
+func confirmYesNo(input io.Reader, output io.Writer, render func(io.Writer)) (bool, error) {
+	render(output)
+	line, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(line) == 0 {
+		return false, err
+	}
+	return strings.EqualFold(strings.TrimSpace(line), "y"), nil
 }
