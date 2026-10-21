@@ -31,7 +31,7 @@ func TestCoordinationReservationSurvivesLockOwnerExit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reservation, err := reserveRemoteInstallAt(directory, false, validRemoteReservationPlan(), "sha256:"+strings.Repeat("a", 64))
+	reservation, err := createRemoteReservationAt(directory, false, validRemoteReservationPlan().OperationID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestRemoteReservationRequiresMatchingOperationToRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	value, err := reserveRemoteInstallAt(directory, false, validRemoteReservationPlan(), "sha256:"+strings.Repeat("b", 64))
+	value, err := createRemoteReservationAt(directory, false, validRemoteReservationPlan().OperationID, "")
 	if err != nil {
 		t.Fatal(err)
 	}

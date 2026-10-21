@@ -9,29 +9,17 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-type fakeRemoteReservation struct{ released bool }
-
-func (reservation *fakeRemoteReservation) ReleaseResolved() error {
-	reservation.released = true
-	return nil
-}
-
 type fakeRemoteInstallSource struct {
 	meta          domain.LabMeta
 	revision      string
 	revisionErr   error
-	active        bool
-	activeErr     error
 	services      map[string]domain.ServiceState
 	reachable     bool
 	reachableErr  error
-	reserveErr    error
-	reservation   *fakeRemoteReservation
 	revalidateErr error
 	dispatch      RemoteInstallDispatch
 	dispatchErr   error
-	reservedToken string
-	reservedPlan  domain.RemoteInstallPlan
+	dispatched    int
 }
 
 func (source *fakeRemoteInstallSource) LabMeta(context.Context, string) (domain.LabMeta, error) {
@@ -40,30 +28,17 @@ func (source *fakeRemoteInstallSource) LabMeta(context.Context, string) (domain.
 func (source *fakeRemoteInstallSource) CurrentRevision(context.Context, string) (string, error) {
 	return source.revision, source.revisionErr
 }
-func (source *fakeRemoteInstallSource) ClientOperationActive() (bool, error) {
-	return source.active, source.activeErr
-}
 func (source *fakeRemoteInstallSource) ServiceState(_ context.Context, unit string) domain.ServiceState {
 	return source.services[unit]
 }
 func (source *fakeRemoteInstallSource) RemoteIdentityReachable(context.Context, string) (bool, error) {
 	return source.reachable, source.reachableErr
 }
-func (source *fakeRemoteInstallSource) ReserveRemoteInstall(_ context.Context, plan domain.RemoteInstallPlan, token string) (domain.RemoteInstallReservation, error) {
-	if source.reserveErr != nil {
-		return nil, source.reserveErr
-	}
-	source.reservedPlan = plan
-	source.reservedToken = token
-	if source.reservation == nil {
-		source.reservation = &fakeRemoteReservation{}
-	}
-	return source.reservation, nil
-}
 func (source *fakeRemoteInstallSource) RevalidateRemoteInstall(context.Context, domain.RemoteInstallPreparation, domain.RemoteInstallPlan) error {
 	return source.revalidateErr
 }
 func (source *fakeRemoteInstallSource) DispatchRemoteInstall(context.Context, domain.RemoteInstallPlan) (RemoteInstallDispatch, error) {
+	source.dispatched++
 	return source.dispatch, source.dispatchErr
 }
 
@@ -120,7 +95,7 @@ func TestRemoteInstallPlanBindsVerifiedPreparation(t *testing.T) {
 	preparation, source := remoteTestPreparation()
 	manager := NewRemoteInstallManager(source)
 	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-	report := manager.Plan(context.Background(), preparation, "/dev/sda")
+	report := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
 	if report.HasErrors() || report.Plan.Disk.Path != "/dev/sda" || report.Plan.BootID != preparation.Facts.BootID {
 		t.Fatalf("plan not ready: %#v", report)
 	}
@@ -140,28 +115,13 @@ func TestRemoteInstallPlanAcceptsObservedCardWithoutExplicitName(t *testing.T) {
 	source.meta.Clients.Hosts[0].InterfaceExplicit = &notExplicit
 	manager := NewRemoteInstallManager(source)
 	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-	if report := manager.Plan(context.Background(), preparation, "/dev/sda"); report.HasErrors() {
+	if report := manager.PlanReserved(context.Background(), preparation, "/dev/sda"); report.HasErrors() {
 		t.Fatalf("observed card rejected without an explicit name: %#v", report)
 	}
 	explicit := true
 	source.meta.Clients.Hosts[0].InterfaceExplicit = &explicit
-	if report := manager.Plan(context.Background(), preparation, "/dev/sda"); !report.HasErrors() {
+	if report := manager.PlanReserved(context.Background(), preparation, "/dev/sda"); !report.HasErrors() {
 		t.Fatal("a differing explicit interface name was accepted")
-	}
-}
-
-func TestRemoteInstallReservedPlanAndApplyReuseWorkerReservation(t *testing.T) {
-	preparation, source := remoteTestPreparation()
-	source.active = true
-	manager := NewRemoteInstallManager(source)
-	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-	plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
-	if plan.HasErrors() {
-		t.Fatalf("owned reservation blocked its own plan: %#v", plan)
-	}
-	report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken)
-	if report.HasErrors() || source.reservedToken != "" || source.reservation != nil {
-		t.Fatalf("reserved apply acquired a second reservation: report=%#v source=%#v", report, source)
 	}
 }
 
@@ -188,7 +148,6 @@ func TestRemoteInstallPlanRequiresExplicitKnownHostRotation(t *testing.T) {
 
 func TestRemoteInstallPlanRejectsUnsafeStateWithoutMutation(t *testing.T) {
 	tests := map[string]func(*domain.RemoteInstallPreparation, *fakeRemoteInstallSource){
-		"active":    func(_ *domain.RemoteInstallPreparation, source *fakeRemoteInstallSource) { source.active = true },
 		"duplicate": func(_ *domain.RemoteInstallPreparation, source *fakeRemoteInstallSource) { source.reachable = true },
 		"revision": func(_ *domain.RemoteInstallPreparation, source *fakeRemoteInstallSource) {
 			source.revision = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -223,29 +182,26 @@ func TestRemoteInstallPlanRejectsUnsafeStateWithoutMutation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			preparation, source := remoteTestPreparation()
 			mutate(&preparation, source)
-			report := NewRemoteInstallManager(source).Plan(context.Background(), preparation, "/dev/sda")
-			if !report.HasErrors() || source.reservedToken != "" {
+			report := NewRemoteInstallManager(source).PlanReserved(context.Background(), preparation, "/dev/sda")
+			if !report.HasErrors() {
 				t.Fatalf("unsafe plan accepted: %#v", report)
 			}
 		})
 	}
 }
 
-func TestRemoteInstallApplyConsumesReviewAndKeepsReservation(t *testing.T) {
+func TestRemoteInstallApplyInstallsTheReviewedPlan(t *testing.T) {
 	preparation, source := remoteTestPreparation()
 	manager := NewRemoteInstallManager(source)
 	now := time.Unix(2000, 0).UTC()
 	manager.now = func() time.Time { return now }
-	plan := manager.Plan(context.Background(), preparation, "/dev/sda")
-	report := manager.Apply(context.Background(), plan, plan.ReviewToken)
+	plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+	report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken)
 	if report.HasErrors() || !report.Installed || report.Phase != domain.RemoteInstallPhaseReadyToReboot {
 		t.Fatalf("apply failed: %#v", report)
 	}
-	if source.reservedToken != plan.ReviewToken || source.reservedPlan.OperationID != plan.OperationID {
-		t.Fatal("review token and operation were not bound to reservation")
-	}
-	if source.reservation.released {
-		t.Fatal("successful installed session released its persistent reservation before close")
+	if source.dispatched != 1 {
+		t.Fatalf("dispatched %d times", source.dispatched)
 	}
 }
 
@@ -254,48 +210,45 @@ func TestRemoteInstallApplyRejectsStaleOrChangedPlan(t *testing.T) {
 	manager := NewRemoteInstallManager(source)
 	now := time.Unix(2000, 0).UTC()
 	manager.now = func() time.Time { return now }
-	plan := manager.Plan(context.Background(), preparation, "/dev/sda")
+	plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
 
-	if report := manager.Apply(context.Background(), plan, "sha256:stale"); !report.HasErrors() || source.reservedToken != "" {
-		t.Fatal("stale token reached reservation")
+	if report := manager.ApplyReserved(context.Background(), plan, "sha256:stale"); !report.HasErrors() || source.dispatched != 0 {
+		t.Fatal("stale token reached dispatch")
 	}
 	changed := plan
 	changed.Plan.Disk.Serial = "replacement"
-	if report := manager.Apply(context.Background(), changed, plan.ReviewToken); !report.HasErrors() || source.reservedToken != "" {
-		t.Fatal("changed plan reached reservation")
+	if report := manager.ApplyReserved(context.Background(), changed, plan.ReviewToken); !report.HasErrors() || source.dispatched != 0 {
+		t.Fatal("changed plan reached dispatch")
 	}
 	manager.now = func() time.Time { return plan.ExpiresAt }
-	if report := manager.Apply(context.Background(), plan, plan.ReviewToken); !report.HasErrors() || source.reservedToken != "" {
-		t.Fatal("expired review reached reservation")
+	if report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken); !report.HasErrors() || source.dispatched != 0 {
+		t.Fatal("expired review reached dispatch")
 	}
 }
 
 func TestRemoteInstallApplyFailureSemantics(t *testing.T) {
-	t.Run("pre-dispatch releases", func(t *testing.T) {
+	t.Run("failed revalidation does not dispatch", func(t *testing.T) {
 		preparation, source := remoteTestPreparation()
 		manager := NewRemoteInstallManager(source)
 		manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-		plan := manager.Plan(context.Background(), preparation, "/dev/sda")
+		plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
 		source.revalidateErr = errors.New("disk changed")
-		report := manager.Apply(context.Background(), plan, plan.ReviewToken)
-		if !report.HasErrors() || source.reservation == nil || !source.reservation.released || report.DiskMayBeModified {
+		report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken)
+		if !report.HasErrors() || source.dispatched != 0 || report.DiskMayBeModified {
 			t.Fatalf("wrong pre-dispatch semantics: %#v", report)
 		}
 	})
 
-	t.Run("uncertain dispatch preserves", func(t *testing.T) {
+	t.Run("uncertain dispatch requires reconciliation", func(t *testing.T) {
 		preparation, source := remoteTestPreparation()
 		manager := NewRemoteInstallManager(source)
 		manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
-		plan := manager.Plan(context.Background(), preparation, "/dev/sda")
+		plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
 		source.dispatch = RemoteInstallDispatch{Uncertain: true, LogID: "usb-install-test.log"}
 		source.dispatchErr = errors.New("connection lost")
-		report := manager.Apply(context.Background(), plan, plan.ReviewToken)
+		report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken)
 		if report.State != "reconciliation-required" || !report.DispatchUncertain || !report.DiskMayBeModified {
 			t.Fatalf("uncertain dispatch was understated: %#v", report)
-		}
-		if source.reservation == nil || source.reservation.released {
-			t.Fatal("uncertain dispatch released persistent reservation")
 		}
 	})
 }

@@ -2,8 +2,6 @@ package adapters
 
 import (
 	"bytes"
-	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -272,10 +270,6 @@ func (Local) RemoteReservationPresent() bool {
 	return present
 }
 
-func (Local) ReserveRemoteInstall(_ context.Context, plan domain.RemoteInstallPlan, reviewToken string) (domain.RemoteInstallReservation, error) {
-	return reserveRemoteInstallAt(managedCoordinationDirectory, true, plan, reviewToken)
-}
-
 func (Local) ReserveRemoteSession(operationID string) (domain.RemoteInstallReservation, error) {
 	if !remoteStateID(operationID) {
 		return nil, errors.New("remote installation operation ID is invalid")
@@ -389,17 +383,6 @@ func readRemoteReservationAt(directory *os.File) (remoteReservationRecord, bool,
 		return record, true, errors.New("reservation record does not bind valid state")
 	}
 	return record, true, nil
-}
-
-func reserveRemoteInstallAt(directoryPath string, managed bool, plan domain.RemoteInstallPlan, reviewToken string) (domain.RemoteInstallReservation, error) {
-	if err := domain.ValidateRemoteInstallPlan(plan); err != nil {
-		return nil, err
-	}
-	if len(reviewToken) != len("sha256:")+64 || !stringsHasHexDigest(reviewToken[len("sha256:"):]) {
-		return nil, errors.New("remote installation review token is invalid")
-	}
-	digest := sha256.Sum256([]byte(reviewToken))
-	return createRemoteReservationAt(directoryPath, managed, plan.OperationID, "sha256:"+hex.EncodeToString(digest[:]))
 }
 
 func createRemoteReservationAt(directoryPath string, managed bool, operationID, tokenDigest string) (domain.RemoteInstallReservation, error) {

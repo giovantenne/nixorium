@@ -719,9 +719,6 @@ func (source *workerInstallSource) CurrentRevision(ctx context.Context, reposito
 	return source.local.GitRevision(ctx, repository)
 }
 
-func (source *workerInstallSource) ClientOperationActive() (bool, error) {
-	return source.local.ClientOperationActive()
-}
 
 func (source *workerInstallSource) ServiceState(ctx context.Context, name string) domain.ServiceState {
 	return source.local.ServiceState(ctx, name)
@@ -736,10 +733,6 @@ func (*workerInstallSource) RemoteIdentityReachable(ctx context.Context, address
 	}
 	_ = connection.Close()
 	return true, nil
-}
-
-func (*workerInstallSource) ReserveRemoteInstall(context.Context, domain.RemoteInstallPlan, string) (domain.RemoteInstallReservation, error) {
-	return nil, errors.New("worker already owns the remote installation reservation")
 }
 
 func (source *workerInstallSource) RevalidateRemoteInstall(ctx context.Context, preparation domain.RemoteInstallPreparation, plan domain.RemoteInstallPlan) error {
