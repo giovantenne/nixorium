@@ -798,6 +798,7 @@ let
     install -m 0644 ${upstreamRoot}/lib/disko-layout.nix "$out/lib/disko-layout.nix"
     install -m 0644 ${upstreamRoot}/scripts/lib/lab-meta.sh "$out/scripts/lib/lab-meta.sh"
     install -m 0644 ${upstreamRoot}/scripts/lib/client-installer.sh "$out/scripts/lib/client-installer.sh"
+    install -m 0644 ${upstreamRoot}/scripts/lib/ui.sh "$out/scripts/lib/ui.sh"
     ${lib.optionalString (cachePublicKeyFile != null) ''
       install -m 0644 ${cachePublicKeyFile} "$out/public-key"
     ''}

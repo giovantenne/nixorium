@@ -83,6 +83,7 @@ scripts/
   release.sh               # Validates, tags, and publishes a release
   install-controller.sh    # Live USB bootstrap installer for controller with disk selection
   lib/lab-meta.sh          # Shared helper: loads labMeta from the flake for shell scripts
+  lib/ui.sh                # Terminal presentation helpers for setup.sh (install scripts carry guarded copies)
   create-home-template.sh  # Builds clean home directory template
   validate.sh              # Tiered upstream validation entry point
   security-check.sh        # Pinned staticcheck and govulncheck entry point

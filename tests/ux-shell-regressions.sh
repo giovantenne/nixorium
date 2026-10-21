@@ -135,4 +135,20 @@ while IFS= read -r CODE; do
 done < <(sed -n 's/^\t"\([A-Z-]*\)": {$/\1/p' "$REPO_ROOT/internal/domain/next_steps.go")
 [[ "$(sed -n 's/^\t"\([A-Z-]*\)": {$/\1/p' "$REPO_ROOT/internal/domain/next_steps.go" | wc -l)" -ge 10 ]]
 
+# install.sh and install-controller.sh are fetched with curl and cannot source
+# scripts/lib/ui.sh, so they carry copies of the helpers they share with it.
+# These bodies must stay identical; the others differ on purpose (stderr,
+# step counts, labels).
+ui_function() {
+  awk -v name="$2" '$0 == name "() {" { p = 1 } p { print } p && $0 == "}" { exit }' "$1"
+}
+for SCRIPT in install.sh scripts/install-controller.sh; do
+  for NAME in ui_note ui_log ui_success ui_error; do
+    EXPECTED="$(ui_function "$REPO_ROOT/scripts/lib/ui.sh" "$NAME")"
+    [[ -n "$EXPECTED" ]] || { echo "scripts/lib/ui.sh has no ${NAME}" >&2; exit 1; }
+    [[ "$(ui_function "$REPO_ROOT/$SCRIPT" "$NAME")" == "$EXPECTED" ]] \
+      || { echo "${NAME} in ${SCRIPT} differs from scripts/lib/ui.sh" >&2; exit 1; }
+  done
+done
+
 echo 'UX shell regression tests passed.'
