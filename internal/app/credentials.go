@@ -37,10 +37,6 @@ type PasswordHasher interface {
 	HashPassword(ctx context.Context, password []byte) (string, error)
 }
 
-func CollectPasswordHash(ctx context.Context, reader SecretReader, hasher PasswordHasher) (string, error) {
-	return CollectNamedPasswordHash(ctx, reader, hasher, "Password")
-}
-
 func CollectNamedPasswordHash(ctx context.Context, reader SecretReader, hasher PasswordHasher, label string) (string, error) {
 	password, err := reader.ReadSecret(label + ": ")
 	if err != nil {

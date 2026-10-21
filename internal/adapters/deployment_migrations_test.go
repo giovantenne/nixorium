@@ -159,7 +159,7 @@ func TestMigrationsMayCreateAndRemoveFiles(t *testing.T) {
 	repository := migrationRepository(t, map[string]string{"modules/old.nix": "{ }\n"})
 	useMigrator(t, []deploymigrate.Migration{{ID: "2027-01-move-module", Description: "Move a module.", Apply: func(tree deploymigrate.Tree) deploymigrate.Outcome {
 		content, mode, _, _ := tree.Read("modules/old.nix")
-		if tree.Write("modules/new/module.nix", content, mode) != nil || tree.Remove("modules/old.nix") != nil {
+		if tree.Write("modules/new/module.nix", content, mode) != nil || os.Remove(filepath.Join(tree.Root, "modules/old.nix")) != nil {
 			return deploymigrate.Outcome{State: deploymigrate.Manual, Detail: "cannot move"}
 		}
 		return deploymigrate.Outcome{State: deploymigrate.Applied, Files: []string{"modules/old.nix", "modules/new/module.nix"}}

@@ -184,15 +184,6 @@ func NextStepByCode(code string) (NextStep, bool) {
 	return step, found
 }
 
-// NextStepCodes lists every catalog code.
-func NextStepCodes() []string {
-	codes := make([]string, 0, len(nextSteps))
-	for code := range nextSteps {
-		codes = append(codes, code)
-	}
-	return codes
-}
-
 // BlockedError is a refusal caused by a catalogued situation. Its text stays
 // the technical message (logs, JSON output and support reports keep it);
 // screens use Code to show the catalogue entry instead.
@@ -257,24 +248,9 @@ func EvaluationIssue(field, what string, err error) ValidationIssue {
 	return BlockedIssue(field, code, fmt.Sprintf("evaluate %s: %v", what, err))
 }
 
-// NextStepForError recognizes a catalogued situation in an error: a typed
-// refusal first, then the text of the error.
-func NextStepForError(err error) (NextStep, bool) {
-	if err == nil {
-		return NextStep{}, false
-	}
-	var coder blockedCoder
-	if errors.As(err, &coder) {
-		if step, found := nextSteps[coder.BlockedCode()]; found {
-			return step, true
-		}
-	}
-	return NextStepFor(err.Error())
-}
-
 // NextStepFor recognizes the shared blocking situations in an operator
 // message. Messages that already carry a code (teacher text) are left alone.
-// Typed refusals are recognized by NextStepForError before their text is
+// Typed refusals are recognized by BlockedCodeOf before their text is
 // matched here.
 func NextStepFor(message string) (NextStep, bool) {
 	text := strings.ToLower(message)

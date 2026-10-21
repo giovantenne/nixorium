@@ -355,9 +355,4 @@ func TestSoftwarePlanKeepsBaseSoftware(t *testing.T) {
 			t.Fatalf("%s = %+v", name, report)
 		}
 	}
-	for _, id := range domain.BaseSoftware() {
-		if !softwareIDValid(id) {
-			t.Fatalf("base software %q is not a valid package attribute", id)
-		}
-	}
 }

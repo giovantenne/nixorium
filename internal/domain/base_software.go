@@ -23,8 +23,5 @@ var baseSoftware = func() []string {
 	return packages
 }()
 
-// BaseSoftware lists the always-installed package attributes.
-func BaseSoftware() []string { return slices.Clone(baseSoftware) }
-
 // IsBaseSoftware tells whether a package is always installed.
 func IsBaseSoftware(id string) bool { return slices.Contains(baseSoftware, id) }

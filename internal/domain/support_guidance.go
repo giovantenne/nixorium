@@ -1,7 +1,5 @@
 package domain
 
-import "sort"
-
 const SupportGuidanceVersion = 1
 
 // Routes refer to the canonical guide in the same product source, not a
@@ -45,17 +43,6 @@ var supportGuides = map[string]string{
 	"RECOVERY-SETTINGS-INVALID":       "configuration-is-invalid",
 	"RECOVERY-CONTROLLER-NOT-APPLIED": "controller-apply-failed",
 	"RECOVERY-BACKUP-DUE":             "backups-and-restoration",
-}
-
-// SupportFindingIDs is an exact allowlist, never a prefix match for dynamic
-// artifact/service names or future IDs that might contain private input.
-func SupportFindingIDs() []string {
-	ids := make([]string, 0, len(supportGuides))
-	for id := range supportGuides {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
 }
 
 func SupportFindingGuide(id string) string {

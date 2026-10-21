@@ -89,12 +89,6 @@ func NewTreeWriter(destination string, entries []FileEntry) (*TreeWriter, error)
 	return writer, nil
 }
 
-// Next is the position of the file whose content is expected, or the
-// number of entries when every file is complete.
-func (writer *TreeWriter) Next() int {
-	return writer.next
-}
-
 // skipDone moves past folders and empty files to the next file whose
 // content is expected.
 func (writer *TreeWriter) skipDone() error {

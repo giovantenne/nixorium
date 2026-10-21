@@ -105,9 +105,6 @@ func TestTheTreeStaysInsideTheDeployment(t *testing.T) {
 	if _, _, _, err := tree.Read("link"); err == nil {
 		t.Fatal("a symbolic link was read")
 	}
-	if err := tree.Remove("a/file"); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestEveryRegistryIDIsValidAndUnique(t *testing.T) {

@@ -29,7 +29,8 @@ func TestBusyGateNamesItsHolder(t *testing.T) {
 	if !strings.HasPrefix(err.Error(), OperationBusyMessage+": Update computers, started") {
 		t.Fatalf("message = %q", err.Error())
 	}
-	if step, found := domain.NextStepForError(err); !found || step.Code != "OP-BUSY" {
+	code, typed := domain.BlockedCodeOf(err)
+	if step, found := domain.NextStepByCode(code); !typed || !found || step.Code != "OP-BUSY" {
 		t.Fatalf("busy refusal next step = %+v, %v", step, found)
 	}
 	active, activeErr := operationActiveAt(directory, false)
