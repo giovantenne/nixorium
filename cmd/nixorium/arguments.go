@@ -70,13 +70,13 @@ func parseArguments(arguments []string) (options, error) {
 var flagParsers = []func(*options, []string, int) (int, bool, error){
 	parseGlobalFlags, parseBackupFlags, parseInternetLockFlags, parseInstallFlags,
 	parseGitFlags, parseUpdateFlags, parsePackageBaseFlags, parseSoftwareFlags,
-	parseWorkspaceFlags, parseOperationsFlags, parseDeployFlags, parseSetupFlags,
+	parseOperationsFlags, parseDeployFlags, parseSetupFlags,
 }
 
 var wordParsers = []func(*options, string) (bool, error){
 	parseDeployWord, parseGitWord, parseSoftwareWord, parseInstallWord,
 	parseSetupWord, parsePackageBaseWord, parseRecoveryWord, parseBackupWord,
-	parsePXEWord, parseUpdateWord, parseConfigWord, parseWorkspaceWord,
+	parsePXEWord, parseUpdateWord, parseConfigWord,
 	parseSupportWord, parseLogsWord, parseServicesWord, parseGenericWord,
 }
 

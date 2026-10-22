@@ -19,20 +19,6 @@ type workspaceCommandManager interface {
 }
 
 func runWorkspaceCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
-	if options.subcommand == "marketplace" {
-		report := app.NewWorkspaceMarketplace(adapters.Local{}).Resolve(ctx, repository, options.extension)
-		if options.json {
-			if err := presentation.JSON(stdout, report); err != nil {
-				return commandOutputError(err, stderr)
-			}
-		} else {
-			presentation.WorkspaceMarketplaceText(stdout, report)
-		}
-		if report.HasErrors() {
-			return 1
-		}
-		return 0
-	}
 	candidate, err := adapters.ReadWorkspaceCandidate(options.file)
 	if err != nil {
 		fmt.Fprintln(stderr, "Error: read workspace candidate:", err)
@@ -119,45 +105,11 @@ func outputWorkspaceApply(stdout, stderr io.Writer, report domain.WorkspaceApply
 	return 0
 }
 
-// parseWorkspaceFlags reads the workspace marketplace flag.
-func parseWorkspaceFlags(result *options, arguments []string, index int) (int, bool, error) {
-	switch arguments[index] {
-	case "--extension":
-		index++
-		if index >= len(arguments) || arguments[index] == "" {
-			return index, true, errors.New("--extension requires a Marketplace identifier such as publisher.name")
-		}
-		result.extension = arguments[index]
-	default:
-		return index, false, nil
-	}
-	return index, true, nil
-}
-
-// parseWorkspaceWord reads the word that only means something after workspace.
-func parseWorkspaceWord(result *options, word string) (bool, error) {
-	switch word {
-	case "marketplace":
-		if result.command != "workspace" || result.subcommand != "" {
-			return true, errors.New("marketplace must follow workspace")
-		}
-		result.subcommand = "marketplace"
-		return true, nil
-	}
-	return false, nil
-}
-
 // validateWorkspaceOptions rejects option combinations that do not belong to the command.
 func validateWorkspaceOptions(result *options) error {
-	if result.extension != "" && (result.command != "workspace" || result.subcommand != "marketplace") {
-		return errors.New("--extension is only valid with workspace marketplace")
-	}
-	if result.command == "workspace" && result.subcommand == "marketplace" && result.extension == "" {
-		return errors.New("workspace marketplace requires --extension")
-	}
-	if result.command == "workspace" && result.subcommand != "marketplace" {
+	if result.command == "workspace" {
 		if result.subcommand != "plan" && result.subcommand != "apply" {
-			return errors.New("workspace requires plan, apply or marketplace")
+			return errors.New("workspace requires plan or apply")
 		}
 		if result.file == "" {
 			return errors.New("workspace plan/apply requires --file")
