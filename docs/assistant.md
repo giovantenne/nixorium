@@ -185,6 +185,7 @@ The model has fixed tools, with no shell or system-operation tool:
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
 | `read_system_file` | Capable controllers only, after the updated consent: one allowlisted system file or directory of one declared computer (see [System files](#system-files)); 256 KiB of text, 500 listing entries, 60-second timeout |
 | `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
+| `vscode_marketplace` | Capable controllers only, after the updated consent: one VS Code extension (`publisher.name`) resolved in the public Marketplace for the deployment's pinned editor and downloaded into the controller's Nix store; returns the pin for `vscode.marketplace` in `workspace-profile.json`, its dependencies and whether it ships native programs |
 
 Assistant never changes the laboratory network; for a new network address or
 prefix it refers the administrator to the guided change (Maintenance → Change
@@ -346,6 +347,25 @@ entries into writable `~/.local/npm`, refuses collisions, and performs no
 network or installation at boot. A switch does not reset or seed a live home.
 Student updates disappear at the next reset; npm and credential snapshot
 exclusions remain intact.
+
+### VS Code extensions for students
+
+Students' VS Code extensions are listed in `vscode.extensions` of
+`workspace-profile.json`; the TUI no longer edits them. Assistant adds or
+removes them on request. Extensions packaged in the deployment's package
+collection are found with `search_packages` (`vscode-extensions.<text>`). For
+one that exists only in the public Marketplace, controllers advertise
+`vscode_marketplace_v1` and the `vscode_marketplace` tool resolves the newest
+stable Linux version that the pinned VS Code accepts, downloads it into the
+controller's Nix store and returns its pin (publisher, name, version, hash and
+platform when needed), its dependencies and extension pack members, and whether
+it ships native programs. Assistant writes the pin in `vscode.marketplace` and
+the lowercase identifier in `vscode.extensions` of its candidate, then
+evaluates. Pins do not follow package-base updates: after an editor update,
+ask Assistant to check them again. The tool writes no deployment file, uses the
+controller's Internet access only when called, and requires the updated
+consent; failures are reported as `not_resolved` with a one-line reason,
+`consent_required` or `marketplace_unavailable`.
 
 ### Prefetched downloads
 

@@ -86,6 +86,10 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		return "Reading " + args.Path + " on " + args.Host
 	case "git_history":
 		return "Reading saved configuration history"
+	case "vscode_marketplace":
+		var extension struct{ Extension string }
+		_ = json.Unmarshal(call.Arguments, &extension)
+		return "Looking up " + extension.Extension + " in the VS Code Marketplace"
 	case "prefetch":
 		host := "a file"
 		if parsed, err := url.Parse(args.URL); err == nil && parsed.Hostname() != "" {
@@ -188,7 +192,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			core = nil
 		}
 	}
-	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1", "settings_v1", "system_files_v1"}}
+	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1", "settings_v1", "system_files_v1", "vscode_marketplace_v1"}}
 	if discovery, ok := runner.Store.(interface {
 		HomeFilesSupported(context.Context, domain.AssistantConversation) bool
 	}); ok && discovery.HomeFilesSupported(ctx, conversation) {

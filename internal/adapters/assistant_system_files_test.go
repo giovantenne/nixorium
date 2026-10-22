@@ -89,3 +89,31 @@ func TestReadSystemFileNeedsTheNewConsent(t *testing.T) {
 		t.Fatal(got, calls)
 	}
 }
+
+func TestVSCodeMarketplaceNeedsConsentAndTheResolver(t *testing.T) {
+	w, store, repo := assistantWorkspaceFixture(t)
+	call := domain.AssistantToolCall{Name: "vscode_marketplace", Arguments: []byte(`{"extension":"arduino.vscode-arduino"}`)}
+	if err := store.state().WriteConsent(); err != nil {
+		t.Fatal(err)
+	}
+	if got := (AssistantWorkspaceTools{Store: store}).Execute(t.Context(), w.Conversation, call); got != `{"ok":false,"error":"marketplace_unavailable"}` {
+		t.Fatal(got)
+	}
+	calls := 0
+	tools := AssistantWorkspaceTools{Store: store, Marketplace: func(_ context.Context, repository, extension string) string {
+		calls++
+		if repository != repo || extension != "arduino.vscode-arduino" {
+			t.Fatal(repository, extension)
+		}
+		return `{"ok":true}`
+	}}
+	if got := tools.Execute(t.Context(), w.Conversation, call); got != `{"ok":true}` || calls != 1 {
+		t.Fatal(got, calls)
+	}
+	if err := os.Remove(filepath.Join(store.Directory, "consent.json")); err != nil {
+		t.Fatal(err)
+	}
+	if got := tools.Execute(t.Context(), w.Conversation, call); !strings.Contains(got, "consent_required") || calls != 1 {
+		t.Fatal("the Marketplace was queried without consent", got, calls)
+	}
+}

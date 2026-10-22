@@ -34,6 +34,7 @@ func AssistantToolsV1() []AssistantToolDefinition {
 		definition("git_history", map[string]any{"limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 20}, "revision": str, "path": str}, []string{}),
 		definition("prefetch", map[string]any{"url": str}, []string{"url"}),
 		definition("read_system_file", map[string]any{"host": str, "path": str}, []string{"host", "path"}),
+		definition("vscode_marketplace", map[string]any{"extension": str}, []string{"extension"}),
 	}
 }
 func ValidateAssistantArguments(name string, data []byte) bool {

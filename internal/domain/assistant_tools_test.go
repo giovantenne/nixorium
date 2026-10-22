@@ -36,6 +36,7 @@ func TestAssistantToolArguments(t *testing.T) {
 		{"write_file", `{"path":"x","content":""}`, true}, {"write_file", `{"path":"x","content":"x","executable":"true"}`, false}, {"list_files", `{}`, true}, {"evaluate", `{}`, true}, {"evaluate", `{"command":"bash"}`, false}, {"bash", `{}`, false},
 		{"read_file", `{"path":"a","path":"b"}`, false}, {"read_file", `{"path":"a","\u0070ath":"b"}`, false}, {"read_file", `{"path":null}`, false}, {"read_file", `{"path":"x","offset":1.5}`, false},
 		{"build", `{}`, true}, {"build", `{"command":"bash"}`, false},
+		{"vscode_marketplace", `{"extension":"ms-python.python"}`, true}, {"vscode_marketplace", `{}`, false}, {"vscode_marketplace", `{"extension":"x","version":"1"}`, false},
 		{"lab_status", `{}`, true}, {"lab_status", `{"command":"bash"}`, false},
 		{"host_diagnostics", `{"host":"pc01","area":"system"}`, true},
 		{"host_diagnostics", `{"host":"pc01","area":"journal"}`, false},

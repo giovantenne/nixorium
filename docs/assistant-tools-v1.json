@@ -236,5 +236,20 @@
       ],
       "type": "object"
     }
+  },
+  {
+    "name": "vscode_marketplace",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "extension": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "extension"
+      ],
+      "type": "object"
+    }
   }
 ]

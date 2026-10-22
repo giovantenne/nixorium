@@ -25,7 +25,7 @@ func wireAssistantActions(actions *presentation.DashboardActions, deps dashboard
 		adapters.ErrSystemFileRefused: "refused_path", adapters.ErrSystemFileMissing: "not_found",
 		adapters.ErrSystemFileUnreadable: "not_readable", adapters.ErrSystemFileOldComputer: "computer_needs_update",
 	}}
-	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace, LabStatus: assistantLabStatus.Execute, Diagnostics: assistantDiagnostics.Execute, SystemFiles: assistantSystemFiles.Execute}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}
+	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace, LabStatus: assistantLabStatus.Execute, Diagnostics: assistantDiagnostics.Execute, SystemFiles: assistantSystemFiles.Execute, Marketplace: app.AssistantMarketplace{Resolver: app.NewWorkspaceMarketplace(local)}.Execute}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}
 	actions.Assistant = assistantConfig
 	actions.AssistantService = &presentation.AssistantActions{
 		ReadToken: assistantStore.ReadToken, WriteToken: assistantStore.WriteToken,
