@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The Programming profile no longer includes the local Apache web server that
+  served the student's `~/public_html`; PHP and MySQL stay. Existing
+  laboratories keep it until they reset the deployment template or remove
+  `apacheHttpd` in Software. To serve PHP pages, ask Assistant to add a local
+  web server.
 - The Assistant now saves every conversation on the Nixorium Assistant service
   for 90 days, so that its mistakes can be found and fixed. Nothing more is
   sent than before, and the usual filtering of passwords, keys and Wi-Fi

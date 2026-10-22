@@ -855,7 +855,7 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 		if model.mode == softwareConfigured {
 			if entry, found := model.declaration(item.ID); found {
 				// What the package is, then where it goes: identifiers such as
-				// apacheHttpd mean little on their own.
+				// mysql-workbench mean little on their own.
 				detail = "Installed on " + softwareScopeLabel(entry.Scope)
 				if summary := strings.TrimSpace(item.Summary); summary != "" {
 					detail = summary + " · " + strings.ToLower(detail[:1]) + detail[1:]

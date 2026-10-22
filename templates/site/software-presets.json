@@ -38,9 +38,8 @@
     {
       "id": "programming",
       "label": "Programming",
-      "description": "General classroom software plus VS Code, C/C++, Java, Python and web/PHP toolchains, a local Apache web server, a local MySQL server, MySQL Workbench, and the Pi and OpenCode coding agents.",
+      "description": "General classroom software plus VS Code, C/C++, Java, Python and web/PHP toolchains, a local MySQL server, MySQL Workbench, and the Pi and OpenCode coding agents.",
       "packages": [
-        "apacheHttpd",
         "chromium",
         "cmake",
         "gcc",

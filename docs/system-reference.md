@@ -917,9 +917,6 @@ Python and PHP toolchains, `mysql84` and `mysql-workbench`. Where `mysql84` is
 selected, the site development module runs a teaching MySQL server that
 listens on loopback only, leaves `root` without a password and discards every
 database at boot; where `php` is selected it adds a PHP build with Xdebug.
-Where `apacheHttpd` is selected it runs Apache with that PHP as the student
-account, on loopback only, serving the student's `~/public_html` (recreated
-empty after the boot reset) with `.htaccess` overrides and folder listings.
 The controller management module also installs Git independently of profile
 selection, and the packaged Nixorium command carries it in its runtime PATH.
 Global npm uses each user's `~/.local/npm`, which precedes the system PATH.

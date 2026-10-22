@@ -729,12 +729,9 @@ connections from the same computer, `root` has no password, and all databases
 are discarded at every boot, like the student home. Keep work that must
 survive as exported SQL files. `modules/development.nix` holds this policy.
 
-Programming also runs Apache with PHP in the XAMPP style: files saved in the
-student's `~/public_html` open at `http://localhost/` (for example
-`~/public_html/sito/index.php` at `http://localhost/sito/`), with `.htaccess`
-rules and folder listings. The server runs as the student account and listens
-on this computer only; the folder is emptied with the rest of the home at every
-boot, and on the controller it serves the student account's folder.
+A local web server for PHP pages (Apache in the XAMPP style, serving the
+student's `~/public_html`) is not part of the profile; Assistant can add it on
+request.
 
 Every profile includes Git, the Ghostty/TTE lab screensaver (which never locks the session) and Node.js (and
 npm); Programming also includes the Pi and OpenCode coding agents. Git is available to every user and is also a runtime

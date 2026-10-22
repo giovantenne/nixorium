@@ -859,7 +859,7 @@ that release's notes, so a release is not finished until the site follows it.
   configuration. The isolated `modules/workspace-reset.nix` service retains
   the `home-reset` unit name, never restarts on switch, and gates both the
   display manager and normal user sessions. Order it before every boot
-  service that runs as, or switches to, the student (Apache, logrotate):
+  service that runs as, or switches to, the student (an added httpd, logrotate):
   the process guard after the pending record otherwise fails closed.
   Preserve manual-start refusal,
   no automatic retry, and `X-OnlyManualStart` so first-time installation during

@@ -2,8 +2,7 @@
 # Qualifies the template's Programming profile in a disposable VM: the managed
 # reset restores its editor extensions, each one activates in the pinned
 # VS Code without network access, the toolchains run as the student, and the
-# teaching MySQL server stays on loopback and is emptied at boot only. The
-# local Apache server runs PHP from the student's public_html as the student.
+# teaching MySQL server stays on loopback and is emptied at boot only.
 # It does not exercise GNOME, MySQL Workbench or a physical laboratory.
 let
   editorPkgs = import pkgs.path { inherit (pkgs.stdenv.hostPlatform) system; config.allowUnfree = true; };
@@ -66,7 +65,7 @@ editorPkgs.testers.runNixOSTest {
     users.users.student = { isNormalUser = true; uid = 2000; group = "users"; };
     users.users.teacher = { isNormalUser = true; uid = 2001; group = "users"; };
     users.groups.nixorium-staff = {};
-    environment.systemPackages = [ editorPkgs.btrfs-progs editorPkgs.jq editorPkgs.iproute2 editorPkgs.curl ]
+    environment.systemPackages = [ editorPkgs.btrfs-progs editorPkgs.jq editorPkgs.iproute2 ]
       ++ map (package: lib.attrByPath (lib.splitString "." package) null editorPkgs) vmPackages;
     # Editor and extensions must work offline, as on a lab client.
     networking.firewall.enable = false;
@@ -145,7 +144,6 @@ editorPkgs.testers.runNixOSTest {
     system.stateVersion = "26.05";
   };
   testScript = ''
-    import base64
     import json
 
     managed.start(allow_reboot=True)
@@ -172,23 +170,6 @@ editorPkgs.testers.runNixOSTest {
     managed.succeed("systemd-tmpfiles --create --remove")
     managed.succeed("runuser -u student -- mysql -u root -e 'SHOW DATABASES' | grep -cx scuola")
 
-    # Local web server: the student's folder, PHP with MySQL, .htaccess
-    # rewrites and listings, on loopback only and running as the student.
-    managed.wait_for_unit("httpd.service")
-    managed.succeed("test \"$(stat -c %U:%a /home/student/public_html)\" = student:755")
-    managed.succeed("test \"$(ps -o user= -C httpd | sort -u)\" = student")
-    managed.succeed("test \"$(ss -ltn | grep -E ':80 ' | grep -vcE '127.0.0.1:80|\\[::1\\]:80')\" = 0")
-    managed.succeed("runuser -u student -- mkdir /home/student/public_html/sito")
-    php_page = '<?php $c = new mysqli("localhost", "root", ""); echo $c->query("SELECT id FROM scuola.t")->fetch_row()[0]; file_put_contents(__DIR__ . "/scritto.txt", "ok");'
-    htaccess = "RewriteEngine On\nRewriteRule ^bello$ index.php [L]\n"
-    for name, content in (("index.php", php_page), (".htaccess", htaccess)):
-        encoded = base64.b64encode(content.encode()).decode()
-        managed.succeed(f"echo {encoded} | base64 -d | runuser -u student -- tee /home/student/public_html/sito/{name} >/dev/null")
-    managed.succeed("test \"$(curl -fsS http://localhost/sito/)\" = 7")
-    managed.succeed("test \"$(curl -fsS http://127.0.0.1/sito/bello)\" = 7")
-    managed.succeed("test \"$(stat -c %U /home/student/public_html/sito/scritto.txt)\" = student")
-    managed.succeed("curl -fsS http://localhost/ | grep -q sito/")
-
     try:
         managed.succeed("systemctl start programming-editor-check.service", timeout=1600)
     except Exception:
@@ -207,8 +188,6 @@ editorPkgs.testers.runNixOSTest {
     managed.wait_for_unit("mysql.service")
     managed.fail("runuser -u student -- mysql -u root -e 'SHOW DATABASES' | grep -cx scuola")
     managed.succeed("runuser -u student -- mysql -u root -e 'SELECT 1'")
-    managed.wait_for_unit("httpd.service")
-    managed.succeed("test -d /home/student/public_html; test -z \"$(ls -A /home/student/public_html)\"")
     managed.succeed("test ! -e /home/student/editor-proof.json")
   '';
 }
