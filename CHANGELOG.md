@@ -9,7 +9,7 @@ The project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - The Assistant now saves every conversation on the Nixorium Assistant service
-  for 90 days, so support can review them and help you better. Nothing more is
+  for 90 days, so that its mistakes can be found and fixed. Nothing more is
   sent than before, and the usual filtering of passwords, keys and Wi-Fi
   details still applies. The administrator can switch it off at any time in
   the Assistant settings ("Save conversations on the service: On/Off"). A

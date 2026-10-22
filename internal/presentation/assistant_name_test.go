@@ -149,8 +149,8 @@ func TestAssistantHeaderTruncatesLabNameGracefully(t *testing.T) {
 }
 
 func TestAssistantNameHelpAndMenu(t *testing.T) {
-	if !strings.Contains(assistantHelpText, "/name     Set this laboratory's name, shown on invoices emails and in support") ||
-		assistantCommandDescriptions["/name"] != "Set this laboratory's name, shown on invoices emails and in support (for example 'Lab 2 – Informatica')." {
+	if !strings.Contains(assistantHelpText, "/name     Set this laboratory's name, shown on invoices and emails") ||
+		assistantCommandDescriptions["/name"] != "Set this laboratory's name, shown on invoices and emails (for example 'Lab 2 – Informatica')." {
 		t.Fatal("help lacks /name")
 	}
 	if assistantCommands[len(assistantCommands)-2] != "/name" || assistantCommands[len(assistantCommands)-1] != "/code" {

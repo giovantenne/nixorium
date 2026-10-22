@@ -402,8 +402,8 @@ identifiers are filtered; filtering is best effort and may leave personal or sen
 not read. The service does not keep configuration files. It keeps messages and answers for 30 days to detect abuse,
 then deletes them.
 Conversations (questions, answers and tool results, after best-effort redaction) are saved on the service for 90
-days so support can review them. Press Space to switch saving off; /share changes it later. Each message you send
-uses one request.
+days to find and fix Assistant's mistakes. Press Space to switch saving off; /share changes it later. Each message
+you send uses one request.
 
 [x] Save conversations on the service: On
 Space switch saving · Enter continue · Esc back
@@ -416,7 +416,7 @@ Nixorium  /  Assistant
 
 Assistant settings
 
-Saved on the Nixorium Assistant service for 90 days so support can review them. Applies to all future
+Saved on the Nixorium Assistant service for 90 days to find and fix Assistant's mistakes. Applies to all future
 conversations of this lab.
 
 [x] Save conversations on the service: On

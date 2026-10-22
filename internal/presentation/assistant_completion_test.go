@@ -28,7 +28,7 @@ func TestAssistantCompleteHelpAndScrolling(t *testing.T) {
 		"How Assistant works\n  Describe what your lab should do. Assistant prepares the change in a private\n  copy and checks it. Nothing is saved or installed until you review and save it.\n  Each message you send uses one request from your trial or yearly allowance.",
 		"/review   Review the current proposal and save it.", "/save     Same as /review: opens the review to save the proposal.", "/new      Start a new chat. Use it when you change topic or after saving.",
 		"/report   Tell us one answer was helpful or wrong. Sends this conversation\n            to Nixorium once, so we can fix mistakes. Kept for 90 days.",
-		"/share    Switch \"Save conversations on the service\" On or Off (On by\n            default). When on, every conversation of this lab is saved on the\n            Nixorium Assistant service for 90 days so support can review it.",
+		"/share    Switch \"Save conversations on the service\" On or Off (On by\n            default). When on, every conversation of this lab is saved on the\n            Nixorium Assistant service for 90 days to find and fix mistakes.",
 		"/code     Enter an activation code (for example after subscribing).", "/help     Show this help.",
 		"Keys\n  Enter        Send the message\n  Alt+Enter    New line (Ctrl+J also works)\n  Ctrl+R       Review the proposal\n  Ctrl+N       New chat\n  PgUp/PgDn    Scroll the conversation\n  Select text      Drag with the mouse (or Shift+drag in some terminals)\n  Esc          Stop Assistant while it works, or go back",
 	} {

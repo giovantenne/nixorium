@@ -125,7 +125,7 @@ func (model dashboardModel) finishAssistantReport(message assistantReportMsg) (t
 	return model, model.assistant.input.Focus()
 }
 func (model dashboardModel) assistantSharingView() string {
-	title, body := "Assistant settings", "Saved on the Nixorium Assistant service for 90 days so support can review them. Applies to all future conversations of this lab.\n\n"+model.assistantSharingCheckbox()
+	title, body := "Assistant settings", "Saved on the Nixorium Assistant service for 90 days to find and fix Assistant's mistakes. Applies to all future conversations of this lab.\n\n"+model.assistantSharingCheckbox()
 	actions := []tuiAction{{key: "Enter", label: "Switch on/off"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	if model.assistant.state != "sharing" {
 		title = "Report this answer"

@@ -74,7 +74,7 @@ Subscription, quota, network and deployment-conflict notices appear inside the
 conversation and preserve the draft. An invalid token is removed, the chat explains that the activation is no
 longer valid, and the next send asks to activate again. `/code` opens activation for a replacement code.
 `/name` gives this laboratory a name (up to 60 characters), shown after the
-school name in the header, on invoices and emails and in support, so several
+school name in the header and on invoices and emails, so several
 laboratories of one school can be told apart; an empty name removes it.
 
 The service sets the size and length of the free trial and shows them when you
@@ -111,7 +111,7 @@ its AI provider. The service does not keep your configuration files. It keeps th
 messages and Assistant's answers for 30 days to detect abuse, then deletes it.
 Conversations (your questions, the answers and the tool results Assistant
 used, after the controller's best-effort redaction) are saved on the service
-for 90 days so support can review them. Saving is on by default and the
+for 90 days to find and fix Assistant's mistakes. Saving is on by default and the
 administrator can switch it off. Do not enter passwords or student data in a request.
 
 The model sees tracked files from the chat's base commit plus its own candidate
@@ -147,8 +147,8 @@ invoices are delivered through SDI.**
 
 The activation consent shows **Save conversations on the service: On**,
 pre-selected (Space switches it off). The consent text says that conversations
-are saved on the Nixorium Assistant service for 90 days so support can review
-them. In the chat, **/share** opens **Assistant settings** with the same
+are saved on the Nixorium Assistant service for 90 days to find and fix
+Assistant's mistakes. In the chat, **/share** opens **Assistant settings** with the same
 switch; Enter changes the saved setting and Esc cancels. Saving uploads the
 complete redacted saved conversation after final and error responses, replacing
 the previous version; nothing is uploaded when it is Off. Upload failures never
