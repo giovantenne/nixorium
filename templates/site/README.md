@@ -499,13 +499,12 @@ the deployment baseline; “Clear” is an explicit empty list. VSCode → Other
 settings adds further editor defaults by name and value, or from a pasted
 settings file; settings that can start programs are refused. Saving includes
 an automatic local commit of just the profile, then a separate controller
-review and client selection; it never deploys automatically. In VSCode →
-extensions, `/` searches every packaged extension of the pinned package set;
-the catalog only adds prerequisites to common ones. `m` adds an extension
-from the Marketplace by its `publisher.name`, pinned to one downloaded version,
-and `u` checks those pins for newer versions; both need Internet on the
-controller at that moment. Test such third-party extensions on one computer
-first. Catalog additions and
+review and client selection; it never deploys automatically. The screen does
+not edit the students' VS Code extensions: ask Assistant to add or remove
+them, including Marketplace extensions pinned to one downloaded version (the
+controller needs Internet at that moment), and existing selections are kept
+when you save. Test third-party extensions on one computer first. Catalog
+additions and
 unsupported fields remain manual deployment edits. Older pins/commands may not
 provide this workflow; the inactive example is never loaded automatically.
 Existing profiles are also compared during input-update review: current versus

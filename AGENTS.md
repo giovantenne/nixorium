@@ -777,10 +777,12 @@ that release's notes, so a release is not finished until the site follows it.
   `vscode.marketplace` pins (publisher, name, stable version, SRI hash,
   optional linux-x64) join the package set through
   `lib/workspace-marketplace.nix`; keep the URL derived by the nixpkgs fetcher
-  and never accept one in the profile. `workspace marketplace` and the TUI
-  `m`/`u` actions are the only gallery clients: fixed endpoint, no redirects,
-  bounded answers, prefetch under the fetcher's name so builds stay offline,
-  and no deployment write. Every pin must be selected.
+  and never accept one in the profile. The Assistant's Marketplace tool (the
+  resolver in `internal/app/workspace_marketplace.go`) is the only gallery
+  client: fixed endpoint, no redirects, bounded answers, prefetch under the
+  fetcher's name so builds stay offline, and no deployment write. The TUI and
+  CLI no longer edit the extension list; saving a draft keeps existing
+  `vscode.extensions` and `vscode.marketplace`. Every pin must be selected.
   `nixoriumResolveWorkspaceCandidate` returns the same metadata for raw candidate
   JSON without writing it. Review consumers must also compose the deployment's
   `nixoriumValidateWorkspaceCandidate` hook and bind/recheck source, pin and base
@@ -1129,9 +1131,9 @@ set -euo pipefail
 - `nixorium git commit apply` must never invoke broad `git add`, normal commit
   hooks, signing helpers, a remote, or push; commit only the exact reviewed tree
   and reconcile only selected index paths
-- `nixorium workspace marketplace` (and the TUI Marketplace actions) may
-  contact only the fixed public gallery and the pinned download URL, only
-  when invoked, and write only to the Nix store
+- The Assistant's Marketplace tool may contact only the fixed public gallery
+  and the pinned download URL, only when invoked, and write only to the Nix
+  store
 - `nixorium update` may use controller internet when explicitly invoked; the
   administrator TUI may also run its bounded, cached advisory discovery;
   it must never accept an arbitrary replacement source URL, expose ignored

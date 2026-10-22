@@ -95,8 +95,8 @@ not stage it as an implicit next step.
 
 Resolve extensions using the pinned package set and existing catalog; never
 invent attributes, identities, versions or hashes. Explain prerequisite tools.
-For an unavailable extension, hand off to the product's native Marketplace
-workflow if supported; do not download/install it or edit the catalog.
+For an unavailable extension, the administrator asks Assistant, which adds
+Marketplace pins on request; do not download/install it or edit the catalog.
 
 Extensions are executable third-party code. Packaging/build success proves
 neither trustworthiness nor loading. Recommend an operator-led single-computer

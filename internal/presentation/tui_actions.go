@@ -128,10 +128,7 @@ type DashboardActions struct {
 	CompleteHomeFilesPath   func(context.Context, string) ([]string, error)
 	PlanHomeFiles           func(context.Context, domain.HomeFilesDraft) domain.HomeFilesPlanReport
 	SaveHomeFiles           func(domain.HomeFilesPlanReport) domain.HomeFilesApplyReport
-	// ResolveMarketplace downloads one Marketplace version into the store
-	// and proposes a pin; it never writes deployment files.
-	ResolveMarketplace func(context.Context, string) domain.WorkspaceMarketplaceReport
-	PlanSettings       func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
+	PlanSettings            func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
 	// LoadControllerAddresses lists the controller's current addresses that
 	// can be its DHCP address; it is read-only.
 	LoadControllerAddresses func(context.Context, domain.LabSettingsFile) domain.ControllerAddresses

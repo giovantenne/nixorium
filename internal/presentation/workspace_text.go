@@ -50,29 +50,6 @@ func WorkspacePlanText(writer io.Writer, report domain.WorkspacePlanReport) {
 	}
 }
 
-// WorkspaceMarketplaceText prints the proposed pin as profile JSON to add
-// under vscode.marketplace, together with the checks an operator must see.
-func WorkspaceMarketplaceText(writer io.Writer, report domain.WorkspaceMarketplaceReport) {
-	fmt.Fprintf(writer, "Marketplace extension: %s (%s)\n", safeWorkspaceText(report.ID), strings.ToUpper(report.State))
-	if c := report.Candidate; c != nil {
-		fmt.Fprintf(writer, "%s: %s\n", safeWorkspaceText(c.DisplayName), safeWorkspaceText(c.Description))
-		fmt.Fprintf(writer, "Editor requirement: %s (pinned VS Code %s)\n", safeWorkspaceText(c.Engine), safeWorkspaceText(c.EditorVersion))
-		if len(c.Dependencies) != 0 {
-			fmt.Fprintf(writer, "Also select: %s\n", safeWorkspaceText(strings.Join(c.Dependencies, ", ")))
-		}
-		if c.Native {
-			fmt.Fprintln(writer, "WARNING: contains native programs not adapted to NixOS; they often fail to start.")
-		}
-		fmt.Fprintln(writer, "Third-party code pinned by hash; test it on one computer before the classroom.")
-		pin, _ := json.MarshalIndent(c.Entry, "", "  ")
-		fmt.Fprintf(writer, "Add to vscode.marketplace and select %s in vscode.extensions:\n%s\n", c.Entry.ID(), pin)
-	}
-	fmt.Fprintln(writer, safeWorkspaceText(report.Message))
-	for _, issue := range report.Issues {
-		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", safeWorkspaceText(issue.Field), safeWorkspaceText(issue.Message))
-	}
-}
-
 func WorkspaceApplyText(writer io.Writer, report domain.WorkspaceApplyReport) {
 	fmt.Fprintf(writer, "Student workspace save: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintln(writer, safeWorkspaceText(report.Message))
@@ -109,7 +86,7 @@ func workspaceChangesText(writer io.Writer, inspection domain.WorkspaceInspectio
 	}
 	fmt.Fprintln(writer, "Preference changes:")
 	changes := 0
-	for _, field := range append(append([]workspaceField{}, workspaceFields...), workspaceMarketplaceField) {
+	for _, field := range append(append([]workspaceField{}, workspaceFields...), workspaceReviewOnlyFields...) {
 		before := workspaceValue(base, field)
 		after := workspaceValue(inspection.Resolution.Declared, field)
 		if reflect.DeepEqual(before, after) {

@@ -72,7 +72,7 @@ func TestWorkspaceFieldsPreserveInheritanceAndReviewedObjects(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Fatal("editing mutated the reviewed candidate")
 	}
-	ext := workspaceGroupFields(2)[0]
+	ext := workspaceReviewOnlyFields[0]
 	updated, err := workspaceSetValue(p, ext, []string{"z.last", "a.first"})
 	if err != nil || !reflect.DeepEqual(*updated.VSCode.Extensions, []string{"a.first", "z.last"}) {
 		t.Fatal("extension normalization was bypassed")
@@ -128,11 +128,6 @@ func TestWorkspaceFieldSelectionOrderInheritanceAndNumericInput(t *testing.T) {
 	m.workspace.startField()
 	if !reflect.DeepEqual(m.workspace.choices, []string{"Inherit", "firefox.desktop"}) {
 		t.Fatal("non-browser offered as default")
-	}
-	m.workspace.group, m.workspace.cursor = 2, 0
-	m.workspace.startField()
-	if !reflect.DeepEqual(m.workspace.choices, []string{"ritwickdey.liveserver"}) {
-		t.Fatal("extension picker does not use the pinned catalog")
 	}
 }
 
@@ -264,7 +259,7 @@ func TestWorkspaceResultRecoveryAndContextualGitReview(t *testing.T) {
 func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		for _, dark := range []bool{false, true} {
-			for _, state := range []string{"overview", "fields", "favorites", "extensions", "empty", "numeric", "review", "loading", "failure", "saving", "saved", "partial"} {
+			for _, state := range []string{"overview", "fields", "favorites", "empty", "numeric", "review", "loading", "failure", "saving", "saved", "partial"} {
 				t.Run(fmt.Sprintf("%dx%d/dark%t/%s", size[0], size[1], dark, state), func(t *testing.T) {
 					m := workspaceFixture(t)
 					m.width, m.height, m.isDark = size[0], size[1], dark
@@ -272,12 +267,9 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					want := []string{"Student workspace", "F1", "Help", "Esc"}
 					switch state {
 					case "fields":
-						w.group, w.cursor, w.stage = 2, 7, workspaceFieldList
+						w.group, w.cursor, w.stage = 2, 6, workspaceFieldList
 						want = append(want, "Auto save", "Review")
-					case "favorites", "extensions", "empty":
-						if state == "extensions" {
-							w.group = 2
-						}
+					case "favorites", "empty":
 						if state == "empty" {
 							w.loaded.Inspection.Resolution.Catalog.Applications = nil
 						}

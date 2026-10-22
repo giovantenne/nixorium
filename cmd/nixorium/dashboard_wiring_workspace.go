@@ -14,7 +14,6 @@ func wireWorkspaceActions(actions *presentation.DashboardActions, deps dashboard
 	gitReviewManager := deps.gitReviewManager
 	workspaceManager := deps.workspaceManager
 	homeFilesManager := deps.homeFilesManager
-	workspaceMarketplace := deps.workspaceMarketplace
 	templateResetManager := deps.templateResetManager
 	ctx := deps.ctx
 	repository := deps.repository
@@ -33,9 +32,6 @@ func wireWorkspaceActions(actions *presentation.DashboardActions, deps dashboard
 	actions.PlanWorkspace = func(requestContext context.Context, candidate domain.WorkspaceProfile) domain.WorkspacePlanReport {
 		data, _ := domain.MarshalWorkspaceProfile(candidate)
 		return workspaceManager.Plan(requestContext, repository, data)
-	}
-	actions.ResolveMarketplace = func(requestContext context.Context, id string) domain.WorkspaceMarketplaceReport {
-		return workspaceMarketplace.Resolve(requestContext, repository, id)
 	}
 	actions.SaveWorkspace = func(plan domain.WorkspacePlanReport) domain.WorkspaceApplyReport {
 		return app.NewWorkspaceSaveManager(local, gitReviewManager).Save(ctx, plan)

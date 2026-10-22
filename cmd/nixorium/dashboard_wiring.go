@@ -34,7 +34,6 @@ type dashboardDeps struct {
 	softwareManager           app.SoftwareManager
 	workspaceManager          app.WorkspaceManager
 	homeFilesManager          app.HomeFilesManager
-	workspaceMarketplace      app.WorkspaceMarketplace
 	templateResetManager      app.TemplateResetManager
 	softwareSaveManager       app.SoftwareSaveManager
 	softwarePresetSaveManager app.SoftwarePresetSaveManager
@@ -76,7 +75,6 @@ func newDashboardDeps(ctx context.Context, repository string, setupMode bool) da
 	softwareManager := app.NewSoftwareManager(local)
 	workspaceManager := app.NewWorkspaceManager(local)
 	homeFilesManager := app.NewHomeFilesManager(local)
-	workspaceMarketplace := app.NewWorkspaceMarketplace(local)
 	templateResetManager := app.NewTemplateResetManager(adapters.TemplateReset{})
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	softwarePresetSaveManager := app.NewSoftwarePresetSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
@@ -110,7 +108,6 @@ func newDashboardDeps(ctx context.Context, repository string, setupMode bool) da
 		softwareManager:           softwareManager,
 		workspaceManager:          workspaceManager,
 		homeFilesManager:          homeFilesManager,
-		workspaceMarketplace:      workspaceMarketplace,
 		templateResetManager:      templateResetManager,
 		softwareSaveManager:       softwareSaveManager,
 		softwarePresetSaveManager: softwarePresetSaveManager,

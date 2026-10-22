@@ -28,7 +28,6 @@ var workspaceFields = []workspaceField{
 	{"Dock", "Extend to screen edge", []string{"desktop", "dock", "extendHeight"}, "boolean", nil},
 	{"Dock", "Show trash", []string{"desktop", "dock", "showTrash"}, "boolean", nil},
 	{"Dock", "Show mounts", []string{"desktop", "dock", "showMounts"}, "boolean", nil},
-	{"VSCode", "VS Code extensions", []string{"vscode", "extensions"}, "extensions", nil},
 	{"VSCode", "Font size (8–40)", []string{"vscode", "settings", "editor.fontSize"}, "number", nil},
 	{"VSCode", "Tab size (1–8)", []string{"vscode", "settings", "editor.tabSize"}, "number", nil},
 	{"VSCode", "Insert spaces", []string{"vscode", "settings", "editor.insertSpaces"}, "boolean", nil},
@@ -38,6 +37,14 @@ var workspaceFields = []workspaceField{
 	{"VSCode", "Auto save", []string{"vscode", "settings", "files.autoSave"}, "choice", []string{"off", "onFocusChange", "onWindowChange"}},
 	{"VSCode", "Other settings", []string{"vscode", "extraSettings"}, "settings", nil},
 	{"Browser", "Default browser", []string{"browser", "defaultApplication"}, "browser", nil},
+}
+
+// workspaceReviewOnlyFields are not edited in the TUI (the Assistant adds and
+// removes extensions) but a review still names their changes, for example when
+// a candidate file written by someone else contains them.
+var workspaceReviewOnlyFields = []workspaceField{
+	{"VSCode", "VS Code extensions", []string{"vscode", "extensions"}, "extensions", nil},
+	{"VSCode", "Marketplace pins", []string{"vscode", "marketplace"}, "marketplace", nil},
 }
 
 func workspaceObject(profile domain.WorkspaceProfile) map[string]any {

@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"context"
 	"reflect"
 	"slices"
 	"strings"
@@ -183,132 +182,33 @@ func TestStripJSONComments(t *testing.T) {
 	}
 }
 
-func TestWorkspaceExtensionSearchAddsPackagedChoices(t *testing.T) {
+func TestWorkspaceEditKeepsExistingExtensionsAndPins(t *testing.T) {
 	m := workspaceFixture(t)
-	var queries []string
-	m.actions.SearchSoftware = func(_ context.Context, query string) domain.SoftwareSearchReport {
-		queries = append(queries, query)
-		return domain.SoftwareSearchReport{State: "ready", Results: []domain.SoftwareCatalogItem{
-			{ID: "vscode-extensions.ms-python.python", Label: "python", Summary: "Python support", Version: "2026.4.0", Availability: "available"},
-			{ID: "vscode-extensions.ms-python.vscode-pylance", Label: "pylance", Summary: "Pylance", Version: "2026.2.1", Availability: "available"},
-			{ID: "vscode-extensions.other.blocked", Label: "blocked", Summary: "Broken", Version: "1", Availability: "blocked-broken"},
-			{ID: "python3", Label: "python3", Summary: "Interpreter", Version: "3", Availability: "available"},
-		}}
+	profile, issues := domain.DecodeWorkspaceProfile([]byte(`{"schemaVersion":1,"vscode":{"extensions":["a.b","c.d"],"marketplace":[{"publisher":"A","name":"B","version":"1.0.0","hash":"sha256-` + strings.Repeat("A", 43) + `="}]}}`))
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	m.workspace.candidate = profile
+	for _, field := range workspaceGroupFields(2) {
+		if field.kind == "extensions" || field.kind == "marketplace" {
+			t.Fatalf("extension field %q is still editable", field.label)
+		}
 	}
 	m.workspace.group = 2
 	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.workspace.field.kind != "extensions" {
-		t.Fatal("first VSCode field must be the extension list")
+	if m.workspace.field.path[len(m.workspace.field.path)-1] != "editor.fontSize" {
+		t.Fatalf("unexpected first VSCode field: %v", m.workspace.field.path)
 	}
-	m = workspaceType(m, "/")
-	if !m.workspace.searching || !m.workspace.textEntry() {
-		t.Fatal("search did not capture text")
-	}
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.workspace.searching || m.workspace.stage != workspaceFieldEdit {
-		t.Fatal("Esc must close only the search")
-	}
-	m = workspaceType(m, "/")
-	m = workspaceType(m, "q")
-	m, cmd := workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd != nil || !strings.Contains(m.message, "two characters") {
-		t.Fatal("a one-letter query must not search")
-	}
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
-	m = workspaceType(m, "Python")
-	m, cmd = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = workspaceComplete(t, m, cmd)
-	if len(queries) != 1 || queries[0] != "vscode-extensions.python" {
-		t.Fatalf("unexpected search %v", queries)
-	}
-	if m.workspace.searching || !strings.Contains(m.message, "2 packaged extensions") {
-		t.Fatalf("results not reported: %q", m.message)
-	}
-	for _, id := range []string{"other.blocked", "python3"} {
-		if slices.Contains(m.workspace.choices, id) {
-			t.Fatalf("offered unusable result %s", id)
-		}
-	}
-	if m.workspace.choices[m.workspace.choice] != "ms-python.python" || !strings.Contains(m.workspaceView(), "2026.4.0 · Python support") {
-		t.Fatal("search result is not focused with its version")
-	}
-	m = workspaceType(m, " ")
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if !slices.Contains(*m.workspace.candidate.VSCode.Extensions, "ms-python.python") {
-		t.Fatal("searched extension was not kept in the draft")
-	}
-	// Reopening keeps a selected non-catalog extension visible.
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if !slices.Contains(m.workspace.choices, "ms-python.python") {
-		t.Fatal("selected extension disappeared from the choices")
-	}
-}
-
-func TestWorkspaceMarketplaceAddUpdateAndDeselect(t *testing.T) {
-	m := workspaceFixture(t)
-	version := "3.3.4"
-	proposals := map[string]string{"platformio.platformio-ide": "3.3.4"}
-	var calls []string
-	m.actions.ResolveMarketplace = func(_ context.Context, id string) domain.WorkspaceMarketplaceReport {
-		calls = append(calls, id)
-		publisher, name := "platformio", "platformio-ide"
-		v, hash, platform := proposals[id], "sha256-"+strings.Repeat("C", 43)+"=", "linux-x64"
-		return domain.WorkspaceMarketplaceReport{State: "ready", ID: id, Candidate: &domain.WorkspaceMarketplaceCandidate{
-			Entry:       domain.WorkspaceMarketplaceExtension{Publisher: &publisher, Name: &name, Version: &v, Hash: &hash, Platform: &platform},
-			DisplayName: "PlatformIO IDE", Engine: "^1.65.0", EditorVersion: "1.119.0",
-			Dependencies: []string{"ms-vscode.cpptools"}, Native: true,
-		}}
-	}
-	m.workspace.group = 2
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = workspaceType(m, "u")
-	if !strings.Contains(m.message, "No Marketplace extensions") {
-		t.Fatalf("update check without pins: %q", m.message)
-	}
-	m = workspaceType(m, "m")
-	m = workspaceType(m, "PlatformIO.platformio-ide")
-	m, cmd := workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = workspaceComplete(t, m, cmd)
-	if m.workspace.pending == nil || strings.Join(calls, ",") != "platformio.platformio-ide" {
-		t.Fatalf("no proposal: %q", m.message)
-	}
-	view := m.workspaceView()
-	for _, text := range []string{"not yet in the draft", "3.3.4", "ms-vscode.cpptools", "not adapted to NixOS", "one computer"} {
-		if !strings.Contains(view, text) {
-			t.Fatalf("proposal view lacks %q:\n%s", text, view)
-		}
-	}
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.workspace.pending != nil || !strings.Contains(m.message, "ms-vscode.cpptools") {
-		t.Fatalf("dependency hint missing: %q", m.message)
-	}
+	m = workspaceType(m, "14")
 	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	vscode := m.workspace.candidate.VSCode
-	if vscode == nil || vscode.Marketplace == nil || len(*vscode.Marketplace) != 1 || *(*vscode.Marketplace)[0].Version != version ||
-		!slices.Contains(*vscode.Extensions, "platformio.platformio-ide") {
-		t.Fatalf("pin not in draft: %+v", vscode)
+	if vscode == nil || vscode.Extensions == nil || !slices.Equal(*vscode.Extensions, []string{"a.b", "c.d"}) ||
+		vscode.Marketplace == nil || len(*vscode.Marketplace) != 1 || *(*vscode.Marketplace)[0].Version != "1.0.0" {
+		t.Fatalf("existing extensions or pins were changed: %+v", vscode)
 	}
-	// A newer compatible version replaces the pin only after the draft is kept.
-	proposals["platformio.platformio-ide"] = "3.4.0"
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m, cmd = workspaceKey(m, tea.KeyPressMsg{Code: 'u', Text: "u"})
-	m = workspaceComplete(t, m, cmd)
-	if !strings.Contains(m.message, "3.3.4 → 3.4.0") || *(*m.workspace.candidate.VSCode.Marketplace)[0].Version != "3.3.4" {
-		t.Fatalf("update not proposed: %q", m.message)
-	}
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if *(*m.workspace.candidate.VSCode.Marketplace)[0].Version != "3.4.0" {
-		t.Fatal("kept draft lacks the newer pin")
-	}
-	// Deselecting the extension drops its pin as well.
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m.workspace.choice = slices.Index(m.workspace.choices, "platformio.platformio-ide")
-	m = workspaceType(m, " ")
-	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if vscode := m.workspace.candidate.VSCode; vscode != nil && vscode.Marketplace != nil {
-		t.Fatalf("unselected pin kept: %+v", *vscode.Marketplace)
+	if vscode.Settings == nil {
+		t.Fatal("font size was not set")
 	}
 }
 

@@ -1040,18 +1040,19 @@ reconstruction. Evaluation and saving do not activate a system or reset a home.
 
 A Marketplace pin replaces a packaged extension with the same identifier. The
 controller fetches the pinned bytes when it builds the seed; clients receive
-the result like any package. `nixorium workspace marketplace --extension
-<publisher.name>` (and `m`/`u` in the TUI) asks the public gallery for the
-newest stable Linux version the pinned VS Code accepts, downloads it into the
-controller's Nix store under the fetcher's own name so later builds work
-offline, and reports its dependencies and any native programs. That command
-and the gallery request use the controller's Internet access only when invoked;
-nothing is contacted at build review, reset or login. Pins do not change with
-package-base updates: check them with `u` after an editor update.
+the result like any package. Assistant adds extensions and Marketplace pins on
+request: it asks the public gallery for the newest stable Linux version the
+pinned VS Code accepts, downloads it into the controller's Nix store under the
+fetcher's own name so later builds work offline, and reports its dependencies
+and any native programs. The gallery request uses the controller's Internet
+access only when made; nothing is contacted at build review, reset or login.
+Pins do not change with package-base updates: ask Assistant to check them after
+an editor update. The student workspace screen and `nixorium workspace` keep
+existing extensions and pins when they save other preferences.
 
 Package search accepts `vscode-extensions.<text>` and then matches
 `publisher.name` across all publishers, listing only extensions selectable by
-their lowercase ID. The TUI uses it for extension search.
+their lowercase ID.
 
 The immutable seed combines supported preferences with a neutral shell/Git/XDG
 scaffold. XDG folders use stable English names. It does not copy a live home,

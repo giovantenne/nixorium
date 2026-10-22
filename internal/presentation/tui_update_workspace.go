@@ -38,10 +38,6 @@ func (model dashboardModel) handleWorkspaceMessage(message tea.Msg) (tea.Model, 
 		return model.finishHomeFilesSave(message)
 	case dashboardWorkspaceSaveMsg:
 		return model.finishWorkspaceSave(message)
-	case dashboardWorkspaceSearchMsg:
-		return model.finishWorkspaceSearch(message)
-	case dashboardWorkspaceMarketplaceMsg:
-		return model.finishWorkspaceMarketplace(message)
 	case dashboardClassroomViewMsg:
 		model.busy = ""
 		if message.err != nil {

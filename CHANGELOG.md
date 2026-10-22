@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Students' VS Code extensions are no longer edited in the TUI or with
+  `nixorium workspace marketplace`; ask Assistant to add or remove them.
+  Existing selections keep working and are kept when other student settings
+  are saved.
 - The Programming profile no longer includes the local Apache web server that
   served the student's `~/public_html`; PHP and MySQL stay. Existing
   laboratories keep it until they reset the deployment template or remove
