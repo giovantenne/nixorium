@@ -237,6 +237,7 @@
   };
   testScript = ''
     import json
+    import re
     start_all()
     controller.wait_for_unit("multi-user.target")
     controller.wait_for_unit("assistant-fake.service")
@@ -257,8 +258,10 @@
       assert controller.succeed("cat /home/admin/deployment/modules/course.nix").strip() == "{ course = 2; }"
       requests = [json.loads(line) for line in controller.succeed("cat /tmp/fake-requests.log").splitlines()]
       step = "/v1/turns/00000000-0000-4000-8000-000000000001/steps"
-      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/turns"] + [step] * 3 + ["/v1/turns", step, "/v1/billing-portal"]
-      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True, False, True, False]
+      # Saving is on by default: each final answer uploads that conversation.
+      posts = [re.sub(r"^/v1/conversations/[0-9a-f-]{36}$", "/v1/conversations", r["path"]) for r in requests if r["method"] == "POST"]
+      assert posts == ["/v1/activate", "/v1/turns"] + [step] * 3 + ["/v1/conversations", "/v1/turns", step, "/v1/conversations", "/v1/billing-portal"], posts
+      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True, True, False, True, True, False]
       assert all(not r["userText"] for r in requests if r["method"] == "GET")
       assert controller.succeed("systemctl list-units 'nixorium-apply*' --state=active --no-legend --no-pager").strip() == ""
     with subtest("Assistant is absent without the controller option"):
