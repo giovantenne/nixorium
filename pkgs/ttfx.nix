@@ -13,6 +13,16 @@ rustPlatform.buildRustPackage rec {
     hash = "sha256-bwFjC6ZkZibkgXjoYVH2VuqqeXklGR9kmRl2fTitWBU=";
   };
   cargoHash = "sha256-DNrg12MNqBcQi6yvoJObM1gtE90iGBCxeQ3RwueYCE4=";
+  # No binary cache has it, so every controller compiles it, again after each
+  # system and packages update. Upstream's release profile (LTO, one codegen
+  # unit) and the test build made that about 4 minutes on a 4-processor
+  # controller; without them it is under a quarter of that, for a binary
+  # 0.5 MB larger that animates text just as well.
+  env = {
+    CARGO_PROFILE_RELEASE_LTO = "false";
+    CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "16";
+  };
+  doCheck = false;
   meta = {
     description = "Terminal text effects, a Rust port of terminaltexteffects";
     homepage = "https://github.com/omacom-io/ttfx";
