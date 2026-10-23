@@ -8,6 +8,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The Nixorium window opens maximized, so the dashboard has room for its
+  bordered next-step buttons; a default-size window is too short for them.
 - After Update Nixorium the result stays on screen until you choose: Enter
   reopens the interface with the new version, Esc keeps this one. Before, it
   reopened by itself after 3 seconds, before the result could be read. The

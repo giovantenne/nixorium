@@ -191,7 +191,9 @@ let
     runtimeInputs = [ pkgs.coreutils ];
     text = ''
       SESSION=${nixoriumSession}/bin/nixorium-session
-      if command -v ghostty >/dev/null; then exec ghostty --class=${dashboardWindowClass} --title=Nixorium -e "$SESSION"; fi
+      # Maximized: below 32 rows the dashboard draws its next-step buttons
+      # without their border, and a default-size window is about 26.
+      if command -v ghostty >/dev/null; then exec ghostty --class=${dashboardWindowClass} --title=Nixorium --maximize=true -e "$SESSION"; fi
       if command -v kgx >/dev/null; then exec kgx -- "$SESSION"; fi
       if command -v gnome-terminal >/dev/null; then exec gnome-terminal --title=Nixorium -- "$SESSION"; fi
       if command -v xterm >/dev/null; then exec xterm -T Nixorium -e "$SESSION"; fi
