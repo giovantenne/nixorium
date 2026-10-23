@@ -71,6 +71,8 @@ type mutterCapture struct {
 	buttonsDown map[string]bool
 	keyboardOn  bool
 	clipboard   clipboardState
+	// wokeAt is when this capture lifted a blank screen (blank.go).
+	wokeAt time.Time
 }
 
 func newMutterCapture() *mutterCapture {
@@ -199,6 +201,10 @@ func (capture *mutterCapture) stopWhenIdle() {
 		capture.mutex.Lock()
 		if capture.running && time.Since(capture.lastRequest) > captureIdle {
 			capture.stopLocked()
+			if !capture.wokeAt.IsZero() {
+				go blankIfUntouched(capture.wokeAt)
+				capture.wokeAt = time.Time{}
+			}
 		}
 		capture.mutex.Unlock()
 	}
@@ -228,7 +234,18 @@ func (capture *mutterCapture) startLocked(width int) error {
 		return err
 	}
 	var remotePath, castPath, streamPath dbus.ObjectPath
-	if err := connection.Object(remoteDesktopName, "/org/gnome/Mutter/RemoteDesktop").Call(remoteDesktopName+".CreateSession", 0).Store(&remotePath); err != nil {
+	create := func() error {
+		return connection.Object(remoteDesktopName, "/org/gnome/Mutter/RemoteDesktop").Call(remoteDesktopName+".CreateSession", 0).Store(&remotePath)
+	}
+	err = create()
+	// A blank (not locked) screen also inhibits capture: wake it and retry.
+	if err != nil && strings.Contains(err.Error(), "inhibited") && wakeScreen(connection) {
+		if capture.wokeAt.IsZero() {
+			capture.wokeAt = time.Now()
+		}
+		err = create()
+	}
+	if err != nil {
 		if strings.Contains(err.Error(), "inhibited") {
 			// GNOME refuses screen capture while the screen is locked.
 			return fail(errLocked)
