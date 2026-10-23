@@ -28,6 +28,13 @@ type controllerInspectionSource interface {
 	InspectController(context.Context, string) (domain.ControllerInspection, error)
 }
 
+// controllerActivationSource confirms an activation from the record the apply
+// unit writes only after the active system is the one it built from the
+// reviewed revision, instead of evaluating the controller once more.
+type controllerActivationSource interface {
+	ControllerActivated(ctx context.Context, revision string) (bool, string, error)
+}
+
 func NewControllerManager(source ControllerRebuildSource) *ControllerManager {
 	return &ControllerManager{source: source}
 }
@@ -112,7 +119,26 @@ func (m *ControllerManager) Plan(ctx context.Context, repository string) domain.
 }
 
 func (m *ControllerManager) Apply(ctx context.Context, repository, expectedRevision string) domain.ControllerRebuildExecutionReport {
-	plan := m.Plan(ctx, repository)
+	return m.apply(ctx, m.Plan(ctx, repository), expectedRevision)
+}
+
+// ApplyReviewed applies a plan the caller has just reviewed. The plan's
+// evaluation is not repeated: only the cheap Git checks that tie it to the
+// deployment are, and the apply unit validates the configuration again
+// before it builds anything.
+func (m *ControllerManager) ApplyReviewed(ctx context.Context, repository string, plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+	root, err := filepath.Abs(repository)
+	if err != nil || plan.Repository != root {
+		plan = controllerIssue(plan, "review", "the reviewed controller plan belongs to another deployment")
+	} else if state, stateErr := m.source.GitState(ctx, root); stateErr != nil || state.Dirty {
+		plan = controllerIssue(plan, "git", "deployment worktree changed after the controller review")
+	} else if revision, revisionErr := m.source.GitRevision(ctx, root); revisionErr != nil || revision != plan.Revision {
+		plan = controllerIssue(plan, "review", "deployment revision differs from the reviewed controller plan")
+	}
+	return m.apply(ctx, plan, plan.Revision)
+}
+
+func (m *ControllerManager) apply(ctx context.Context, plan domain.ControllerRebuildPlanReport, expectedRevision string) domain.ControllerRebuildExecutionReport {
 	report := domain.ControllerRebuildExecutionReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "controller-apply",
@@ -142,8 +168,15 @@ func (m *ControllerManager) Apply(ctx context.Context, repository, expectedRevis
 	}
 	report.Applied = true
 	report.Phase = domain.ControllerRebuildPhaseVerify
-	verified := m.Plan(ctx, plan.Repository)
-	if verified.HasErrors() || verified.Revision != expectedRevision || !verified.Current {
+	active := false
+	if source, ok := m.source.(controllerActivationSource); ok {
+		recorded, _, recordErr := source.ControllerActivated(ctx, expectedRevision)
+		active = recorded && recordErr == nil
+	} else {
+		verified := m.Plan(ctx, plan.Repository)
+		active = !verified.HasErrors() && verified.Revision == expectedRevision && verified.Current
+	}
+	if !active {
 		report.State = "failed"
 		report.Message = "controller activation completed but the reviewed revision is not the active system; inspect the unit journal and create a fresh plan"
 		return report

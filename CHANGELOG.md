@@ -8,6 +8,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Applying an update to the controller is about half a minute shorter: the
+  controller configuration is no longer evaluated a second time right after
+  the review, and the final check reads the record the apply unit writes once
+  the reviewed system is active instead of evaluating the configuration
+  again.
+- Update screens on master name the revision (`master · 3f2387e0aabb`), since
+  the version number stays the same between master revisions; the review
+  indents wrapped migration sentences; the review progress says that the
+  network-installation files are only checked; a successful result no longer
+  repeats itself in a yellow or blue notice.
 - The Nixorium window opens maximized, so the dashboard has room for its
   bordered next-step buttons; a default-size window is too short for them.
 - After Update Nixorium the result stays on screen until you choose: Enter

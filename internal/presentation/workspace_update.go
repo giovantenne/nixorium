@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -108,7 +109,7 @@ func updateReviewLines(report domain.UpdatePlanReport, full bool) []string {
 		workspaceUpdateText(&content, report.Workspace)
 	} else if report.Workspace != nil {
 		if report.CurrentRef != "" || report.Target != "" {
-			fmt.Fprintf(&content, "Nixorium: %s -> %s\n", safeWorkspaceText(report.CurrentRef), safeWorkspaceText(report.Target))
+			fmt.Fprintln(&content, "Nixorium: "+safeWorkspaceText(updateRefChange(report)))
 		}
 		if changes := workspaceVersionChanges(report.Workspace); len(changes) > 0 {
 			fmt.Fprintln(&content, "Applications whose version changes:")
@@ -140,6 +141,39 @@ func updateReviewLines(report domain.UpdatePlanReport, full bool) []string {
 	return strings.Split(strings.TrimSuffix(content.String(), "\n"), "\n")
 }
 
+// updateRefChange names the Nixorium change. A moving target such as master
+// keeps its name, so the revisions say what changes.
+func updateRefChange(report domain.UpdatePlanReport) string {
+	if report.CurrentRef == report.Target && report.CurrentRev != "" && report.TargetRev != "" {
+		return fmt.Sprintf("%s %s -> %s", report.Target, shortRevision(report.CurrentRev), shortRevision(report.TargetRev))
+	}
+	return report.CurrentRef + " -> " + report.Target
+}
+
+// hangingWrap wraps a "Label:   text" line, or an indented one, so its
+// continuation lines start under the text instead of at the margin.
+func hangingWrap(line string, width int) string {
+	if lipgloss.Width(line) <= width {
+		return line
+	}
+	indent := len(line) - len(strings.TrimLeft(line, " "))
+	if indent == 0 {
+		if colon := strings.Index(line, ":"); colon > 0 && colon < 24 {
+			rest := line[colon+1:]
+			indent = colon + 1 + len(rest) - len(strings.TrimLeft(rest, " "))
+		}
+	}
+	if indent == 0 || indent > width/2 {
+		return line
+	}
+	wrapped := strings.Split(ansi.Wordwrap(line[indent:], width-indent, ""), "\n")
+	pad := strings.Repeat(" ", indent)
+	for index := 1; index < len(wrapped); index++ {
+		wrapped[index] = pad + wrapped[index]
+	}
+	return line[:indent] + strings.Join(wrapped, "\n")
+}
+
 func (model dashboardModel) updateReviewContent() []string {
 	lines := updateReviewLines(model.updates.plan, model.updateDetails)
 	if model.updates.plan.Workspace == nil {
@@ -153,6 +187,11 @@ func (model dashboardModel) updateReviewContent() []string {
 		lines = append(details, lines...)
 	}
 	width := min(110, max(24, model.width-10))
+	if !model.updateDetails {
+		for index, line := range lines {
+			lines[index] = hangingWrap(line, width)
+		}
+	}
 	return strings.Split(lipgloss.NewStyle().Width(width).Render(strings.Join(lines, "\n")), "\n")
 }
 

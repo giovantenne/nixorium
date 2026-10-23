@@ -137,3 +137,24 @@ func TestControllerFailureDoesNotOfferReload(t *testing.T) {
 		t.Fatalf("failed activation offered a reload (checks=%d):\n%s", checks, model.View().Content)
 	}
 }
+
+func TestUpdateResultOnMasterNamesTheRevisionNotTheSameVersion(t *testing.T) {
+	checks := 0
+	actions := reloadTestActions(true, &checks)
+	actions.RunningVersion = "1.1.0"
+	model := newTestModel(t, withActions(actions))
+	model.screen = dashboardUpdate
+	model.updates.plan = domain.UpdatePlanReport{CurrentRef: "master", Target: "master", CurrentRev: strings.Repeat("3", 40), TargetRev: strings.Repeat("a", 40)}
+	model.updates.result = domain.UpdateApplyReport{Operation: "update-apply", State: "saved", Revision: "abc", Target: "master", Updated: true}
+	report := domain.ControllerRebuildExecutionReport{Operation: "controller-rebuild", State: "applied", Revision: "abc", Applied: true, Verified: true, Message: "The controller now uses the saved configuration."}
+	updated, _ := model.Update(dashboardUpdateControllerMsg{report: report})
+	view := demoANSI.ReplaceAllString(updated.(dashboardModel).View().Content, "")
+	for _, want := range []string{"Configured target: master · aaaaaaaaaaaa", "Running interface: 1.1.0 (this window, opened before the update)", "The updated Nixorium is active on this controller."} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("result lacks %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "Nixorium 1.1.0 is active") || strings.Contains(view, "now uses the saved configuration") {
+		t.Fatalf("result repeats the version or the success message:\n%s", view)
+	}
+}

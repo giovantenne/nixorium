@@ -259,6 +259,7 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 	report.Workspace = proposal.Workspace
 	report.Migrations = proposal.Migrations
 	report.ReviewToken = updateReviewToken(report, snapshot, proposal)
+	report.TargetRev = proposal.NixoriumRevision
 	report.State = "ready"
 	return report
 }

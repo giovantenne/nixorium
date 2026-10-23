@@ -134,3 +134,67 @@ func TestControllerApplyRejectsStaleReviewAndReportsUnitFailure(t *testing.T) {
 		t.Fatalf("failure report = %+v", report)
 	}
 }
+
+// recordingControllerSource counts evaluations and confirms activations
+// from a record, like the local adapter.
+type recordingControllerSource struct {
+	*fakeControllerSource
+	evaluations int
+	recorded    string
+	noRecord    bool
+}
+
+func (f *recordingControllerSource) LabMeta(ctx context.Context, root string) (domain.LabMeta, error) {
+	f.evaluations++
+	return f.fakeControllerSource.LabMeta(ctx, root)
+}
+func (f *recordingControllerSource) StartSystemUnit(ctx context.Context, unit string) error {
+	err := f.fakeControllerSource.StartSystemUnit(ctx, unit)
+	if err == nil && !f.noRecord {
+		f.recorded = f.revision
+	}
+	return err
+}
+func (f *recordingControllerSource) ControllerActivated(_ context.Context, revision string) (bool, string, error) {
+	return f.recorded == revision, "", nil
+}
+
+func TestReviewedControllerApplyEvaluatesOnceAndVerifiesFromTheRecord(t *testing.T) {
+	source := &recordingControllerSource{fakeControllerSource: readyControllerSource()}
+	manager := NewControllerManager(source)
+	plan := manager.Plan(context.Background(), "/deployment")
+	report := manager.ApplyReviewed(context.Background(), "/deployment", plan)
+	if report.HasErrors() || !report.Verified || source.unit != ControllerApplyUnit(source.revision) {
+		t.Fatalf("reviewed apply = %+v", report)
+	}
+	if source.evaluations != 1 {
+		t.Fatalf("controller evaluated %d times, want only the review", source.evaluations)
+	}
+}
+
+func TestReviewedControllerApplyRefusesAChangedDeployment(t *testing.T) {
+	for name, change := range map[string]func(*recordingControllerSource){
+		"new revision": func(f *recordingControllerSource) { f.revision = "fedcba9876543210fedcba9876543210fedcba98" },
+		"dirty":        func(f *recordingControllerSource) { f.git.Dirty = true },
+	} {
+		source := &recordingControllerSource{fakeControllerSource: readyControllerSource()}
+		manager := NewControllerManager(source)
+		plan := manager.Plan(context.Background(), "/deployment")
+		change(source)
+		if report := manager.ApplyReviewed(context.Background(), "/deployment", plan); !report.HasErrors() || source.unit != "" {
+			t.Fatalf("%s: stale review applied: %+v", name, report)
+		}
+	}
+}
+
+func TestReviewedControllerApplyFailsWithoutTheRecord(t *testing.T) {
+	source := &recordingControllerSource{fakeControllerSource: readyControllerSource()}
+	manager := NewControllerManager(source)
+	plan := manager.Plan(context.Background(), "/deployment")
+	// The unit ran but recorded no activation of this revision.
+	source.noRecord = true
+	report := manager.ApplyReviewed(context.Background(), "/deployment", plan)
+	if report.Verified || report.State != "failed" {
+		t.Fatalf("unverified activation reported as verified: %+v", report)
+	}
+}

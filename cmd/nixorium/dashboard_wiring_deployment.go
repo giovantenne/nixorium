@@ -35,7 +35,7 @@ func wireDeploymentActions(actions *presentation.DashboardActions, deps dashboar
 		return controllerManager.Plan(ctx, repository)
 	}
 	actions.ApplyController = func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
-		report := controllerManager.Apply(ctx, repository, plan.Revision)
+		report := controllerManager.ApplyReviewed(ctx, repository, plan)
 		report.Message = operationRecordMessage(report.Message, report)
 		return report
 	}

@@ -32,7 +32,7 @@ func (model dashboardModel) updateView() string {
 			lines = append(lines, "", model.busyView())
 			if model.updates.planProgress.Total > 0 {
 				if model.updates.planProgress.Current == 0 {
-					lines = append(lines, fmt.Sprintf("Required outputs: %d · checking together", model.updates.planProgress.Total))
+					lines = append(lines, groupedBuildLine(model.updates.planProgress))
 				} else {
 					lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updates.planProgress.Current, model.updates.planProgress.Total))
 				}
@@ -76,7 +76,16 @@ func (model dashboardModel) updateView() string {
 			saveState = "saved"
 		}
 		lines = append(lines, saveStatusLines(saveState, model.updates.result.RecoveryRequired, true, true, success)...)
-		lines = append(lines, "", "Configured target: "+model.updates.result.Target, "Running interface: "+displayRunningVersion(model.actions.RunningVersion))
+		target := model.updates.result.Target
+		if plan := model.updates.plan; plan.Target == target && plan.CurrentRef == target && plan.TargetRev != "" {
+			// master keeps its name; the revision says which one is saved.
+			target += " · " + shortRevision(plan.TargetRev)
+		}
+		running := displayRunningVersion(model.actions.RunningVersion)
+		if model.reload.offered() {
+			running += " (this window, opened before the update)"
+		}
+		lines = append(lines, "", "Configured target: "+target, "Running interface: "+running)
 		if success && model.updates.packageBase {
 			lines = append(lines, "Check boot, networking, desktop and services before client distribution; a reboot may be needed.")
 		} else if success {
@@ -90,7 +99,9 @@ func (model dashboardModel) updateView() string {
 			lines = append(lines, tuiMuted(heldDeploymentLine, model.isDark))
 		}
 		notices := []tuiNotice{}
-		if model.message != "" {
+		// On success the message is the controller's own "now uses the saved
+		// configuration", which the green result already says.
+		if model.message != "" && !success {
 			notices = append(notices, failureNotice(model.updateFailurePrefix(), model.message))
 		}
 		notices = append(notices, model.heldRecordNotices()...)
@@ -138,7 +149,7 @@ func (model dashboardModel) updateView() string {
 		runningLine = "Running version     " + floor + " (older releases are hidden)"
 	}
 	lines = append(lines,
-		fmt.Sprintf("Configured target   %s", model.updates.check.CurrentRef),
+		fmt.Sprintf("Configured target   %s", configuredTargetLabel(model.updates.check)),
 		runningLine,
 		tuiMuted("Source  "+model.updates.check.Upstream, model.isDark),
 		"",
@@ -214,6 +225,9 @@ func updatePlanProgressDescription(progress domain.UpdatePlanProgress) string {
 		return "Checking the laboratory configuration"
 	case domain.UpdatePlanPhaseBuild:
 		if progress.Current == 0 && progress.Total > 1 {
+			if _, _, ok := evaluatedOutputs(progress.Detail); ok {
+				return "Testing the required systems"
+			}
 			return "Testing the required systems and installation files"
 		}
 		detail := strings.ToLower(progress.Detail)
@@ -377,4 +391,28 @@ func (model dashboardModel) maximumUpdateScroll() int {
 		return 0
 	}
 	return maximum
+}
+
+// evaluatedOutputs reads the laboratory review's grouped build detail, in
+// which the network-installation outputs are only evaluated.
+func evaluatedOutputs(detail string) (built, evaluated int, ok bool) {
+	_, err := fmt.Sscanf(detail, "Building %d systems and evaluating %d installation outputs", &built, &evaluated)
+	return built, evaluated, err == nil
+}
+
+// groupedBuildLine describes one Nix invocation that checks several outputs.
+func groupedBuildLine(progress domain.UpdatePlanProgress) string {
+	if built, evaluated, ok := evaluatedOutputs(progress.Detail); ok {
+		return fmt.Sprintf("%d systems built together · %d installation files checked, built when network installation is prepared", built, evaluated)
+	}
+	return fmt.Sprintf("Required outputs: %d · checking together", progress.Total)
+}
+
+// configuredTargetLabel adds the locked revision to a moving target such as
+// master, whose version number stays the same between revisions.
+func configuredTargetLabel(check domain.UpdateCheckReport) string {
+	if check.CurrentChannel == domain.UpdateChannelMoving && check.CurrentRev != "" {
+		return check.CurrentRef + " · " + shortRevision(check.CurrentRev)
+	}
+	return check.CurrentRef
 }

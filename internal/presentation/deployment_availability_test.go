@@ -120,3 +120,18 @@ func TestDeploymentPerComputerResultsAndRecoveryRemainScrollable(t *testing.T) {
 		}
 	}
 }
+
+func TestSuccessfulDeploymentDoesNotRepeatItsHeadline(t *testing.T) {
+	model := newTestModel(t)
+	model.width, model.height = 120, 40
+	model.screen = dashboardDeploy
+	model.deployment.result = domain.DeploymentExecutionReport{Operation: "deploy-apply", State: "verified", Phase: domain.DeploymentPhaseVerify, BuildCompleted: true, ApplyCompleted: true, Targets: mixedDeploymentPlan().Targets[:1], Verification: domain.DeploymentVerificationSummary{Attempted: 1, Verified: 1, Recorded: 1, Targets: []domain.DeploymentTargetVerification{{Name: "pc01", State: "verified"}}}}
+	model.message = "The selected computers were updated, checked, and recorded."
+	if model.deployment.result.HasErrors() {
+		t.Fatalf("fixture is not a success: %+v", model.deployment.result)
+	}
+	view := demoANSI.ReplaceAllString(model.View().Content, "")
+	if !strings.Contains(view, "pc01 — Updated") || strings.Contains(view, "updated, checked, and recorded") {
+		t.Fatalf("success result repeats its headline:\n%s", view)
+	}
+}

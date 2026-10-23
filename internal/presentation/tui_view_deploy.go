@@ -106,7 +106,10 @@ func (model dashboardModel) deployView() string {
 		for _, computer := range summary.Computers {
 			lines = append(lines, "", computer.Name+" — "+computer.Outcome, "  "+computer.Guidance)
 		}
-		if model.message != "" || model.deployment.result.RecoveryRequired {
+		// A full success is already the green headline; the notice would
+		// only repeat it.
+		repeatsHeadline := success && len(model.deployment.result.Skipped) == 0
+		if (model.message != "" && !repeatsHeadline) || model.deployment.result.RecoveryRequired {
 			shell.notices = append(shell.notices, model.deploymentResultNotice())
 		}
 		shell.body = strings.Join(lines, "\n")

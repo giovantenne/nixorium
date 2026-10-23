@@ -155,6 +155,24 @@ func TestGroupedUpdateBuildRetainsDetailsWithoutInventingCompletion(t *testing.T
 	}
 }
 
+func TestLaboratoryReviewSaysWhichOutputsAreOnlyChecked(t *testing.T) {
+	model := dashboardModel{screen: dashboardUpdate, busy: "Checking systems", width: 140, height: 40,
+		updates: updateModel{planning: true, target: "master", planStarted: time.Now(), planProgress: domain.UpdatePlanProgress{
+			Phase: domain.UpdatePlanPhaseBuild, Detail: "Building 2 systems and evaluating 3 installation outputs", Total: 5,
+		}}}
+	model.beginRead(dashboardBuildTimeout)
+	t.Cleanup(model.read.cancel)
+	view := demoANSI.ReplaceAllString(model.View().Content, "")
+	for _, expected := range []string{"Testing the required systems", "2 systems built together · 3 installation files checked, built when network installation is prepared"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("grouped build lost %q:\n%s", expected, view)
+		}
+	}
+	if strings.Contains(view, "Required outputs") || strings.Contains(view, "installation files\n") {
+		t.Fatalf("grouped build still says every output is built:\n%s", view)
+	}
+}
+
 func TestControllerReviewStatesChangesOrUpToDate(t *testing.T) {
 	m := experienceFixture(t, 1)
 	m.screen = dashboardControllerReview

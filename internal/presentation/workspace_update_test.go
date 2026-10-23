@@ -95,3 +95,23 @@ func TestUpdateReviewShowsOnlyChangesUntilDetails(t *testing.T) {
 		t.Fatalf("unchanged summary:\n%s", summary)
 	}
 }
+
+func TestUpdateReviewNamesMasterRevisionsAndIndentsMigrations(t *testing.T) {
+	m := workspaceFixture(t)
+	m.width, m.height = 100, 40
+	m.screen = dashboardUpdateReview
+	m.updates.plan = demoWorkspaceUpdatePlan()
+	m.updates.plan.CurrentRef, m.updates.plan.Target = "master", "master"
+	m.updates.plan.CurrentRev, m.updates.plan.TargetRev = strings.Repeat("3", 40), strings.Repeat("a", 40)
+	m.updates.plan.Migrations = []domain.DeploymentMigrationResult{{State: domain.MigrationApplied, Files: []string{"scripts/cmd-screensaver.sh"},
+		Description: "The lab screensaver draws 60 frames per second instead of 30: its effects advance once per frame, so at 30 they ran at half speed."}}
+	content := strings.Join(m.updateReviewContent(), "\n")
+	if !strings.Contains(content, "Nixorium: master 333333333333 -> aaaaaaaaaaaa") {
+		t.Fatalf("revisions missing:\n%s", content)
+	}
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "half speed") && !strings.HasPrefix(line, strings.Repeat(" ", 18)) {
+			t.Fatalf("migration continuation not indented: %q\n%s", line, content)
+		}
+	}
+}

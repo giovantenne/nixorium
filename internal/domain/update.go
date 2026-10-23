@@ -65,10 +65,12 @@ type UpdateInputSnapshot struct {
 type UpdateProposal struct {
 	FlakeContent []byte
 	LockContent  []byte
-	Diff         GitDiff
-	Checks       []UpdateCheck
-	PackageBase  *PackageBaseChange
-	Workspace    *WorkspaceUpdateImpact
+	// NixoriumRevision is the Nixorium revision LockContent pins.
+	NixoriumRevision string
+	Diff             GitDiff
+	Checks           []UpdateCheck
+	PackageBase      *PackageBaseChange
+	Workspace        *WorkspaceUpdateImpact
 	// Migrations are the target release's changes to the deployment's own
 	// files (ADR 0034), with their outcome on this deployment; MigratedFiles
 	// are the files the applied ones change, written when the update is saved.
@@ -186,15 +188,18 @@ type UpdatePlanReport struct {
 	CurrentRev     string                      `json:"currentRevision,omitempty"`
 	CurrentChannel UpdateChannel               `json:"currentChannel,omitempty"`
 	Target         string                      `json:"target,omitempty"`
-	TargetChannel  UpdateChannel               `json:"targetChannel,omitempty"`
-	Downgrade      bool                        `json:"downgrade"`
-	ReviewToken    string                      `json:"reviewToken,omitempty"`
-	Confirmation   string                      `json:"confirmation,omitempty"`
-	Diff           GitDiff                     `json:"diff"`
-	Checks         []UpdateCheck               `json:"checks"`
-	Issues         []ValidationIssue           `json:"issues"`
-	Snapshot       UpdateInputSnapshot         `json:"-"`
-	Proposal       UpdateProposal              `json:"-"`
+	// TargetRev is the Nixorium revision the candidate locks; on a moving
+	// target such as master it tells two revisions of the same name apart.
+	TargetRev     string              `json:"targetRevision,omitempty"`
+	TargetChannel UpdateChannel       `json:"targetChannel,omitempty"`
+	Downgrade     bool                `json:"downgrade"`
+	ReviewToken   string              `json:"reviewToken,omitempty"`
+	Confirmation  string              `json:"confirmation,omitempty"`
+	Diff          GitDiff             `json:"diff"`
+	Checks        []UpdateCheck       `json:"checks"`
+	Issues        []ValidationIssue   `json:"issues"`
+	Snapshot      UpdateInputSnapshot `json:"-"`
+	Proposal      UpdateProposal      `json:"-"`
 }
 
 func (r UpdatePlanReport) HasErrors() bool {

@@ -426,15 +426,16 @@ func validateUpdateCandidate(ctx context.Context, repository, currentFlake strin
 		return domain.UpdateProposal{}, err
 	}
 	return domain.UpdateProposal{
-		FlakeContent:    proposedFlake,
-		LockContent:     proposedLock,
-		Diff:            domain.GitDiff{Scope: "nixorium-update", Content: diff},
-		Checks:          checks,
-		Workspace:       workspace,
-		Migrations:      migrations,
-		MigratedFiles:   migratedFiles,
-		MigrationReport: migrationReport,
-		Migrator:        migrator,
+		FlakeContent:     proposedFlake,
+		LockContent:      proposedLock,
+		NixoriumRevision: proposedRevision,
+		Diff:             domain.GitDiff{Scope: "nixorium-update", Content: diff},
+		Checks:           checks,
+		Workspace:        workspace,
+		Migrations:       migrations,
+		MigratedFiles:    migratedFiles,
+		MigrationReport:  migrationReport,
+		Migrator:         migrator,
 	}, nil
 }
 

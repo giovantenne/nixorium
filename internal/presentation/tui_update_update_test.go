@@ -177,7 +177,7 @@ func TestDashboardHidesNixoriumDowngrades(t *testing.T) {
 func TestDashboardHidesReleasesOlderThanRunningVersionOnMasterPins(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), actions: DashboardActions{RunningVersion: "3.5.0"}}
 	report := domain.UpdateCheckReport{
-		State: "available", CurrentRef: "master", CurrentChannel: domain.UpdateChannelMoving, VersionFloor: "v3.5.0",
+		State: "available", CurrentRef: "master", CurrentRev: strings.Repeat("3", 40), CurrentChannel: domain.UpdateChannelMoving, VersionFloor: "v3.5.0",
 		Development: []domain.UpdateRelease{{Tag: "master", Channel: domain.UpdateChannelMoving}},
 		Stable: []domain.UpdateRelease{
 			{Tag: "v3.6.0", Channel: domain.UpdateChannelStable},
@@ -192,7 +192,7 @@ func TestDashboardHidesReleasesOlderThanRunningVersionOnMasterPins(t *testing.T)
 		t.Fatalf("selectable releases = %+v", releases)
 	}
 	view := model.View().Content
-	if strings.Contains(view, "v3.4.0") || !strings.Contains(view, "Running version     3.5.0 (older releases are hidden)") || !strings.Contains(view, "Configured target   master") {
+	if strings.Contains(view, "v3.4.0") || !strings.Contains(view, "Running version     3.5.0 (older releases are hidden)") || !strings.Contains(view, "Configured target   master · 333333333333") {
 		t.Fatalf("master-pinned update screen does not apply the version floor:\n%s", view)
 	}
 	for index, release := range releases {

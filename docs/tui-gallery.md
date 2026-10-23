@@ -719,8 +719,6 @@ pc04 — Updated
 pc05 — Updated
   Updated and checked: it is running the reviewed version.
 
-○ All five clients report the reviewed revision.
-
 n New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
 ```
 

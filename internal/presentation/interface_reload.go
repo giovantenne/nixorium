@@ -77,6 +77,11 @@ func (model dashboardModel) offerInterfaceReload() (dashboardModel, tea.Cmd) {
 	if !reload {
 		return model, nil
 	}
+	if installed.Version == model.actions.RunningVersion {
+		// A new revision of the same version (master): the number would
+		// read as no change.
+		installed.Version = ""
+	}
 	model.reload = interfaceReloadModel{state: interfaceReloadOffered, version: installed.Version, id: id}
 	return model, nil
 }
