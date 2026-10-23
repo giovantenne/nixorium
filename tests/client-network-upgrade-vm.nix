@@ -137,6 +137,20 @@ in
     lab_ip_present()
     controller.wait_until_succeeds(ssh + "true")
 
+    # Saving the profile outside Nixorium (GNOME Settings, here nmcli, which
+    # persists it the same way) can drop the laboratory address; the profile
+    # writer removes that copy and the declared profile applies again.
+    uuid_line = "uuid=5c0e2a3e-8f3b-4d57-9f0f-3b1e0d6a9c11"
+    client.succeed("nmcli connection modify nixorium-lab ipv4.addresses \"\" ipv4.dns 1.1.1.1 ipv4.ignore-auto-dns yes")
+    client.succeed(f"grep -lx '{uuid_line}' /etc/NetworkManager/system-connections/*.nmconnection")
+    client.succeed("nmcli -w 0 connection up nixorium-lab ifname eth1")
+    client.wait_until_fails("ip -4 -o address show dev eth1 | grep -F ' 10.0.0.1/24 '", timeout=30)
+    client.succeed("systemctl restart NetworkManager-ensure-profiles.service")
+    client.succeed(f"! grep -lsx '{uuid_line}' /etc/NetworkManager/system-connections/*.nmconnection")
+    lab_ip_present()
+    client.succeed("nmcli -g ipv4.addresses connection show nixorium-lab | grep -F 10.0.0.1/24")
+    controller.wait_until_succeeds(ssh + "true")
+
     # Straight from the scripted address to the controller profile, as an
     # existing controller upgrades.
     deploy(base)

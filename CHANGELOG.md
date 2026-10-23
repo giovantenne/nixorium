@@ -8,6 +8,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Saving the laboratory network profile in GNOME Settings (to change DNS, for
+  example) wrote the whole profile without the laboratory address, and the
+  next controller update stopped with "controller static address is absent
+  after activation". Nixorium now removes such a copy of `nixorium-lab` and
+  restores its own profile at start-up and during controller activation; DNS
+  and other network choices belong in the deployment. When the controller
+  apply fails, the result shows the apply unit's own reason instead of the
+  generic systemctl message.
 - Applying an update to the controller is about half a minute shorter: the
   controller configuration is no longer evaluated a second time right after
   the review, and the final check reads the record the apply unit writes once

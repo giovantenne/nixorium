@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -196,5 +197,30 @@ func TestReviewedControllerApplyFailsWithoutTheRecord(t *testing.T) {
 	report := manager.ApplyReviewed(context.Background(), "/deployment", plan)
 	if report.Verified || report.State != "failed" {
 		t.Fatalf("unverified activation reported as verified: %+v", report)
+	}
+}
+
+// failingUnitSource is a controller whose apply unit records why it failed.
+type failingUnitSource struct {
+	*fakeControllerSource
+	progress []byte
+}
+
+func (f *failingUnitSource) ReadOperationProgress(string) ([]byte, error) { return f.progress, nil }
+
+func TestFailedControllerApplyShowsTheUnitsReason(t *testing.T) {
+	source := &failingUnitSource{fakeControllerSource: readyControllerSource()}
+	source.startErr = errors.New("systemctl: Job for nixorium-apply-controller@x.service failed")
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	source.progress = []byte(`{"schemaVersion":1,"operation":"controller-apply","state":"failed","phase":"activate","startedAt":"` + now + `","updatedAt":"` + now + `","current":2,"total":4,"recent":["Built controller system; beginning activation","Failed: controller static address is absent after activation; run: nmcli connection up nixorium-lab ifname enp0s3"]}`)
+	report := NewControllerManager(source).Apply(context.Background(), "/deployment", source.revision)
+	if report.State != "failed" || report.Message != "controller build or activation failed: controller static address is absent after activation; run: nmcli connection up nixorium-lab ifname enp0s3" {
+		t.Fatalf("report = %+v", report)
+	}
+	// A record from an earlier run is not this failure.
+	old := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+	source.progress = []byte(`{"schemaVersion":1,"operation":"controller-apply","state":"failed","phase":"activate","startedAt":"` + old + `","updatedAt":"` + old + `","recent":["Failed: an older reason"]}`)
+	if report := NewControllerManager(source).Apply(context.Background(), "/deployment", source.revision); report.Message != "controller build or activation failed: systemctl: Job for nixorium-apply-controller@x.service failed" {
+		t.Fatalf("stale reason used: %+v", report)
 	}
 }

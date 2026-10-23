@@ -37,6 +37,7 @@ let
     else if shared then "$NIXORIUM_PREVIOUS_ADDRESS"
     else transition.hostIps.${hostName} or null;
   labAddress = if shared then "$NIXORIUM_LAB_ADDRESS" else hostIp;
+  labProfileUuid = "5c0e2a3e-8f3b-4d57-9f0f-3b1e0d6a9c11";
 in
 {
   # A shared system has no single name. Services that write the configured
@@ -73,7 +74,7 @@ in
   networking.networkmanager.ensureProfiles.profiles.nixorium-lab = lib.mkIf profile {
     connection = {
       id = "nixorium-lab";
-      uuid = "5c0e2a3e-8f3b-4d57-9f0f-3b1e0d6a9c11";
+      uuid = labProfileUuid;
       type = "ethernet";
       autoconnect = "true";
       # A shared system detects a duplicated address (two computers with the
@@ -111,8 +112,20 @@ in
     # at most a minute.
     preStart = ''
       for _ in $(seq 120); do
-        nmcli -t general status >/dev/null 2>&1 && exit 0
+        nmcli -t general status >/dev/null 2>&1 && break
         sleep 0.5
+      done
+      # Saving this profile in GNOME Settings (to change DNS, for example)
+      # writes the whole profile to /etc, without the laboratory address, and
+      # that copy takes the place of the declared one. Remove it, so the
+      # declared profile applies again; the change belongs in the deployment.
+      for file in /etc/NetworkManager/system-connections/*.nmconnection; do
+        [ -f "$file" ] || continue
+        if grep -qx 'uuid=${labProfileUuid}' "$file"; then
+          echo "Restoring nixorium-lab: removing $file, changed outside Nixorium"
+          rm -f -- "$file"
+          touch /run/nixorium-lab-restored
+        fi
       done
     '';
     # Upgrading a running computer from the scripted lab address (clients
@@ -122,6 +135,15 @@ in
     # autoconnect. Activate the profile explicitly, without waiting, unless it
     # is already active or activating (normal boot).
     postStart = ''
+      # A restored profile replaces the edited one that may still be active.
+      if [ -e /run/nixorium-lab-restored ]; then
+        rm -f /run/nixorium-lab-restored
+        device=$(nmcli -t -f NAME,DEVICE connection show --active \
+          | awk -F: '$1 == "nixorium-lab" { print $2; exit }')
+        if [ -n "$device" ]; then
+          nmcli -w 0 connection up nixorium-lab ifname "$device" || true
+        fi
+      fi
       if ! nmcli -t -f NAME connection show --active | grep -Fxq nixorium-lab; then
         device=${if byName then lib.escapeShellArg labSettings.ifaceName else ''$(nmcli -t -f DEVICE,TYPE,STATE device \
           | awk -F: '$2 == "ethernet" && $3 != "unmanaged" { print $1; exit }')''}

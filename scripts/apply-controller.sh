@@ -232,6 +232,16 @@ if [[ "$DEPLOYMENT_MODE" == laboratory && ! -e /var/lib/nixorium/pxe/session.jso
       sleep 1
     done
     if ! static_address_present; then
+      # A copy of nixorium-lab saved outside Nixorium (GNOME Settings) has no
+      # laboratory address; the profile writer removes it and restores the
+      # declared profile.
+      systemctl restart NetworkManager-ensure-profiles.service || true
+      for _ in $(seq 30); do
+        static_address_present && break
+        sleep 1
+      done
+    fi
+    if ! static_address_present; then
       nmcli --wait 60 connection up nixorium-lab ifname "$CONTROLLER_IFACE" >/dev/null \
         || fail "could not activate the laboratory network profile; run: nmcli connection up nixorium-lab ifname $CONTROLLER_IFACE"
     fi

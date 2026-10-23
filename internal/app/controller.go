@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -161,9 +163,15 @@ func (m *ControllerManager) apply(ctx context.Context, plan domain.ControllerReb
 	}
 	report.Unit = ControllerApplyUnit(expectedRevision)
 	report.Phase = domain.ControllerRebuildPhaseApply
+	started := time.Now()
 	if err := m.source.StartSystemUnit(ctx, report.Unit); err != nil {
 		report.State = "failed"
 		report.Message = fmt.Sprintf("controller build or activation failed: %v", err)
+		if reason := m.unitFailure(started); reason != "" {
+			// The unit's own reason says what to do; systemctl only says
+			// that it failed.
+			report.Message = "controller build or activation failed: " + reason
+		}
 		return report
 	}
 	report.Applied = true
@@ -186,6 +194,32 @@ func (m *ControllerManager) apply(ctx context.Context, plan domain.ControllerReb
 	report.Phase = domain.ControllerRebuildPhaseComplete
 	report.Message = "The controller now uses the saved configuration."
 	return report
+}
+
+// controllerProgressReader reads the progress record the apply unit keeps.
+type controllerProgressReader interface {
+	ReadOperationProgress(string) ([]byte, error)
+}
+
+// unitFailure is the failure the apply unit recorded in this run, if any.
+func (m *ControllerManager) unitFailure(started time.Time) string {
+	reader, ok := m.source.(controllerProgressReader)
+	if !ok {
+		return ""
+	}
+	data, err := reader.ReadOperationProgress("controller-apply")
+	if err != nil {
+		return ""
+	}
+	progress, err := domain.DecodeOperationProgress(data)
+	if err != nil || progress.State != "failed" || len(progress.Recent) == 0 || progress.StartedAt.Before(started.Add(-5*time.Second)) {
+		return ""
+	}
+	last := progress.Recent[len(progress.Recent)-1]
+	if !strings.HasPrefix(last, "Failed: ") {
+		return ""
+	}
+	return strings.TrimPrefix(last, "Failed: ")
 }
 
 func ControllerApplyUnit(revision string) string {
