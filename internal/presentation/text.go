@@ -263,7 +263,9 @@ func deploymentMigrationLines(migrations []domain.DeploymentMigrationResult) []s
 	for _, result := range migrations {
 		switch result.State {
 		case domain.MigrationApplied:
-			lines = append(lines, fmt.Sprintf("Migration:        %s — %s", safeWorkspaceText(strings.Join(result.Files, ", ")), safeWorkspaceText(result.Description)))
+			lines = append(lines,
+				"Migration:        "+safeWorkspaceText(result.Description),
+				"                  Files: "+safeWorkspaceText(strings.Join(result.Files, ", ")))
 		case domain.MigrationManual:
 			lines = append(lines,
 				"Manual change:    "+safeWorkspaceText(result.Description),

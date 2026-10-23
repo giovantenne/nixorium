@@ -8,6 +8,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The Update Nixorium review fits on one screen: the release change, the
+  applications whose version changes and, for each change to the deployment's
+  own files, one sentence with the files under it. The line-by-line diff of
+  `flake.nix`, `flake.lock` and the migrated files moved to F4 Details; it is
+  still saved in the Git history with the update, and the text plan
+  (`nixorium update plan`) still prints it.
 - Update Nixorium reviews faster: the network-installation outputs (netboot
   image, PXE firmware, installer) are now only evaluated during the review and
   built when network installation is prepared. On a test controller with four

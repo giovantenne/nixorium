@@ -59,11 +59,13 @@ Open Maintenance:
    accept unverified channel compatibility. Enter validates the proposal.
    A future channel name is only a requested target, not proof it exists or
    is supported. Resolution/evaluation/build failures still block.
-4. Review the bounded flake diff and checks. Enter explicitly saves the
-   reviewed files and records them in local Git, then activates/verifies the
-   controller through the existing managed controller operation. The review
-   can also list changes the new release makes to your own files (see
-   [Changes to your own files](#changes-to-your-own-files)).
+4. Review the summary: the release change, the applications whose version
+   changes and the changes the new release makes to your own files (see
+   [Changes to your own files](#changes-to-your-own-files)). **F4 Details**
+   adds every version, the checks and the line-by-line file changes. Enter
+   explicitly saves the reviewed files and records them in local Git, then
+   activates/verifies the controller through the existing managed controller
+   operation.
 5. If saving fails, recover saving first. If controller activation fails after
    saving, the desired configuration is saved but the running controller is
    not verified; retry controller activation, not a new input update.
@@ -143,8 +145,9 @@ plan the configured release again to repair them before updating the computers.
 For an existing prepared student workspace, both update planners compare its
 current and proposed pinned packages, extensions, dependencies and effective
 preferences. CLI JSON exposes these as `workspace.current` and
-`workspace.proposed`; text and TUI review show a scrollable comparison before
-the flake diff. This is not the currently running home state or a search for the
+`workspace.proposed`; the TUI review lists the applications whose version
+changes, and F4 Details and the text plan show the full comparison before the
+flake diff. This is not the currently running home state or a search for the
 vendor's latest release. Equal version strings can still hide rebuilt
 dependencies; review the pin diff too.
 
@@ -214,9 +217,10 @@ files. It accepts only plain changes to your own files: never `flake.nix`,
 1 MiB each. It does this only when the update changes the Nixorium release, not for
 an update of the system and packages alone. The review shows, for each change:
 
-- `Migration:` the files and, in one sentence, why they change. The change is
-  also in the diff, together with any other file the release creates or
-  removes.
+- `Migration:` in one sentence, why your files change, and under it the files.
+  F4 Details shows the change line by line, together with any other file the
+  release creates or removes, and it is saved in the Git history with the
+  update.
 - `Manual change:` the release could not make this change automatically,
   because you edited that place or the file is missing. Nothing in that file is
   touched. The line under it says what to do, for a text replacement

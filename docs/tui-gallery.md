@@ -1303,15 +1303,12 @@ Nixorium  /  Maintenance  /  Update system and packages  /  Review
 
 Review update
 Builds passed; programs are checked when they run on a computer.
-Lines 1-8 of 8
 Nixorium: nixos-26.05 -> nixos-26.05
 Applications whose version changes:
   Extension example.extension: 1.0 -> 2.0
   Package nodejs: not selected -> 24.0
   Package vscode: 1.0 -> 2.0
-
-Proposed flake.nix/flake.lock changes:
-+ reviewed pin
+F4 shows every version and the changes to the deployment files.
 
 Enter saves the update and applies it to this controller.
 Computers are updated afterwards, from Computers → Update computers.

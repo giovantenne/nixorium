@@ -246,7 +246,7 @@ func TestUpdateTextShowsValidatedPlanAndReviewableResult(t *testing.T) {
 	var output bytes.Buffer
 	UpdatePlanText(&output, plan)
 	for _, expected := range []string{"update plan: READY", "v2.0.0", "prerelease", "client", "PASSED", "sha256:review", plan.Confirmation, "No branch, commit, push", "Proposed changes to deployment files",
-		"Migration:        modules/workstation.nix — Find the controller with isController.",
+		"Migration:        Find the controller with isController.", "Files: modules/workstation.nix",
 		"Manual change:    Import the new module.", "modules/shared.nix was changed by hand. Replace \"a\" with \"b\"."} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("update plan output omits %q:\n%s", expected, output.String())

@@ -18,6 +18,7 @@ var gitReviewHelp = helpText{head: []string{
 
 var updateHelp = helpText{head: []string{
 	"During validation: l expands or collapses current check details in place, when there are details.",
+	"The review shows what changes; F4 Details adds every version, the checks and the line-by-line changes to the deployment files, which are also saved in its Git history.",
 }}
 
 // screenHelp lists every screen with its own help. A screen present with

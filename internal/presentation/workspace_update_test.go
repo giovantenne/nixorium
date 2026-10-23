@@ -35,6 +35,7 @@ func TestWorkspaceUpdateScrollableReviewKeepsCancelAndVersionComparison(t *testi
 			m.screen = dashboardUpdateReview
 			m.updates.packageBase = true
 			m.updates.plan = demoWorkspaceUpdatePlan()
+			m.updateDetails = true // the diff is in F4 Details
 			seen := ""
 			var firstView string
 			for i := 0; i <= m.maximumUpdateScroll(); i++ {
@@ -72,18 +73,18 @@ func TestUpdateReviewShowsOnlyChangesUntilDetails(t *testing.T) {
 	plan.Workspace.Current.Packages = append(plan.Workspace.Current.Packages, domain.WorkspacePackage{Package: "gcc", Version: "15.2.0"})
 	plan.Workspace.Proposed.Packages = append(plan.Workspace.Proposed.Packages, domain.WorkspacePackage{Package: "gcc", Version: "15.2.0"})
 	summary := strings.Join(updateReviewLines(plan, false), "\n")
-	for _, want := range []string{"Nixorium: nixos-26.05 -> nixos-26.05", "Applications whose version changes:", "Package vscode: 1.0 -> 2.0", "Package nodejs: not selected -> 24.0", "+ reviewed pin"} {
+	for _, want := range []string{"Nixorium: nixos-26.05 -> nixos-26.05", "Applications whose version changes:", "Package vscode: 1.0 -> 2.0", "Package nodejs: not selected -> 24.0", "F4 shows every version and the changes to the deployment files."} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary misses %q:\n%s", want, summary)
 		}
 	}
-	for _, unwanted := range []string{"gcc", "requires packages", "effective preferences"} {
+	for _, unwanted := range []string{"gcc", "requires packages", "effective preferences", "+ reviewed pin", "Proposed flake.nix/flake.lock changes"} {
 		if strings.Contains(summary, unwanted) {
 			t.Fatalf("summary shows %q:\n%s", unwanted, summary)
 		}
 	}
 	full := strings.Join(updateReviewLines(plan, true), "\n")
-	for _, want := range []string{"Package gcc: 15.2.0 -> 15.2.0", "requires packages [nodejs]", "effective preferences"} {
+	for _, want := range []string{"Package gcc: 15.2.0 -> 15.2.0", "requires packages [nodejs]", "effective preferences", "+ reviewed pin"} {
 		if !strings.Contains(full, want) {
 			t.Fatalf("details miss %q:\n%s", want, full)
 		}

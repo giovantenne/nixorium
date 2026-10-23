@@ -600,7 +600,10 @@ func (model dashboardModel) releaseReviewView() string {
 	patch := updateReviewLines(model.updates.plan, model.updateDetails)
 	start := min(model.updates.scroll, max(0, len(patch)-model.updateReviewHeight()))
 	end := min(len(patch), start+model.updateReviewHeight())
-	lines = append(lines, "", fmt.Sprintf("Diff lines %d-%d of %d", start+1, end, len(patch)))
+	lines = append(lines, "")
+	if len(patch) > model.updateReviewHeight() {
+		lines = append(lines, fmt.Sprintf("Lines %d-%d of %d", start+1, end, len(patch)))
+	}
 	lines = append(lines, patch[start:end]...)
 	lines = append(lines, "", "Press Enter to save this validated update and activate the controller.")
 	notices := []tuiNotice{}
@@ -610,5 +613,5 @@ func (model dashboardModel) releaseReviewView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return model.renderShell(tuiShell{path: []string{"Maintenance", model.updateTitle(), "Review"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Scroll diff"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
+	return model.renderShell(tuiShell{path: []string{"Maintenance", model.updateTitle(), "Review"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Scroll"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
 }

@@ -85,9 +85,12 @@ fixed rules, shows it in the review and saves it with the update.
   migration therefore runs once, even if the old text comes back later. This is
   the idea of Omarchy's migration markers, with the record versioned with the
   configuration and reviewed with it.
-- **Review and saving.** The review shows "Migration: <files> — <description>"
-  for applied migrations and "Manual change: <description>" with the detail for
-  manual ones, and the diff shows every changed, created or removed file. The
+- **Review and saving.** The review shows "Migration: <description>" with the
+  files under it for applied migrations and "Manual change: <description>" with
+  the detail for manual ones. The diff of every changed, created or removed
+  file is in F4 Details (and in the text plan), not in the summary: the
+  administrator decides on the descriptions, and the diff stays in the Git
+  history. The
   review token binds the files, the raw report and the migrator's store path.
   Saving writes the files first, each only if still unchanged since the review,
   then `flake.lock` and `flake.nix`; everything is restored if a later step

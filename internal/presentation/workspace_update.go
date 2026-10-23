@@ -98,9 +98,10 @@ func workspaceVersionChanges(impact *domain.WorkspaceUpdateImpact) []string {
 }
 
 // updateReviewLines is the review of an update. The summary shows what
-// changes: the release, the deployment file migrations, the applications
-// whose version changes and the file diff; full adds every pinned version,
-// target and preference (F4 Details, and the command-line plan).
+// changes: the release, the deployment file migrations and the applications
+// whose version changes. full (F4 Details, and the command-line plan) adds
+// every pinned version, target and preference, and the file diff, which is
+// also saved in the Git history with the update.
 func updateReviewLines(report domain.UpdatePlanReport, full bool) []string {
 	var content bytes.Buffer
 	if full {
@@ -115,11 +116,22 @@ func updateReviewLines(report domain.UpdatePlanReport, full bool) []string {
 				fmt.Fprintln(&content, "  "+change)
 			}
 		} else {
-			fmt.Fprintln(&content, "No application version changes. F4 shows every version.")
+			fmt.Fprintln(&content, "No application version changes.")
 		}
 	}
-	if migrations := deploymentMigrationLines(report.Migrations); len(migrations) > 0 {
+	migrations := deploymentMigrationLines(report.Migrations)
+	if len(migrations) > 0 {
 		fmt.Fprintln(&content, strings.Join(migrations, "\n"))
+	}
+	if !full {
+		if report.Workspace != nil {
+			fmt.Fprintln(&content, "F4 shows every version and the changes to the deployment files.")
+		} else {
+			fmt.Fprintln(&content, "F4 shows the changes to the deployment files.")
+		}
+		return strings.Split(strings.TrimSuffix(content.String(), "\n"), "\n")
+	}
+	if len(migrations) > 0 {
 		fmt.Fprintln(&content, "\nProposed changes to deployment files:")
 	} else if report.Workspace != nil {
 		fmt.Fprintln(&content, "\nProposed flake.nix/flake.lock changes:")
@@ -149,8 +161,10 @@ func (model dashboardModel) workspaceUpdateReviewView() string {
 	start := min(model.updates.scroll, max(0, len(content)-model.updateReviewHeight()))
 	end := min(len(content), start+model.updateReviewHeight())
 	lines := []string{tuiTitle("Review update", model.isDark),
-		"Builds passed; programs are checked when they run on a computer.",
-		fmt.Sprintf("Lines %d-%d of %d", start+1, end, len(content))}
+		"Builds passed; programs are checked when they run on a computer."}
+	if len(content) > model.updateReviewHeight() {
+		lines = append(lines, fmt.Sprintf("Lines %d-%d of %d", start+1, end, len(content)))
+	}
 	lines = append(lines, content[start:end]...)
 	notices := []tuiNotice{}
 	if model.message != "" {

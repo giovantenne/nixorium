@@ -108,9 +108,15 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.WindowSizeMsg{Height: 24})
 	model = updated.(dashboardModel)
+	if diff, _, _ := strings.Cut(model.updates.plan.Diff.Content, "\n"); diff == "" || strings.Contains(model.View().Content, diff) {
+		t.Fatalf("update summary shows the file diff:\n%s", model.View().Content)
+	}
+	// F4 Details shows the diff, which scrolls.
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyF4})
+	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
 	model = updated.(dashboardModel)
-	if model.updates.scroll == 0 {
+	if !model.updateDetails || model.updates.scroll == 0 {
 		t.Fatal("update diff did not scroll")
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
