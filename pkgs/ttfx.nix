@@ -5,14 +5,14 @@
 # nixpkgs ships it; then the screensaver uses nixpkgs' ttfx instead.
 rustPlatform.buildRustPackage rec {
   pname = "ttfx";
-  version = "0.3.2";
+  version = "0.5.0";
   src = fetchFromGitHub {
     owner = "omacom-io";
     repo = "ttfx";
     rev = "v${version}";
-    hash = "sha256-bwFjC6ZkZibkgXjoYVH2VuqqeXklGR9kmRl2fTitWBU=";
+    hash = "sha256-ZeWRyo9zturjRcH23SDgFOKoPOSY6nGMFzGeJAoDapk=";
   };
-  cargoHash = "sha256-DNrg12MNqBcQi6yvoJObM1gtE90iGBCxeQ3RwueYCE4=";
+  cargoHash = "sha256-ntoj5bmAa9U2+3K1UX6HL0t6MjfCYQNe5LuiuNJ/CnY=";
   # No binary cache has it, so every controller compiles it, again after each
   # system and packages update. Upstream's release profile (LTO, one codegen
   # unit) and the test build made that about 4 minutes on a 4-processor
