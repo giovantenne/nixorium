@@ -39,12 +39,13 @@ code shown after payment and accept its separate data-sharing consent. Review ea
 saving creates a local commit and backup, with separate system-application
 and computer-update reviews afterwards.
 You can also activate the free trial with its emailed code. The service shows
-the trial size and length when you activate (currently ten requests for thirty
+the trial size and length when you activate (currently 30 requests for 90
 days). Assistant shows the remaining requests and a purchase link when the trial
 ends; conversion keeps the controller activated. Each account enables one lab.
-Conversation sharing is off by default. In the chat, `/share` changes it and
-`/report` reports a final answer with your explicit consent. Reports and shared
-conversations are kept for 90 days.
+Conversations are saved on the Assistant service by default for 90 days to
+find and fix Assistant's mistakes; in the chat, `/share` switches saving off and
+`/report` reports a final answer with your explicit consent. Reports are kept
+for 90 days too.
 Capable controllers can prepare a public npm CLI package/tag into an offline
 baseline restored after the normal student-home reset; review its exact version,
 scope and reported optional-feature limitations before saving.

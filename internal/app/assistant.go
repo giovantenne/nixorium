@@ -51,12 +51,13 @@ func assistantSafeText(text, token string) string {
 }
 func assistantActivity(call domain.AssistantToolCall) string {
 	var args struct {
-		Path    string
-		Pattern string
-		Query   string
-		Package string
-		URL     string
-		Host    string
+		Path      string
+		Pattern   string
+		Query     string
+		Package   string
+		URL       string
+		Host      string
+		Extension string
 	}
 	_ = json.Unmarshal(call.Arguments, &args)
 	switch call.Name {
@@ -87,9 +88,7 @@ func assistantActivity(call domain.AssistantToolCall) string {
 	case "git_history":
 		return "Reading saved configuration history"
 	case "vscode_marketplace":
-		var extension struct{ Extension string }
-		_ = json.Unmarshal(call.Arguments, &extension)
-		return "Looking up " + extension.Extension + " in the VS Code Marketplace"
+		return "Looking up " + args.Extension + " in the VS Code Marketplace"
 	case "prefetch":
 		host := "a file"
 		if parsed, err := url.Parse(args.URL); err == nil && parsed.Hostname() != "" {
