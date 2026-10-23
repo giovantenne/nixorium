@@ -40,4 +40,13 @@ var Registry = []Migration{
 			})
 		},
 	},
+	{
+		ID:          "2026-10-screensaver-60-fps",
+		Description: "The lab screensaver draws 60 frames per second instead of 30: its effects advance once per frame, so at 30 they ran at half speed.",
+		Apply: func(tree Tree) Outcome {
+			return ReplaceExact(tree, "scripts/cmd-screensaver.sh",
+				"  # 30 frames per second look the same here and cost the terminal a quarter of\n  # the drawing that 120 would.\n  ttfx -i \"$SCREENSAVER_TEXT\" \\\n    --frame-rate 30 \\\n",
+				"  # Effects advance once per frame, so the frame rate is also their speed: 60\n  # keeps them lively for half the drawing that 120 cost the terminal.\n  ttfx -i \"$SCREENSAVER_TEXT\" \\\n    --frame-rate 60 \\\n")
+		},
+	},
 }

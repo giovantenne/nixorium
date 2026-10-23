@@ -26,16 +26,18 @@ The project follows [Semantic Versioning](https://semver.org/).
   built when network installation is prepared. On a test controller with four
   processors this removed about two and a half minutes from each review.
 - The lab screensaver uses much less processor: its effects now come from
-  `ttfx`, a Rust port of the previous Python effects, at 30 frames per second
-  instead of 120. After 30 idle minutes the screen goes black and switches off,
+  `ttfx`, a Rust port of the previous Python effects, at 60 frames per second
+  instead of 120 (the effects advance once per frame, so fewer frames would
+  slow them down). After 30 idle minutes the screen goes black and switches off,
   and the screensaver stops; a key or the mouse brings the desktop back without
   a password, and the computer stays on and reachable. Update Nixorium brings
-  the new screensaver to existing laboratories with the deployment migration
+  the new screensaver to existing laboratories with the deployment migrations
   `2026-10-ttfx-screensaver`, which replaces `modules/screensaver.nix`,
   `scripts/cmd-screensaver.sh` and `scripts/screensaver-monitor.sh` when they
-  are still as released (3.6.0 or later). If one of them was changed by hand,
-  the review shows a manual change and nothing is touched: copy the three
-  files from `templates/site` of this release.
+  are still as released (3.6.0 or later), and `2026-10-screensaver-60-fps`.
+  If one of them was changed by hand, the review shows a manual change and
+  nothing is touched: copy the three files from `templates/site` of this
+  release.
 
 ## [3.10.0-beta.3] - 2026-10-23
 

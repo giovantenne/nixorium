@@ -99,10 +99,20 @@ func TestTheScreensaverMigrationIsManualWithoutTheFiles(t *testing.T) {
 	}
 }
 
-func TestFrozenScreensaverFilesMatchTheTemplateTheyWereTakenFrom(t *testing.T) {
-	// The frozen copies are the template of the release that added the
-	// migration. When the template changes again, this test points at the
-	// need for a new migration instead of an edit of the frozen copy.
+func TestAMigratedScreensaverIsTheTemplateOfThisRelease(t *testing.T) {
+	// A 3.6.1 deployment that runs every screensaver migration ends up with
+	// the template's own files. When the template changes again, this test
+	// points at the need for a new migration.
+	root := treeWith(t, releasedScreensaver(t))
+	report, err := Run(root, "3.10.0", Registry[2:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range report.Migrations {
+		if entry.State != Applied {
+			t.Fatalf("%s = %s: %s", entry.ID, entry.State, entry.Detail)
+		}
+	}
 	for _, file := range []string{"modules/screensaver.nix", "scripts/cmd-screensaver.sh", "scripts/screensaver-monitor.sh"} {
 		template, err := os.ReadFile(filepath.Join("..", "..", "templates", "site", file))
 		if os.IsNotExist(err) {
@@ -111,8 +121,23 @@ func TestFrozenScreensaverFilesMatchTheTemplateTheyWereTakenFrom(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(template) != string(frozen("2026-10-ttfx-screensaver", filepath.Base(file))) {
-			t.Errorf("templates/site/%s differs from the frozen copy of 2026-10-ttfx-screensaver: add a new migration", file)
+		if read(t, root, file) != string(template) {
+			t.Errorf("a migrated templates/site/%s differs from the template: add a migration", file)
 		}
+	}
+}
+
+func TestTheSixtyFramesMigrationAppliesOnceAndRespectsEdits(t *testing.T) {
+	sixty := Registry[3:4]
+	current := string(frozen("2026-10-ttfx-screensaver", "cmd-screensaver.sh"))
+	root := treeWith(t, map[string]string{"scripts/cmd-screensaver.sh": current})
+	report, err := Run(root, "3.10.0", sixty)
+	if err != nil || report.Migrations[0].State != Applied || !strings.Contains(read(t, root, "scripts/cmd-screensaver.sh"), "--frame-rate 60 \\") {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	edited := strings.Replace(current, "--frame-rate 30", "--frame-rate 45", 1)
+	report, err = Run(treeWith(t, map[string]string{"scripts/cmd-screensaver.sh": edited}), "3.10.0", sixty)
+	if err != nil || report.Migrations[0].State != Manual {
+		t.Fatalf("an edited frame rate was not left alone: %+v, %v", report, err)
 	}
 }

@@ -51,10 +51,10 @@ while true; do
 
   # The canvas is the full terminal height, so the trailing newline (--no-eol)
   # would scroll the finished picture up one row. The cursor stays hidden.
-  # 30 frames per second look the same here and cost the terminal a quarter of
-  # the drawing that 120 would.
+  # Effects advance once per frame, so the frame rate is also their speed: 60
+  # keeps them lively for half the drawing that 120 cost the terminal.
   ttfx -i "$SCREENSAVER_TEXT" \
-    --frame-rate 30 \
+    --frame-rate 60 \
     --canvas-width 0 \
     --canvas-height 0 \
     --anchor-canvas c \
