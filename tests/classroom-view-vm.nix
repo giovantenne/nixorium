@@ -176,7 +176,18 @@ pkgs.testers.runNixOSTest {
     client.succeed("loginctl lock-sessions")
     client.sleep(3)
     client.succeed("(${agent} probe --thumbnail /tmp/thumb-locked.jpg nixorium-classroom-connect || true) | grep -F 'code=screen-locked'")
+    # GNOME's SetActive(false) would lift a password lock too: the agent never
+    # wakes a locked session, so it is still locked.
+    client.succeed("loginctl show-session \"$(loginctl list-sessions --no-legend | awk '$3 == \"student\" { print $1; exit }')\" -p LockedHint | grep -Fx LockedHint=yes")
     client.succeed("loginctl unlock-sessions")
+
+    # A screen that is only blank (Nixorium never locks it) is woken for the
+    # classroom view and captured.
+    saver = "su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gdbus call --session --dest org.gnome.ScreenSaver --object-path /org/gnome/ScreenSaver --method org.gnome.ScreenSaver."
+    client.succeed(saver + "SetActive true'")
+    client.wait_until_succeeds(saver + "GetActive' | grep -F true", timeout=10)
+    client.succeed("loginctl show-session \"$(loginctl list-sessions --no-legend | awk '$3 == \"student\" { print $1; exit }')\" -p LockedHint | grep -Fx LockedHint=no")
+    client.succeed("${agent} probe --thumbnail /tmp/thumb-blank.jpg nixorium-classroom-connect | grep -E '^thumbnail width='")
 
     # The student's terminal cannot stop the agent or its extension helper:
     # a manual stop is refused, and a killed agent starts again by itself.

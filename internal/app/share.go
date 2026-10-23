@@ -95,7 +95,9 @@ func (m *ShareManager) Plan(ctx context.Context, repository, requested, transfer
 		return fail("No selected computer has someone signed in with the classroom view. Check that the computers are on and updated.")
 	}
 	p.State = "ready"
-	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(5 * time.Minute)
+	// Between 5 and 10 minutes: a review made at the end of a block must not
+	// expire seconds later.
+	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(10 * time.Minute)
 	p.Message = fmt.Sprintf("%s (%s) go to the desktop of %d of %d computers. A restart empties the student's home.", shareCount(files), shareSize(p.Bytes), eligible, len(p.Targets))
 	p.ReviewToken = domain.ShareReviewToken(p)
 	return p

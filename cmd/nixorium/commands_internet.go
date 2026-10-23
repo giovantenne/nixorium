@@ -16,6 +16,9 @@ import (
 func runInternetCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
 	manager := app.NewInternetManager(adapters.Local{})
 	plan := manager.Plan(ctx, repository, options.on, options.internetAction)
+	if options.subcommand == "apply" {
+		plan = manager.Replan(ctx, repository, options.on, options.internetAction, options.expect)
+	}
 	if options.subcommand == "plan" || plan.HasErrors() {
 		if options.json {
 			_ = presentation.JSON(stdout, plan)

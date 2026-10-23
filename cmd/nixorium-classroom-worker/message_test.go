@@ -118,7 +118,7 @@ func TestPageShowsAMessageAfterAReviewThatQuotesIt(t *testing.T) {
 	if !strings.HasPrefix(review.Message, "“"+text+"”\n\nThis is shown on 2 of 3 computers, above everything, a lock included. It goes away by itself after 30 seconds.") {
 		t.Fatalf("review message = %q", review.Message)
 	}
-	if want := time.Now().UnixMilli(); review.Expires <= want || review.Expires > want+int64(6*time.Minute/time.Millisecond) {
+	if want := time.Now().UnixMilli(); review.Expires <= want || review.Expires > want+int64(11*time.Minute/time.Millisecond) {
 		t.Fatalf("the review ends at %d, now is %d", review.Expires, want)
 	}
 	if len(review.Rows) != 3 || review.Rows[0].Skip || !review.Rows[1].Skip || review.Rows[1].Note != app.ClassroomOffDetail || review.Rows[2].Skip {

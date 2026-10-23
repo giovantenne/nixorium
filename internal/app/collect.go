@@ -91,7 +91,9 @@ func (m *CollectManager) Plan(ctx context.Context, repository, requested, destin
 		return fail("No selected computer has someone signed in with the classroom view. Check that the computers are on and updated.")
 	}
 	p.State = "ready"
-	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(5 * time.Minute)
+	// Between 5 and 10 minutes: a review made at the end of a block must not
+	// expire seconds later.
+	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(10 * time.Minute)
 	p.Message = fmt.Sprintf("The desktop files of %d of %d computers are copied to %s, one folder per computer. Hidden files and links are left out; nothing changes on the students' computers.", eligible, len(p.Targets), destination)
 	p.ReviewToken = domain.CollectReviewToken(p)
 	return p

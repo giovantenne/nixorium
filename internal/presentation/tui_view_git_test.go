@@ -159,3 +159,17 @@ func TestGitCommitSelectionPreservesReviewOrderAndSkipsPrivatePaths(t *testing.T
 		t.Fatalf("unsafe or reordered selection = %v / %q", chosen, selectedGitCommitPaths(changes, chosen))
 	}
 }
+
+func TestSuccessfulCommitShowsItsNoteAsInformation(t *testing.T) {
+	model := dashboardModel{
+		screen:  dashboardGitReview,
+		message: "reviewed paths committed locally; no remote push was attempted",
+		maintenance: maintenanceModel{
+			gitCommitResult: domain.GitCommitReport{Operation: "git-commit", State: "completed", Committed: true},
+		},
+	}
+	view := demoANSI.ReplaceAllString(model.View().Content, "")
+	if !strings.Contains(view, "○ reviewed paths committed locally") || strings.Contains(view, "! reviewed paths") {
+		t.Fatalf("success note shown as a warning:\n%s", view)
+	}
+}

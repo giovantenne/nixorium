@@ -8,6 +8,17 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The classroom view wakes a blank screen only when the session is not
+  locked. GNOME's screensaver call that wakes a screen also lifts a lock that
+  asks for a password, so a locked session (logind's LockedHint, or an
+  unreadable state) is left locked and shown as locked, as before.
+- Reviews for Internet access, locked screens, messages, sending files and
+  collecting work stay valid between 5 and 10 minutes. Before, a review made at
+  the end of a 5-minute block expired seconds later, and `nixorium internet
+  apply` could refuse a review made just before the boundary with "Internet
+  state or review changed".
+- A successful save in Review Git changes shows its note ("no remote push was
+  attempted") as information, not as a warning.
 - Saving the laboratory network profile in GNOME Settings (to change DNS, for
   example) wrote the whole profile without the laboratory address, and the
   next controller update stopped with "controller static address is absent

@@ -155,3 +155,28 @@ func TestInternetBlockRunsBesideMaintenanceAndLeavesComputersBeingUpdated(t *tes
 		t.Fatalf("plan with only a computer being updated: %+v", p)
 	}
 }
+
+func TestInternetReviewAtABlockBoundaryStillApplies(t *testing.T) {
+	s, m := internetFixture()
+	reviewed := time.Date(2026, 10, 23, 16, 59, 59, 0, time.UTC)
+	m.now = func() time.Time { return reviewed }
+	p := m.Plan(context.Background(), ".", "pc01", domain.InternetBlock)
+	if !p.ExpiresAt.After(reviewed.Add(5 * time.Minute)) {
+		t.Fatalf("a review at the end of a block expires at once: %v", p.ExpiresAt)
+	}
+	// The command line's apply runs in a new process, one second later and
+	// in the next block.
+	m.now = func() time.Time { return reviewed.Add(time.Second) }
+	again := m.Replan(context.Background(), ".", "pc01", domain.InternetBlock, p.ReviewToken)
+	if again.ReviewToken != p.ReviewToken {
+		t.Fatalf("replan across the boundary changed the review: %v -> %v", p.ExpiresAt, again.ExpiresAt)
+	}
+	if r := m.Apply(context.Background(), again, p.ReviewToken); r.State != "completed" || len(s.changed) != 1 {
+		t.Fatalf("report: %+v", r)
+	}
+	// Once expired, the same review is refused.
+	m.now = func() time.Time { return again.ExpiresAt }
+	if r := m.Apply(context.Background(), again, p.ReviewToken); r.State == "completed" {
+		t.Fatalf("expired review applied: %+v", r)
+	}
+}

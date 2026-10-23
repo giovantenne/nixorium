@@ -60,7 +60,13 @@ func (model dashboardModel) gitReviewView() string {
 		)
 		notices := []tuiNotice{}
 		if model.message != "" {
-			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+			// A success message is information ("no remote push was
+			// attempted"), not something to act on.
+			kind := tuiStatusAttention
+			if success {
+				kind = tuiStatusNeutral
+			}
+			notices = append(notices, tuiNotice{kind: kind, title: model.message})
 		}
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: returnLabel}, {key: "r", label: "Refresh review"}, {key: "F1", label: "Help"}}})
 	}

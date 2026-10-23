@@ -32,6 +32,26 @@ func (m *InternetManager) conflict(ctx context.Context) bool {
 	return state.Mode == "active" || state.Mode == "degraded" || state.Mode == "recovery-required"
 }
 func (m *InternetManager) Plan(ctx context.Context, repository, requested string, action domain.InternetAction) domain.InternetPlan {
+	return m.planAt(ctx, repository, requested, action, m.now())
+}
+
+// Replan recomputes a reviewed plan in a later process (the command line's
+// apply). The expiry is part of the review token and moves in 5-minute
+// blocks, so a review made just before a block boundary is recomputed for the
+// block it was made in too. Apply still refuses it once it has expired.
+func (m *InternetManager) Replan(ctx context.Context, repository, requested string, action domain.InternetAction, token string) domain.InternetPlan {
+	now := m.now()
+	p := m.planAt(ctx, repository, requested, action, now)
+	if p.HasErrors() || p.ReviewToken == token {
+		return p
+	}
+	if earlier := m.planAt(ctx, repository, requested, action, now.Add(-5*time.Minute)); earlier.ReviewToken == token {
+		return earlier
+	}
+	return p
+}
+
+func (m *InternetManager) planAt(ctx context.Context, repository, requested string, action domain.InternetAction, at time.Time) domain.InternetPlan {
 	p := domain.InternetPlan{SchemaVersion: domain.SchemaVersion, Operation: "internet-plan", State: "blocked", Action: action, Requested: requested, Targets: []domain.InternetTarget{}, Issues: []domain.ValidationIssue{}}
 	fail := func(message string) domain.InternetPlan {
 		p.Message = message
@@ -95,7 +115,9 @@ func (m *InternetManager) Plan(ctx context.Context, repository, requested string
 		return fail("No selected client supports authenticated Internet control. Update or reconnect the clients and review again.")
 	}
 	p.State = "ready"
-	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(5 * time.Minute)
+	// Between 5 and 10 minutes: a review made at the end of a block must not
+	// expire seconds later.
+	p.ExpiresAt = at.UTC().Truncate(5 * time.Minute).Add(10 * time.Minute)
 	p.Message = fmt.Sprintf("%d of %d clients available. Internet is restored on reboot; offline clients are never queued. Lab access remains available.", eligible, len(p.Targets))
 	if len(updating) > 0 {
 		p.Message += " Left unchanged while they are being updated: " + strings.Join(updating, ", ") + "."

@@ -87,7 +87,9 @@ func (m *LockManager) Plan(ctx context.Context, repository, requested string, ac
 	p.State = "ready"
 	// A fixed five-minute window, as for Internet control, so that a fresh
 	// plan of the same computers keeps the reviewed token.
-	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(5 * time.Minute)
+	// Between 5 and 10 minutes: a review made at the end of a block must not
+	// expire seconds later.
+	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(10 * time.Minute)
 	p.Message = fmt.Sprintf("%d of %d computers available. Logging out or restarting always unlocks a computer.", eligible, len(p.Targets))
 	p.ReviewToken = domain.LockReviewToken(p)
 	return p
