@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- After Update Nixorium the result stays on screen until you choose: Enter
+  reopens the interface with the new version, Esc keeps this one. Before, it
+  reopened by itself after 3 seconds, before the result could be read. The
+  reopened interface shows the outcome on the overview as a green notice
+  until you leave the overview.
 - The Update Nixorium review fits on one screen: the release change, the
   applications whose version changes and, for each change to the deployment's
   own files, one sentence with the files under it. The line-by-line diff of

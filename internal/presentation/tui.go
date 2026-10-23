@@ -104,6 +104,9 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if next.screen != model.screen {
 		next.navigation.pageScroll = 0
 	}
+	if _, key := message.(tea.KeyPressMsg); key && model.screen == dashboardHome && next.screen != dashboardHome {
+		next.reopenOutcome = ""
+	}
 	if next.screen == dashboardHome && !next.initializing && !next.initialError {
 		switch message.(type) {
 		case dashboardInitialMsg, overviewRefreshMsg:

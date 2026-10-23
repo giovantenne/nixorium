@@ -54,6 +54,21 @@ func TestReopenedInterfaceShowsTheUpdateOutcome(t *testing.T) {
 	if !strings.Contains(m.View().Content, "Nixorium and this controller are updated") || m.reopenNotice != "" {
 		t.Fatalf("outcome not shown after reopening:\n%s", m.View().Content)
 	}
+	if plain := demoANSI.ReplaceAllString(m.View().Content, ""); m.screen != dashboardHome || !strings.Contains(plain, "✓ Nixorium and this controller are updated") {
+		t.Fatalf("outcome is not a success notice on the overview:\n%s", plain)
+	}
+	// It stays while the overview is open, and goes when the administrator
+	// leaves it.
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m = next.(dashboardModel)
+	if m.reopenOutcome == "" {
+		t.Fatal("outcome cleared by a move inside the overview")
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Text: "m"})
+	m = next.(dashboardModel)
+	if m.screen == dashboardHome || m.reopenOutcome != "" {
+		t.Fatalf("outcome kept after leaving the overview: screen %v", m.screen)
+	}
 	m.screen = dashboardUpdate
 	if outcome := m.reloadOutcome(); !strings.Contains(outcome, "Update computers") {
 		t.Fatalf("outcome = %q", outcome)

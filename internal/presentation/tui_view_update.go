@@ -106,7 +106,7 @@ func (model dashboardModel) updateView() string {
 			actions = append(actions, tuiAction{key: "Enter", label: "Retry controller"}, tuiAction{key: "a", label: "Retry controller"})
 		}
 		actions = append(actions, retry, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
-		if success && !model.updates.packageBase && model.reload.counting() {
+		if success && !model.updates.packageBase && model.reload.offered() {
 			actions = model.reloadActions()
 		}
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})

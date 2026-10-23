@@ -72,7 +72,7 @@ func (model dashboardModel) handleSetupMessage(message tea.Msg) (tea.Model, tea.
 			model.screen = dashboardHome
 		}
 		// The outcome of the update that reopened this interface, if any.
-		model.message, model.reopenNotice = model.reopenNotice, ""
+		model.reopenOutcome, model.reopenNotice = model.reopenNotice, ""
 		if model.actions.LoadDisclaimer != nil && !model.actions.ClassroomMode {
 			next, invitation := model.beginTelemetryInvitation()
 			return next, tea.Batch(poll, invitation, model.checkUpdateNotification())

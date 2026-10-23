@@ -74,7 +74,7 @@ func (model dashboardModel) controllerView() string {
 			returnLabel = "Setup"
 		}
 		actions := []tuiAction{{key: "Enter", label: returnLabel}, {key: "d", label: detailsLabel}, {key: "l", label: "Logs"}, {key: "n", label: "New review"}, {key: "F1", label: "Help"}}
-		if controllerReload && model.reload.counting() {
+		if controllerReload && model.reload.offered() {
 			actions = model.reloadActions()
 		}
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})

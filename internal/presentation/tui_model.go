@@ -367,7 +367,10 @@ type dashboardModel struct {
 	overviewReads uint64
 	// reopenNotice is the outcome of the update that reopened this
 	// interface, shown on the first screen.
-	reopenNotice       string
+	reopenNotice string
+	// reopenOutcome is that outcome while it is on the overview: a success
+	// notice that stays until the administrator leaves the overview.
+	reopenOutcome      string
 	maintenance        maintenanceModel
 	updates            updateModel
 	settings           settingsModel

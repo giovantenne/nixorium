@@ -197,6 +197,9 @@ func (model dashboardModel) homeView() string {
 		lines = append(lines, model.busyView(), "")
 	}
 	lines = append(lines, model.taskMenu(model.overviewTasks(), menu.list.Index()))
+	if model.reopenOutcome != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusSuccess, title: model.reopenOutcome})
+	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}

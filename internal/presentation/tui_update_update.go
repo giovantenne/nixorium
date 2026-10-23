@@ -135,8 +135,6 @@ func (model dashboardModel) handleUpdateMessage(message tea.Msg) (tea.Model, tea
 		}
 		model.reload = interfaceReloadModel{id: model.reload.id + 1}
 		return model, nil
-	case interfaceReloadTickMsg:
-		return model.updateInterfaceReloadTick(message)
 	default:
 		return model.handleSetupMessage(message)
 	}
