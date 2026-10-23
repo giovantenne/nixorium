@@ -30,7 +30,9 @@ pkgs.testers.runNixOSTest {
     services.displayManager.gdm.enable = true;
     services.desktopManager.gnome.enable = true;
     # As on Nixorium workstations: no modal welcome dialog over the top bar.
-    services.desktopManager.gnome.extraGSettingsOverrides = "[org.gnome.shell]\nwelcome-dialog-last-shown-version='9999'\n";
+    # As on Nixorium computers (modules/desktop.nix): a blank screen is not
+    # locked; loginctl lock-sessions still locks it.
+    services.desktopManager.gnome.extraGSettingsOverrides = "[org.gnome.shell]\nwelcome-dialog-last-shown-version='9999'\n\n[org.gnome.desktop.screensaver]\nlock-enabled=false\n";
     services.displayManager.autoLogin = { enable = true; user = "student"; };
     users.users.student = { isNormalUser = true; uid = 1000; };
     services.openssh.enable = true;
@@ -180,6 +182,7 @@ pkgs.testers.runNixOSTest {
     # wakes a locked session, so it is still locked.
     client.succeed("loginctl show-session \"$(loginctl list-sessions --no-legend | awk '$3 == \"student\" { print $1; exit }')\" -p LockedHint | grep -Fx LockedHint=yes")
     client.succeed("loginctl unlock-sessions")
+    client.wait_until_succeeds("loginctl show-session \"$(loginctl list-sessions --no-legend | awk '$3 == \"student\" { print $1; exit }')\" -p LockedHint | grep -Fx LockedHint=no", timeout=20)
 
     # A screen that is only blank (Nixorium never locks it) is woken for the
     # classroom view and captured.
