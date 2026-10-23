@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.10.0-beta.3] - 2026-10-23
+
+A controller still on 3.10.0-beta.1 follows the update note of 3.10.0-beta.2
+below, with `v3.10.0-beta.3` in both places.
+
 ### Changed
 
 - Students' VS Code extensions are no longer edited in the TUI or with
