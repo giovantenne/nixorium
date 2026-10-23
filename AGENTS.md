@@ -1014,7 +1014,8 @@ that release's notes, so a release is not finished until the site follows it.
   screensaver behavior, and application policy belong in the deployment.
   The one exception, by owner decision, is base software:
   `internal/domain/base-software.json` (Chromium, Ghostty, Git, the
-  screensaver's terminaltexteffects) is installed on every host by
+  screensaver's terminaltexteffects, whose presence switches the screensaver on;
+  its effects run with the core's `pkgs/ttfx.nix`) is installed on every host by
   `lib/mk-lab.nix` whatever `lab-software.json` declares, counts as effective
   software for the template, and the software review refuses to remove or
   narrow it. Keep that file the single list for Nix and Go.

@@ -120,8 +120,11 @@ suggestions in `software-catalog.nix`, desktop and shell policy under
 as `hostSoftwarePackages`. The template uses this list to enable Docker, npm
 setup, application favorites, shortcuts, browser policy, VS Code extensions,
 and the site screensaver only when their packages apply to that host. Every
-built-in profile, including Essential, declares the Ghostty and TTE dependencies
-required by the screensaver.
+built-in profile, including Essential, declares the Ghostty and TTE packages
+that switch the screensaver on; its effects come from `ttfx` (`pkgs/ttfx.nix`,
+until nixpkgs ships it) at 30 frames per second. After 30 idle minutes GNOME
+blanks and switches off the screen and the screensaver stops; the session is
+never locked and the computer does not sleep.
 Removing a declaration therefore does not leave an upstream launcher or service
 behind.
 

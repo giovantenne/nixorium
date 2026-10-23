@@ -71,9 +71,12 @@ in
   # No GNOME remote desktop server: the classroom view reaches sessions only
   # through the controller's SSH access.
   systemd.user.services.gnome-remote-desktop.enable = false;
+  # After 30 idle minutes GNOME blanks and switches off the screen; the session
+  # is never locked, so a key or the mouse brings the desktop back without a
+  # password. The computer does not sleep: it stays reachable.
   services.desktopManager.gnome.extraGSettingsOverrides = ''
     [org.gnome.desktop.session]
-    idle-delay=uint32 0
+    idle-delay=uint32 1800
 
     [org.gnome.desktop.screensaver]
     lock-enabled=false

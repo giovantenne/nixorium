@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Monitor GNOME idle time and run the TTE screensaver.
-# Replaces GNOME's built-in screensaver with a custom TTE animation.
+# Monitor GNOME idle time and run the text-effects screensaver.
 # It never locks the session.
 #
 # Timeline:
 #   IDLE_SCREENSAVER_MS -> launch screensaver
+#   IDLE_BLANK_MS       -> stop it: GNOME blanks the screen at the same time
+#                          (idle-delay in the core desktop module), no lock
 #   On activity          -> kill screensaver
 #
 # The service passes the Nix store paths of the terminal script and the logo:
@@ -17,8 +18,9 @@ set -euo pipefail
 : "${SCREENSAVER_CMD:?SCREENSAVER_CMD is not set}"
 : "${SCREENSAVER_TEXT:?SCREENSAVER_TEXT is not set}"
 
-# Idle threshold (milliseconds)
+# Idle thresholds (milliseconds)
 IDLE_SCREENSAVER_MS=300000
+IDLE_BLANK_MS=1800000
 
 SCREENSAVER_CLASS="org.nixorium.screensaver"
 POLL_INTERVAL=2
@@ -66,7 +68,12 @@ kill_screensaver() {
 while true; do
   IDLE_MS=$(get_idle_ms)
 
-  if [[ "$IDLE_MS" -ge "$IDLE_SCREENSAVER_MS" ]] && [[ "$SCREENSAVER_ACTIVE" == "false" ]]; then
+  if [[ "$IDLE_MS" -ge "$IDLE_BLANK_MS" ]]; then
+    # The screen is blank: nothing to animate, nothing to spend CPU on.
+    if pgrep -f "$SCREENSAVER_CLASS" >/dev/null 2>&1; then
+      kill_screensaver
+    fi
+  elif [[ "$IDLE_MS" -ge "$IDLE_SCREENSAVER_MS" ]] && [[ "$SCREENSAVER_ACTIVE" == "false" ]]; then
     launch_screensaver
     SCREENSAVER_ACTIVE=true
   elif [[ "$IDLE_MS" -lt "$IDLE_SCREENSAVER_MS" ]] && [[ "$SCREENSAVER_ACTIVE" == "true" ]]; then

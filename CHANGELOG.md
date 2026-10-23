@@ -6,6 +6,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The lab screensaver uses much less processor: its effects now come from
+  `ttfx`, a Rust port of the previous Python effects, at 30 frames per second
+  instead of 120. After 30 idle minutes the screen goes black and switches off,
+  and the screensaver stops; a key or the mouse brings the desktop back without
+  a password, and the computer stays on and reachable. The black screen comes
+  with the update; the lighter screensaver comes when a laboratory resets its
+  deployment template.
+
 ## [3.10.0-beta.3] - 2026-10-23
 
 A controller still on 3.10.0-beta.1 follows the update note of 3.10.0-beta.2

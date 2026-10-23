@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run the lab screensaver using random TTE effects.
+# Run the lab screensaver using random text effects (ttfx, a Rust port of TTE).
 # This script is meant to be launched inside a fullscreen terminal.
 # Usage: cmd-screensaver.sh TEXT_FILE
 
@@ -49,10 +49,12 @@ while true; do
   # Ensure each effect starts from a stable full-screen origin.
   reset_canvas
 
-  # The canvas is the full terminal height, so TTE's trailing newline (--no-eol)
+  # The canvas is the full terminal height, so the trailing newline (--no-eol)
   # would scroll the finished picture up one row. The cursor stays hidden.
-  tte -i "$SCREENSAVER_TEXT" \
-    --frame-rate 120 \
+  # 30 frames per second look the same here and cost the terminal a quarter of
+  # the drawing that 120 would.
+  ttfx -i "$SCREENSAVER_TEXT" \
+    --frame-rate 30 \
     --canvas-width 0 \
     --canvas-height 0 \
     --anchor-canvas c \

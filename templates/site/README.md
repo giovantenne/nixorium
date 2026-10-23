@@ -342,7 +342,7 @@ computers before first use.
 - `modules/workstation.nix`: GNOME desktop icons, persistent dock, application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
-- `modules/screensaver.nix`: Ghostty/TTE lab screensaver supplied by every built-in profile (starts after 5 idle minutes and never locks the session)
+- `modules/screensaver.nix`: Ghostty lab screensaver with text effects supplied by every built-in profile (starts after 5 idle minutes, stops after 30 when the screen goes black, and never locks the session)
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `groupModules` in `flake.nix`: common modules for members of those client groups
 - `hostModules` in `flake.nix`: individual hosts
@@ -733,7 +733,7 @@ A local web server for PHP pages (Apache in the XAMPP style, serving the
 student's `~/public_html`) is not part of the profile; Assistant can add it on
 request.
 
-Every profile includes Git, the Ghostty/TTE lab screensaver (which never locks the session) and Node.js (and
+Every profile includes Git, the Ghostty lab screensaver with text effects (which never locks the session) and Node.js (and
 npm); Programming also includes the Pi and OpenCode coding agents. Git is available to every user and is also a runtime
 dependency of the controller management workflows. The screensaver therefore
 remains active in Essential as well as the larger profiles. Desktop Icons NG, Dash to Dock and

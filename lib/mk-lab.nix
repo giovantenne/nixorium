@@ -264,6 +264,8 @@ let
     workspaceWallpapers = map (background: "${background}") labAssets.backgrounds;
     hostSoftwarePackages = map (entry: entry.package) (hostSoftwareEntries name);
     inherit nixoriumPackage;
+    # The lab screensaver's effects (pkgs/ttfx.nix) until nixpkgs ships ttfx.
+    nixoriumTtfx = bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/ttfx.nix") {};
     inherit hostIp;
     hostName = name;
     # The role is explicit so modules never infer it from the host name.
