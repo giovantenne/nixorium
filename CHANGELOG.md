@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Update Nixorium reviews faster: the network-installation outputs (netboot
+  image, PXE firmware, installer) are now only evaluated during the review and
+  built when network installation is prepared. On a test controller with four
+  processors this removed about two and a half minutes from each review.
 - The lab screensaver uses much less processor: its effects now come from
   `ttfx`, a Rust port of the previous Python effects, at 30 frames per second
   instead of 120. After 30 idle minutes the screen goes black and switches off,

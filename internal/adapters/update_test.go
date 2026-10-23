@@ -237,6 +237,7 @@ case " $* " in
     ;;
   *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
   *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
+  *" path-info "*) printf '/nix/store/%032d-output.drv\n' 0 ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac
@@ -264,16 +265,23 @@ esac
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
 	// Two candidate sources, the candidate lock, the lock check, two
-	// evaluations, two workspace reads, the validator and one grouped build.
-	if len(lines) != 10 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 0 || strings.Count(string(log), "--no-write-lock-file") != 1 || strings.Count(string(log), "store add-path") != 2 {
+	// evaluations, two workspace reads, the validator, one evaluation of the
+	// installation outputs and one grouped build.
+	if len(lines) != 11 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 0 || strings.Count(string(log), "--no-write-lock-file") != 1 || strings.Count(string(log), "store add-path") != 2 {
 		t.Fatalf("unexpected Nix invocations (%d):\n%s", len(lines), log)
 	}
 	if !strings.HasPrefix(lines[1], "--extra-experimental-features nix-command flakes flake lock path:/nix/store/") || !strings.Contains(lines[1], "--override-input nixorium github:owner/project/v1.1.0") || !strings.Contains(lines[3], "flake lock --no-update-lock-file path:/nix/store/") {
 		t.Fatalf("candidate lock was not computed and checked from the proposed source:\n%s", log)
 	}
-	for _, output := range []string{"nixosConfigurations.pc01.config.system.build.toplevel", "nixosConfigurations.pc99.config.system.build.toplevel", "nixosConfigurations.netboot.config.system.build.netbootRamdisk", "pxeFirmware", "installerBundle"} {
-		if !strings.Contains(lines[9], "#"+output) {
-			t.Fatalf("required output %s missing from grouped build: %s", output, lines[9])
+	for _, output := range []string{"nixosConfigurations.pc01.config.system.build.toplevel", "nixosConfigurations.pc99.config.system.build.toplevel"} {
+		if !strings.Contains(lines[10], "#"+output) {
+			t.Fatalf("required system %s missing from grouped build: %s", output, lines[10])
+		}
+	}
+	// The network-installation outputs are evaluated, not built.
+	for _, output := range []string{"nixosConfigurations.netboot.config.system.build.netbootRamdisk", "pxeFirmware", "installerBundle"} {
+		if !strings.Contains(lines[9], "path-info --derivation") || !strings.Contains(lines[9], "#"+output) || strings.Contains(lines[10], "#"+output) {
+			t.Fatalf("installation output %s was not evaluated only:\n%s\n%s", output, lines[9], lines[10])
 		}
 	}
 	// The lock was computed from the proposed flake.nix with the current lock,
@@ -339,6 +347,7 @@ case " $* " in
     ;;
   *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
   *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
+  *" path-info "*) printf '/nix/store/%032d-output.drv\n' 0 ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac
@@ -415,6 +424,7 @@ case " $* " in
     ;;
   *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
   *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
+  *" path-info "*) printf '/nix/store/%032d-output.drv\n' 0 ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac

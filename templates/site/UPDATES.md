@@ -186,8 +186,10 @@ computer is never overwritten: that computer stays unchanged and the result says
 "identity record names another computer" (see
 [Troubleshooting](troubleshooting.md#the-update-says-identity-record-names-another-computer)).
 To go back, choose the previous generation in the computer's boot menu.
-The plan also builds netboot, PXE firmware and installer outputs
-when laboratory mode needs them. Controller-only mode builds no client/PXE
+In laboratory mode the plan also evaluates the netboot, PXE firmware and
+installer outputs without building them: they are built when network
+installation is prepared (Installation → Network boot), which keeps the review
+short. Controller-only mode builds no client/PXE
 system. `nixoriumOfflineCheck` compares the selected systems' derivation paths
 against evaluation from the standalone installer in an isolated offline store.
 Neither output should be overridden to bypass failures.

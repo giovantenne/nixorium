@@ -372,14 +372,23 @@ func validateUpdateCandidate(ctx context.Context, repository, currentFlake strin
 				return domain.UpdateProposal{}, fmt.Errorf("unknown update target %q", host)
 			}
 			if !seen[host] {
-				builds = append(builds, updateCandidateBuild{"host-" + host, "nixosConfigurations." + host + ".config.system.build.toplevel"})
+				builds = append(builds, updateCandidateBuild{"host-" + host, "nixosConfigurations." + host + ".config.system.build.toplevel", false})
 				seen[host] = true
 			}
 		}
-		builds = append(builds, updateCandidateBuild{"offline-equivalence", "nixoriumOfflineCheck"})
+		builds = append(builds, updateCandidateBuild{"offline-equivalence", "nixoriumOfflineCheck", false})
 	}
 	// One Nix invocation groups the complete reviewed output set. Do not mark individual checks passed until all succeed.
+	evaluated := 0
+	for _, build := range builds {
+		if build.evaluateOnly {
+			evaluated++
+		}
+	}
 	detail := fmt.Sprintf("Building all %d required outputs together", len(builds))
+	if evaluated > 0 {
+		detail = fmt.Sprintf("Building %d systems and evaluating %d installation outputs", len(builds)-evaluated, evaluated)
+	}
 	current := 0
 	if len(builds) == 1 {
 		detail = "Building " + updateBuildLabel(builds[0].id)
@@ -387,15 +396,29 @@ func validateUpdateCandidate(ctx context.Context, repository, currentFlake strin
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseBuild, detail, current, len(builds))
 	arguments := []string{"build", "--no-link"}
+	evaluations := []string{"path-info", "--derivation"}
 	for _, build := range builds {
-		arguments = append(arguments, flake+"#"+build.attribute)
+		if build.evaluateOnly {
+			evaluations = append(evaluations, flake+"#"+build.attribute)
+		} else {
+			arguments = append(arguments, flake+"#"+build.attribute)
+		}
+	}
+	if len(evaluations) > 2 {
+		if _, err := runBoundedNix(ctx, 256*1024, append(evaluations, common...)...); err != nil {
+			return domain.UpdateProposal{}, fmt.Errorf("evaluate candidate installation outputs: %w", err)
+		}
 	}
 	arguments = append(arguments, common...)
 	if _, err := runBoundedNix(ctx, 256*1024, arguments...); err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("build candidate systems and installation outputs: %w", err)
+		return domain.UpdateProposal{}, fmt.Errorf("build candidate systems: %w", err)
 	}
 	for _, build := range builds {
-		checks = append(checks, domain.UpdateCheck{ID: build.id, State: "passed", Message: "candidate output built without a result link"})
+		message := "candidate output built without a result link"
+		if build.evaluateOnly {
+			message = "candidate output evaluated; it is built when network installation is prepared"
+		}
+		checks = append(checks, domain.UpdateCheck{ID: build.id, State: "passed", Message: message})
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseReview, "Preparing the bounded flake.nix and flake.lock review", 0, 0)
 	diff, err := updateProposalDiff(ctx, snapshot.FlakeContent, proposedFlake, snapshot.LockContent, proposedLock, migratedFiles...)
@@ -501,6 +524,10 @@ func directRootInputNode(content []byte, inputName string) ([]byte, bool, error)
 type updateCandidateBuild struct {
 	id        string
 	attribute string
+	// evaluateOnly outputs are evaluated and instantiated, not built: the
+	// network-installation outputs are built when PXE is prepared, and building
+	// the netboot image here doubled the review time.
+	evaluateOnly bool
 }
 
 func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) ([]updateCandidateBuild, []domain.UpdateCheck, error) {
@@ -523,7 +550,7 @@ func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) 
 			return nil, nil, fmt.Errorf("candidate controller is not ready: %s", detail)
 		}
 		return []updateCandidateBuild{
-				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel"},
+				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel", false},
 			}, []domain.UpdateCheck{
 				{ID: "lab-meta", State: "passed", Message: "candidate controller metadata evaluated"},
 				{ID: "deployment-status", State: "passed", Message: "candidate controller is ready"},
@@ -540,11 +567,11 @@ func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) 
 			return nil, nil, fmt.Errorf("candidate deployment is not ready: %s", detail)
 		}
 		return []updateCandidateBuild{
-				{"client", "nixosConfigurations." + meta.Clients.Hosts[0].Name + ".config.system.build.toplevel"},
-				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel"},
-				{"netboot", "nixosConfigurations.netboot.config.system.build.netbootRamdisk"},
-				{"pxe-firmware", "pxeFirmware"},
-				{"installer-bundle", "installerBundle"},
+				{"client", "nixosConfigurations." + meta.Clients.Hosts[0].Name + ".config.system.build.toplevel", false},
+				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel", false},
+				{"netboot", "nixosConfigurations.netboot.config.system.build.netbootRamdisk", true},
+				{"pxe-firmware", "pxeFirmware", true},
+				{"installer-bundle", "installerBundle", true},
 			}, []domain.UpdateCheck{
 				{ID: "lab-meta", State: "passed", Message: "candidate laboratory metadata evaluated"},
 				{ID: "deployment-status", State: "passed", Message: "candidate deployment is ready"},
