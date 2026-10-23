@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.10.0-beta.4] - 2026-10-23
+
+A controller still on 3.10.0-beta.1 follows the update note of 3.10.0-beta.2
+below, with `v3.10.0-beta.4` in both places. From 3.10.0-beta.2 or later,
+Update Nixorium is enough: the review shows the changes it makes to the
+screensaver files as migrations.
+
 ### Changed
 
 - The classroom view wakes a blank screen only when the session is not
