@@ -213,6 +213,11 @@ migration in the same change:
   replacements that end with a newline, and keep each text short. A migration
   may also create, change or remove files through `Tree.Write` and
   `Tree.Remove`.
+- To replace whole template files the administrator never changed, use
+  `ReplaceWholeFiles`: freeze the new content under
+  `internal/deploymigrate/files/<migration id>/` and list the SHA-256 of every
+  released form it replaces (from `git show <tag>:templates/site/<file>`). The
+  files are replaced together or, when one was edited, not at all (manual).
 - To give existing laboratories a package the template now declares for
   every computer, use `AddSharedPackage`: it adds the package to
   `lab-software.json` for the controller and all clients, and leaves it
