@@ -188,12 +188,38 @@ let
   dashboardWindowClass = "org.nixorium.Nixorium";
   nixoriumOpen = pkgs.writeShellApplication {
     name = "nixorium-open";
-    runtimeInputs = [ pkgs.coreutils ];
+    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep ];
     text = ''
       SESSION=${nixoriumSession}/bin/nixorium-session
-      # Maximized: below 32 rows the dashboard draws its next-step buttons
-      # without their border, and a default-size window is about 26.
-      if command -v ghostty >/dev/null; then exec ghostty --class=${dashboardWindowClass} --title=Nixorium --maximize=true -e "$SESSION"; fi
+      if command -v ghostty >/dev/null; then
+        # Maximized: below 32 rows the dashboard draws its next-step buttons
+        # without their border, and a default-size window is about 26.
+        # Ghostty needs OpenGL 3.3. Without it (an old graphics card, a virtual
+        # machine with broken 3D) it does not exit: it keeps an empty window
+        # and logs that it cannot create a GL context. Watch its first seconds
+        # and open another terminal instead.
+        log=$(mktemp -t nixorium-open.XXXXXX)
+        ghostty --class=${dashboardWindowClass} --title=Nixorium --maximize=true -e "$SESSION" 2> >(tee "$log" >&2) &
+        pid=$!
+        cannot_draw=false
+        for _ in $(seq 50); do
+          if grep -qE 'gtk-opengl-context|create a GL context' "$log"; then
+            cannot_draw=true
+            break
+          fi
+          kill -0 "$pid" 2>/dev/null || break
+          sleep 0.1
+        done
+        rm -f "$log"
+        if [ "$cannot_draw" = false ]; then
+          status=0
+          wait "$pid" || status=$?
+          exit "$status"
+        fi
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+        echo "Ghostty cannot draw on this computer (OpenGL 3.3 is missing); opening another terminal." >&2
+      fi
       if command -v kgx >/dev/null; then exec kgx -- "$SESSION"; fi
       if command -v gnome-terminal >/dev/null; then exec gnome-terminal --title=Nixorium -- "$SESSION"; fi
       if command -v xterm >/dev/null; then exec xterm -T Nixorium -e "$SESSION"; fi

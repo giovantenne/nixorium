@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The Nixorium icon opens GNOME Console when Ghostty cannot draw on the
+  controller (no OpenGL 3.3: an old graphics card, or a virtual machine with
+  broken 3D acceleration). Ghostty does not exit in that case but keeps an
+  empty window, so the dashboard did not open at all.
 - The bootstrap installer offers three versions: the latest stable release
   (the default), the latest prerelease when it is newer than that release, and
   master. Before, it listed every stable release and preselected the
