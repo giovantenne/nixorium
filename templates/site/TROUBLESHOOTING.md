@@ -1152,8 +1152,8 @@ partial result and the retained directory; keep it and collect support evidence
 before activation instead of deleting it or blindly retrying.
 
 On a replacement controller, install the controller as usual, sign in as
-`admin`, open Nixorium and choose **Replacing a controller? Restore its lab** on
-the Overview (or **Maintenance → Restore lab**). After the restore, the result
+`admin`, open Nixorium and choose **Maintenance → Restore lab**. After the
+restore, the result
 offers **Use this lab on this controller**: the deployment created by the
 installer is kept as `nixorium-deployment-before-restore-DATE`, the restored lab
 takes its place and its keys are installed on the controller. Nothing is

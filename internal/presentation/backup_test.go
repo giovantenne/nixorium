@@ -441,24 +441,17 @@ func TestStandaloneRestoreDoesNotOfferThisController(t *testing.T) {
 	}
 }
 
-func TestFreshLabOverviewOffersRestore(t *testing.T) {
-	count := 0
+func TestFreshLabOverviewDoesNotOfferRestore(t *testing.T) {
+	// Restore lab is in Maintenance; the overview lists only what needs
+	// attention, not a choice a new lab may never need.
 	m := newTestModel(t, withActions(DashboardActions{
 		RestoreLabArchive: func(string, string, []byte) domain.BackupReport { return domain.BackupReport{} },
-		LabComputerCount:  func() (int, bool) { return count, true },
+		LabComputerCount:  func() (int, bool) { return 0, true },
 	}))
 	m.recovery.report = domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryBackupDue, Title: "This laboratory has no backup yet", Next: domain.NextStep{Code: "BACKUP-NONE"}}}}
-	found := false
 	for _, task := range m.pendingTasks() {
-		found = found || task.id == "pending-restore"
-	}
-	if !found {
-		t.Fatal("fresh lab does not offer Restore lab")
-	}
-	count = 2
-	for _, task := range m.pendingTasks() {
-		if task.id == "pending-restore" {
-			t.Fatal("lab with computers offers Restore lab")
+		if strings.Contains(task.title, "Restore") {
+			t.Fatalf("overview offers %q", task.title)
 		}
 	}
 }

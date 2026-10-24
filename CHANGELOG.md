@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The overview no longer lists "Replacing a controller? Restore its lab" on a
+  laboratory with no backup and no computers: it stayed there until the first
+  backup or computer. Restore lab is in Maintenance, and the installer's last
+  screen points there.
 - The Nixorium icon opens GNOME Console when Ghostty cannot draw on the
   controller (no OpenGL 3.3: an old graphics card, or a virtual machine with
   broken 3D acceleration). Ghostty does not exit in that case but keeps an
