@@ -364,7 +364,7 @@ ui_success "Lab configuration fixed."
 
 CURRENT_STEP="downloading and installing the controller system"
 ui_log "[3/3] Downloading and installing the controller system. This is the longest step."
-ui_note "${UI_MUTED}Files go to the new disk, not into the memory of the USB system.${UI_RESET}"
+ui_note "${UI_MUTED}The system is downloaded and written to the chosen disk; on a slow connection this takes a while.${UI_RESET}"
 ui_note "${UI_MUTED}Technical details are saved in ${INSTALL_LOG}.${UI_RESET}"
 if ! sudo env \
   NIX_CONFIG="$NIX_CONFIG" \

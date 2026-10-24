@@ -132,7 +132,7 @@ grep -F 'swapoff|' "$ACTION_LOG" >/dev/null
 grep -F 'nixos-install|experimental-features = nix-command flakes;' "$ACTION_LOG" >/dev/null
 grep -F "|${TARGET_ROOT}/var/cache/nixorium-bootstrap|--root ${TARGET_ROOT} --flake path:/deployment#pc99 --no-write-lock-file --no-root-passwd" "$ACTION_LOG" >/dev/null
 test -f "$DEPLOYMENT/flake.lock"
-grep -F 'Files go to the new disk, not into the memory of the USB system' "${TEST_ROOT}/output" >/dev/null
+grep -F 'The system is downloaded and written to the chosen disk' "${TEST_ROOT}/output" >/dev/null
 grep -F '/dev/vda  40G QEMU HARDDISK' "${TEST_ROOT}/output" >/dev/null
 grep -F '[3/3] Downloading and installing the controller system' "${TEST_ROOT}/output" >/dev/null
 grep -F '[ OK ] Controller system installed.' "${TEST_ROOT}/output" >/dev/null
