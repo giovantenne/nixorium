@@ -67,10 +67,13 @@ func TestUSBRecoveryStatesInPlainWords(t *testing.T) {
 			[]string{"x Cancel safely", "c Close this record"}, []string{"a Resume", "v Verify"}},
 		{"lost", "Nixorium is no longer connected to the computer started from the USB stick.", "The disk was not touched.",
 			[]string{"a Resume the installation", "c Close this record"}, []string{"x Cancel", "n Check", "v Verify"}},
+		// A possibly written disk is never cancelled, but the record can
+		// always be closed (CLOSE), so a broken computer does not hold the
+		// controller.
 		{"answering", "The computer is still booted from the USB stick and answers.", "The disk may have been partly written.",
-			nil, []string{"x Cancel", "c Close"}},
+			[]string{"c Close this record"}, []string{"x Cancel"}},
 		{"silent", "The computer does not answer.", "The disk may have been partly written.",
-			[]string{"n Check how far it got", "a Resume the installation", "v Verify installed system"}, []string{"x Cancel", "c Close"}},
+			[]string{"n Check how far it got", "a Resume the installation", "v Verify installed system", "c Close this record"}, []string{"x Cancel"}},
 		{"installed", "The computer is still booted from the USB stick and answers.", "The system is installed on the disk.",
 			[]string{"b Restart the computer", "c Close this record"}, []string{"x Cancel"}},
 	} {
@@ -211,5 +214,20 @@ func TestUSBStatusTextStartsWithTheFindings(t *testing.T) {
 	}
 	if RemoteInstallCloseNeedsWord(usbRecoveryResponse(t, "lost")) || !RemoteInstallCloseNeedsWord(usbRecoveryResponse(t, "installed")) {
 		t.Fatal("CLOSE is typed only after a possible disk change")
+	}
+}
+
+func TestUSBRecordAfterARestartWithoutAnswerCanBeClosed(t *testing.T) {
+	response := usbRecoveryResponse(t, "installed")
+	response.State, response.Session.State = "reboot-requested", "reboot-requested"
+	response.Session.RebootRequested = true
+	view := plainView(usbRecoveryModel(response, &[]domain.RemoteInstallRequest{}))
+	for _, want := range []string{"v Verify now", "c Close this record"} {
+		if !contains(view, want) {
+			t.Fatalf("a computer that did not come back cannot be closed; missing %q:\n%s", want, view)
+		}
+	}
+	if !remoteInstallCloseNeedsWord(response) {
+		t.Fatal("closing after the disk was written must ask for CLOSE")
 	}
 }

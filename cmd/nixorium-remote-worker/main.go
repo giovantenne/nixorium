@@ -136,6 +136,9 @@ func (worker *remoteWorker) recover() error {
 	if session.State == "closed-before-apply" && remoteSessionNeverDispatched(session) {
 		return worker.releaseClosedBeforeApplyLocked(session)
 	}
+	if session.State == "closed-unverified" {
+		return worker.finishClosedUnverifiedLocked(session)
+	}
 	if session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
 		if err := worker.releaseResolvedFailureLocked(&session); err != nil {
 			return fmt.Errorf("finish resolved USB failure cleanup: %w", err)
@@ -412,9 +415,17 @@ func (worker *remoteWorker) handleClose(ctx context.Context, request domain.Remo
 		response.Message = "never-dispatched session closed; local credentials discarded, remote key revocation unconfirmed; a new installation requires a new review"
 		return response
 	}
-	if err != nil || worker.liveSession == nil || session.Receipt == nil || !session.Receipt.Installed || session.RebootRequested || session.DispatchUncertain {
-		response.Message = "only a confirmed installed session before reboot can be closed"
+	if err != nil || session.BootVerified {
+		response.Message = "the session cannot be read or is already verified"
 		return response
+	}
+	if worker.liveSession == nil || session.Receipt == nil || !session.Receipt.Installed || session.RebootRequested || session.DispatchUncertain {
+		// The disk may have been written and the computer cannot be checked:
+		// it did not come back from the restart (a broken disk, a computer
+		// switched off or started from the USB stick again) or the outcome is
+		// unknown. The administrator closes the record (CLOSE) and the
+		// computer is left to be checked or installed again.
+		return worker.closeUnverifiedLocked(ctx, session)
 	}
 	if err := worker.bootstrap.CloseSession(ctx, *worker.liveSession); err != nil {
 		response.Message = "live key cleanup was not confirmed; reservation retained"
@@ -468,6 +479,57 @@ func (worker *remoteWorker) releaseClosedBeforeApplyLocked(session domain.Remote
 	}
 	if err := worker.reservation.ReleaseResolved(); err != nil {
 		return fmt.Errorf("release closed session reservation: %w", err)
+	}
+	worker.operationID = ""
+	worker.liveSession = nil
+	worker.reservation = nil
+	return nil
+}
+
+// closeUnverifiedLocked closes a session whose disk may have been written
+// without verifying the computer, and frees the controller for other work.
+func (worker *remoteWorker) closeUnverifiedLocked(ctx context.Context, session domain.RemoteInstallSession) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: session.OperationID, State: "reconciliation-required"}
+	if session.State != "closed-unverified" {
+		// The live key exists only in the memory of the USB system: revoke it
+		// when that system still answers, and always discard the local copy.
+		if worker.liveSession != nil {
+			_ = worker.bootstrap.CloseSession(ctx, *worker.liveSession)
+		}
+		if err := worker.bootstrap.DiscardLocalSession(adapters.VerifiedLiveSession{OperationID: session.OperationID}); err != nil {
+			response.Message = "local live-session credentials could not be removed; reservation retained"
+			return response
+		}
+		session.State = "closed-unverified"
+		session.Events = append(session.Events, domain.RemoteInstallProgress{
+			Phase:  domain.RemoteInstallPhaseReconciliationRequired,
+			Detail: "operator closed the record without verifying the computer; its disk may have been written, check it or install it again",
+		})
+		if err := worker.state.Save(session); err != nil {
+			response.Message = "could not persist the closure; reservation retained"
+			return response
+		}
+	}
+	if err := worker.finishClosedUnverifiedLocked(session); err != nil {
+		response.Message = err.Error()
+		return response
+	}
+	response.State = session.State
+	response.Session = &session
+	response.Message = "record closed without verifying the computer; check it or install it again"
+	return response
+}
+
+// finishClosedUnverifiedLocked releases what a closed, unverified session
+// still holds; a restarted worker finishes it the same way.
+func (worker *remoteWorker) finishClosedUnverifiedLocked(session domain.RemoteInstallSession) error {
+	if (session.Artifacts != nil || session.Preparation != nil) && worker.preparer != nil {
+		if err := worker.preparer.Discard(session.OperationID); err != nil {
+			return fmt.Errorf("record closed but preparation GC roots could not be removed; reservation retained")
+		}
+	}
+	if err := worker.reservation.ReleaseResolved(); err != nil {
+		return fmt.Errorf("record closed but the controller reservation could not be released")
 	}
 	worker.operationID = ""
 	worker.liveSession = nil

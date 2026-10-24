@@ -103,7 +103,7 @@ func remoteInstallChoices(response domain.RemoteInstallResponse) []remoteInstall
 	if state == "ready-to-reboot" {
 		add("b", "Restart the computer", "remove the USB stick first; the controller then checks the installed system.", "nixorium install usb reboot --id "+id)
 	}
-	if state == "reboot-requested" || state == "verified" || (state == "reconciliation-required" && !neverDispatched) {
+	if state == "reboot-requested" || (state == "reconciliation-required" && !neverDispatched) {
 		label := "Verify installed system"
 		if state == "reboot-requested" {
 			label = "Verify now"
@@ -118,6 +118,11 @@ func remoteInstallChoices(response domain.RemoteInstallResponse) []remoteInstall
 		add("c", "Close this record", "stop following it without restarting; the disk was written, so you type CLOSE.", "nixorium install usb close --id "+id)
 	case neverDispatched && session.Bootstrap != nil && state != "closed-before-apply":
 		add("c", "Close this record", "forget it when the computer started from the USB stick is gone; the disk was not touched.", "nixorium install usb close --id "+id)
+	case session != nil && !neverDispatched && !session.BootVerified && !remoteInstallRunning(response) &&
+		state != "verified" && state != "cancelled" && !strings.HasPrefix(state, "closed"):
+		// A computer that does not come back (a broken disk, started from the
+		// USB stick again) must not hold the controller: close without it.
+		add("c", "Close this record", "stop following this computer and free the controller; the disk may have been written, so you type CLOSE. Check the computer or install it again.", "nixorium install usb close --id "+id)
 	}
 	return choices
 }
@@ -137,7 +142,7 @@ func remoteInstallOffers(response domain.RemoteInstallResponse, key string) bool
 func (model dashboardModel) remoteInstallFindingLines(next string) []string {
 	response := model.installation.remote.response
 	switch response.State {
-	case "verified", "cancelled", "closed-before-apply", "closed-installed":
+	case "verified", "cancelled", "closed-before-apply", "closed-installed", "closed-unverified":
 		// A finished installation has nothing left to resolve.
 		return []string{"Next: " + next}
 	}

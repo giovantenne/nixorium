@@ -168,6 +168,8 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 		return "The record was closed; the disk was not touched.", "Restart the computer started from the USB stick before using it, then start again from Installation."
 	case response.State == "closed-installed":
 		return "The session was closed without restarting; the system is installed.", "Restart the computer locally when ready."
+	case response.State == "closed-unverified":
+		return "The record was closed without checking " + host + "; the controller is free.", "Its disk may have been written: check the computer, or install it again from Installation."
 	case remoteInstallCanConnect(response):
 		return "The installation files for " + host + " are ready.", "Start the computer from the USB stick, then connect to it."
 	case remoteInstallResponseFailed(response):

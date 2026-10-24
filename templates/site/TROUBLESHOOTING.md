@@ -346,14 +346,20 @@ verify the installed revision after disk boot. `close` releases a completed or
 deliberately abandoned record; it does not make an uncertain disk safe. If the
 live ISO is gone before any apply was dispatched, choose **Close this record**
 (Enter), or run `nixorium install usb close --id OPERATION_ID` and answer the
-yes/no question; closing an installed record before its restart keeps the
-typed `CLOSE`. Closing a never-dispatched record discards the operation's
+yes/no question. Closing a never-dispatched record discards the operation's
 local access credentials and releases its reservation without claiming remote
 key revocation. The old record is retained;
-a new installation must establish identity and review the disk again. Any
-consumed apply token, remote receipt, uncertain dispatch, or reboot evidence
-blocks this abandonment path. If apply was dispatched and completion cannot
-be proved, retain the reservation for reconciliation.
+a new installation must establish identity and review the disk again.
+
+When the disk may have been written, **Close this record** asks you to type
+`CLOSE`: before the restart of an installed computer, and also when the
+computer does not come back from the restart (a broken disk, a computer that
+starts from the USB stick again) or when the outcome cannot be proved. Closing
+frees the controller for other operations and keeps the record as closed
+without verification; the live key is revoked when the computer started from
+the USB stick still answers, and the controller's copy is always discarded.
+Nixorium does not check that computer: check it, or install it again with a
+new review. Prefer **Verify now** when the computer is back.
 
 For a reinstall, a different key at the configured static address is expected
 only after proving the old machine is the selected physical client. Approve

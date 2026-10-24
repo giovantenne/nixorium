@@ -173,8 +173,11 @@ func TestCompletedDiskReceiptSurvivesOfflineStatusRefresh(t *testing.T) {
 	}
 }
 
-func TestRemoteWorkerCloseRejectsAnyPossibleDispatch(t *testing.T) {
-	for _, field := range []string{"consumed", "uncertain", "receipt", "reboot", "verified", "dispatching", "unknown"} {
+func TestRemoteWorkerClosesAPossiblyWrittenSessionUnverified(t *testing.T) {
+	// A computer that did not come back from the restart (a broken disk, a
+	// computer started from the USB stick again) or whose outcome is unknown
+	// must not hold the controller forever: CLOSE ends the record, unverified.
+	for _, field := range []string{"consumed", "uncertain", "receipt", "reboot", "dispatching", "unknown"} {
 		t.Run(field, func(t *testing.T) {
 			id := "0123456789abcdef0123456789abcdef"
 			session := domain.RemoteInstallSession{OperationID: id, State: "reconciliation-required"}
@@ -186,9 +189,8 @@ func TestRemoteWorkerCloseRejectsAnyPossibleDispatch(t *testing.T) {
 			case "receipt":
 				session.Receipt = &domain.RemoteInstallReceipt{OperationID: id}
 			case "reboot":
+				session.State = "reboot-requested"
 				session.RebootRequested = true
-			case "verified":
-				session.BootVerified = true
 			default:
 				session.State = field
 			}
@@ -197,10 +199,35 @@ func TestRemoteWorkerCloseRejectsAnyPossibleDispatch(t *testing.T) {
 			reservation := &fakeWorkerReservation{}
 			worker := &remoteWorker{state: state, bootstrap: bootstrap, operationID: id, reservation: reservation}
 			response := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: id}, nil)
-			if response.State != "reconciliation-required" || bootstrap.discarded || reservation.released {
-				t.Fatalf("unsafe closure: %+v", response)
+			if response.State != "closed-unverified" || !bootstrap.discarded || !reservation.released || worker.reservation != nil {
+				t.Fatalf("not closed: %+v", response)
+			}
+			if saved := state.sessions[id]; saved.State != "closed-unverified" || len(saved.Events) == 0 {
+				t.Fatalf("closure not recorded: %+v", saved)
 			}
 		})
+	}
+}
+
+func TestRemoteWorkerDoesNotCloseAVerifiedSession(t *testing.T) {
+	id := "0123456789abcdef0123456789abcdef"
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: {OperationID: id, State: "verified", BootVerified: true, RebootRequested: true}}}
+	reservation := &fakeWorkerReservation{}
+	worker := &remoteWorker{state: state, bootstrap: &fakeWorkerBootstrap{}, operationID: id, reservation: reservation}
+	response := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: id}, nil)
+	if response.State == "closed-unverified" || reservation.released {
+		t.Fatalf("verified session closed: %+v", response)
+	}
+}
+
+func TestRemoteWorkerFinishesAnUnverifiedClosureAfterRestart(t *testing.T) {
+	id := "0123456789abcdef0123456789abcdef"
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: {OperationID: id, State: "closed-unverified", RebootRequested: true}}}
+	reservation := &fakeWorkerReservation{}
+	worker := &remoteWorker{state: state, bootstrap: &fakeWorkerBootstrap{}, operationID: id, reservation: reservation}
+	response := worker.closeUnverifiedLocked(context.Background(), state.sessions[id])
+	if response.State != "closed-unverified" || !reservation.released {
+		t.Fatalf("cleanup not finished: %+v", response)
 	}
 }
 

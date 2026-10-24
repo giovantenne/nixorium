@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- A USB installation whose computer does not come back from the restart (a
+  broken disk, a computer that starts from the USB stick again) or whose
+  outcome cannot be proved can be closed with **Close this record** and the
+  typed `CLOSE`. Before, only Verify was offered after the restart, so the
+  notices stayed and every controller and client operation waited until the
+  computer answered. The record stays as closed without verification; check
+  the computer or install it again.
 - The Terminal icon, Super+Enter and GNOME's default terminal open GNOME
   Console when Ghostty cannot draw (Ghostty needs OpenGL 4.3, which Intel
   integrated graphics of 2011-2012 and virtual machines with 3D acceleration
