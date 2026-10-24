@@ -33,6 +33,7 @@ import GLib from 'gi://GLib';
 import Pango from 'gi://Pango';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
+import System from 'system';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as SystemActions from 'resource:///org/gnome/shell/misc/systemActions.js';
@@ -44,6 +45,11 @@ const NoticeFile = 'update-notice.json';
 const RecentNoticeSeconds = 30 * 60;
 // A message that stays until the student closes it offers Close after this.
 const MessageCloseSeconds = 10;
+
+// Decoded pictures of the teacher's screen live in native memory that the
+// JavaScript collector does not count: without a collection every few
+// pictures, a few seconds at fifteen a second fill the computer's memory.
+const CollectAfterBytes = 64 * 1024 * 1024;
 
 const BusName = 'org.nixorium.Classroom';
 const ObjectPath = '/org/nixorium/Classroom';
@@ -164,15 +170,23 @@ export default class NixoriumClassroomExtension extends Extension {
         const pixbuf = GdkPixbuf.Pixbuf.new_from_file(path);
         if (!this._screen)
             this._showScreen();
-        const content = St.ImageContent.new_with_preferred_size(pixbuf.width, pixbuf.height);
-        content.set_bytes(
+        // One content for the whole showing; a new size gets a new one.
+        const content = this._picture.get_content();
+        if (content?.get_preferred_size()[1] !== pixbuf.width || content?.get_preferred_size()[2] !== pixbuf.height)
+            this._picture.set_content(St.ImageContent.new_with_preferred_size(pixbuf.width, pixbuf.height));
+        this._picture.get_content().set_bytes(
             global.stage.context.get_backend().get_cogl_context(),
             pixbuf.read_pixel_bytes(),
             pixbuf.get_has_alpha() ? Cogl.PixelFormat.RGBA_8888 : Cogl.PixelFormat.RGB_888,
             pixbuf.width,
             pixbuf.height,
             pixbuf.rowstride);
-        this._picture.set_content(content);
+        // The pixels and their copy for set_bytes.
+        this._decodedBytes = (this._decodedBytes ?? 0) + 2 * pixbuf.rowstride * pixbuf.height;
+        if (this._decodedBytes >= CollectAfterBytes) {
+            this._decodedBytes = 0;
+            System.gc();
+        }
     }
 
     StopBroadcast() {
@@ -187,6 +201,8 @@ export default class NixoriumClassroomExtension extends Extension {
         this._screen.destroy();
         this._screen = null;
         this._picture = null;
+        this._decodedBytes = 0;
+        System.gc();
         this._service?.emit_property_changed('Broadcasting', GLib.Variant.new_boolean(false));
         this._updateMessage();
     }

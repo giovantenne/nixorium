@@ -56,6 +56,14 @@ The project follows [Semantic Versioning](https://semver.org/).
   "packages downloaded" line. Each build now uses every processor; builds
   still run one at a time, which keeps the USB system's memory bounded.
 
+### Fixed
+
+- Showing the teacher's screen no longer fills a student computer's memory.
+  The classroom extension decoded every picture into a new buffer that GNOME
+  Shell freed only much later (3.1 GB after a short showing on a 4 GB
+  computer, which then stopped answering); it now reuses one picture and
+  frees decoded pictures every 64 MB (about 600 MB after 450 pictures).
+
 ## [3.10.0-beta.4] - 2026-10-23
 
 A controller still on 3.10.0-beta.1 follows the update note of 3.10.0-beta.2
