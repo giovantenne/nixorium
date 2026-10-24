@@ -125,6 +125,7 @@ func TestClassroomViewHubShowsEveryComputerAndStopsWhenNobodyLooks(t *testing.T)
 	if image, frame, found := hub.Frame("pc01", 0); !found || frame != 3 || string(image) != "pc01" {
 		t.Fatalf("frame = %q %d %v", image, frame, found)
 	}
+	hub.frameWait = 20 * time.Millisecond
 	if image, _, _ := hub.Frame("pc01", 3); image != nil {
 		t.Fatal("an unchanged frame was sent again")
 	}
@@ -314,5 +315,24 @@ func TestClassroomClipboardWorksOnlyUnderControl(t *testing.T) {
 	connector.mutex.Unlock()
 	if got != "begin,set:hello,end" {
 		t.Fatalf("calls = %s", got)
+	}
+}
+
+func TestClassroomFrameWaitsForTheNextPicture(t *testing.T) {
+	hub := NewClassroomViewHub(nil, nil)
+	hub.computers["pc01"] = &ClassroomComputer{Name: "pc01", Frame: 3, imageBytes: []byte("three")}
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		hub.update("pc01", func(computer *ClassroomComputer) { computer.Frame, computer.imageBytes = 4, []byte("four") })
+		hub.frameArrived()
+	}()
+	started := time.Now()
+	image, frame, found := hub.Frame("pc01", 3)
+	if !found || frame != 4 || string(image) != "four" || time.Since(started) >= classroomFrameWait {
+		t.Fatalf("frame = %q %d %v after %v", image, frame, found, time.Since(started))
+	}
+	hub.frameWait = 30 * time.Millisecond
+	if image, frame, _ := hub.Frame("pc01", 4); image != nil || frame != 4 {
+		t.Fatalf("an unchanged frame was sent: %q %d", image, frame)
 	}
 }

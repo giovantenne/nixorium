@@ -290,15 +290,19 @@ func (capture *mutterCapture) startLocked(width int) error {
 	// the small thumbnails.
 	outputWidth := min(width, screenW)
 	height := scaledHeight(outputWidth, screenW, screenH)
-	quality := 60
+	// Mutter sends a picture only when the screen changes; the enlarged view
+	// takes up to fifteen a second, the thumbnails (one every 1.5 seconds)
+	// two. Mutter still sends the last change once the interval has passed.
+	quality, rate := 60, 2
 	if outputWidth > 640 {
-		quality = 85
+		quality, rate = 85, 15
 	}
 	// The pipeline lives as long as this capture: stopping the capture
 	// cancels the context, which kills it.
 	pipelineContext, stopPipeline := context.WithCancel(context.Background())
 	pipeline := exec.CommandContext(pipelineContext, "gst-launch-1.0", "-q",
 		"pipewiresrc", fmt.Sprintf("path=%d", node), "always-copy=true", "!",
+		fmt.Sprintf("video/x-raw,max-framerate=%d/1", rate), "!",
 		"videoconvert", "!", "videoscale", "!",
 		fmt.Sprintf("video/x-raw,width=%d,height=%d", outputWidth, height), "!",
 		"jpegenc", fmt.Sprintf("quality=%d", quality), "!",

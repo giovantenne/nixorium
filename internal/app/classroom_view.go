@@ -31,10 +31,13 @@ type ClassroomComputer struct {
 }
 
 // Enlarged view: a computer opened in full is refreshed often and larger.
+// The agent sends at most fifteen pictures a second (capture.go), and the
+// page waits for the next one instead of asking again after a pause.
 const (
 	classroomFocusWidth    = classroomview.MaxThumbnailWidth
-	classroomFocusInterval = 100 * time.Millisecond
+	classroomFocusInterval = 30 * time.Millisecond
 	classroomFocusTimeout  = 3 * time.Second
+	classroomFrameWait     = time.Second
 )
 
 // ErrClassroomNotViewed means input arrived for a computer nobody is viewing.
@@ -82,7 +85,11 @@ type ClassroomViewHub struct {
 	focus      map[string]time.Time
 	controlled map[string]bool
 	lastViewed time.Time
-	now        func() time.Time
+	// frameWait bounds how long Frame waits for a new picture; newFrame is
+	// closed (and replaced) when one arrives.
+	frameWait time.Duration
+	newFrame  chan struct{}
+	now       func() time.Time
 	// Answered, when set, hears of every computer that answered over the
 	// lab network, whether or not someone is signed in; Switch on learns
 	// its hardware address then.
@@ -92,7 +99,7 @@ type ClassroomViewHub struct {
 func NewClassroomViewHub(hosts func(ctx context.Context) ([]domain.HostMeta, error), connector ClassroomAgentConnector) *ClassroomViewHub {
 	return &ClassroomViewHub{
 		hosts: hosts, connector: connector, width: 320,
-		interval: 1500 * time.Millisecond, idle: 15 * time.Second,
+		interval: 1500 * time.Millisecond, idle: 15 * time.Second, frameWait: classroomFrameWait, newFrame: make(chan struct{}),
 		computers: map[string]*ClassroomComputer{}, running: map[string]bool{},
 		sessions: map[string]classroomview.Session{}, focus: map[string]time.Time{}, controlled: map[string]bool{}, now: time.Now,
 	}
@@ -140,19 +147,31 @@ func (hub *ClassroomViewHub) Thumbnail(name string) ([]byte, bool) {
 
 // Frame returns the latest image of a computer opened in full when it is newer
 // than since, and keeps that computer on the fast refresh.
+// Frame waits up to frameWait for a picture newer than since.
 func (hub *ClassroomViewHub) Frame(name string, since int64) ([]byte, int64, bool) {
-	hub.mutex.Lock()
-	defer hub.mutex.Unlock()
-	computer, found := hub.computers[name]
-	if !found {
-		return nil, 0, false
+	deadline := time.After(hub.frameWait)
+	for {
+		hub.mutex.Lock()
+		computer, found := hub.computers[name]
+		if !found {
+			hub.mutex.Unlock()
+			return nil, 0, false
+		}
+		hub.focus[name] = hub.now()
+		hub.lastViewed = hub.now()
+		if computer.Frame != since && len(computer.imageBytes) > 0 {
+			image, frame := computer.imageBytes, computer.Frame
+			hub.mutex.Unlock()
+			return image, frame, true
+		}
+		frame, changed := computer.Frame, hub.newFrame
+		hub.mutex.Unlock()
+		select {
+		case <-changed:
+		case <-deadline:
+			return nil, frame, true
+		}
 	}
-	hub.focus[name] = hub.now()
-	hub.lastViewed = hub.now()
-	if computer.Frame == since || len(computer.imageBytes) == 0 {
-		return nil, computer.Frame, true
-	}
-	return computer.imageBytes, computer.Frame, true
 }
 
 // Input sends mouse and keyboard events to a computer open in full.
@@ -346,6 +365,9 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 					computer.ImageAt, computer.ScreenAt, computer.Frame = at, reply.CapturedAt, reply.Frame
 				}
 			})
+			if len(reply.Image) > 0 {
+				hub.frameArrived()
+			}
 		case reply.Code == classroomview.CodeNotReady:
 		default:
 			state, detail := classroomFailureState(classroomview.AgentError{Code: reply.Code})
@@ -357,6 +379,14 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 		}
 		hub.sleep(interval)
 	}
+}
+
+// frameArrived wakes every Frame waiting for a new picture.
+func (hub *ClassroomViewHub) frameArrived() {
+	hub.mutex.Lock()
+	close(hub.newFrame)
+	hub.newFrame = make(chan struct{})
+	hub.mutex.Unlock()
 }
 
 func (hub *ClassroomViewHub) sleep(duration time.Duration) {

@@ -13,6 +13,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   instead of at most five with a pause after each. Each computer still gets
   only the latest picture, so a slow one skips pictures instead of falling
   behind.
+- A student's computer opened in full in the classroom view follows changes
+  sooner: the controller asks for the next picture after 30 ms instead of
+  100 ms and the page waits for it instead of pausing. Student computers
+  compress at most fifteen pictures a second for the enlarged view and two
+  for the thumbnails, instead of one for every screen change (37 a second
+  while the pointer moves).
 - A USB installation whose computer does not come back from the restart (a
   broken disk, a computer that starts from the USB stick again) or whose
   outcome cannot be proved can be closed with **Close this record** and the

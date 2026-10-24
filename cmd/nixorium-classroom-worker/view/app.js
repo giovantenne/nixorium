@@ -649,7 +649,8 @@ for (const button of document.querySelectorAll('.viewer-actions button[data-acti
   });
 }
 
-// Enlarged view: frames as fast as the computer sends them (only changes).
+// Enlarged view: frames as fast as the computer sends them (only changes);
+// the controller answers when the next frame arrives.
 let frameSince = 0;
 let frameURL = null;
 let frameLoopRunning = false;
@@ -673,7 +674,6 @@ async function frameLoop() {
     } catch (error) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    await new Promise((resolve) => setTimeout(resolve, 100));
   }
   frameLoopRunning = false;
 }
