@@ -147,3 +147,23 @@ func (session screenSession) ClipboardBegin() error         { return nil }
 func (session screenSession) ClipboardEnd() error           { return nil }
 func (session screenSession) ClipboardSet(string) error     { return nil }
 func (session screenSession) ClipboardGet() (string, error) { return "", nil }
+
+func TestPageSendsTheTeachersScreenAsItChanges(t *testing.T) {
+	script, err := viewAssets.ReadFile("view/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// New pictures follow the screen, one at a time, with no fixed pause.
+	for _, words := range []string{
+		"frameRate: { ideal: 15, max: 15 }",
+		"video.requestVideoFrameCallback(onFrame);",
+		"} while (again && casting && casting.id === id);",
+	} {
+		if !strings.Contains(string(script), words) {
+			t.Fatalf("app.js lacks %s", words)
+		}
+	}
+	if strings.Contains(string(script), "setTimeout(tick, 200)") {
+		t.Fatal("app.js still pauses between pictures")
+	}
+}

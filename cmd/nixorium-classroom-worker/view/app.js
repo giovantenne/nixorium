@@ -507,8 +507,10 @@ screenshotButton.addEventListener('click', () => {
 
 // Share screen: GNOME asks what to share (the whole screen is offered
 // first; a window or a tab works too, but not this page itself); after the
-// review the page sends a picture whenever it changes, at most five a
-// second, and one every few seconds to keep the showing on.
+// review the page sends each new picture as soon as the previous one has
+// left, at most fifteen a second, and one every few seconds to keep the
+// showing on. Each computer gets the latest picture, so a slow one skips
+// pictures instead of falling behind.
 let pendingStream = null;
 let casting = null;
 
@@ -516,7 +518,7 @@ async function showMyScreen(computers) {
   let stream;
   try {
     stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: 'monitor', frameRate: { ideal: 5, max: 5 } },
+      video: { displaySurface: 'monitor', frameRate: { ideal: 15, max: 15 } },
       audio: false,
       monitorTypeSurfaces: 'include',
       selfBrowserSurface: 'exclude',
@@ -540,36 +542,57 @@ async function startCasting(id) {
   const canvas = document.createElement('canvas');
   let lastDigest = '';
   let lastSent = 0;
+  let busy = false;
+  let again = false;
   casting = { id, stream, timer: 0 };
   stream.getVideoTracks()[0].addEventListener('ended', () => stopCasting());
   updateCasting();
-  const tick = async () => {
-    if (!casting || casting.id !== id) return;
-    if (video.videoWidth > 0) {
-      // Sharp enough to read text on the students' screens.
-      const width = Math.min(1920, video.videoWidth);
-      canvas.width = width;
-      canvas.height = Math.round(video.videoHeight * width / video.videoWidth);
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-      if (blob) {
-        const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))).join(',');
-        if (digest !== lastDigest || Date.now() - lastSent > 4000) {
-          const response = await fetch('/api/broadcast/frame?id=' + encodeURIComponent(id), {
-            method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob,
-          }).catch(() => null);
-          if (response && response.status === 410) {
-            stopCasting();
-            return;
-          }
-          lastDigest = digest;
-          lastSent = Date.now();
-        }
-      }
+  const send = async () => {
+    if (!casting || casting.id !== id || video.videoWidth === 0) return;
+    // Sharp enough to read text on the students' screens.
+    const width = Math.min(1920, video.videoWidth);
+    canvas.width = width;
+    canvas.height = Math.round(video.videoHeight * width / video.videoWidth);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    if (!blob) return;
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))).join(',');
+    if (digest === lastDigest && Date.now() - lastSent < 4000) return;
+    const response = await fetch('/api/broadcast/frame?id=' + encodeURIComponent(id), {
+      method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob,
+    }).catch(() => null);
+    if (response && response.status === 410) {
+      stopCasting();
+      return;
     }
-    if (casting && casting.id === id) casting.timer = setTimeout(tick, 200);
+    lastDigest = digest;
+    lastSent = Date.now();
   };
-  tick();
+  // One picture at a time; a picture that arrives meanwhile is sent next.
+  const tick = async () => {
+    if (busy) {
+      again = true;
+      return;
+    }
+    busy = true;
+    do {
+      again = false;
+      await send();
+    } while (again && casting && casting.id === id);
+    busy = false;
+  };
+  const onFrame = () => {
+    if (!casting || casting.id !== id) return;
+    tick();
+    video.requestVideoFrameCallback(onFrame);
+  };
+  if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(onFrame);
+  const keepAlive = () => {
+    if (!casting || casting.id !== id) return;
+    if (!('requestVideoFrameCallback' in video) || Date.now() - lastSent > 2000) tick();
+    casting.timer = setTimeout(keepAlive, 'requestVideoFrameCallback' in video ? 1000 : 100);
+  };
+  keepAlive();
 }
 
 function stopCasting() {

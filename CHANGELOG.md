@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Sharing the teacher's screen follows changes sooner: the page sends each
+  new picture as soon as the previous one has left, up to fifteen a second
+  instead of at most five with a pause after each. Each computer still gets
+  only the latest picture, so a slow one skips pictures instead of falling
+  behind.
 - A USB installation whose computer does not come back from the restart (a
   broken disk, a computer that starts from the USB stick again) or whose
   outcome cannot be proved can be closed with **Close this record** and the
