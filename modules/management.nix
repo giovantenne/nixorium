@@ -190,7 +190,7 @@ let
     name = "nixorium-open";
     # GNOME Console is the launcher's own fallback, so it is there even where
     # the desktop leaves it out.
-    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep pkgs.gnome-console ];
+    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep (pkgs.callPackage ../pkgs/nixorium-console.nix { }) ];
     text = ''
       SESSION=${nixoriumSession}/bin/nixorium-session
       if command -v ghostty >/dev/null; then
@@ -231,7 +231,7 @@ let
         wait "$pid" 2>/dev/null || true
         echo "Ghostty cannot draw on this computer (OpenGL 4.3 is missing); opening GNOME Console." >&2
       fi
-      if command -v kgx >/dev/null; then exec kgx -- "$SESSION"; fi
+      if command -v nixorium-console >/dev/null; then exec nixorium-console "$SESSION"; fi
       if command -v gnome-terminal >/dev/null; then exec gnome-terminal --title=Nixorium -- "$SESSION"; fi
       if command -v xterm >/dev/null; then exec xterm -T Nixorium -e "$SESSION"; fi
       echo "No terminal application is installed; open a terminal and run: nixorium" >&2

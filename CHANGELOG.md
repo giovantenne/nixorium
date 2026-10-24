@@ -12,7 +12,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   Console when Ghostty cannot draw (Ghostty needs OpenGL 4.3, which Intel
   integrated graphics of 2011-2012 and virtual machines with 3D acceleration
   do not reach). Before, nothing opened. It works on the controller and on
-  every computer that has Ghostty; the screensaver is left out.
+  every computer that has Ghostty; the screensaver is left out. Console closes
+  when the program it opened ends (q in Nixorium), as Ghostty does, instead of
+  keeping a read-only window.
 - The overview no longer lists "Replacing a controller? Restore its lab" on a
   laboratory with no backup and no computers: it stayed there until the first
   backup or computer. Restore lab is in Maintenance, and the installer's last

@@ -1,6 +1,7 @@
 { pkgs, lib, hostSoftwarePackages, ... }:
 let
   ghostty = pkgs.ghostty;
+  console = pkgs.callPackage ../pkgs/nixorium-console.nix { };
   # Ghostty draws with OpenGL 4.3. On older graphics (Intel integrated
   # graphics of 2011-2012, a virtual machine with 3D acceleration) it either
   # closes at once ("OpenGL version is too old") or keeps an empty window
@@ -9,7 +10,7 @@ let
   # instead. The screensaver calls Ghostty by its own path and is left out.
   wrapper = pkgs.writeShellApplication {
     name = "ghostty";
-    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep pkgs.gnome-console ];
+    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep console ];
     text = ''
       real=${ghostty}/bin/ghostty
       case "''${1:-}" in
@@ -54,10 +55,7 @@ let
           found=true
         fi
       done
-      if [ "''${#command[@]}" -gt 0 ]; then
-        exec kgx -- "''${command[@]}"
-      fi
-      exec kgx
+      exec nixorium-console "''${command[@]}"
     '';
   };
   # Ghostty's own launcher starts it through D-Bus by its store path, which
