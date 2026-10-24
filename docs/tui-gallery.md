@@ -899,7 +899,7 @@ Technical details are hidden; press d to show them.
 
 ✓ pc01 is installed and verified.
 
-r Refresh status  ·  d Details  ·  v Verify installed system  ·  Esc Detach  ·  F1 Help
+r Refresh status  ·  d Details  ·  Esc Detach  ·  F1 Help
 ```
 
 ## Shutdown with active sessions
