@@ -94,14 +94,25 @@ fail_with_log() {
 install_progress() {
   awk '
     /^copying path / { n++; if (n % 100 == 0) { print "        " n " packages downloaded so far..."; fflush() }; next }
-    /^(these|this) [0-9]+ paths? will be (fetched|built)/ { print "        " $0; fflush() }
+    /^(these|this) [0-9]+ paths? will be (fetched|built)/ { print "        " $0; fflush(); next }
+    # What is not in the public cache (Nixorium itself, its screensaver
+    # effects, the system configuration) is built here after the downloads,
+    # with no download count: say so, and name the long builds.
+    /^these [0-9]+ derivations will be built/ { print "        " $2 " components are built on this computer after the downloads; this can take several minutes."; fflush(); next }
+    /^this derivation will be built/ { print "        1 component is built on this computer after the downloads."; fflush(); next }
+    /^building \047\/nix\/store\/[a-z0-9]+-(nixorium|ttfx|go)-[0-9]/ {
+      name = $2; sub(/^\047\/nix\/store\/[a-z0-9]+-/, "", name); sub(/\.drv\047.*$/, "", name)
+      print "        Building " name "..."; fflush(); next
+    }
   '
 }
 
 # Force the bootstrap install to use the official NixOS cache only.
 # This avoids inheriting substituters from a preconfigured live/netboot
 # environment, which may point at an unavailable or unsigned local cache.
-export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=\nmax-jobs = 1\ncores = 1'
+# One build or download at a time bounds the live system's memory; each build
+# may use every processor (the swap file on the new disk absorbs peaks).
+export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=\nmax-jobs = 1\ncores = 0'
 
 INSTALLER_INPUT_FD=""
 

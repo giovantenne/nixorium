@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The controller installer says when it builds on the computer after the
+  downloads, and names the long builds (Nixorium, the screensaver effects).
+  Before, that phase printed nothing for several minutes after the last
+  "packages downloaded" line. Each build now uses every processor; builds
+  still run one at a time, which keeps the USB system's memory bounded.
+
 ## [3.10.0-beta.4] - 2026-10-23
 
 A controller still on 3.10.0-beta.1 follows the update note of 3.10.0-beta.2

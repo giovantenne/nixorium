@@ -74,6 +74,14 @@ set -euo pipefail
 config=${NIX_CONFIG//$'\n'/;}
 printf 'nixos-install|%s|%s|%s\n' "$config" "$XDG_CACHE_HOME" "$*" >> "$CONTROLLER_INSTALLER_LOG"
 if [[ -n "${MOCK_INSTALL_FAILS:-}" ]]; then exit 1; fi
+cat <<'OUTPUT'
+these 3 derivations will be built:
+  /nix/store/00000000000000000000000000000000-nixorium-3.10.0.drv
+these 2 paths will be fetched (1.0 MiB download, 2.0 MiB unpacked):
+copying path '/nix/store/11111111111111111111111111111111-hello-1.0' from 'https://cache.nixos.org'...
+building '/nix/store/22222222222222222222222222222222-unit-polkit.service.drv'...
+building '/nix/store/00000000000000000000000000000000-nixorium-3.10.0.drv'...
+OUTPUT
 EOF
 
 cat > "${MOCK_BIN}/sudo" <<'EOF'
@@ -117,7 +125,7 @@ STUDENT_USER=student \
 test "$(grep -c '^nix|' "$ACTION_LOG")" -eq 3
 test "$(grep -c -- '--dry-run' "$ACTION_LOG" || true)" -eq 0
 grep -F 'max-jobs = 1' "$ACTION_LOG" >/dev/null
-grep -F 'cores = 1' "$ACTION_LOG" >/dev/null
+grep -F 'cores = 0' "$ACTION_LOG" >/dev/null
 grep -F 'trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=' \
   "$ACTION_LOG" >/dev/null
 if grep -F '6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo=' "$ACTION_LOG"; then
@@ -133,6 +141,12 @@ grep -F 'nixos-install|experimental-features = nix-command flakes;' "$ACTION_LOG
 grep -F "|${TARGET_ROOT}/var/cache/nixorium-bootstrap|--root ${TARGET_ROOT} --flake path:/deployment#pc99 --no-write-lock-file --no-root-passwd" "$ACTION_LOG" >/dev/null
 test -f "$DEPLOYMENT/flake.lock"
 grep -F 'The system is downloaded and written to the chosen disk' "${TEST_ROOT}/output" >/dev/null
+grep -F '3 components are built on this computer after the downloads' "${TEST_ROOT}/output" >/dev/null
+grep -Fx '        Building nixorium-3.10.0...' "${TEST_ROOT}/output" >/dev/null
+if grep -F 'unit-polkit' "${TEST_ROOT}/output"; then
+  echo "controller installer named a small build" >&2
+  exit 1
+fi
 grep -F '/dev/vda  40G QEMU HARDDISK' "${TEST_ROOT}/output" >/dev/null
 grep -F '[3/3] Downloading and installing the controller system' "${TEST_ROOT}/output" >/dev/null
 grep -F '[ OK ] Controller system installed.' "${TEST_ROOT}/output" >/dev/null
