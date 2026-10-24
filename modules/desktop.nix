@@ -8,6 +8,7 @@ in
 {
   imports = [
     { environment.etc = backgroundFiles; }
+    ./terminal-fallback.nix
   ];
 
   time.timeZone = labSettings.timeZone;

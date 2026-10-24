@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The Terminal icon, Super+Enter and GNOME's default terminal open GNOME
+  Console when Ghostty cannot draw (Ghostty needs OpenGL 4.3, which Intel
+  integrated graphics of 2011-2012 and virtual machines with 3D acceleration
+  do not reach). Before, nothing opened. It works on the controller and on
+  every computer that has Ghostty; the screensaver is left out.
 - The overview no longer lists "Replacing a controller? Restore its lab" on a
   laboratory with no backup and no computers: it stayed there until the first
   backup or computer. Restore lab is in Maintenance, and the installer's last
