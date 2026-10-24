@@ -571,72 +571,65 @@ configure_bootstrap_settings() {
   fi
 }
 
+# release_menu_entries prints the versions the installer offers, one per
+# line, the default first: the latest stable release, the latest prerelease
+# when it is newer than that stable release, and master. RELEASES lists tags
+# newest first, as the GitHub release list does; when it is empty (the list
+# could not be read) the release this installer was published with stands in.
+release_menu_entries() {
+  local RELEASES="$1"
+  local LATEST_PRERELEASE=""
+  local LATEST_STABLE=""
+  local TAG
+  while IFS= read -r TAG; do
+    if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+      continue
+    fi
+    if [[ "$TAG" == *-* ]]; then
+      if [[ -z "$LATEST_PRERELEASE" && -z "$LATEST_STABLE" ]]; then
+        LATEST_PRERELEASE="$TAG"
+      fi
+    elif [[ -z "$LATEST_STABLE" ]]; then
+      LATEST_STABLE="$TAG"
+    fi
+  done <<< "$RELEASES"
+  if [[ -z "$LATEST_STABLE" && -z "$LATEST_PRERELEASE" && "$DEFAULT_RELEASE" != "master" ]]; then
+    if [[ "$DEFAULT_RELEASE" == *-* ]]; then
+      LATEST_PRERELEASE="$DEFAULT_RELEASE"
+    else
+      LATEST_STABLE="$DEFAULT_RELEASE"
+    fi
+  fi
+  if [[ -n "$LATEST_STABLE" ]]; then
+    printf '%s\n' "$LATEST_STABLE"
+  fi
+  if [[ -n "$LATEST_PRERELEASE" ]]; then
+    printf '%s\n' "$LATEST_PRERELEASE"
+  fi
+  printf 'master\n'
+}
+
 choose_release() {
-  local API_RESPONSE
-  local API_SUCCEEDED=false
+  local API_RESPONSE=""
   local CHOICE
   local CHOICE_NUMBER
-  local DEFAULT_AVAILABLE=false
   local INDEX
   local LABEL
-  local LATEST_PRERELEASE=""
-  local MENU_DEFAULT="$DEFAULT_RELEASE"
+  local MENU_DEFAULT
   local TAG
-  local -a AVAILABLE_RELEASES=("master")
-  local -a STABLE_RELEASES=()
+  local -a AVAILABLE_RELEASES=()
 
   ui_section "Version" >&3
   ui_log "Fetching published Nixorium releases..." >&3
-  if API_RESPONSE="$(curl -fsSL "$RELEASES_API_URL")"; then
-    API_SUCCEEDED=true
-    while IFS= read -r TAG; do
-      if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-        continue
-      fi
-
-      if [[ "$TAG" == *-* ]]; then
-        if [[ -z "$LATEST_PRERELEASE" ]]; then
-          LATEST_PRERELEASE="$TAG"
-        fi
-      else
-        STABLE_RELEASES+=("$TAG")
-      fi
-    done < <(
-      printf '%s\n' "$API_RESPONSE" |
-        sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\(v[^"]*\)",*$/\1/p'
-    )
-  else
+  if ! API_RESPONSE="$(curl -fsSL "$RELEASES_API_URL")"; then
+    API_RESPONSE=""
     ui_feedback "Could not retrieve the GitHub release list." >&3
   fi
-
-  if [[ -n "$LATEST_PRERELEASE" ]]; then
-    AVAILABLE_RELEASES+=("$LATEST_PRERELEASE")
-  fi
-  AVAILABLE_RELEASES+=("${STABLE_RELEASES[@]}")
-
-  if [[ "$API_SUCCEEDED" == "false" && "$DEFAULT_RELEASE" != "master" ]]; then
-    AVAILABLE_RELEASES+=("$DEFAULT_RELEASE")
-  fi
-
-  if [[ "$DEFAULT_RELEASE" == *-* && -n "$LATEST_PRERELEASE" ]]; then
-    MENU_DEFAULT="$LATEST_PRERELEASE"
-  fi
-
-  for TAG in "${AVAILABLE_RELEASES[@]}"; do
-    if [[ "$TAG" == "$MENU_DEFAULT" ]]; then
-      DEFAULT_AVAILABLE=true
-      break
-    fi
-  done
-  if [[ "$DEFAULT_AVAILABLE" == "false" ]]; then
-    if [[ -n "$LATEST_PRERELEASE" ]]; then
-      MENU_DEFAULT="$LATEST_PRERELEASE"
-    elif (( ${#STABLE_RELEASES[@]} > 0 )); then
-      MENU_DEFAULT="${STABLE_RELEASES[0]}"
-    else
-      MENU_DEFAULT="master"
-    fi
-  fi
+  mapfile -t AVAILABLE_RELEASES < <(release_menu_entries "$(
+    printf '%s\n' "$API_RESPONSE" |
+      sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\(v[^"]*\)",*$/\1/p'
+  )")
+  MENU_DEFAULT="${AVAILABLE_RELEASES[0]}"
 
   echo >&3
   ui_note "Select a Nixorium version:" >&3

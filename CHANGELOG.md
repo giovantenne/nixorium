@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The bootstrap installer offers three versions: the latest stable release
+  (the default), the latest prerelease when it is newer than that release, and
+  master. Before, it listed every stable release and preselected the
+  prerelease when it ran from one.
+- New laboratories open https://nixorium.org as the browser homepage instead
+  of https://example.org; existing laboratories keep theirs (Maintenance →
+  Change settings → Browser).
 - The controller installer says when it builds on the computer after the
   downloads, and names the long builds (Nixorium, the screensaver effects).
   Before, that phase printed nothing for several minutes after the last

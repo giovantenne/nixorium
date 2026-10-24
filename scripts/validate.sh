@@ -85,6 +85,7 @@ bash tests/client-installer-library.sh
 bash tests/remote-client-installer.sh
 bash tests/controller-bootstrap.sh
 bash tests/controller-installer.sh
+bash tests/install-release-menu.sh
 bash tests/software-profile-bootstrap.sh
 bash tests/canonical-copy-sync.sh
 bash tests/known-hosts-migration.sh
