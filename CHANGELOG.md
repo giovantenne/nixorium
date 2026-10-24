@@ -13,9 +13,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   backup or computer. Restore lab is in Maintenance, and the installer's last
   screen points there.
 - The Nixorium icon opens GNOME Console when Ghostty cannot draw on the
-  controller (no OpenGL 3.3: an old graphics card, or a virtual machine with
-  broken 3D acceleration). Ghostty does not exit in that case but keeps an
-  empty window, so the dashboard did not open at all.
+  controller (Ghostty needs OpenGL 4.3: an old graphics card, or a virtual
+  machine with 3D acceleration on). Ghostty then closed at once or kept an
+  empty window, both with exit status 0, so the dashboard did not open at
+  all. GNOME Console comes with the launcher, also where the desktop leaves
+  it out.
 - The bootstrap installer offers three versions: the latest stable release
   (the default), the latest prerelease when it is newer than that release, and
   master. Before, it listed every stable release and preselected the
