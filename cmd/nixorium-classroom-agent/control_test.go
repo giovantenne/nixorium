@@ -43,7 +43,7 @@ func waitForCalls(t *testing.T, notifier *fakeControlNotifier, want int) []bool 
 
 func TestControlBannerFollowsTheControl(t *testing.T) {
 	notifier := &fakeControlNotifier{}
-	banner := newControlBanner(notifier)
+	banner := newExtensionFlag(notifier.SetControlled)
 	banner.Set(true)
 	waitForCalls(t, notifier, 1)
 	// Further input changes nothing.
@@ -64,7 +64,7 @@ func TestControlBannerFollowsTheControl(t *testing.T) {
 
 func TestControlBannerRetriesAfterAFailure(t *testing.T) {
 	notifier := &fakeControlNotifier{fail: true}
-	banner := newControlBanner(notifier)
+	banner := newExtensionFlag(notifier.SetControlled)
 	banner.Set(true)
 	time.Sleep(50 * time.Millisecond)
 	notifier.mutex.Lock()
@@ -77,7 +77,7 @@ func TestControlBannerRetriesAfterAFailure(t *testing.T) {
 }
 
 func TestNoBannerWithoutNotifier(t *testing.T) {
-	var banner *controlBanner
+	var banner *extensionFlag
 	banner.Set(true)
 	banner.Set(false)
 }

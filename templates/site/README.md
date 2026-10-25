@@ -269,7 +269,8 @@ apply at the student's next login. A computer whose classroom view was
 stopped from the student's terminal shows "Monitoring stopped on this PC" and
 starts it again by itself within seconds. While you control a computer with
 your keyboard and mouse, its screen shows the banner "Your teacher is
-controlling this computer" until you stop. In a computer's window of the classroom
+controlling this computer" until you stop. GNOME hides its sharing icon while a window is full screen; then
+the screen shows a small "Classroom view open" label instead. In a computer's window of the classroom
 view page, **Save screenshot** keeps a picture of its screen in
 `Nixorium/Screenshots` of your home folder, such as
 `pc03-2026-10-15-10.30.12.jpg`; a page not opened from Nixorium downloads the

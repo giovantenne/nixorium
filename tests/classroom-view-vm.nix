@@ -14,6 +14,10 @@ let
     export GI_TYPELIB_PATH="${pkgs.glib.out}/lib/girepository-1.0:${pkgs.gobject-introspection}/lib/girepository-1.0"
     exec ${python}/bin/python3 ${./classroom-view-key.py}
   '';
+  f11Key = pkgs.writeShellScript "classroom-view-f11" ''
+    export GI_TYPELIB_PATH="${pkgs.glib.out}/lib/girepository-1.0:${pkgs.gobject-introspection}/lib/girepository-1.0"
+    exec ${python}/bin/python3 ${./classroom-view-f11.py}
+  '';
   labSettings = {
     classroomView = true;
     deploymentMode = "laboratory";
@@ -163,6 +167,23 @@ pkgs.testers.runNixOSTest {
     client.sleep(1)
     client.screenshot("classroom-control")
     client.wait_until_succeeds(classroom_property + "Controlled' | grep -F false", timeout=30)
+    client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
+
+    # While a window is full screen GNOME hides the top bar and its sharing
+    # icon: the extension then shows its own small indicator, and only then.
+    client.succeed("systemd-run --user -M student@ --collect --unit classroom-view-editor gnome-text-editor")
+    client.wait_until_succeeds("su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus --method org.freedesktop.DBus.NameHasOwner org.gnome.TextEditor' | grep -F true", timeout=60)
+    client.sleep(3)
+    client.succeed("${agent} probe --thumbnail /tmp/thumb-fullscreen.jpg nixorium-classroom-connect")
+    client.wait_until_succeeds(classroom_property + "IndicatorShown' | grep -F false", timeout=10)
+    client.succeed("systemd-run --user -M student@ --wait --pipe --collect ${f11Key}")
+    client.succeed("${agent} probe --thumbnail /tmp/thumb-fullscreen.jpg nixorium-classroom-connect")
+    client.wait_until_succeeds(classroom_property + "IndicatorShown' | grep -F true", timeout=10)
+    client.sleep(1)
+    client.screenshot("classroom-fullscreen-indicator")
+    client.succeed("systemd-run --user -M student@ --wait --pipe --collect ${f11Key}")
+    client.wait_until_succeeds(classroom_property + "IndicatorShown' | grep -F false", timeout=10)
+    client.succeed("systemctl --user -M student@ stop classroom-view-editor")
     client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
 
     # Files sent to the desktop belong to the student and are never

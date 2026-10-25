@@ -24,6 +24,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   computer", from the first input until the control ends (the sharing icon
   alone told students nothing about it). The banner is drawn by the classroom
   Shell extension, so it appears after the student's next login.
+- While the classroom view captures a screen and a window is full screen (a
+  video, a game), GNOME hides the top bar and its sharing icon. The classroom
+  extension now shows a small "Classroom view open" label in the corner of the
+  screen in that case only. It takes no clicks and appears after the student's
+  next login.
 
 ### Fixed
 

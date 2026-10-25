@@ -26,6 +26,10 @@
 // banner at the top of the screen says so. It is plain text above everything,
 // does not take clicks or keys, and goes when the control ends.
 //
+// While the screen is being shared and a full-screen window hides GNOME's top
+// bar (a video, a game), a small "Classroom view open" label in a corner of
+// the screen takes the place of the sharing icon. It takes no clicks or keys.
+//
 // When an update from the controller replaces the running system, the system
 // writes /run/nixorium/update-notice.json; a notification tells the person at
 // the computer, with a Restart button when a restart finishes the update.
@@ -79,12 +83,19 @@ const Interface = `<node>
       <arg type="b" direction="in" name="controlled"/>
     </method>
     <property name="Controlled" type="b" access="read"/>
+    <method name="SetSharing">
+      <arg type="b" direction="in" name="sharing"/>
+    </method>
+    <property name="IndicatorShown" type="b" access="read"/>
   </interface>
 </node>`;
 
 export default class NixoriumClassroomExtension extends Extension {
     enable() {
         this._quietIndicator();
+        // GNOME hides the top bar, and with it the sharing icon, while a
+        // window is full screen: the small indicator takes over then.
+        Main.layoutManager.panelBox.connectObject('notify::visible', () => this._updateChip(), this);
         this._service = Gio.DBusExportedObject.wrapJSObject(Interface, this);
         this._service.export(Gio.DBus.session, ObjectPath);
         this._nameId = Gio.bus_own_name_on_connection(Gio.DBus.session, BusName,
@@ -99,6 +110,9 @@ export default class NixoriumClassroomExtension extends Extension {
         this._notice = null;
         this.HideMessage();
         this.SetControlled(false);
+        this._sharing = false;
+        this._updateChip();
+        Main.layoutManager.panelBox.disconnectObject(this);
         this.StopBroadcast();
         this._setLocked(false);
         if (this._nameId) {
@@ -475,6 +489,55 @@ export default class NixoriumClassroomExtension extends Extension {
 
     get Controlled() {
         return Boolean(this._control);
+    }
+
+    // D-Bus: called by the classroom agent while a capture session exists.
+    SetSharing(sharing) {
+        this._sharing = Boolean(sharing);
+        this._updateChip();
+    }
+
+    get IndicatorShown() {
+        return Boolean(this._chip);
+    }
+
+    // The top bar is hidden exactly when a window is full screen on the
+    // primary monitor (layout.js hides the panel box then).
+    _updateChip() {
+        const wanted = Boolean(this._sharing) && !Main.layoutManager.panelBox.visible;
+        if (wanted === Boolean(this._chip))
+            return;
+        if (!wanted) {
+            Main.layoutManager.uiGroup.disconnect(this._chip.raiseId);
+            this._chip.layer.destroy();
+            this._chip = null;
+        } else {
+            const layer = new St.Widget({
+                name: 'nixoriumClassroomIndicator',
+                layout_manager: new Clutter.BinLayout(),
+            });
+            layer.add_constraint(new Clutter.BindConstraint({
+                source: global.stage,
+                coordinate: Clutter.BindCoordinate.ALL,
+            }));
+            layer.add_child(new St.Label({
+                text: 'Classroom view open',
+                style: 'background-color: rgba(16, 19, 23, 0.7); color: #ffffff; font-size: 13px; padding: 4px 12px; border-radius: 0 0 0 8px;',
+                x_align: Clutter.ActorAlign.END,
+                y_align: Clutter.ActorAlign.START,
+                x_expand: true,
+                y_expand: true,
+            }));
+            Main.layoutManager.uiGroup.add_child(layer);
+            Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+            // Kept above anything shown later, the way the lock cover is.
+            const raiseId = Main.layoutManager.uiGroup.connect('child-added', () => {
+                Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+                this._updateMessage();
+            });
+            this._chip = {layer, raiseId};
+        }
+        this._service?.emit_property_changed('IndicatorShown', GLib.Variant.new_boolean(Boolean(this._chip)));
     }
 
     _quietIndicator() {
