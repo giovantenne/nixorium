@@ -1,7 +1,7 @@
 # Assistant protocol v2.5
 
 The v2 endpoints and fields remain unchanged except for the additions below.
-The client executes the thirteen v1 deployment tools listed in
+The client executes the fifteen v1 deployment tools listed in
 [assistant-tools-v1.json](assistant-tools-v1.json) and described in the
 [Assistant guide](assistant.md#tools-and-limits). The service alone executes
 `read_core`.
@@ -34,15 +34,18 @@ that turn.
 
 Step requests may carry the optional `X-Nixorium-Capabilities` HTTP header, a
 comma-separated list drawn from `prepare_npm_v1`, `host_diagnostics_v1`,
-`git_history_v1`, `prefetch_v1`, `settings_v1`, `home_files_v1` and
-`system_files_v1`. The request
+`git_history_v1`, `prefetch_v1`, `settings_v1`, `settings_v2`, `home_files_v1`
+and `system_files_v1`. The request
 JSON is unchanged and sharing routes never carry the header. The service offers
 a capability-gated tool only to a controller that lists its capability:
 `prefetch` requires `prefetch_v1` and `read_system_file` requires
-`system_files_v1`. `settings_v1` adds no tool: it tells the
+`system_files_v1`. `settings_v1` and `settings_v2` add no tool: they tell the
 service that `write_file` of `lab-settings.json` accepts changes to the
 writable settings listed in the [Assistant guide](assistant.md#laboratory-settings)
 and refuses any other with `settings_field_read_only` or `settings_invalid`.
+`settings_v2` adds the classroom view, the number of computers and the
+teacher and student user names to the writable settings. It is guidance only:
+a controller without it still refuses those fields by name.
 Older services ignore the header; older controllers never send it.
 
 ## Service messages event

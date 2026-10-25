@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -183,7 +184,7 @@ func TestAssistantSettingsRefusesEachReadOnlyFieldByName(t *testing.T) {
 			fields = append(fields, "lab."+name)
 		}
 	}
-	if len(fields) < 18 {
+	if len(fields) < 14 {
 		t.Fatalf("only %d read-only fields found", len(fields))
 	}
 	for _, field := range fields {
@@ -208,15 +209,15 @@ func TestAssistantSettingsRefusesReadOnlyChangeAlongsideWritableChange(t *testin
 	result := assistantSettingsModelWrite(t, w, func(tree map[string]any) {
 		lab := assistantSettingsLab(tree)
 		lab["timeZone"] = "Europe/London"
-		lab["pcCount"] = 25
+		lab["ifaceName"] = "eth0"
 	})
-	if result["error"] != "settings_field_read_only" || !strings.HasPrefix(result["message"].(string), "settings_field_read_only: lab.pcCount.") {
+	if result["error"] != "settings_field_read_only" || !strings.HasPrefix(result["message"].(string), "settings_field_read_only: lab.ifaceName.") {
 		t.Fatal(result)
 	}
 	assistantSettingsUntouched(t, w, store, base)
 	// Nor can a changed account name or a changed password count slip through
 	// as a copy of the masked value: only the exact view is accepted.
-	for _, key := range []string{"credentialsVersion", "teacherUser"} {
+	for _, key := range []string{"credentialsVersion", "masterDhcpIp"} {
 		result = assistantSettingsModelWrite(t, w, func(tree map[string]any) {
 			lab := assistantSettingsLab(tree)
 			lab["timeZone"] = "Europe/London"
@@ -265,7 +266,7 @@ func TestAssistantSettingsRefusesInvalidWrites(t *testing.T) {
 		"not a text": {func(tree map[string]any) { assistantSettingsLab(tree)["keyboardLayout"] = []any{"it"} }, "settings_invalid: lab.keyboardLayout must be text"},
 	} {
 		result := assistantSettingsModelWrite(t, w, test.edit)
-		if result["ok"] == true || result["error"] != "settings_invalid" || result["message"] != test.want {
+		if result["ok"] == true || result["error"] != "settings_invalid" || !strings.HasPrefix(result["message"].(string), test.want) {
 			t.Fatalf("%s: %v", name, result)
 		}
 		assistantSettingsUntouched(t, w, store, base)
@@ -427,8 +428,8 @@ func TestAssistantSavePlanRefusesWhatANativeSettingsSaveRefuses(t *testing.T) {
 	}{
 		"network":    {canonical(func(lab *domain.LabSettings) { lab.NetworkBase = "10.1.0.0" }), false, domain.NetworkLockedMessage(20)},
 		"controller": {canonical(func(lab *domain.LabSettings) { lab.MasterHostNumber = 100 }), false, domain.ControllerNumberLockedMessage(20)},
-		"count":      {canonical(func(lab *domain.LabSettings) { lab.PCCount = 19 }), false, "The proposal changes a setting the assistant may not change (lab.pcCount)."},
-		"account":    {canonical(func(lab *domain.LabSettings) { lab.StudentUser = "pupil" }), false, "(lab.studentUser)"},
+		"interface":  {canonical(func(lab *domain.LabSettings) { lab.InterfaceName = "eth0" }), false, "The proposal changes a setting the assistant may not change (lab.ifaceName)."},
+		"dhcp":       {canonical(func(lab *domain.LabSettings) { lab.MasterDHCPIP = "192.0.2.11" }), false, "(lab.masterDhcpIp)"},
 		"invalid":    {[]byte("{}"), false, "The proposed settings are not valid:"},
 		"form":       {[]byte(strings.ReplaceAll(string(canonical(func(lab *domain.LabSettings) { lab.TimeZone = "UTC" })), "  ", "\t")), false, "not in the form Nixorium writes"},
 		"mode":       {canonical(func(lab *domain.LabSettings) { lab.TimeZone = "UTC" }), true, "The proposal changes a protected path."},
@@ -452,7 +453,7 @@ func TestAssistantSavePlanRefusesWhatANativeSettingsSaveRefuses(t *testing.T) {
 }
 
 func TestAssistantClientAdvertisesSettingsCapability(t *testing.T) {
-	// The header allowlist is exact: settings_v1 passes, near misses do not.
+	// The header allowlist is exact: settings_v1 and settings_v2 pass, near misses do not.
 	seen := ""
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = r.Header.Get("X-Nixorium-Capabilities")
@@ -461,11 +462,85 @@ func TestAssistantClientAdvertisesSettingsCapability(t *testing.T) {
 	}))
 	defer server.Close()
 	client := AssistantClient{Endpoint: server.URL + "/v1", Version: "3.8.0"}
-	payload := domain.AssistantStepRequest{Context: &domain.AssistantContext{Nixorium: "3.8.0", Files: []string{"flake.nix"}, Capabilities: []string{"settings_v1", "SETTINGS_V1", "settings", "settings_v2", "settings_v1", "settings_v1,prefetch_v1"}}, Messages: []domain.AssistantMessage{{Role: "user", Content: "Synthetic"}}}
+	payload := domain.AssistantStepRequest{Context: &domain.AssistantContext{Nixorium: "3.8.0", Files: []string{"flake.nix"}, Capabilities: []string{"settings_v1", "SETTINGS_V1", "settings", "settings_v3", "settings_v1", "settings_v2", "settings_v1,prefetch_v1"}}, Messages: []domain.AssistantMessage{{Role: "user", Content: "Synthetic"}}}
 	if err := client.Step(t.Context(), strings.Repeat("t", 43), assistantTestTurnID, payload, func(domain.AssistantEvent) {}); err != nil {
 		t.Fatal(err)
 	}
-	if seen != "settings_v1" {
+	if seen != "settings_v1,settings_v2" {
 		t.Fatalf("header %q", seen)
+	}
+}
+
+func TestAssistantSettingsAcceptsTheMenuSettings(t *testing.T) {
+	for name, test := range map[string]struct {
+		edit   func(lab map[string]any)
+		want   func(lab *domain.LabSettings)
+		field  string
+		impact string
+	}{
+		"classroom view off":  {func(lab map[string]any) { lab["classroomView"] = false }, func(lab *domain.LabSettings) { off := false; lab.ClassroomView = &off }, "lab.classroomView", "classroom-view"},
+		"computer count up":   {func(lab map[string]any) { lab["pcCount"] = 24 }, func(lab *domain.LabSettings) { lab.PCCount = 24 }, "lab.pcCount", "computers-added"},
+		"computer count down": {func(lab map[string]any) { lab["pcCount"] = 12 }, func(lab *domain.LabSettings) { lab.PCCount = 12 }, "lab.pcCount", "computers-removed"},
+		"teacher user":        {func(lab map[string]any) { lab["teacherUser"] = "docente" }, func(lab *domain.LabSettings) { lab.TeacherUser = "docente" }, "lab.teacherUser", "accounts"},
+		"student user":        {func(lab map[string]any) { lab["studentUser"] = "alunno" }, func(lab *domain.LabSettings) { lab.StudentUser = "alunno" }, "lab.studentUser", "accounts"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w, store, _, _ := assistantSettingsFixture(t)
+			if result := assistantSettingsModelWrite(t, w, func(tree map[string]any) { test.edit(assistantSettingsLab(tree)) }); result["ok"] != true {
+				t.Fatal(result)
+			}
+			want := assistantSettingsBase()
+			test.want(&want.Lab)
+			if got := assistantCandidateSettings(t, w); !reflect.DeepEqual(got, want) {
+				t.Fatalf("candidate %+v", got.Lab)
+			}
+			plan := assistantSettingsPlan(t, w, store)
+			if plan.State != "ready" {
+				t.Fatalf("plan: %+v", plan)
+			}
+			found := false
+			for _, impact := range plan.SettingsImpacts {
+				found = found || impact.Kind == test.impact
+			}
+			if !found {
+				t.Fatalf("no %s impact: %+v", test.impact, plan.SettingsImpacts)
+			}
+		})
+	}
+}
+
+func TestAssistantSettingsClassroomViewImpactIsTheMenuText(t *testing.T) {
+	w, store, _, _ := assistantSettingsFixture(t)
+	if result := assistantSettingsModelWrite(t, w, func(tree map[string]any) { assistantSettingsLab(tree)["classroomView"] = false }); result["ok"] != true {
+		t.Fatal(result)
+	}
+	plan := assistantSettingsPlan(t, w, store)
+	if !slices.Contains(plan.SettingsReviewLines(), "Checked by Nixorium: "+domain.ClassroomViewImpact(false).Detail) {
+		t.Fatalf("lines %q", plan.SettingsReviewLines())
+	}
+}
+
+func TestAssistantSettingsRefusesInvalidMenuSettings(t *testing.T) {
+	w, store, _, base := assistantSettingsFixture(t)
+	for name, test := range map[string]struct {
+		edit func(lab map[string]any)
+		want string
+	}{
+		"count zero":       {func(lab map[string]any) { lab["pcCount"] = 0 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode"},
+		"count too many":   {func(lab map[string]any) { lab["pcCount"] = 254 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode"},
+		"count negative":   {func(lab map[string]any) { lab["pcCount"] = -3 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode"},
+		"count above host": {func(lab map[string]any) { lab["pcCount"] = 120 }, "settings_invalid: lab.masterHostNumber: must be greater than pcCount"},
+		"count fraction":   {func(lab map[string]any) { lab["pcCount"] = 2.5 }, "settings_invalid: lab.pcCount must be an integer"},
+		"count text":       {func(lab map[string]any) { lab["pcCount"] = "20" }, "settings_invalid: lab.pcCount must be an integer"},
+		"view text":        {func(lab map[string]any) { lab["classroomView"] = "off" }, "settings_invalid: lab.classroomView must be true or false"},
+		"teacher root":     {func(lab map[string]any) { lab["teacherUser"] = "root" }, "settings_invalid: lab.teacherUser: must not be root or admin"},
+		"student bad":      {func(lab map[string]any) { lab["studentUser"] = "Bad Name" }, "settings_invalid: lab.studentUser: must be a valid Unix user name"},
+		"same account":     {func(lab map[string]any) { lab["studentUser"] = "desk-teacher" }, "settings_invalid: lab.studentUser: must be different from teacherUser"},
+	} {
+		result := assistantSettingsModelWrite(t, w, func(tree map[string]any) { test.edit(assistantSettingsLab(tree)) })
+		if result["ok"] == true || result["error"] != "settings_invalid" || !strings.HasPrefix(result["message"].(string), test.want) {
+			t.Fatalf("%s: %v", name, result)
+		}
+		assistantSettingsUntouched(t, w, store, base)
 	}
 }

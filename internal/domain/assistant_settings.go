@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -27,10 +28,11 @@ const (
 // assistantWritableSettings are the settings the model may propose changes to.
 // Names are the field names DiffLabSettings reports. Everything else in
 // lab-settings.json (network, counts, interfaces, accounts, passwords,
-// credentialsVersion, classroomView, assistant, schemaVersion) stays read-only.
+// credentialsVersion, assistant, schemaVersion) stays read-only.
 var assistantWritableSettings = []string{
 	"lab.homepageUrl", "lab.timeZone", "lab.defaultLocale", "lab.extraLocale", "lab.keyboardLayout",
 	"lab.studentGitName", "lab.studentGitEmail", "lab.adminGitName", "lab.adminGitEmail",
+	"lab.classroomView", "lab.pcCount", "lab.teacherUser", "lab.studentUser",
 }
 
 // AssistantWritableSettings lists the settings Assistant may change.
@@ -163,25 +165,72 @@ func changedSettingFields(shown, wrote map[string]any) []string {
 	return changed
 }
 
-// assistantSettingSpec ties a writable field to its place in LabSettings and
-// to the longest value it accepts.
+// assistantSettingSpec ties a writable field to its place in LabSettings.
+// set applies the value the model wrote (present is false when the key is
+// missing from the model's copy) and returns what is wrong with it, if
+// anything, in words that follow the field name.
 type assistantSettingSpec struct {
-	field  string
-	key    string
-	target func(*LabSettings) *string
-	limit  int
+	field string
+	key   string
+	set   func(lab *LabSettings, present bool, raw any) string
+}
+
+func textSetting(field, key string, target func(*LabSettings) *string, limit int) assistantSettingSpec {
+	return assistantSettingSpec{field, key, func(lab *LabSettings, present bool, raw any) string {
+		text := ""
+		if present {
+			var isText bool
+			if text, isText = raw.(string); !isText {
+				return "must be text"
+			}
+			if problem := assistantSettingValueProblem(text, limit); problem != "" {
+				return problem
+			}
+		}
+		*target(lab) = text
+		return ""
+	}}
 }
 
 var assistantSettingSpecs = []assistantSettingSpec{
-	{"lab.homepageUrl", "homepageUrl", func(lab *LabSettings) *string { return &lab.HomepageURL }, 2048},
-	{"lab.timeZone", "timeZone", func(lab *LabSettings) *string { return &lab.TimeZone }, 128},
-	{"lab.defaultLocale", "defaultLocale", func(lab *LabSettings) *string { return &lab.DefaultLocale }, 128},
-	{"lab.extraLocale", "extraLocale", func(lab *LabSettings) *string { return &lab.ExtraLocale }, 128},
-	{"lab.keyboardLayout", "keyboardLayout", func(lab *LabSettings) *string { return &lab.KeyboardLayout }, 128},
-	{"lab.studentGitName", "studentGitName", func(lab *LabSettings) *string { return &lab.StudentGitName }, 256},
-	{"lab.studentGitEmail", "studentGitEmail", func(lab *LabSettings) *string { return &lab.StudentGitEmail }, 256},
-	{"lab.adminGitName", "adminGitName", func(lab *LabSettings) *string { return &lab.AdminGitName }, 256},
-	{"lab.adminGitEmail", "adminGitEmail", func(lab *LabSettings) *string { return &lab.AdminGitEmail }, 256},
+	textSetting("lab.homepageUrl", "homepageUrl", func(lab *LabSettings) *string { return &lab.HomepageURL }, 2048),
+	textSetting("lab.timeZone", "timeZone", func(lab *LabSettings) *string { return &lab.TimeZone }, 128),
+	textSetting("lab.defaultLocale", "defaultLocale", func(lab *LabSettings) *string { return &lab.DefaultLocale }, 128),
+	textSetting("lab.extraLocale", "extraLocale", func(lab *LabSettings) *string { return &lab.ExtraLocale }, 128),
+	textSetting("lab.keyboardLayout", "keyboardLayout", func(lab *LabSettings) *string { return &lab.KeyboardLayout }, 128),
+	textSetting("lab.studentGitName", "studentGitName", func(lab *LabSettings) *string { return &lab.StudentGitName }, 256),
+	textSetting("lab.studentGitEmail", "studentGitEmail", func(lab *LabSettings) *string { return &lab.StudentGitEmail }, 256),
+	textSetting("lab.adminGitName", "adminGitName", func(lab *LabSettings) *string { return &lab.AdminGitName }, 256),
+	textSetting("lab.adminGitEmail", "adminGitEmail", func(lab *LabSettings) *string { return &lab.AdminGitEmail }, 256),
+	textSetting("lab.teacherUser", "teacherUser", func(lab *LabSettings) *string { return &lab.TeacherUser }, 64),
+	textSetting("lab.studentUser", "studentUser", func(lab *LabSettings) *string { return &lab.StudentUser }, 64),
+	{"lab.pcCount", "pcCount", func(lab *LabSettings, present bool, raw any) string {
+		number, isNumber := raw.(float64)
+		if !present || !isNumber || number != math.Trunc(number) || math.Abs(number) > 1e9 {
+			return "must be an integer"
+		}
+		lab.PCCount = int(number)
+		return ""
+	}},
+	// Same as the menu's save: on leaves the key out (an explicit true stays),
+	// off writes false. A missing key reads as on.
+	{"lab.classroomView", "classroomView", func(lab *LabSettings, present bool, raw any) string {
+		on := true
+		if present {
+			var isBool bool
+			if on, isBool = raw.(bool); !isBool {
+				return "must be true or false"
+			}
+		}
+		switch {
+		case on && !lab.ClassroomViewOn():
+			lab.ClassroomView = nil
+		case !on:
+			off := false
+			lab.ClassroomView = &off
+		}
+		return ""
+	}},
 }
 
 // assistantSettingValueProblem checks a value the model wrote beyond what the
@@ -256,17 +305,9 @@ func MergeAssistantSettings(base, view, proposed []byte) ([]byte, error) {
 		if hasNew == hadOld && reflect.DeepEqual(newValue, oldValue) {
 			continue
 		}
-		text := ""
-		if hasNew {
-			var isText bool
-			if text, isText = newValue.(string); !isText {
-				return nil, assistantSettingsInvalid("%s must be text", spec.field)
-			}
-			if problem := assistantSettingValueProblem(text, spec.limit); problem != "" {
-				return nil, assistantSettingsInvalid("%s %s", spec.field, problem)
-			}
+		if problem := spec.set(&merged.Lab, hasNew, newValue); problem != "" {
+			return nil, assistantSettingsInvalid("%s %s", spec.field, problem)
 		}
-		*spec.target(&merged.Lab) = text
 		changed = true
 	}
 	if !changed {

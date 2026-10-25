@@ -558,8 +558,9 @@ that release's notes, so a release is not finished until the site follows it.
   Consent- and capability-gated `prefetch` downloads one public https file into
   the controller store: keep public-host and per-redirect checks, the 1 GiB,
   15-minute and one-at-a-time bounds, and return only hash, size and store path.
-  Settings are read-only except the `settings_v1` fields (homepage, time zone,
-  locales, keyboard layout, Git identities): `write_file` of `lab-settings.json`
+  Settings are read-only except the `settings_v1` and `settings_v2` fields
+  (homepage, time zone, locales, keyboard layout, Git identities, classroom
+  view, number of computers, teacher and student user names): `write_file` of `lab-settings.json`
   merges only those fields onto the saved file (`domain.MergeAssistantSettings`),
   refuses any other changed field by name, and the save review repeats the
   native transition rules and impacts (`domain.ReviewAssistantSettings`).

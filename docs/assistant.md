@@ -403,7 +403,7 @@ and Nix checks the same hash.
 
 ### Laboratory settings
 
-Controllers advertise `settings_v1` through the same optional header. The
+Controllers advertise `settings_v1` and `settings_v2` through the same optional header. The
 Assistant can then propose a change to these settings in `lab-settings.json`,
 reviewed and saved like any other proposal:
 
@@ -415,12 +415,20 @@ reviewed and saved like any other proposal:
 | Keyboard layout | `lab.keyboardLayout` |
 | Student Git name and email | `lab.studentGitName`, `lab.studentGitEmail` |
 | Administrator Git name and email | `lab.adminGitName`, `lab.adminGitEmail` |
+| Classroom view on or off | `lab.classroomView` |
+| Number of client computers | `lab.pcCount` |
+| Teacher and student user names | `lab.teacherUser`, `lab.studentUser` |
 
 Everything else stays in the menu (Maintenance → Change settings): the
-network and its addresses, the number of computers, the controller number,
-network devices, the DHCP address hint, account names and passwords, the
-credentials version, the classroom view, the `assistant` switch and the schema
-version. Assistant cannot change them, and it cannot delete the file.
+network and its addresses, the controller number, network devices, the DHCP
+address hint, passwords, the credentials version, the `assistant` switch and
+the schema version. Assistant cannot change them, and it cannot delete the
+file. The classroom view is written as the menu writes it: turning it off
+writes `"classroomView": false`, turning it on again leaves the key out. The
+number of computers, the user names and the classroom view get the same
+validation, warnings and review lines as in the menu, for example the
+removed-computers warning, the account warning (a renamed account gets a new,
+empty home) and the classroom view explanation.
 
 The model reads a copy of the file with sensitive fields withheld and writes it
 back whole. Nixorium never takes that copy as it is: it keeps the saved file,
@@ -432,8 +440,8 @@ error and leaves the candidate as it was:
 
 | Error | Meaning |
 |---|---|
-| `settings_field_read_only: lab.pcCount` | The copy differs from what the model read in a setting it may not change, or adds or removes one. The message names every such field, even when a writable setting changed too. |
-| `settings_invalid: …` | The content is not a settings file or has an unknown field, a value is not text, a value fails the settings validation (for example `lab.timeZone: must not be empty` or `lab.homepageUrl: must be an absolute http:// or https:// URL`), a value is longer than 128 bytes (256 for a Git name or email, 2,048 for the homepage), has spaces at either end, spans several lines or carries a `[REDACTED]` or `[WITHHELD]` stand-in, or the saved settings no longer validate and must be repaired in the menu first. |
+| `settings_field_read_only: lab.ifaceName` | The copy differs from what the model read in a setting it may not change, or adds or removes one. The message names every such field, even when a writable setting changed too. |
+| `settings_invalid: …` | The content is not a settings file or has an unknown field, a value has the wrong type (`lab.pcCount must be an integer`, `lab.classroomView must be true or false`), a value fails the settings validation (for example `lab.timeZone: must not be empty`, `lab.pcCount: must be between 1 and 253 in laboratory mode` or `lab.homepageUrl: must be an absolute http:// or https:// URL`), a value is longer than 128 bytes (256 for a Git name or email, 2,048 for the homepage), has spaces at either end, spans several lines or carries a `[REDACTED]` or `[WITHHELD]` stand-in, or the saved settings no longer validate and must be repaired in the menu first. |
 
 Deleting `lab-settings.json` and writing a file of that name in a subfolder
 remain `protected_path`.

@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The Assistant can now also turn the classroom view on or off, change the
+  number of client computers and rename the teacher and student accounts, as
+  the menu does, through the same review. The review shows the same warnings
+  as the menu (computers no longer managed, a renamed account gets a new, empty
+  home, what the classroom view stops). The network, the interface names, the
+  controller number, passwords and the other settings stay in the menu.
+  Controllers tell the service with the new `settings_v2` capability.
 - The classroom view can be turned on or off from **Maintenance → Change
   settings → Classroom view**, instead of editing `lab-settings.json` by hand.
   The review says what stops (the classroom view page, locking screens,
