@@ -81,6 +81,9 @@ pkgs.testers.runNixOSTest {
     # The indicator stays visible but a student's click no longer stops the view.
     extensions = "su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gnome-extensions "
     client.wait_until_succeeds(extensions + "info nixorium-classroom@nixorium.org' | grep -E 'State: (ENABLED|ACTIVE)'", timeout=60)
+    # The capture ends with the last controller channel, so one stays open
+    # (as the hub's does) while the clicks below need the capture running.
+    client.execute("(sleep 45 | nixorium-classroom-connect >/dev/null 2>&1 &)")
     client.succeed("${agent} probe --thumbnail /tmp/thumb2.jpg nixorium-classroom-connect")
     client.sleep(2)
     client.screenshot("sharing-indicator")
@@ -172,6 +175,9 @@ pkgs.testers.runNixOSTest {
 
     # While a window is full screen GNOME hides the top bar and its sharing
     # icon: the extension then shows its own small indicator, and only then.
+    # One controller channel stays open, as the hub's does, or the capture
+    # (and the indicator with it) ends between the probes.
+    client.execute("(sleep 45 | nixorium-classroom-connect >/dev/null 2>&1 &)")
     client.succeed("systemd-run --user -M student@ --collect --unit classroom-view-editor ${pkgs.gnome-text-editor}/bin/gnome-text-editor")
     client.sleep(8)
     client.succeed("systemctl --user -M student@ is-active classroom-view-editor")
