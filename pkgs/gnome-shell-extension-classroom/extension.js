@@ -23,7 +23,7 @@
 // replaces the previous one, and logging out removes it.
 //
 // While the teacher controls the computer with their keyboard and mouse, a
-// banner at the top of the screen says so. It is plain text above everything,
+// small label under the top bar says so. It is plain text above everything,
 // does not take clicks or keys, and goes when the control ends.
 //
 // While the screen is being shared and a full-screen window hides GNOME's top
@@ -31,8 +31,8 @@
 // the screen takes the place of the sharing icon. It takes no clicks or keys.
 //
 // When the teacher saves a picture of the screen or collects the files on
-// the desktop, a short notice at the bottom of the screen says so for a few
-// seconds. The agent sends only the kind; the words are here. The notice
+// the desktop, a small notice in the bottom corner says so for a few
+// seconds and fades. The agent sends only the kind; the words are here. The notice
 // takes no clicks or keys.
 //
 // When an update from the controller replaces the running system, the system
@@ -485,8 +485,8 @@ export default class NixoriumClassroomExtension extends Extension {
                 coordinate: Clutter.BindCoordinate.ALL,
             }));
             layer.add_child(new St.Label({
-                text: 'Your teacher is controlling this computer',
-                style: 'background-color: #b45309; color: #ffffff; font-size: 20px; font-weight: bold; padding: 10px 28px; border-radius: 0 0 12px 12px;',
+                text: 'Teacher in control',
+                style: 'background-color: rgba(180, 83, 9, 0.92); color: #ffffff; font-size: 13px; font-weight: bold; padding: 3px 12px; border-radius: 10px; margin-top: 38px;',
                 x_align: Clutter.ActorAlign.CENTER,
                 y_align: Clutter.ActorAlign.START,
                 x_expand: true,
@@ -523,8 +523,8 @@ export default class NixoriumClassroomExtension extends Extension {
         }));
         layer.add_child(new St.Label({
             text,
-            style: 'background-color: #20242b; border: 2px solid #78aef0; color: #ffffff; font-size: 18px; padding: 10px 24px; border-radius: 12px; margin-bottom: 48px;',
-            x_align: Clutter.ActorAlign.CENTER,
+            style: 'background-color: rgba(32, 36, 43, 0.92); color: #ffffff; font-size: 14px; padding: 6px 14px; border-radius: 10px; margin: 0 24px 24px 0;',
+            x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.END,
             x_expand: true,
             y_expand: true,
@@ -536,9 +536,20 @@ export default class NixoriumClassroomExtension extends Extension {
             this._updateMessage();
         });
         const notice = {kind, layer, raiseId, timer: 0};
+        // It fades in and out; nothing else moves.
+        layer.opacity = 0;
+        layer.ease({opacity: 255, duration: 300, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
         notice.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, NoticeSeconds, () => {
             notice.timer = 0;
-            this._hideNotice();
+            layer.ease({
+                opacity: 0,
+                duration: 600,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => {
+                    if (this._noticeShown === notice)
+                        this._hideNotice();
+                },
+            });
             return GLib.SOURCE_REMOVE;
         });
         this._noticeShown = notice;

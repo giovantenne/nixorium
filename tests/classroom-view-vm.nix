@@ -30,6 +30,7 @@ pkgs.testers.runNixOSTest {
     imports = [ ../modules/classroom-view.nix ];
     _module.args = { inherit labSettings nixoriumPackage; hostName = "pc01"; isController = false; };
     virtualisation.memorySize = 3072;
+    environment.systemPackages = [ pkgs.gnome-text-editor ];
     virtualisation.resolution = { x = 1280; y = 800; };
     services.displayManager.gdm.enable = true;
     services.desktopManager.gnome.enable = true;
@@ -171,9 +172,10 @@ pkgs.testers.runNixOSTest {
 
     # While a window is full screen GNOME hides the top bar and its sharing
     # icon: the extension then shows its own small indicator, and only then.
-    client.succeed("systemd-run --user -M student@ --collect --unit classroom-view-editor gnome-text-editor")
-    client.wait_until_succeeds("su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus --method org.freedesktop.DBus.NameHasOwner org.gnome.TextEditor' | grep -F true", timeout=60)
-    client.sleep(3)
+    client.succeed("systemd-run --user -M student@ --collect --unit classroom-view-editor ${pkgs.gnome-text-editor}/bin/gnome-text-editor")
+    client.sleep(8)
+    client.succeed("systemctl --user -M student@ is-active classroom-view-editor")
+    client.screenshot("classroom-editor-window")
     client.succeed("${agent} probe --thumbnail /tmp/thumb-fullscreen.jpg nixorium-classroom-connect")
     client.wait_until_succeeds(classroom_property + "IndicatorShown' | grep -F false", timeout=10)
     client.succeed("systemd-run --user -M student@ --wait --pipe --collect ${f11Key}")
