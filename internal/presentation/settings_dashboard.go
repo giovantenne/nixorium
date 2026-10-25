@@ -89,6 +89,15 @@ var routineSettingsGroups = []routineSettingsGroup{
 		},
 	},
 	{
+		id:          "classroom",
+		shortcut:    "v",
+		label:       "Classroom view",
+		description: "Turn the teacher's classroom view on or off",
+		fields: []settingsField{
+			{id: "lab.classroomView", group: "Classroom view", label: "Classroom view", choices: classroomViewChoices, closed: true},
+		},
+	},
+	{
 		id:          "git",
 		shortcut:    "g",
 		label:       "Git",
@@ -499,6 +508,9 @@ func (model dashboardModel) settingsReviewView() string {
 			before = "configured"
 			after = "updated"
 		}
+		if change.Field == "lab.classroomView" {
+			before, after = onOff(before), onOff(after)
+		}
 		lines = append(lines, fmt.Sprintf("  %s: %v → %v", settingLabel(change.Field), before, after))
 	}
 	if len(model.settings.plan.Impacts) > 0 {
@@ -591,4 +603,15 @@ func (model dashboardModel) openSettingsEditor(fields []settingsField, title str
 	model.message = ""
 	model.screen = dashboardSettingsEdit
 	return model
+}
+
+// onOff shows a yes/no setting value in plain words.
+func onOff(value any) any {
+	if on, ok := value.(bool); ok {
+		if on {
+			return "on"
+		}
+		return "off"
+	}
+	return value
 }

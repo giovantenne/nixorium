@@ -448,7 +448,8 @@ installed by the reset student account are intentionally ephemeral.
 
 ## Classroom view
 
-`lab.classroomView` in `lab-settings.json` (on unless set to `false`) installs the
+`lab.classroomView` in `lab-settings.json` (on unless set to `false`; the administrator
+changes it in Maintenance → Change settings → Classroom view) installs the
 classroom view agent on client computers only. It is a systemd user service
 started with the graphical session; it listens on
 `$XDG_RUNTIME_DIR/nixorium-classroom.sock` (mode 0600) and opens no network

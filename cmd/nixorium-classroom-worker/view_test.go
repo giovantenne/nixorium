@@ -82,6 +82,27 @@ func viewRequest(server *viewServer, path, host, cookie string) *httptest.Respon
 	return recorder
 }
 
+func TestOpenPageStopsAnsweringWhenTheViewIsTurnedOff(t *testing.T) {
+	server := newViewServer(fakeViewSource{})
+	on := true
+	server.enabled = func() bool { return on }
+	address, err := server.Open(1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := strings.TrimPrefix(strings.SplitN(address, "/open", 2)[0], "http://")
+	entered := viewRequest(server, "/open"+strings.SplitN(address, "/open", 2)[1], host, "")
+	cookie := entered.Result().Cookies()[0]
+	if page := viewRequest(server, "/api/computers", host, cookie.Value); page.Code != http.StatusOK {
+		t.Fatalf("on = %d", page.Code)
+	}
+	on = false
+	page := viewRequest(server, "/api/computers", host, cookie.Value)
+	if page.Code != http.StatusForbidden || !strings.Contains(page.Body.String(), "turned off") {
+		t.Fatalf("off = %d %q", page.Code, page.Body.String())
+	}
+}
+
 func TestClassroomViewNeedsTheOneTimeTokenAndTheLoopbackHost(t *testing.T) {
 	server := newViewServer(fakeViewSource{})
 	address, err := server.Open(1000)

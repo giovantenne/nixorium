@@ -446,7 +446,7 @@ technical cause stays in `journalctl -u nixorium-classroom.service`.
 | `PXE-ACTIVE` | Network installation is still active | Finish installation or run `nixorium pxe recover` |
 | `CLASSROOM-LOAD` | The classroom service could not read the committed configuration | Read the service journal; fix and commit the configuration |
 | `CLASSROOM-SERVICE` | The classroom service is not running or not answering | `systemctl status nixorium-classroom.service`; apply the controller configuration if it is missing |
-| `CLASSROOM-VIEW-OFF` | The classroom view is turned off for this laboratory | Remove `"classroomView": false` from `lab-settings.json` (or set it to `true`), apply the controller and update the client computers |
+| `CLASSROOM-VIEW-OFF` | The classroom view is turned off in this laboratory's settings | Turn it on in **Maintenance → Change settings → Classroom view**, save, apply the controller and update the client computers |
 | `DISK-LOW` | Collect from students' desktops found too little free space on the controller to keep a computer's files (it keeps 1 GB free) | Free disk space (Maintenance → Free disk space) and collect again |
 
 Classroom controls read the last **committed** configuration, so uncommitted

@@ -18,6 +18,7 @@ import (
 
 	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/classroomview"
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 //go:embed view/index.html view/app.js view/message.js view/style.css
@@ -71,6 +72,9 @@ type viewServer struct {
 	// open; nil keeps only the page's own changes.
 	internet *internetWatcher
 	now      func() time.Time
+	// enabled is nil, or says whether the classroom view is still on; a page
+	// opened before it was turned off stops answering.
+	enabled func() bool
 }
 
 func newViewServer(source viewSource) *viewServer {
@@ -143,6 +147,10 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	}
 	if !server.authorized(request) {
 		http.Error(writer, "Open the classroom view again from Nixorium.", http.StatusForbidden)
+		return
+	}
+	if server.enabled != nil && !server.enabled() {
+		http.Error(writer, domain.ClassroomViewOffMessage, http.StatusForbidden)
 		return
 	}
 	switch request.URL.Path {
@@ -337,4 +345,4 @@ func (server *viewServer) asset(writer http.ResponseWriter, name, contentType st
 	_, _ = writer.Write(content)
 }
 
-var errViewDisabled = errors.New("The classroom view is not turned on for this laboratory. Ask the administrator. Code: CLASSROOM-VIEW-OFF.")
+var errViewDisabled = errors.New(domain.ClassroomViewOffMessage)

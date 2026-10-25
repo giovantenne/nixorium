@@ -99,7 +99,7 @@ let
   staffFavorites = lib.optionals isController [ "nixorium.desktop" ]
     ++ studentFavorites;
   teacherFavorites = lib.optionals isController
-    [ (if labSettings.classroomView or true then "nixorium-classroom.desktop" else "nixorium.desktop") ]
+    [ "nixorium-classroom.desktop" ]
     ++ studentFavorites;
   enabledExtensions = [
     "ding@rastersoft.com"

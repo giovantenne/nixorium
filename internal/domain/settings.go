@@ -36,6 +36,11 @@ func (settings LabSettings) ClassroomViewOn() bool {
 	return settings.ClassroomView == nil || *settings.ClassroomView
 }
 
+// ClassroomViewOffMessage is the one sentence every entry point to the
+// classroom view answers when the laboratory has it turned off (situation
+// CLASSROOM-VIEW-OFF).
+const ClassroomViewOffMessage = "The classroom view is turned off in this laboratory's settings (Maintenance → Change settings). Code: CLASSROOM-VIEW-OFF."
+
 // AssistantOn tells whether the controller offers Assistant: it is on unless
 // the settings turn it off. Account activation and consent remain separate.
 func (settings LabSettings) AssistantOn() bool {

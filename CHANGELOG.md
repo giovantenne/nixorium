@@ -6,6 +6,18 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- The classroom view can be turned on or off from **Maintenance → Change
+  settings → Classroom view**, instead of editing `lab-settings.json` by hand.
+  The review says what stops (the classroom view page, locking screens,
+  messages, sending and collecting files) and what keeps working (Internet
+  pause, switching computers on and off, the schedule). The change reaches the
+  controller with Apply to controller and the student computers with Update
+  computers. With the view off, the teacher's dock icon stays and opens the
+  Nixorium menu, and the menu and the commands no longer offer the classroom
+  view: they answer that it is turned off in the settings.
+
 ### Changed
 
 - The laboratory network is wired, and the documentation now says so: every
