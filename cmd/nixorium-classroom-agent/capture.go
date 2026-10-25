@@ -73,11 +73,17 @@ type mutterCapture struct {
 	clipboard   clipboardState
 	// wokeAt is when this capture lifted a blank screen (blank.go).
 	wokeAt time.Time
+	// banner tells the student while the teacher controls the computer
+	// (control.go); nil shows nothing.
+	banner *controlBanner
 }
 
-func newMutterCapture() *mutterCapture {
+func newMutterCapture(notifier controlNotifier) *mutterCapture {
 	capture := &mutterCapture{widths: map[int]time.Time{}, keysDown: map[uint32]bool{}, buttonsDown: map[string]bool{}}
 	capture.changed = sync.NewCond(&capture.mutex)
+	if notifier != nil {
+		capture.banner = newControlBanner(notifier)
+	}
 	go capture.stopWhenIdle()
 	return capture
 }
@@ -129,6 +135,10 @@ func (capture *mutterCapture) Input(events []classroomview.InputEvent, release b
 		return errNotReady
 	}
 	capture.lastRequest = time.Now()
+	if len(events) > 0 {
+		// The first input of a control tells the student.
+		capture.banner.Set(true)
+	}
 	session := remoteDesktopName + ".Session"
 	call := func(method string, arguments ...any) error {
 		return capture.remote.Call(session+"."+method, 0, arguments...).Err
@@ -175,6 +185,7 @@ func (capture *mutterCapture) Input(events []classroomview.InputEvent, release b
 // releaseLocked lets go of everything still pressed, so a closed view never
 // leaves a stuck key or button on the student's computer.
 func (capture *mutterCapture) releaseLocked() {
+	capture.banner.Set(false)
 	if capture.remote == nil {
 		return
 	}

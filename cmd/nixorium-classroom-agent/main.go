@@ -10,7 +10,8 @@
 //	         lock request (--lock on|off), sends a folder's contents to the
 //	         desktop (--send DIR), collects the desktop into a folder
 //	         (--collect DIR), shows a picture as the teacher's screen for
-//	         some seconds (--show JPEG SECONDS), or shows (--message TEXT
+//	         some seconds (--show JPEG SECONDS), takes control for some
+//	         seconds (--control SECONDS), or shows (--message TEXT
 //	         SECONDS|unlock) or removes (--message-hide) the teacher's
 //	         message; used by tests and diagnostics.
 package main
@@ -79,6 +80,7 @@ const probeTimeout = 10 * time.Minute
 // name; the command it starts ends when ctx does.
 func runProbe(ctx context.Context, arguments []string, output io.Writer) error {
 	thumbnail, input := "", false
+	var hold time.Duration
 	if len(arguments) >= 3 && arguments[0] == "--show" {
 		seconds, err := strconv.Atoi(arguments[2])
 		if err != nil || seconds < 0 || seconds > 60 {
@@ -104,10 +106,19 @@ func runProbe(ctx context.Context, arguments []string, output io.Writer) error {
 	if len(arguments) >= 1 && arguments[0] == "--input" {
 		input, arguments = true, arguments[1:]
 	}
+	// --control SECONDS keeps the control open (input not released) for
+	// some seconds after the first input, as the teacher's page does.
+	if len(arguments) >= 2 && arguments[0] == "--control" {
+		seconds, err := strconv.Atoi(arguments[1])
+		if err != nil || seconds < 1 || seconds > 60 {
+			return errors.New("--control needs 1–60 seconds")
+		}
+		input, hold, arguments = true, time.Duration(seconds)*time.Second, arguments[2:]
+	}
 	if len(arguments) >= 2 && arguments[0] == "--thumbnail" {
 		thumbnail, arguments = arguments[1], arguments[2:]
 	}
-	return probe(ctx, arguments, thumbnail, input, output)
+	return probe(ctx, arguments, thumbnail, input, hold, output)
 }
 
 // startProbe runs command with its standard input and output for a probe to
@@ -165,7 +176,7 @@ func serve(runtimeDirectory string) error {
 		return err
 	}
 	lock := &extensionLocker{}
-	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}, notice: lock})
+	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(lock), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}, notice: lock})
 }
 
 // agentContext is what every connection of the session's agent shares.
@@ -702,7 +713,7 @@ func probeLock(ctx context.Context, command []string, locked bool, output io.Wri
 }
 
 // probe exchanges one hello through a command's standard input and output.
-func probe(ctx context.Context, command []string, thumbnail string, input bool, output io.Writer) error {
+func probe(ctx context.Context, command []string, thumbnail string, input bool, hold time.Duration, output io.Writer) error {
 	stdin, stdout, finish, err := startProbe(ctx, command)
 	if err != nil {
 		return err
@@ -745,7 +756,7 @@ func probe(ctx context.Context, command []string, thumbnail string, input bool, 
 				{Kind: classroomview.InputKey, Keysym: 0xffe1, Pressed: true},
 				{Kind: classroomview.InputKey, Keysym: 0xffe1},
 			}
-			if err := classroomview.Write(stdin, classroomview.Message{Type: classroomview.TypeInput, Events: events, Release: true}); err != nil {
+			if err := classroomview.Write(stdin, classroomview.Message{Type: classroomview.TypeInput, Events: events, Release: hold == 0}); err != nil {
 				return err
 			}
 			reply, err = classroomview.Read(stdout)
@@ -755,6 +766,10 @@ func probe(ctx context.Context, command []string, thumbnail string, input bool, 
 			fmt.Fprintf(output, "%s code=%s detail=%s\n", reply.Type, reply.Code, reply.Detail)
 			if reply.Type != classroomview.TypeInputDone {
 				return errors.New("the agent refused the input")
+			}
+			select {
+			case <-time.After(hold):
+			case <-ctx.Done():
 			}
 			return nil
 		}

@@ -267,7 +267,9 @@ each student's session through that access, and GNOME shows its sharing
 notice while the classroom view page is open and visible. Changes to the classroom Shell extension
 apply at the student's next login. A computer whose classroom view was
 stopped from the student's terminal shows "Monitoring stopped on this PC" and
-starts it again by itself within seconds. In a computer's window of the classroom
+starts it again by itself within seconds. While you control a computer with
+your keyboard and mouse, its screen shows the banner "Your teacher is
+controlling this computer" until you stop. In a computer's window of the classroom
 view page, **Save screenshot** keeps a picture of its screen in
 `Nixorium/Screenshots` of your home folder, such as
 `pc03-2026-10-15-10.30.12.jpg`; a page not opened from Nixorium downloads the

@@ -70,6 +70,8 @@ func (capture *mutterCapture) ClipboardEnd() error {
 
 // clipboardOffLocked turns the clipboard off and forgets any text.
 func (capture *mutterCapture) clipboardOffLocked() {
+	// The control ends with its clipboard.
+	capture.banner.Set(false)
 	if capture.clipboard.on && capture.remote != nil {
 		_ = capture.remote.Call(remoteDesktopName+".Session.DisableClipboard", 0).Err
 	}

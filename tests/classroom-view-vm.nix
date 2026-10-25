@@ -154,6 +154,17 @@ pkgs.testers.runNixOSTest {
     client.succeed(classroom_property + "MessageShown' | grep -F false")
     client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
 
+    # While the teacher controls the computer, a banner says so: it comes
+    # with the first input and goes when the control ends.
+    client.succeed(classroom_property + "Controlled' | grep -F false")
+    client.succeed("(${agent} probe --control 12 --thumbnail /tmp/thumb-control.jpg nixorium-classroom-connect > /tmp/control.log 2>&1 &)")
+    client.wait_until_succeeds("grep -F input.done /tmp/control.log", timeout=30)
+    client.wait_until_succeeds(classroom_property + "Controlled' | grep -F true", timeout=10)
+    client.sleep(1)
+    client.screenshot("classroom-control")
+    client.wait_until_succeeds(classroom_property + "Controlled' | grep -F false", timeout=30)
+    client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
+
     # Files sent to the desktop belong to the student and are never
     # executable; links are not sent and nothing on the desktop is replaced.
     client.succeed("mkdir -p /tmp/share/Lesson && echo notes > /tmp/share/Lesson/notes.txt && printf 'ls\\n' > /tmp/share/run.sh && chmod 755 /tmp/share/run.sh && ln -s /etc/shadow /tmp/share/secret")

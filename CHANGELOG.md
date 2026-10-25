@@ -19,6 +19,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   (minimized window or background tab): the student computers stop being
   captured a few seconds later, and capture resumes when the page is shown
   again. The enlarged window and take control follow the same rule.
+- While the teacher controls a computer with the keyboard and mouse, the
+  student's screen shows a banner, "Your teacher is controlling this
+  computer", from the first input until the control ends (the sharing icon
+  alone told students nothing about it). The banner is drawn by the classroom
+  Shell extension, so it appears after the student's next login.
 
 ### Fixed
 

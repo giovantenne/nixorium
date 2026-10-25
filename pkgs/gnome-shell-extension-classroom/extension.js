@@ -22,6 +22,10 @@
 // number of seconds, or until the computer is unlocked. A new message
 // replaces the previous one, and logging out removes it.
 //
+// While the teacher controls the computer with their keyboard and mouse, a
+// banner at the top of the screen says so. It is plain text above everything,
+// does not take clicks or keys, and goes when the control ends.
+//
 // When an update from the controller replaces the running system, the system
 // writes /run/nixorium/update-notice.json; a notification tells the person at
 // the computer, with a Restart button when a restart finishes the update.
@@ -71,6 +75,10 @@ const Interface = `<node>
     </method>
     <method name="HideMessage"/>
     <property name="MessageShown" type="b" access="read"/>
+    <method name="SetControlled">
+      <arg type="b" direction="in" name="controlled"/>
+    </method>
+    <property name="Controlled" type="b" access="read"/>
   </interface>
 </node>`;
 
@@ -90,6 +98,7 @@ export default class NixoriumClassroomExtension extends Extension {
         this._notice?.destroy();
         this._notice = null;
         this.HideMessage();
+        this.SetControlled(false);
         this.StopBroadcast();
         this._setLocked(false);
         if (this._nameId) {
@@ -425,6 +434,47 @@ export default class NixoriumClassroomExtension extends Extension {
             message.close.opacity = offered ? 255 : 0;
             message.close.reactive = offered;
         }
+    }
+
+    // D-Bus: called by the classroom agent while the teacher's keyboard and
+    // mouse control this computer.
+    SetControlled(controlled) {
+        if (controlled === Boolean(this._control))
+            return;
+        if (!controlled) {
+            Main.layoutManager.uiGroup.disconnect(this._control.raiseId);
+            this._control.layer.destroy();
+            this._control = null;
+        } else {
+            const layer = new St.Widget({
+                name: 'nixoriumClassroomControl',
+                layout_manager: new Clutter.BinLayout(),
+            });
+            layer.add_constraint(new Clutter.BindConstraint({
+                source: global.stage,
+                coordinate: Clutter.BindCoordinate.ALL,
+            }));
+            layer.add_child(new St.Label({
+                text: 'Your teacher is controlling this computer',
+                style: 'background-color: #b45309; color: #ffffff; font-size: 20px; font-weight: bold; padding: 10px 28px; border-radius: 0 0 12px 12px;',
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.START,
+                x_expand: true,
+                y_expand: true,
+            }));
+            Main.layoutManager.uiGroup.add_child(layer);
+            Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+            const raiseId = Main.layoutManager.uiGroup.connect('child-added', () => {
+                Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+                this._updateMessage();
+            });
+            this._control = {layer, raiseId};
+        }
+        this._service?.emit_property_changed('Controlled', GLib.Variant.new_boolean(Boolean(this._control)));
+    }
+
+    get Controlled() {
+        return Boolean(this._control);
     }
 
     _quietIndicator() {
