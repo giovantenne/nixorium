@@ -6,6 +6,17 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The laboratory network is wired, and the documentation now says so: every
+  computer needs an Ethernet cable. The settings review refuses a Wi-Fi card as
+  a client's network card, as it already did for the controller, because the
+  laboratory profile is an Ethernet profile and a Wi-Fi card never carried the
+  laboratory address (the earlier documentation said it did). USB installation
+  never offers to save a Wi-Fi card: it asks for the cable instead, and after an
+  installation over Wi-Fi the review says to connect the cable before the
+  restart.
+
 ## [3.10.0] - 2026-10-25
 
 The stable release of the 3.10.0 betas: it brings the changes below and those

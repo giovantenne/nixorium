@@ -345,3 +345,24 @@ func TestControllerInterfaceIsChosenAmongItsWiredCards(t *testing.T) {
 		t.Fatalf("choosing another card saved %q", moved.settings.Lab.ControllerInterfaceName)
 	}
 }
+
+func TestSettingsReviewRefusesAClientWiFiCard(t *testing.T) {
+	preflight := &domain.NetworkPreflight{Clients: []domain.ClientNetworkCheck{
+		domain.CheckClientInterface(domain.HostMeta{Name: "pc01", IP: "10.0.0.1", Interface: "wlp2s0"}, "", networkCheckDevices()),
+	}}
+	saved := []domain.ConfigPlanReport{}
+	model := networkReviewModel(t, func(lab *domain.LabSettings) { lab.ClientInterfaceName = "wlp2s0" }, preflight, &saved)
+	view := plainView(model)
+	for _, want := range []string{"× pc01  wlp2s0 is a Wi-Fi card: the laboratory needs a wired one", "Saving is blocked by the network check"} {
+		if !contains(view, want) {
+			t.Fatalf("missing %q in review:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "Save anyway") {
+		t.Fatalf("a Wi-Fi card can be saved anyway:\n%s", view)
+	}
+	model, command := pressReviewKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if command != nil || len(saved) != 0 || !strings.Contains(model.message, "Wi-Fi card on pc01") {
+		t.Fatalf("Wi-Fi card saved: message=%q", model.message)
+	}
+}

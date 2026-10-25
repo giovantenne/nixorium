@@ -124,16 +124,16 @@ start with one controller and one client of your own.
 Two 64-bit PCs with UEFI that you can erase (or two virtual machines), a USB
 stick with the official [NixOS ISO](https://nixos.org/download/#nixos-iso)
 (Minimal for a text console, or Graphical with GNOME),
-Internet on the controller, and a network where the two PCs reach each other.
+Internet on the controller, and a wired network where the two PCs reach each
+other: the laboratory network uses Ethernet cables, not Wi-Fi.
 Installation erases the disk you confirm on each PC: back up anything you need
 first.
 
 Network installation also needs UEFI network boot on the clients and permission
-to run ProxyDHCP beside the existing DHCP server; Wi-Fi may not support it,
-and USB over SSH works without it, including over Wi-Fi. An installed client
-uses a wired card unless its
-[network interface name](templates/site/README.md#configuration-and-first-run-setup)
-is set in the lab settings. The
+to run ProxyDHCP beside the existing DHCP server; USB over SSH works without
+it. The USB live system may reach the controller over Wi-Fi during the
+installation, but an installed computer uses its wired card: connect the cable
+before it restarts. The
 [administrator guide](templates/site/README.md#requirements-for-installing-clients)
 lists the network, storage and console requirements in full.
 

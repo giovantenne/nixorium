@@ -340,10 +340,12 @@ that release's notes, so a release is not finished until the site follows it.
   `x86_64-linux`, UEFI, and reachable Ethernet or Wi-Fi networking (prefer
   Minimal on computers with 4 GB of RAM or less: the live system keeps the
   installer files in memory). Bind the
-  reviewed live address to the declared interface, not its wired/wireless type.
-  Wi-Fi credentials are not imported from the live ISO; arrange installed-system
-  connectivity separately without putting secrets in Git or the Nix store.
-  PXE compatibility over Wi-Fi depends on hardware, firmware and networking.
+  reviewed live address to the declared interface. The laboratory network is
+  wired: the lab profile is Ethernet, the settings review refuses a Wi-Fi card
+  as a controller or client interface, and the USB flow never offers to save
+  one; Wi-Fi in the live ISO serves only the installation of a computer without
+  an explicit interface name. Wi-Fi credentials are not imported from the live
+  ISO.
   Preserve physical-console
   credential-free host-key observation, physical-console fingerprint
   confirmation and pinning before password use, terminal-only masked secret

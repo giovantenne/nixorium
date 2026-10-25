@@ -125,7 +125,7 @@ func (model dashboardModel) remoteInstallView() string {
 		// small screens: each command is one row with what it is for.
 		lines = append(lines, "",
 			tuiSection("On the PC to install ("+remote.host+")", model.isDark),
-			"Boot NixOS 26.05 (Minimal or Graphical) from USB (UEFI), connect it to the network, run:",
+			"Boot NixOS 26.05 (Minimal or Graphical) from USB (UEFI), connect the laboratory cable, run:",
 		)
 		lines = append(lines, tuiFields(model.isDark,
 			[2]string{"1", tuiFieldValue("passwd", model.isDark) + tuiMuted("   set a temporary password", model.isDark)},
@@ -195,6 +195,22 @@ func (model dashboardModel) remoteInstallView() string {
 		if remote.response.Session != nil && remote.response.Session.Preparation != nil {
 			configured = remote.response.Session.Preparation.Host.Interface
 		}
+		if domain.WirelessInterfaceName(remote.liveInterface) {
+			// The laboratory network is wired: a Wi-Fi card is never saved.
+			lines = append(lines, "",
+				fmt.Sprintf("%s is set to use the network card %s, but this PC is connected", remote.host, configured),
+				fmt.Sprintf("through the Wi-Fi card %s. The laboratory needs the cable.", remote.liveInterface),
+				"",
+				remoteInstallField("Computer", remote.host, false, false),
+				remoteInstallField("Configured card", configured, false, false),
+				remoteInstallField("This PC's card", remote.liveInterface+" (Wi-Fi)", false, false),
+				"",
+				fmt.Sprintf("Connect %s to the laboratory network with a cable, restart the PC from", configured),
+				"the USB stick and start again. No disk has been touched.",
+			)
+			actions = []tuiAction{{key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+			break
+		}
 		lines = append(lines, "",
 			fmt.Sprintf("%s is set to use the network card %s, but this PC is connected", remote.host, configured),
 			fmt.Sprintf("through %s. With the wrong name it would start without its lab address.", remote.liveInterface),
@@ -225,7 +241,7 @@ func (model dashboardModel) remoteInstallView() string {
 			[2]string{"Disk to erase", tuiStatus(fmt.Sprintf("%s · %s", plan.Disk.Path, humanBytes(plan.Disk.SizeBytes)), tuiStatusFailure, model.isDark)},
 			[2]string{"Disk serial / WWN", joinNonEmpty(" / ", plan.Disk.Serial, plan.Disk.WWN)},
 			[2]string{"Computer", plan.Host.Name},
-			[2]string{"Address afterwards", plan.Host.StaticIP + " on " + plan.Host.Interface},
+			[2]string{"Address afterwards", remoteInstallAddressAfterwards(plan.Host)},
 			[2]string{"PC on the USB stick", plan.Host.LiveIP},
 		)...)
 		// Exact identifiers stay available for audit, below the facts to check.
@@ -583,6 +599,9 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 		case "esc":
 			return model.cancelRemoteInstall()
 		case "enter":
+			if domain.WirelessInterfaceName(remote.liveInterface) {
+				return model, nil
+			}
 			return model.saveRemoteLiveInterface()
 		}
 		return model, nil
@@ -1015,6 +1034,16 @@ func remoteDiskExclusions(reasons []string) string {
 }
 
 // remoteLiveInterface names the network card that carries the live address.
+// remoteInstallAddressAfterwards names the card that carries the laboratory
+// address after the restart. A PC installed over Wi-Fi uses its wired card
+// then, so the cable must be connected before the restart.
+func remoteInstallAddressAfterwards(host domain.RemoteInstallHost) string {
+	if domain.WirelessInterfaceName(host.Interface) {
+		return host.StaticIP + " on the wired card (connect the cable before the restart)"
+	}
+	return host.StaticIP + " on " + host.Interface
+}
+
 func remoteLiveInterface(facts domain.RemoteMachineFacts, address string) string {
 	for _, networkInterface := range facts.Interfaces {
 		if slices.Contains(networkInterface.Addresses, address) {

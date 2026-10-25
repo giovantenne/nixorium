@@ -142,8 +142,16 @@ func TestCheckClientInterfaceAndSaveRefusal(t *testing.T) {
 	if refusal := preflight.SaveRefusal(); !strings.Contains(refusal, "no network device called enp5s0") {
 		t.Fatalf("controller refusal = %q", refusal)
 	}
+	wireless := CheckClientInterface(HostMeta{Name: "pc04", IP: "10.0.0.4", Interface: "wlp3s0"}, "", NetworkObservation{Reachable: true, Devices: []NetworkDevice{{Name: "enp2s0", Kind: NetworkDeviceWired}, {Name: "wlp3s0", Kind: NetworkDeviceWireless}}})
+	if wireless.State != DeviceNotWired {
+		t.Fatalf("wireless check = %+v", wireless)
+	}
+	preflight = &NetworkPreflight{Clients: []ClientNetworkCheck{present, wireless}, Acknowledged: []string{"pc04"}}
+	if refusal := preflight.SaveRefusal(); !strings.Contains(refusal, "Wi-Fi card on pc04") || len(preflight.Missing()) != 0 {
+		t.Fatalf("wireless refusal = %q, missing %v", refusal, preflight.Missing())
+	}
 	var none *NetworkPreflight
-	if none.SaveRefusal() != "" || none.Missing() != nil {
+	if none.SaveRefusal() != "" || none.Missing() != nil || none.Wireless() != nil {
 		t.Fatal("an absent preflight refused")
 	}
 }

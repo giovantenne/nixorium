@@ -920,10 +920,12 @@ soon as the live boot is verified; neither secret is stored in Git, a Nix
 derivation, process arguments, durable session JSON, or the operation log.
 
 The live IPv4 address must belong to the declared client interface; its wired
-or wireless type is not an eligibility condition. Network policy must allow
-controller-to-client SSH and client-to-controller signed-cache traffic. Live
-Wi-Fi profiles are not imported into the installed system, so connectivity
-after reboot remains an explicit deployment/operator responsibility.
+or wireless type is not an eligibility condition for the live session. Network
+policy must allow controller-to-client SSH and client-to-controller signed-cache
+traffic. The installed system takes its laboratory address only on a wired
+card (the laboratory profile is Ethernet), so a client installed over Wi-Fi
+needs its cable before the restart, and the TUI never saves a Wi-Fi card as
+the computer's interface. Live Wi-Fi profiles are not imported.
 
 `packages.x86_64-linux.remoteInstallerBundle` is target-independent. It
 contains the fixed remote helper, strict metadata, and precompiled Disko

@@ -111,6 +111,8 @@ func (model dashboardModel) settingsNetworkCheckLines() []string {
 				kind = tuiStatusAttention
 			}
 			lines = append(lines, "  "+tuiStatus(fmt.Sprintf("%s  device missing: no %s (its devices: %s)", client.Name, client.Interface, devices), kind, model.isDark))
+		case domain.DeviceNotWired:
+			lines = append(lines, "  "+tuiStatus(fmt.Sprintf("%s  %s is a Wi-Fi card: the laboratory needs a wired one (its devices: %s)", client.Name, client.Interface, strings.Join(client.Devices, ", ")), tuiStatusFailure, model.isDark))
 		default:
 			lines = append(lines, "  "+tuiStatus(client.Name+"  not reachable: check it at its screen before updating it", tuiStatusNeutral, model.isDark))
 		}

@@ -332,16 +332,14 @@ accepted. This workflow does not depend on PXE services or alter the
 controller's static address.
 
 The declared client interface must carry the reviewed live IPv4 address.
-Connect Wi-Fi in the live ISO before the SSH workflow and arrange persistent
-system connectivity separately; live profiles and credentials are not copied.
-An installed client uses a wired Ethernet card unless a `clientIfaceName` or
-`hostIfaceNames` entry (see [Network interfaces](#network-interfaces)) names
-its interface; with the name of a wireless card, the lab address is applied to
-that card.
-After reboot, the configured static client address must be reachable for
-verification. Keep Wi-Fi secrets out of Git and the Nix store. PXE may be
-incompatible with Wi-Fi depending on hardware, firmware, and network setup;
-that restriction is not part of USB/SSH transport.
+The laboratory network is wired: the `nixorium-lab` NetworkManager profile is
+an Ethernet profile, so a Wi-Fi card never carries the laboratory address, and
+the settings review refuses a client interface name that is a Wi-Fi card.
+Without an explicit name (see [Network interfaces](#network-interfaces)) the
+live ISO may reach the controller over Wi-Fi for the installation itself; the
+installed client then uses its wired card, which must be connected before the
+restart because verification needs the configured static address. Live Wi-Fi
+profiles and credentials are not copied. PXE and Wake-on-LAN need the cable.
 
 `packages.x86_64-linux.remoteInstallerBundle` contains the target-independent
 remote helper, metadata, and Disko programs. It deliberately excludes a client

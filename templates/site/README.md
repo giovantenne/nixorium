@@ -202,16 +202,21 @@ one-time adoption for older deployments, independent packages and recovery.
 
 ### Requirements for installing clients
 
-- **Network.** The controller and the clients share the lab network, and the
+- **Network.** The controller and the clients share the lab network, which is
+  wired: every computer is connected with an Ethernet cable. Wi-Fi is not a
+  laboratory network (no network boot, no Switch on, and an installed
+  computer never takes its laboratory address on a Wi-Fi card); the
+  controller may use Wi-Fi only for its own Internet connection. The
   controller needs Internet for preparation and updates. It also gives the
   clients the correct time (UDP 123, laboratory network only), taken from
   Internet time servers that the school firewall must let it reach, so a
   computer needs no Internet of its own to show the right time. For
   [network boot](#install-computers-with-pxe), the clients need UEFI network
   boot and the controller must be allowed to run ProxyDHCP beside the
-  institutional DHCP server, which stays authoritative; Wi-Fi may not support
-  it. [USB over SSH](#install-one-computer-from-usb-over-ssh) needs neither:
-  the live ISO only has to reach the controller over Ethernet or Wi-Fi.
+  institutional DHCP server, which stays authoritative.
+  [USB over SSH](#install-one-computer-from-usb-over-ssh) needs neither: the
+  live ISO only has to reach the controller, over the cable or, during the
+  installation only, over Wi-Fi.
 - **Storage.** Every computer boots in UEFI mode and its disk is erased after
   you confirm it. The network installer offers only disks with room for the
   client system plus 2 GiB. Keep free space on the controller (see
@@ -1269,7 +1274,8 @@ fallback name (the template's `enp0s3` is VirtualBox's) and apply DHCP and their
 static lab address to the wired Ethernet card **whatever its name**, so PCs of
 different models work without any interface setting. The temporary Internet
 block and the SSH rule from the controller are likewise independent of the name.
-Wireless cards, bridges and virtual devices are never selected. A computer with
+Wireless cards, bridges and virtual devices are never selected, and a named
+Wi-Fi card is refused by the settings review: the laboratory network is wired. A computer with
 more than one wired card gets the lab address on only one of them (the first to
 come up, which can differ between boots) and no automatic DHCP on the others;
 give such a PC a `hostIfaceNames` entry. Set `clientIfaceName` only when every
@@ -1387,13 +1393,13 @@ boot the official **NixOS 26.05 ISO**, either Minimal or Graphical (GNOME), for
 `x86_64-linux` in UEFI mode with Ethernet or Wi-Fi connectivity to the
 controller. Minimal is smaller and lighter: prefer it when the computer has
 4 GB of RAM or less, because the live system keeps the installer files in
-memory. Graphical is a larger download and needs more RAM. Connect Wi-Fi from
-the live console with `nmtui` first when needed. The installation itself works
-over Wi-Fi, but an installed client uses a wired Ethernet card unless its
-[network interface name](#configuration-and-first-run-setup) is set in the lab
-settings (`clientIfaceName`, or `hostIfaceNames` for one computer): with the
-name of a wireless card set, the static lab address is applied to that card,
-and verification after reboot needs that address. At its physical console run:
+memory. Graphical is a larger download and needs more RAM. Prefer the
+laboratory cable. Without an explicit
+[network interface name](#configuration-and-first-run-setup) the installation
+itself can run over Wi-Fi (connect it from the live console with `nmtui`), but
+the installed computer takes its laboratory address on its wired card, and
+verification after the restart needs that address: connect the cable before
+the restart. At its physical console run:
 
 ```sh
 passwd
@@ -1422,14 +1428,12 @@ that interface must carry the reviewed live address. When the
 PC is connected through a differently named card, the TUI shows both names
 before disk selection and offers to save the observed card for that computer
 only (a `hostIfaceNames` override, through the ordinary reviewed settings save).
+A Wi-Fi card is never offered: connect the configured card with a cable and
+start again.
 It then cancels the prepared session, prepares the computer again and returns
 to the live console step; set a new temporary password with `passwd`, because
 the previous one was locked. No disk is touched. Wi-Fi
-profiles and credentials are not copied from the ISO into the installed system:
-arrange persistent connectivity separately, or reconnect locally as the
-administrator after boot before verifying the configured static address.
-Keep wireless secrets out of Git and the Nix store. Wi-Fi may not support PXE
-on the selected hardware, firmware, or network; USB/SSH does not require PXE.
+profiles and credentials are not copied from the ISO into the installed system.
 
 The controller prepares only target-independent installer content before it
 contacts the live ISO; the target closure is then built and served by the

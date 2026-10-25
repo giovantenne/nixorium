@@ -817,6 +817,8 @@ func configNetworkCheckText(writer io.Writer, preflight *domain.NetworkPreflight
 			fmt.Fprintf(writer, "  - %s: %s present\n", client.Name, client.Interface)
 		case domain.DeviceMissing:
 			fmt.Fprintf(writer, "  ! %s: %s missing (devices: %s)\n", client.Name, client.Interface, strings.Join(client.Devices, ", "))
+		case domain.DeviceNotWired:
+			fmt.Fprintf(writer, "  ! %s: %s is a Wi-Fi card; the laboratory needs a wired one (devices: %s)\n", client.Name, client.Interface, strings.Join(client.Devices, ", "))
 		default:
 			fmt.Fprintf(writer, "  - %s: not reachable; check it at its screen\n", client.Name)
 		}

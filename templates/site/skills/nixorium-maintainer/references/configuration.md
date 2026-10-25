@@ -40,9 +40,13 @@ proposing settings edits. A change in progress shows `NETWORK-CHANGING`.
 Interface changes can disconnect computers; do not prescribe a universal
 controller-first order. On supporting pins the settings review checks the named
 devices read-only (`networkPreflight` in `config plan --json`); point the
-administrator to that review instead of guessing device names. USB/SSH can use Wi-Fi on supporting pins, but live-ISO
-credentials do not configure the installed system. PXE compatibility depends
-on hardware and networking.
+administrator to that review instead of guessing device names. The laboratory
+network is wired: every computer needs an Ethernet cable, and on supporting pins the
+review refuses a Wi-Fi card as a controller or client interface. Do not
+propose a Wi-Fi laboratory, Wi-Fi interface names or Wi-Fi credentials in the
+deployment. Wi-Fi in the USB live system serves only the installation itself;
+the installed computer needs its cable before the restart. PXE and Switch on
+(Wake-on-LAN) need the cable too.
 
 Never relax student network-administration restrictions, share the deployment
 with teachers/students or copy credentials to bypass a refusal.

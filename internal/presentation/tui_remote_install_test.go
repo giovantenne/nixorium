@@ -620,6 +620,49 @@ func TestUSBInstallKeepsTheConfiguredNetworkCardWhenItMatches(t *testing.T) {
 	}
 }
 
+func TestUSBInstallNeverSavesAWiFiCard(t *testing.T) {
+	response := remoteTUITestPreparedResponse("prepared")
+	response.Session.Preparation.Facts.Interfaces = []domain.RemoteNetworkInterface{{Name: "wlp2s0", Addresses: []string{"192.0.2.20"}}}
+	model := dashboardModel{
+		width: 120, height: 30, screen: dashboardUSBInstall,
+		installation: installationModel{remote: remoteInstallationModel{stage: remoteInstallBootstrap, host: "pc01", operationID: remoteTUITestOperationID, address: "192.0.2.20"}},
+	}
+	model.actions = DashboardActions{
+		RemoteInstallRequest: func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+			t.Fatal("a Wi-Fi card started a request")
+			return domain.RemoteInstallResponse{}, nil
+		},
+	}
+	next, _ := model.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "finalize", response: response})
+	model = next.(dashboardModel)
+	if model.installation.remote.stage != remoteInstallInterfaceMismatch {
+		t.Fatalf("stage=%d", model.installation.remote.stage)
+	}
+	view := model.View().Content
+	for _, expected := range []string{"through the Wi-Fi card wlp2s0", "The laboratory needs the cable", "Connect enp1s0", "No disk has been touched"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("Wi-Fi view omits %q:\n%s", expected, view)
+		}
+	}
+	if strings.Contains(view, "Use wlp2s0") {
+		t.Fatalf("Wi-Fi view offers to save the card:\n%s", view)
+	}
+	if _, command := model.updateRemoteInstallKey(tea.KeyPressMsg{Code: tea.KeyEnter}); command != nil {
+		t.Fatal("Enter saved the Wi-Fi card")
+	}
+}
+
+func TestUSBInstallReviewAsksForTheCableAfterAWiFiInstallation(t *testing.T) {
+	host := domain.RemoteInstallHost{Name: "pc01", Interface: "wlp2s0", StaticIP: "10.0.0.1"}
+	if got := remoteInstallAddressAfterwards(host); !strings.Contains(got, "10.0.0.1 on the wired card") {
+		t.Fatalf("address afterwards = %q", got)
+	}
+	host.Interface = "enp1s0"
+	if got := remoteInstallAddressAfterwards(host); got != "10.0.0.1 on enp1s0" {
+		t.Fatalf("address afterwards = %q", got)
+	}
+}
+
 func TestUnescapeUdevShowsReadableDiskNames(t *testing.T) {
 	for input, want := range map[string]string{
 		`VBOX\x20HARDDISK`: "VBOX HARDDISK",

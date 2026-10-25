@@ -226,8 +226,9 @@ either side until its provenance is understood.
 
 Use the official NixOS 26.05 ISO for `x86_64-linux`, either Minimal or
 Graphical (GNOME), booted in
-UEFI mode with Ethernet or Wi-Fi connectivity. Connect Wi-Fi with `nmtui` in
-the live environment first. Keep its physical console visible and recheck:
+UEFI mode, preferably on the laboratory cable (Wi-Fi, connected with `nmtui`
+in the live environment, serves only the installation itself). Keep its
+physical console visible and recheck:
 
 ```sh
 passwd
@@ -253,10 +254,10 @@ the TUI offers to save the observed card for that computer and prepares it
 again. USB/SSH does not
 need PXE, ProxyDHCP, or a controller address transition, but the controller must
 reach the live client's SSH server and the client must reach the signed Harmonia
-cache. Wi-Fi profiles and credentials are not copied into the installed system:
-arrange connectivity separately or reconnect locally as the administrator after
-boot before verifying the installed client. Keep secrets out of Git and the
-Nix store. Do not bridge an isolated trial onto an institutional
+cache. The installed client takes its laboratory address on its wired card
+only: connect the cable before the restart, or verification after boot finds
+nothing at the static address. Wi-Fi profiles and credentials are not copied
+into the installed system. Do not bridge an isolated trial onto an institutional
 LAN as a troubleshooting shortcut.
 
 ## USB installation refuses the disk or cache
