@@ -6,6 +6,27 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-10-25
+
+The stable release of the 3.10.0 betas: it brings the changes below and those
+of 3.10.0-beta.1 to 3.10.0-beta.4. How to update depends on the release the
+controller runs:
+
+- **3.9.0 or older.** This release changes four things in your own deployment
+  files: the workstation profile finds the controller with `isController`, jq
+  joins the software of every laboratory, and the screensaver uses ttfx at 60
+  frames per second. A release before 3.10 cannot make these changes during
+  the update, so once, in the deployment folder, run `nix run
+  github:giovantenne/nixorium/v3.10.0#nixorium -- deployment migrate --root .`,
+  review the result with `git diff`, save it in **Maintenance → Review Git
+  changes**, then run **Update Nixorium**. See
+  [Updating](docs/updates.md#changes-to-your-own-files).
+- **3.10.0-beta.1.** Update once with the new release's program, in the
+  deployment folder: `nix run github:giovantenne/nixorium/v3.10.0 -- update
+  plan --target v3.10.0`, then `update apply` with the review token it prints
+  (see the large-file fix in 3.10.0-beta.2).
+- **3.10.0-beta.2 or later.** Update Nixorium is enough.
+
 ### Changed
 
 - Installing a controller and **Update system and packages** no longer compile
@@ -2766,7 +2787,11 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.10.0...HEAD
+[3.10.0]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.4...v3.10.0
+[3.10.0-beta.4]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.3...v3.10.0-beta.4
+[3.10.0-beta.3]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.2...v3.10.0-beta.3
+[3.10.0-beta.2]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.1...v3.10.0-beta.2
 [3.10.0-beta.1]: https://github.com/giovantenne/nixorium/compare/v3.9.0...v3.10.0-beta.1
 [3.9.0]: https://github.com/giovantenne/nixorium/compare/v3.8.2...v3.9.0
 [3.8.2]: https://github.com/giovantenne/nixorium/compare/v3.8.1...v3.8.2
