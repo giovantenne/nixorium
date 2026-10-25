@@ -3,6 +3,7 @@ package presentation
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
@@ -145,9 +146,14 @@ func tuiShortcut(value string, darkBackground bool) string {
 	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).controls).Render(value)
 }
 
+// tuiSpinnerFrames is four frames a second instead of ten: without a graphics
+// card each frame makes the terminal redraw the whole window on the CPU, which
+// took more than a processor away from long builds.
+var tuiSpinnerFrames = spinner.Spinner{Frames: spinner.Dot.Frames, FPS: time.Second / 4}
+
 func newTUISpinner(darkBackground bool) spinner.Model {
 	return spinner.New(
-		spinner.WithSpinner(spinner.Dot),
+		spinner.WithSpinner(tuiSpinnerFrames),
 		spinner.WithStyle(lipgloss.NewStyle().Foreground(newTUITheme(darkBackground).accent)),
 	)
 }

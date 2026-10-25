@@ -8,6 +8,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Installing a controller and **Update system and packages** no longer compile
+  Go on the computer. While the package set has a Go older than the 1.26.9
+  that Nixorium requires for security fixes, Nixorium uses the official Go
+  1.26.9 from go.dev instead of building it from source, which took several
+  minutes after each package update. The programs still use the system's own
+  loader, as with the Go of the package set.
+- The working indicator turns four times a second instead of ten. Without a
+  graphics card the terminal redraws the whole window on the processor for
+  each step: on a test controller it took 1.2 of 4 processors away from the
+  builds of an update.
 - **Settings → Student workspace** no longer offers VS Code preferences (font
   size, tab size, other settings and the rest): VS Code may not be installed.
   Ask the Assistant to change students' VS Code settings and extensions; the
