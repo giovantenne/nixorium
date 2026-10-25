@@ -560,10 +560,11 @@ that release's notes, so a release is not finished until the site follows it.
   15-minute and one-at-a-time bounds, and return only hash, size and store path.
   Settings are read-only except the `settings_v1` and `settings_v2` fields
   (homepage, time zone, locales, keyboard layout, Git identities, classroom
-  view, number of computers, teacher and student user names): `write_file` of `lab-settings.json`
-  merges only those fields onto the saved file (`domain.MergeAssistantSettings`),
-  refuses any other changed field by name, and the save review repeats the
-  native transition rules and impacts (`domain.ReviewAssistantSettings`).
+  view, number of computers, teacher and student user names): `write_file` of
+  `lab-settings.json` merges only those fields onto the saved file
+  (`domain.MergeAssistantSettings`), refuses any other changed field by name,
+  and the save review repeats the native transition rules and impacts
+  (`domain.ReviewAssistantSettings`).
   Evaluate a temporary clone with IFD disabled and bounded time/output; compare
   `nixoriumHostClasses` representatives. `groupModules` assigns common module
   paths to existing clientGroups; compose overlaps deterministically, preserve

@@ -310,7 +310,9 @@ func MergeAssistantSettings(base, view, proposed []byte) ([]byte, error) {
 		}
 		changed = true
 	}
-	if !changed {
+	// A write that changes nothing (classroomView true where the key is
+	// absent, say) leaves the saved file as it is, whatever its formatting.
+	if !changed || reflect.DeepEqual(merged, baseSettings) {
 		return base, nil
 	}
 	if issues := merged.Validate(); len(issues) > 0 {

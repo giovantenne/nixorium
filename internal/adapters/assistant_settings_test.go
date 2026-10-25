@@ -215,7 +215,7 @@ func TestAssistantSettingsRefusesReadOnlyChangeAlongsideWritableChange(t *testin
 		t.Fatal(result)
 	}
 	assistantSettingsUntouched(t, w, store, base)
-	// Nor can a changed account name or a changed password count slip through
+	// Nor can a changed DHCP address or a changed password count slip through
 	// as a copy of the masked value: only the exact view is accepted.
 	for _, key := range []string{"credentialsVersion", "masterDhcpIp"} {
 		result = assistantSettingsModelWrite(t, w, func(tree map[string]any) {
@@ -266,7 +266,7 @@ func TestAssistantSettingsRefusesInvalidWrites(t *testing.T) {
 		"not a text": {func(tree map[string]any) { assistantSettingsLab(tree)["keyboardLayout"] = []any{"it"} }, "settings_invalid: lab.keyboardLayout must be text"},
 	} {
 		result := assistantSettingsModelWrite(t, w, test.edit)
-		if result["ok"] == true || result["error"] != "settings_invalid" || !strings.HasPrefix(result["message"].(string), test.want) {
+		if result["ok"] == true || result["error"] != "settings_invalid" || result["message"] != test.want {
 			t.Fatalf("%s: %v", name, result)
 		}
 		assistantSettingsUntouched(t, w, store, base)
@@ -526,9 +526,9 @@ func TestAssistantSettingsRefusesInvalidMenuSettings(t *testing.T) {
 		edit func(lab map[string]any)
 		want string
 	}{
-		"count zero":       {func(lab map[string]any) { lab["pcCount"] = 0 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode"},
-		"count too many":   {func(lab map[string]any) { lab["pcCount"] = 254 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode"},
-		"count negative":   {func(lab map[string]any) { lab["pcCount"] = -3 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode"},
+		"count zero":       {func(lab map[string]any) { lab["pcCount"] = 0 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode; lab.hostIfaceNames.pc01: must name a configured client or controller"},
+		"count too many":   {func(lab map[string]any) { lab["pcCount"] = 254 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode; lab.masterHostNumber: must be greater than pcCount"},
+		"count negative":   {func(lab map[string]any) { lab["pcCount"] = -3 }, "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode; lab.hostIfaceNames.pc01: must name a configured client or controller"},
 		"count above host": {func(lab map[string]any) { lab["pcCount"] = 120 }, "settings_invalid: lab.masterHostNumber: must be greater than pcCount"},
 		"count fraction":   {func(lab map[string]any) { lab["pcCount"] = 2.5 }, "settings_invalid: lab.pcCount must be an integer"},
 		"count text":       {func(lab map[string]any) { lab["pcCount"] = "20" }, "settings_invalid: lab.pcCount must be an integer"},
@@ -538,7 +538,7 @@ func TestAssistantSettingsRefusesInvalidMenuSettings(t *testing.T) {
 		"same account":     {func(lab map[string]any) { lab["studentUser"] = "desk-teacher" }, "settings_invalid: lab.studentUser: must be different from teacherUser"},
 	} {
 		result := assistantSettingsModelWrite(t, w, func(tree map[string]any) { test.edit(assistantSettingsLab(tree)) })
-		if result["ok"] == true || result["error"] != "settings_invalid" || !strings.HasPrefix(result["message"].(string), test.want) {
+		if result["ok"] == true || result["error"] != "settings_invalid" || result["message"] != test.want {
 			t.Fatalf("%s: %v", name, result)
 		}
 		assistantSettingsUntouched(t, w, store, base)

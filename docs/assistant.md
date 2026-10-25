@@ -441,7 +441,7 @@ error and leaves the candidate as it was:
 | Error | Meaning |
 |---|---|
 | `settings_field_read_only: lab.ifaceName` | The copy differs from what the model read in a setting it may not change, or adds or removes one. The message names every such field, even when a writable setting changed too. |
-| `settings_invalid: …` | The content is not a settings file or has an unknown field, a value has the wrong type (`lab.pcCount must be an integer`, `lab.classroomView must be true or false`), a value fails the settings validation (for example `lab.timeZone: must not be empty`, `lab.pcCount: must be between 1 and 253 in laboratory mode` or `lab.homepageUrl: must be an absolute http:// or https:// URL`), a value is longer than 128 bytes (256 for a Git name or email, 2,048 for the homepage), has spaces at either end, spans several lines or carries a `[REDACTED]` or `[WITHHELD]` stand-in, or the saved settings no longer validate and must be repaired in the menu first. |
+| `settings_invalid: …` | The content is not a settings file or has an unknown field, a value has the wrong type (`lab.pcCount must be an integer`, `lab.classroomView must be true or false`), a value fails the settings validation (for example `lab.timeZone: must not be empty`, `lab.pcCount: must be between 1 and 253 in laboratory mode` or `lab.homepageUrl: must be an absolute http:// or https:// URL`), a value is longer than 128 bytes (256 for a Git name or email, 64 for a user name, 2,048 for the homepage), has spaces at either end, spans several lines or carries a `[REDACTED]` or `[WITHHELD]` stand-in, or the saved settings no longer validate and must be repaired in the menu first. |
 
 Deleting `lab-settings.json` and writing a file of that name in a subfolder
 remain `protected_path`.

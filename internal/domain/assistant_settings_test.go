@@ -441,3 +441,84 @@ func TestMergeAssistantSettingsAcceptsCountAndAccounts(t *testing.T) {
 		t.Fatalf("fraction: %v", err)
 	}
 }
+
+func TestMergeAssistantSettingsNoOpClassroomViewKeepsANonCanonicalFile(t *testing.T) {
+	// A hand-edited file: tabs instead of the canonical indentation.
+	absent := assistantPublicSettings()
+	absent.Lab.ClassroomView = nil
+	explicit := assistantPublicSettings()
+	for name, test := range map[string]struct {
+		saved LabSettingsFile
+		edit  func(lab map[string]any)
+	}{
+		"true where the key is absent":   {absent, func(lab map[string]any) { lab["classroomView"] = true }},
+		"key removed from explicit true": {explicit, func(lab map[string]any) { delete(lab, "classroomView") }},
+	} {
+		base := []byte(strings.ReplaceAll(string(assistantSettingsBytes(t, test.saved)), "  ", "\t"))
+		view := assistantSettingsViewOf(t, base)
+		merged, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, test.edit))
+		if err != nil || !bytes.Equal(merged, base) {
+			t.Fatalf("%s: merged=%q err=%v", name, merged, err)
+		}
+	}
+}
+
+func TestMergeAssistantSettingsRefusesNullAndDuplicateMenuValues(t *testing.T) {
+	base := assistantSettingsBytes(t, assistantPublicSettings())
+	view := assistantSettingsViewOf(t, base)
+	for key, want := range map[string]string{
+		"pcCount":       "settings_invalid: lab.pcCount must be an integer",
+		"classroomView": "settings_invalid: lab.classroomView must be true or false",
+		"teacherUser":   "settings_invalid: lab.teacherUser must be text",
+	} {
+		_, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, func(lab map[string]any) { lab[key] = nil }))
+		if err == nil || err.Error() != want {
+			t.Fatalf("null %s: %v", key, err)
+		}
+	}
+	// With a duplicate key the last value wins, in the merge and in the review.
+	duplicated := []byte(strings.Replace(string(view), `"pcCount": 20`, `"pcCount": 21, "pcCount": 22`, 1))
+	merged, err := MergeAssistantSettings(base, view, duplicated)
+	if err == nil {
+		settings, _ := DecodeLabSettings(merged)
+		if settings.Lab.PCCount != 22 {
+			t.Fatalf("merge kept %d", settings.Lab.PCCount)
+		}
+		if _, reviewErr := ReviewAssistantSettings(base, merged); reviewErr != nil {
+			t.Fatal(reviewErr)
+		}
+	} else if assistantSettingsCode(err) != AssistantSettingsInvalid {
+		t.Fatalf("duplicate: %v", err)
+	}
+	if _, err := ReviewAssistantSettings(base, []byte(strings.Replace(string(base), `"pcCount": 20`, `"pcCount": 21, "pcCount": 22`, 1))); assistantSettingsCode(err) != AssistantSettingsInvalid {
+		t.Fatalf("review of a duplicate: %v", err)
+	}
+}
+
+func TestMergeAssistantSettingsRefusesCountBelowAHostInterface(t *testing.T) {
+	saved := assistantPublicSettings()
+	saved.Lab.HostInterfaceNames = map[string]string{"pc15": "enp3s0"}
+	base := assistantSettingsBytes(t, saved)
+	view := assistantSettingsViewOf(t, base)
+	_, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, func(lab map[string]any) { lab["pcCount"] = 12 }))
+	if err == nil || err.Error() != "settings_invalid: lab.hostIfaceNames.pc15: must name a configured client or controller" {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestMergeAssistantSettingsRefusesCountGrowthDuringANetworkTransition(t *testing.T) {
+	saved := assistantPublicSettings()
+	saved.Lab.NetworkBase = "10.1.0.0"
+	saved.Lab.PCCount, saved.Lab.MasterHostNumber = 10, 14
+	saved.Lab.HostInterfaceNames = nil
+	saved.Lab.NetworkTransition = &NetworkTransition{PreviousBase: "10.0.0.0", PreviousPrefixLength: 28, StartedAt: "2026-10-15T08:00:00Z"}
+	base := assistantSettingsBytes(t, saved)
+	if _, issues := DecodeLabSettings(base); len(issues) > 0 {
+		t.Fatal(issues)
+	}
+	view := assistantSettingsViewOf(t, base)
+	_, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, func(lab map[string]any) { lab["pcCount"] = 15 }))
+	if err == nil || !strings.Contains(err.Error(), "the previous network must hold every configured host number") {
+		t.Fatalf("growth: %v", err)
+	}
+}
