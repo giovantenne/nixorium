@@ -27,6 +27,28 @@ The project follows [Semantic Versioning](https://semver.org/).
   laboratory profile is an Ethernet profile and a Wi-Fi card never carried the
   laboratory address (the earlier documentation said it did). A laboratory
   with such a name must change it to the wired card before updating.
+- The classroom view stops asking for the screens while its page is hidden
+  (minimized window or background tab): the student computers stop being
+  captured a few seconds later, and capture resumes when the page is shown
+  again. The enlarged window and take control follow the same rule.
+- While the teacher controls a computer with the keyboard and mouse, the
+  student's screen shows a small "Teacher in control" label under the top bar,
+  from the first input until the control ends (the sharing icon alone told
+  students nothing about it). The label is drawn by the classroom
+  Shell extension, so it appears after the student's next login.
+- While the classroom view captures a screen and a window is full screen (a
+  video, a game), GNOME hides the top bar and its sharing icon. The classroom
+  extension now shows a small "Classroom view open" label in the corner of the
+  screen in that case only. It takes no clicks and appears after the student's
+  next login.
+- When the teacher saves a screenshot of a computer, its screen shows "Your
+  teacher saved a picture of this screen" in a small notice that fades after
+  a few seconds; when the teacher
+  collects the files on its desktop, it shows "Your teacher collected the
+  files on your desktop". Before, the student saw nothing. The notices are
+  drawn by the classroom Shell extension (they appear after the student's next
+  login) and are asked for with a new classroom view message, so a computer
+  not yet updated just shows no notice.
 
 ### Fixed
 

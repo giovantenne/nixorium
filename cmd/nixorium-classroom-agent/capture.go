@@ -73,11 +73,20 @@ type mutterCapture struct {
 	clipboard   clipboardState
 	// wokeAt is when this capture lifted a blank screen (blank.go).
 	wokeAt time.Time
+	// banner tells the student while the teacher controls the computer
+	// (control.go); nil shows nothing.
+	banner *extensionFlag
+	// sharing tells the extension that a capture session exists.
+	sharing *extensionFlag
 }
 
-func newMutterCapture() *mutterCapture {
+func newMutterCapture(notifier stateNotifier) *mutterCapture {
 	capture := &mutterCapture{widths: map[int]time.Time{}, keysDown: map[uint32]bool{}, buttonsDown: map[string]bool{}}
 	capture.changed = sync.NewCond(&capture.mutex)
+	if notifier != nil {
+		capture.banner = newExtensionFlag(notifier.SetControlled)
+		capture.sharing = newExtensionFlag(notifier.SetSharing)
+	}
 	go capture.stopWhenIdle()
 	return capture
 }
@@ -102,6 +111,9 @@ func (capture *mutterCapture) Thumbnail(requested int, since int64) ([]byte, int
 			return nil, 0, time.Time{}, 0, err
 		}
 	}
+	// An extension that was not ready when the capture started hears of it
+	// with the next request.
+	capture.sharing.Set(true)
 	deadline := time.Now().Add(firstFrameMax)
 	for capture.frame == nil && capture.running && time.Now().Before(deadline) {
 		timer := time.AfterFunc(100*time.Millisecond, capture.changed.Broadcast)
@@ -129,6 +141,10 @@ func (capture *mutterCapture) Input(events []classroomview.InputEvent, release b
 		return errNotReady
 	}
 	capture.lastRequest = time.Now()
+	if len(events) > 0 {
+		// The first input of a control tells the student.
+		capture.banner.Set(true)
+	}
 	session := remoteDesktopName + ".Session"
 	call := func(method string, arguments ...any) error {
 		return capture.remote.Call(session+"."+method, 0, arguments...).Err
@@ -175,6 +191,7 @@ func (capture *mutterCapture) Input(events []classroomview.InputEvent, release b
 // releaseLocked lets go of everything still pressed, so a closed view never
 // leaves a stuck key or button on the student's computer.
 func (capture *mutterCapture) releaseLocked() {
+	capture.banner.Set(false)
 	if capture.remote == nil {
 		return
 	}
@@ -220,6 +237,7 @@ func (capture *mutterCapture) stopLocked() {
 	}
 	capture.running, capture.stop, capture.frame, capture.failure = false, nil, nil, nil
 	capture.remote, capture.keyboardOn = nil, false
+	capture.sharing.Set(false)
 }
 
 // startLocked opens the Mutter sessions (no consent dialog: these are the
@@ -319,6 +337,7 @@ func (capture *mutterCapture) startLocked(width int) error {
 	capture.generation++
 	generation := capture.generation
 	capture.running, capture.width, capture.height = true, width, height
+	capture.sharing.Set(true)
 	capture.remote, capture.streamPath = remote, streamPath
 	capture.screenW, capture.screenH = float64(screenW), float64(screenH)
 	var once sync.Once
@@ -373,6 +392,8 @@ func (capture *mutterCapture) ended(generation int, err error) {
 	capture.running, capture.stop, capture.frame = false, nil, nil
 	capture.remote, capture.keyboardOn = nil, false
 	capture.clipboard = clipboardState{}
+	capture.banner.Set(false)
+	capture.sharing.Set(false)
 	if err != nil && !errors.Is(err, io.EOF) {
 		capture.failure = err
 	}

@@ -22,6 +22,19 @@
 // number of seconds, or until the computer is unlocked. A new message
 // replaces the previous one, and logging out removes it.
 //
+// While the teacher controls the computer with their keyboard and mouse, a
+// small label under the top bar says so. It is plain text above everything,
+// does not take clicks or keys, and goes when the control ends.
+//
+// While the screen is being shared and a full-screen window hides GNOME's top
+// bar (a video, a game), a small "Classroom view open" label in a corner of
+// the screen takes the place of the sharing icon. It takes no clicks or keys.
+//
+// When the teacher saves a picture of the screen or collects the files on
+// the desktop, a small notice in the bottom corner says so for a few
+// seconds and fades. The agent sends only the kind; the words are here. The notice
+// takes no clicks or keys.
+//
 // When an update from the controller replaces the running system, the system
 // writes /run/nixorium/update-notice.json; a notification tells the person at
 // the computer, with a Restart button when a restart finishes the update.
@@ -45,6 +58,12 @@ const NoticeFile = 'update-notice.json';
 const RecentNoticeSeconds = 30 * 60;
 // A message that stays until the student closes it offers Close after this.
 const MessageCloseSeconds = 10;
+// The notice of a screenshot or a collection stays this long.
+const NoticeSeconds = 6;
+const NoticeTexts = {
+    screenshot: 'Your teacher saved a picture of this screen',
+    collect: 'Your teacher collected the files on your desktop',
+};
 
 // Decoded pictures of the teacher's screen live in native memory that the
 // JavaScript collector does not count: without a collection every few
@@ -71,12 +90,27 @@ const Interface = `<node>
     </method>
     <method name="HideMessage"/>
     <property name="MessageShown" type="b" access="read"/>
+    <method name="SetControlled">
+      <arg type="b" direction="in" name="controlled"/>
+    </method>
+    <property name="Controlled" type="b" access="read"/>
+    <method name="SetSharing">
+      <arg type="b" direction="in" name="sharing"/>
+    </method>
+    <property name="IndicatorShown" type="b" access="read"/>
+    <method name="ShowNotice">
+      <arg type="s" direction="in" name="kind"/>
+    </method>
+    <property name="NoticeKind" type="s" access="read"/>
   </interface>
 </node>`;
 
 export default class NixoriumClassroomExtension extends Extension {
     enable() {
         this._quietIndicator();
+        // GNOME hides the top bar, and with it the sharing icon, while a
+        // window is full screen: the small indicator takes over then.
+        Main.layoutManager.panelBox.connectObject('notify::visible', () => this._updateChip(), this);
         this._service = Gio.DBusExportedObject.wrapJSObject(Interface, this);
         this._service.export(Gio.DBus.session, ObjectPath);
         this._nameId = Gio.bus_own_name_on_connection(Gio.DBus.session, BusName,
@@ -90,6 +124,11 @@ export default class NixoriumClassroomExtension extends Extension {
         this._notice?.destroy();
         this._notice = null;
         this.HideMessage();
+        this.SetControlled(false);
+        this._hideNotice();
+        this._sharing = false;
+        this._updateChip();
+        Main.layoutManager.panelBox.disconnectObject(this);
         this.StopBroadcast();
         this._setLocked(false);
         if (this._nameId) {
@@ -425,6 +464,161 @@ export default class NixoriumClassroomExtension extends Extension {
             message.close.opacity = offered ? 255 : 0;
             message.close.reactive = offered;
         }
+    }
+
+    // D-Bus: called by the classroom agent while the teacher's keyboard and
+    // mouse control this computer.
+    SetControlled(controlled) {
+        if (controlled === Boolean(this._control))
+            return;
+        if (!controlled) {
+            Main.layoutManager.uiGroup.disconnect(this._control.raiseId);
+            this._control.layer.destroy();
+            this._control = null;
+        } else {
+            const layer = new St.Widget({
+                name: 'nixoriumClassroomControl',
+                layout_manager: new Clutter.BinLayout(),
+            });
+            layer.add_constraint(new Clutter.BindConstraint({
+                source: global.stage,
+                coordinate: Clutter.BindCoordinate.ALL,
+            }));
+            layer.add_child(new St.Label({
+                text: 'Teacher in control',
+                style: 'background-color: rgba(180, 83, 9, 0.92); color: #ffffff; font-size: 13px; font-weight: bold; padding: 3px 12px; border-radius: 10px; margin-top: 38px;',
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.START,
+                x_expand: true,
+                y_expand: true,
+            }));
+            Main.layoutManager.uiGroup.add_child(layer);
+            Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+            const raiseId = Main.layoutManager.uiGroup.connect('child-added', () => {
+                Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+                this._updateMessage();
+            });
+            this._control = {layer, raiseId};
+        }
+        this._service?.emit_property_changed('Controlled', GLib.Variant.new_boolean(Boolean(this._control)));
+    }
+
+    get Controlled() {
+        return Boolean(this._control);
+    }
+
+    // D-Bus: called by the classroom agent, which has checked the kind.
+    ShowNotice(kind) {
+        const text = NoticeTexts[kind];
+        if (!text)
+            throw new Error('Unexpected notice');
+        this._hideNotice();
+        const layer = new St.Widget({
+            name: 'nixoriumClassroomNotice',
+            layout_manager: new Clutter.BinLayout(),
+        });
+        layer.add_constraint(new Clutter.BindConstraint({
+            source: global.stage,
+            coordinate: Clutter.BindCoordinate.ALL,
+        }));
+        layer.add_child(new St.Label({
+            text,
+            style: 'background-color: rgba(32, 36, 43, 0.92); color: #ffffff; font-size: 14px; padding: 6px 14px; border-radius: 10px; margin: 0 24px 24px 0;',
+            x_align: Clutter.ActorAlign.END,
+            y_align: Clutter.ActorAlign.END,
+            x_expand: true,
+            y_expand: true,
+        }));
+        Main.layoutManager.uiGroup.add_child(layer);
+        Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+        const raiseId = Main.layoutManager.uiGroup.connect('child-added', () => {
+            Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+            this._updateMessage();
+        });
+        const notice = {kind, layer, raiseId, timer: 0};
+        // It fades in and out; nothing else moves.
+        layer.opacity = 0;
+        layer.ease({opacity: 255, duration: 300, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        notice.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, NoticeSeconds, () => {
+            notice.timer = 0;
+            layer.ease({
+                opacity: 0,
+                duration: 600,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => {
+                    if (this._noticeShown === notice)
+                        this._hideNotice();
+                },
+            });
+            return GLib.SOURCE_REMOVE;
+        });
+        this._noticeShown = notice;
+        this._service?.emit_property_changed('NoticeKind', GLib.Variant.new_string(kind));
+    }
+
+    get NoticeKind() {
+        return this._noticeShown?.kind ?? '';
+    }
+
+    _hideNotice() {
+        const notice = this._noticeShown;
+        if (!notice)
+            return;
+        this._noticeShown = null;
+        if (notice.timer)
+            GLib.source_remove(notice.timer);
+        Main.layoutManager.uiGroup.disconnect(notice.raiseId);
+        notice.layer.destroy();
+        this._service?.emit_property_changed('NoticeKind', GLib.Variant.new_string(''));
+    }
+
+    // D-Bus: called by the classroom agent while a capture session exists.
+    SetSharing(sharing) {
+        this._sharing = Boolean(sharing);
+        this._updateChip();
+    }
+
+    get IndicatorShown() {
+        return Boolean(this._chip);
+    }
+
+    // The top bar is hidden exactly when a window is full screen on the
+    // primary monitor (layout.js hides the panel box then).
+    _updateChip() {
+        const wanted = Boolean(this._sharing) && !Main.layoutManager.panelBox.visible;
+        if (wanted === Boolean(this._chip))
+            return;
+        if (!wanted) {
+            Main.layoutManager.uiGroup.disconnect(this._chip.raiseId);
+            this._chip.layer.destroy();
+            this._chip = null;
+        } else {
+            const layer = new St.Widget({
+                name: 'nixoriumClassroomIndicator',
+                layout_manager: new Clutter.BinLayout(),
+            });
+            layer.add_constraint(new Clutter.BindConstraint({
+                source: global.stage,
+                coordinate: Clutter.BindCoordinate.ALL,
+            }));
+            layer.add_child(new St.Label({
+                text: 'Classroom view open',
+                style: 'background-color: rgba(16, 19, 23, 0.7); color: #ffffff; font-size: 13px; padding: 4px 12px; border-radius: 0 0 0 8px;',
+                x_align: Clutter.ActorAlign.END,
+                y_align: Clutter.ActorAlign.START,
+                x_expand: true,
+                y_expand: true,
+            }));
+            Main.layoutManager.uiGroup.add_child(layer);
+            Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+            // Kept above anything shown later, the way the lock cover is.
+            const raiseId = Main.layoutManager.uiGroup.connect('child-added', () => {
+                Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+                this._updateMessage();
+            });
+            this._chip = {layer, raiseId};
+        }
+        this._service?.emit_property_changed('IndicatorShown', GLib.Variant.new_boolean(Boolean(this._chip)));
     }
 
     _quietIndicator() {

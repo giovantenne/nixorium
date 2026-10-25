@@ -155,5 +155,6 @@ func TestLockReportsUnconfirmedAndRefusesTheController(t *testing.T) {
 
 func (session fakeLockSession) ClipboardBegin() error         { return nil }
 func (session fakeLockSession) ClipboardEnd() error           { return nil }
+func (session fakeLockSession) Notice(string) error           { return nil }
 func (session fakeLockSession) ClipboardSet(string) error     { return nil }
 func (session fakeLockSession) ClipboardGet() (string, error) { return "", nil }

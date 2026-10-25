@@ -32,6 +32,10 @@ func (session fakeAgentSession) note(call string) {
 }
 func (session fakeAgentSession) ClipboardBegin() error { session.note("begin"); return nil }
 func (session fakeAgentSession) ClipboardEnd() error   { session.note("end"); return nil }
+func (session fakeAgentSession) Notice(kind string) error {
+	session.note("notice:" + kind)
+	return nil
+}
 func (session fakeAgentSession) ClipboardSet(text string) error {
 	session.note("set:" + text)
 	return nil

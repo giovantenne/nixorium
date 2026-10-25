@@ -115,6 +115,17 @@ func (session *sshAgentSession) ClipboardGet() (string, error) {
 	return session.clipboard(classroomview.Message{Type: classroomview.TypeClipboardGet})
 }
 
+func (session *sshAgentSession) Notice(kind string) error {
+	reply, err := session.exchange(classroomview.Message{Type: classroomview.TypeNotice, Notice: kind}, 5*time.Second)
+	if err != nil {
+		return err
+	}
+	if reply.Type != classroomview.TypeNoticeShown {
+		return classroomview.AgentError{Code: reply.Code}
+	}
+	return nil
+}
+
 func (session *sshAgentSession) ShowFrame(image []byte) error {
 	return session.broadcast(classroomview.Message{Type: classroomview.TypeBroadcastFrame, Image: image})
 }

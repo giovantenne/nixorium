@@ -167,6 +167,8 @@ type Message struct {
 	Text        string `json:"text,omitempty"`
 	Seconds     int    `json:"seconds,omitempty"`
 	UntilUnlock bool   `json:"untilUnlock,omitempty"`
+	// Notice is the kind of a notice.show (see message.go).
+	Notice string `json:"notice,omitempty"`
 }
 
 // Write encodes a message as a big-endian length followed by JSON.
@@ -233,6 +235,9 @@ type Session interface {
 	// SendFiles places files on the session's desktop; content opens the
 	// file at an entry's position. It returns the names given there.
 	SendFiles(entries []FileEntry, content func(int) (io.ReadCloser, error)) ([]string, error)
+	// Notice tells the student, briefly, what the teacher did (one of the
+	// Notice kinds).
+	Notice(kind string) error
 	Close() error
 }
 

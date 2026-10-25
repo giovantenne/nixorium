@@ -439,7 +439,7 @@ func TestProbeEndsWhenItsContextEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, run := range map[string]func(context.Context) error{
-		"hello": func(ctx context.Context) error { return probe(ctx, []string{"sleep", "30"}, "", false, io.Discard) },
+		"hello": func(ctx context.Context) error { return probe(ctx, []string{"sleep", "30"}, "", false, 0, io.Discard) },
 		"lock":  func(ctx context.Context) error { return probeLock(ctx, []string{"sleep", "30"}, true, io.Discard) },
 		"collect": func(ctx context.Context) error {
 			return probeCollect(ctx, []string{"sleep", "30"}, t.TempDir(), io.Discard)

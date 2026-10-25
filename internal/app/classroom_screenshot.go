@@ -43,6 +43,9 @@ func (hub *ClassroomViewHub) Screenshot(name string) ([]byte, ClassroomComputer,
 		case err != nil:
 			return nil, snapshot, err
 		case reply.Type == classroomview.TypeThumbnail && len(reply.Image) > 0:
+			// The student's screen tells that a picture was saved; a
+			// computer that cannot show it still gets its picture saved.
+			_ = session.Notice(classroomview.NoticeScreenshot)
 			return reply.Image, snapshot, nil
 		case reply.Type == classroomview.TypeThumbnail, reply.Code == classroomview.CodeNotReady:
 			time.Sleep(500 * time.Millisecond)
