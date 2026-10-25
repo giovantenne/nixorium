@@ -183,7 +183,7 @@ The model has fixed tools, with no shell or system-operation tool:
 | `build` | New non-cached candidate derivations after evaluation; bounded build logs, no activation |
 | `lab_status` | Read-only controller observations of the lab computers |
 | `prepare_npm` | Capable controllers only: prepare a public npm CLI package/tag and its tested offline dependency artifact |
-| `host_diagnostics` | One exact declared computer and a fixed area; read-only state and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
+| `host_diagnostics` | One exact declared computer and a fixed area (`system`, `home_reset`, `updates`, `network`, `cache`, `pxe`, `hardware`); read-only state or device facts and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
 | `read_system_file` | Capable controllers only, after the updated consent: one allowlisted system file or directory of one declared computer (see [System files](#system-files)); 256 KiB of text, 500 listing entries, 60-second timeout |
 | `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
@@ -219,8 +219,8 @@ filtered, but filtering cannot guarantee removal of every personal or sensitive
 detail in logs or historical configuration. Student home files are not read.
 
 `host_diagnostics` takes an exact name from fresh evaluated inventory and one of
-`system`, `home_reset`, `updates`, `network`, `cache`, or `pxe`. Cache and PXE are
-controller-only. The native helper accepts only that area, using immutable
+`system`, `home_reset`, `updates`, `network`, `cache`, `pxe`, or `hardware`. Cache
+and PXE are controller-only. The native helper accepts only that area, using immutable
 systemd executable paths and fixed core unit lists. It reports service loading,
 state, result, exit status and timestamps; boot ID and deployment revision;
 numeric free space for fixed mounts; and available reset/update markers. It
@@ -233,6 +233,36 @@ roles, missing helpers, insufficient journal permissions and incomplete evidence
 remain explicit; an empty journal is not proof of service health. Apply an
 updated configuration through ordinary reviews to install the helper on older
 computers. This tool never restarts a service, changes a system or runs a queue.
+
+The `hardware` area works on the controller and on every client and answers
+questions about devices (USB devices for udev rules such as an Arduino or a
+tablet, monitors and projectors, sound, printers). It adds these optional lists
+to the report, each bounded; a source that cannot be read is named in
+`unavailable` (`usb`, `pci`, `displays`, `audio`, `printers`, `kernel_log`)
+instead of being reported as empty:
+
+- `usbDevices` (at most 32): `path` (for example `1-2`), `vendorId`,
+  `productId`, `manufacturer`, `product`, `class` and `interfaceClasses`
+  (hexadecimal USB class codes), from `/sys/bus/usb/devices`.
+- `pciDevices` (at most 64): `slot`, `vendorId`, `deviceId`, `class` and the
+  kernel `driver` in use, from `/sys/bus/pci/devices`. Names are not looked up.
+- `displays` (at most 16): `connector` (for example `card0-HDMI-A-1`),
+  `status` (`connected` or `disconnected`), `enabled` and at most five `modes`,
+  from `/sys/class/drm`. The EDID is not read, so there is no monitor name.
+- `audioCards` (at most 8): `index`, `id`, `driver` and `name`, from
+  `/proc/asound/cards`.
+- `printers` (at most 16): `name`, `uri` and `state` (`idle`, `printing`,
+  `disabled` or `unknown`), from `lpstat` of the installed CUPS.
+- `journal`: at most 50 kernel messages of the current boot (`kernel` source
+  only) about USB, graphics, sound, HID and CUPS.
+
+Serial numbers are never read: the USB `serial` attribute is not opened, and
+any label, kernel message or printer address that mentions a serial number is
+dropped, because a serial can identify a student's personal device. Printer
+addresses keep only scheme, host, port and path; credentials
+(`user:password@`), query strings and fragments are removed. The computer
+chooses the files and commands; the model chooses only the computer and the
+area.
 
 ### System files
 

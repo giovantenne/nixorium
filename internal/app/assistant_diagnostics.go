@@ -58,7 +58,7 @@ func (diagnostics AssistantDiagnostics) Execute(ctx context.Context, repository,
 	if selected.Name == "" {
 		return failure("unknown_host")
 	}
-	if len(hostdiagnostics.Units(area, controller)) == 0 {
+	if !hostdiagnostics.Supported(area, controller) {
 		return failure("unsupported_role")
 	}
 	report, err := diagnostics.Source.HostDiagnostics(ctx, selected, controller, area)

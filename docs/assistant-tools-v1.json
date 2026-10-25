@@ -167,7 +167,8 @@
             "updates",
             "network",
             "cache",
-            "pxe"
+            "pxe",
+            "hardware"
           ],
           "type": "string"
         },

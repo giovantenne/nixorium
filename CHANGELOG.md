@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The Assistant can now look at the devices of a computer: the `hardware`
+  area of the computer diagnostics lists USB devices (so it can write udev
+  rules for an Arduino or a tablet), graphics cards, connected monitors and
+  projectors with their modes, sound cards, printer queues and recent kernel
+  messages about them. It only reads, it never reads serial numbers, and
+  passwords in printer addresses are removed. Computers need the usual update
+  to get the new helper.
 - `docs/menu-map.md`, generated from the TUI's own menu definitions by
   `scripts/generate-docs.sh` and checked for staleness with the TUI gallery, so
   the Assistant can give exact menu paths without a hand-kept table.

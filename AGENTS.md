@@ -544,7 +544,10 @@ that release's notes, so a release is not finished until the site follows it.
   no arbitrary shell, service control, activation or student-home file access.
   Capability-gated diagnostics use fresh declared inventory, strict existing
   SSH trust, fixed core units, bounded current-boot journal excerpts, numeric
-  disk state and typed reset/update evidence. Never read arbitrary app logs,
+  disk state and typed reset/update evidence. The `hardware` area reads fixed
+  sysfs/procfs files and `lpstat` for USB, PCI, display, audio and printer
+  facts plus kernel messages; it never reads a `serial` attribute and removes
+  URI credentials and queries. Never read arbitrary app logs,
   environment or command-line fields; keep missing evidence explicit. Journal
   filtering is best effort and the renewed version-2 consent must disclose that
   personal or sensitive text can remain. Read-only Git history stays within

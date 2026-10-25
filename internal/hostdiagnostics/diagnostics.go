@@ -28,6 +28,9 @@ type Config struct {
 	Controller bool   `json:"controller"`
 	Systemctl  string `json:"systemctl"`
 	Journalctl string `json:"journalctl"`
+	// Lpstat is optional; without it the hardware area reports printers as
+	// unavailable.
+	Lpstat string `json:"lpstat,omitempty"`
 }
 type Space struct {
 	Mount          string `json:"mount"`
@@ -49,25 +52,31 @@ type Entry struct {
 	Excerpt  string `json:"excerpt"`
 }
 type Report struct {
-	SchemaVersion    int      `json:"schemaVersion"`
-	Area             string   `json:"area"`
-	Controller       bool     `json:"controller"`
-	GeneratedAt      string   `json:"generatedAt"`
-	BootID           string   `json:"bootId,omitempty"`
-	Revision         string   `json:"revision,omitempty"`
-	Space            []Space  `json:"space"`
-	Units            []Unit   `json:"units"`
-	Journal          []Entry  `json:"journal"`
-	HomeResetPending *bool    `json:"homeResetPending,omitempty"`
-	RestartRequired  *bool    `json:"restartRequired,omitempty"`
-	RestartNoticeAt  string   `json:"restartNoticeAt,omitempty"`
-	Unavailable      []string `json:"unavailable"`
-	Truncated        bool     `json:"truncated"`
+	SchemaVersion    int     `json:"schemaVersion"`
+	Area             string  `json:"area"`
+	Controller       bool    `json:"controller"`
+	GeneratedAt      string  `json:"generatedAt"`
+	BootID           string  `json:"bootId,omitempty"`
+	Revision         string  `json:"revision,omitempty"`
+	Space            []Space `json:"space"`
+	Units            []Unit  `json:"units"`
+	Journal          []Entry `json:"journal"`
+	HomeResetPending *bool   `json:"homeResetPending,omitempty"`
+	RestartRequired  *bool   `json:"restartRequired,omitempty"`
+	RestartNoticeAt  string  `json:"restartNoticeAt,omitempty"`
+	// The hardware area only. Each list is bounded; serial numbers are never read.
+	UsbDevices  []UsbDevice `json:"usbDevices,omitempty"`
+	PciDevices  []PciDevice `json:"pciDevices,omitempty"`
+	Displays    []Display   `json:"displays,omitempty"`
+	AudioCards  []AudioCard `json:"audioCards,omitempty"`
+	Printers    []Printer   `json:"printers,omitempty"`
+	Unavailable []string    `json:"unavailable"`
+	Truncated   bool        `json:"truncated"`
 }
 
 func ValidArea(area string) bool {
 	switch area {
-	case "system", "home_reset", "updates", "network", "cache", "pxe":
+	case "system", "home_reset", "updates", "network", "cache", "pxe", "hardware":
 		return true
 	}
 	return false
@@ -103,6 +112,9 @@ func Units(area string, controller bool) []string {
 var applyUnit = regexp.MustCompile(`^nixorium-apply-controller@[0-9a-f]{40}\.service$`)
 
 func allowedUnit(name, area string, controller bool) bool {
+	if area == "hardware" {
+		return name == kernelSource
+	}
 	for _, unit := range Units(area, controller) {
 		if unit == name || unit == "nixorium-apply-controller@*.service" && applyUnit.MatchString(name) {
 			return true
@@ -188,7 +200,7 @@ func collect(ctx context.Context, config Config, area string, execute runner) Re
 		return r
 	}
 	units := Units(area, config.Controller)
-	if len(units) == 0 {
+	if len(units) == 0 && area != "hardware" {
 		r.Unavailable = append(r.Unavailable, "unsupported_role")
 		return r
 	}
@@ -230,6 +242,9 @@ func collect(ctx context.Context, config Config, area string, execute runner) Re
 		} else {
 			r.Unavailable = append(r.Unavailable, "restart_notice")
 		}
+	}
+	if area == "hardware" {
+		return collectHardware(ctx, config, r, execute, hardwareRoot{Sys: "/sys", Proc: "/proc"})
 	}
 	args := append([]string{"show", "--no-pager", "--property=Id,LoadState,ActiveState,Result,ExecMainStatus,StateChangeTimestamp", "--timestamp=us+utc"}, units...)
 	data, truncated, err := execute(ctx, config.Systemctl, args...)
@@ -324,7 +339,7 @@ func LoadConfig() (Config, error) {
 	}
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&config) != nil || !storeExecutable(config.Systemctl, "systemctl") || !storeExecutable(config.Journalctl, "journalctl") {
+	if decoder.Decode(&config) != nil || !storeExecutable(config.Systemctl, "systemctl") || !storeExecutable(config.Journalctl, "journalctl") || config.Lpstat != "" && !storeExecutable(config.Lpstat, "lpstat") {
 		return config, errors.New("invalid diagnostics configuration")
 	}
 	return config, nil
@@ -399,6 +414,21 @@ func parseUnits(data []byte, area string, controller bool) ([]Unit, bool) {
 	}
 	return result, incomplete
 }
+
+type journalRecord map[string]json.RawMessage
+
+func (r journalRecord) get(key string) string {
+	var value string
+	_ = json.Unmarshal(r[key], &value)
+	return value
+}
+func journalFields(line string) (journalRecord, bool) {
+	var fields journalRecord
+	if domain.ValidateStrictRemoteJSON([]byte(line), 64*1024) != nil || json.Unmarshal([]byte(line), &fields) != nil {
+		return nil, false
+	}
+	return fields, true
+}
 func parseJournal(data []byte, area string, controller bool) ([]Entry, bool) {
 	result := []Entry{}
 	incomplete := false
@@ -406,12 +436,12 @@ func parseJournal(data []byte, area string, controller bool) ([]Entry, bool) {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		var fields map[string]json.RawMessage
-		if domain.ValidateStrictRemoteJSON([]byte(line), 64*1024) != nil || json.Unmarshal([]byte(line), &fields) != nil {
+		record, ok := journalFields(line)
+		if !ok {
 			incomplete = true
 			continue
 		}
-		get := func(key string) string { var value string; _ = json.Unmarshal(fields[key], &value); return value }
+		fields, get := record, record.get
 		unit := get("_SYSTEMD_UNIT")
 		if !allowedUnit(unit, area, controller) {
 			unit = get("UNIT")
@@ -477,8 +507,12 @@ func Encode(report Report) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for len(data) > MaxBytes-512 && len(report.Journal) > 0 {
-		report.Journal = report.Journal[:len(report.Journal)-1]
+	for len(data) > MaxBytes-512 && (len(report.Journal) > 0 || len(report.PciDevices) > 0) {
+		if len(report.Journal) > 0 {
+			report.Journal = report.Journal[:len(report.Journal)-1]
+		} else {
+			report.PciDevices = report.PciDevices[:len(report.PciDevices)-1]
+		}
 		report.Truncated = true
 		data, err = json.Marshal(report)
 	}
@@ -497,7 +531,7 @@ func Decode(data []byte, area string, controller bool) (Report, error) {
 	}
 	d := json.NewDecoder(strings.NewReader(string(data)))
 	d.DisallowUnknownFields()
-	if d.Decode(&r) != nil || r.SchemaVersion != 1 || r.Area != area || r.Controller != controller || !ValidArea(area) || len(r.Space) > 3 || len(r.Units) > 12 || len(r.Journal) > 50 || len(r.Unavailable) > 12 {
+	if d.Decode(&r) != nil || r.SchemaVersion != 1 || r.Area != area || r.Controller != controller || !ValidArea(area) || len(r.Space) > 3 || len(r.Units) > 12 || len(r.Journal) > 50 || len(r.Unavailable) > 20 {
 		return r, errors.New("invalid diagnostics")
 	}
 	if _, err := time.Parse(time.RFC3339, r.GeneratedAt); err != nil {
@@ -533,7 +567,7 @@ func Decode(data []byte, area string, controller bool) (Report, error) {
 	}
 	for _, item := range r.Unavailable {
 		switch item {
-		case "unsupported_area", "unsupported_role", "boot_id", "boot_changed", "revision", "disk:/", "disk:/nix/store", "disk:/home", "home_reset_pending", "restart_notice", "service_state", "journal":
+		case "unsupported_area", "unsupported_role", "boot_id", "boot_changed", "revision", "disk:/", "disk:/nix/store", "disk:/home", "home_reset_pending", "restart_notice", "service_state", "journal", "usb", "pci", "displays", "audio", "printers", "kernel_log":
 		default:
 			return r, fmt.Errorf("invalid unavailable observation")
 		}
@@ -542,8 +576,16 @@ func Decode(data []byte, area string, controller bool) (Report, error) {
 	for _, code := range r.Unavailable {
 		unavailable[code] = true
 	}
+	if area != "hardware" && (len(r.UsbDevices) != 0 || len(r.PciDevices) != 0 || len(r.Displays) != 0 || len(r.AudioCards) != 0 || len(r.Printers) != 0) {
+		return r, errors.New("foreign hardware observation")
+	}
+	if area == "hardware" {
+		if err := validateHardware(&r); err != nil {
+			return r, err
+		}
+	}
 	if unavailable["unsupported_role"] {
-		if len(Units(area, controller)) != 0 || len(r.Units) != 0 || len(r.Journal) != 0 {
+		if Supported(area, controller) || len(r.Units) != 0 || len(r.Journal) != 0 {
 			return r, errors.New("invalid unsupported role")
 		}
 		return r, nil

@@ -5,11 +5,17 @@
   nodes.machine = { pkgs, ... }: {
     virtualisation.memorySize = 768;
     users.users.admin.isNormalUser = true;
+    # A USB tablet and a virtio display give the hardware area real devices.
+    virtualisation.qemu.options = [ "-device qemu-xhci" "-device usb-tablet" "-device virtio-gpu-pci" "-device intel-hda" "-device hda-duplex" ];
+    boot.initrd.availableKernelModules = [ "virtio_gpu" "xhci_pci" "usbhid" ];
+    boot.kernelModules = [ "snd_hda_intel" ];
+    services.printing.enable = true;
     environment.systemPackages = [ nixoriumPackage ];
     environment.etc."nixorium-host-diagnostics.json".text = builtins.toJSON {
       controller = true;
       systemctl = "${pkgs.systemd}/bin/systemctl";
       journalctl = "${pkgs.systemd}/bin/journalctl";
+      lpstat = "${pkgs.cups}/bin/lpstat";
     };
     system.configurationRevision = "0123456789012345678901234567890123456789";
     # A disposable failure exercises real systemd manager/unit journal records.
@@ -45,6 +51,20 @@
       assert any("Failed to start" in entry["excerpt"] for entry in report["journal"]), report
       assert not any(secret in data for secret in ["synthetic-secret", "student@example.org", "private.txt"]), data
       assert report["space"] and all(item["totalBytes"] >= item["availableBytes"] for item in report["space"])
+    with subtest("hardware area reports devices without serial numbers"):
+      data = machine.succeed("nixorium-host-diagnostics hardware")
+      report = json.loads(data)
+      print(json.dumps(report, indent=1))
+      assert len(data.encode()) < 32768 and report["area"] == "hardware", report
+      assert any(device["vendorId"] == "0627" and device["productId"] == "0001" for device in report["usbDevices"]), report["usbDevices"]
+      assert all(set(device) <= {"path", "vendorId", "productId", "manufacturer", "product", "class", "interfaceClasses"} for device in report["usbDevices"])
+      assert report["pciDevices"] and all(device["vendorId"] and device["deviceId"] for device in report["pciDevices"]), report
+      assert report["displays"] and all(display["connector"].startswith("card") for display in report["displays"]), report
+      assert report["audioCards"] and report["audioCards"][0]["driver"], report
+      assert "printers" not in report["unavailable"] and "usb" not in report["unavailable"] and "displays" not in report["unavailable"], report
+      assert all(entry["unit"] == "kernel" for entry in report["journal"]) and len(report["journal"]) <= 50, report
+      assert "serial" not in data.lower(), data
+      machine.fail("nixorium-host-diagnostics hardware extra")
     with subtest("restricted local journal access is explicitly unavailable"):
       report = json.loads(machine.succeed("su - admin -c 'nixorium-host-diagnostics home_reset'"))
       assert "journal" in report["unavailable"], report

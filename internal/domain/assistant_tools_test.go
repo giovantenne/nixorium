@@ -39,6 +39,8 @@ func TestAssistantToolArguments(t *testing.T) {
 		{"vscode_marketplace", `{"extension":"ms-python.python"}`, true}, {"vscode_marketplace", `{}`, false}, {"vscode_marketplace", `{"extension":"x","version":"1"}`, false},
 		{"lab_status", `{}`, true}, {"lab_status", `{"command":"bash"}`, false},
 		{"host_diagnostics", `{"host":"pc01","area":"system"}`, true},
+		{"host_diagnostics", `{"host":"pc01","area":"hardware"}`, true},
+		{"host_diagnostics", `{"host":"pc01","area":"hardware","path":"/sys/bus/usb/devices/1-1/serial"}`, false},
 		{"host_diagnostics", `{"host":"pc01","area":"journal"}`, false},
 		{"host_diagnostics", `{"host":"pc01","area":"system","unit":"sshd"}`, false},
 		{"host_diagnostics", `{"host":"pc01","area":null}`, false},

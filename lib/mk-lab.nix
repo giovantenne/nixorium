@@ -220,6 +220,7 @@ let
           controller = isController;
           systemctl = "${bootstrapPkgs.systemd}/bin/systemctl";
           journalctl = "${bootstrapPkgs.systemd}/bin/journalctl";
+          lpstat = "${bootstrapPkgs.cups}/bin/lpstat";
         };
       }
       // lib.optionalAttrs (effectiveDeploymentRevision != null) {
