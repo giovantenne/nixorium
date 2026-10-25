@@ -32,6 +32,9 @@ var Registry = []Migration{
 				}},
 				{Path: "scripts/cmd-screensaver.sh", Content: frozen(id, "cmd-screensaver.sh"), Released: []string{
 					"c4bc7fb93494dd55f2e4a1209032abb2783d8d69764a83d4697f5c52da5dcc8d",
+				}, Later: []string{
+					// 2026-10-screensaver-60-fps applied, as released in 3.10.0.
+					"29f1b0ff986cc02d91db8f39dc48531b1d48c08ef5788548be7d19d352b395f6",
 				}},
 				{Path: "scripts/screensaver-monitor.sh", Content: frozen(id, "screensaver-monitor.sh"), Released: []string{
 					"1ca0eda66faa35f0cc974da0bc92b97d1a4cd9d1081901905b1a0f3a0a3ac128",

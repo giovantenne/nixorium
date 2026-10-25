@@ -21,12 +21,18 @@ type WholeFile struct {
 	Path     string   // in the deployment
 	Released []string // SHA-256 of every released form this migration replaces
 	Content  []byte   // the new form
+	// Later lists the SHA-256 of forms a later migration or template made
+	// from the new one: such a file already has this change. Without it, a
+	// laboratory created after the later change would read as changed by
+	// hand at every update.
+	Later []string
 }
 
 // ReplaceWholeFiles replaces template files the administrator never changed,
 // all together or not at all: applied when each file is a released form or
-// already the new one, done when all are already new, manual (nothing
-// touched) when any file was changed by hand or is missing.
+// already the new one (or a later form), done when all are already new or
+// later, manual (nothing touched) when any file was changed by hand or is
+// missing.
 func ReplaceWholeFiles(tree Tree, replacements []WholeFile) Outcome {
 	var edited, pending []string
 	for _, file := range replacements {
@@ -38,8 +44,12 @@ func ReplaceWholeFiles(tree Tree, replacements []WholeFile) Outcome {
 		if string(content) == string(file.Content) {
 			continue
 		}
-		sum := sha256.Sum256(content)
-		if !slices.Contains(file.Released, hex.EncodeToString(sum[:])) {
+		digest := sha256.Sum256(content)
+		sum := hex.EncodeToString(digest[:])
+		if slices.Contains(file.Later, sum) {
+			continue
+		}
+		if !slices.Contains(file.Released, sum) {
 			edited = append(edited, file.Path)
 			continue
 		}

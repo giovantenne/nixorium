@@ -141,3 +141,36 @@ func TestTheSixtyFramesMigrationAppliesOnceAndRespectsEdits(t *testing.T) {
 		t.Fatalf("an edited frame rate was not left alone: %+v, %v", report, err)
 	}
 }
+
+func TestALaboratoryCreatedAtSixtyFramesNeedsNoScreensaverChange(t *testing.T) {
+	// A laboratory created from a template that already had both changes
+	// (3.10.0 and later) is not "changed by hand": both migrations are done
+	// and recorded, so later updates do not mention them again.
+	current := map[string]string{
+		"modules/screensaver.nix":        string(frozen("2026-10-ttfx-screensaver", "screensaver.nix")),
+		"scripts/cmd-screensaver.sh":     string(frozen("2026-10-ttfx-screensaver", "cmd-screensaver.sh")),
+		"scripts/screensaver-monitor.sh": string(frozen("2026-10-ttfx-screensaver", "screensaver-monitor.sh")),
+	}
+	// The sixty-frames form is what that migration makes of the frozen file.
+	root := treeWith(t, current)
+	if report, err := Run(root, "3.10.0", registryWith("screensaver")); err != nil || len(report.Migrations) != 2 {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	current["scripts/cmd-screensaver.sh"] = read(t, root, "scripts/cmd-screensaver.sh")
+	if !strings.Contains(current["scripts/cmd-screensaver.sh"], "--frame-rate 60") {
+		t.Fatal("the sixty-frames migration did not apply")
+	}
+	root = treeWith(t, current)
+	report, err := Run(root, "3.10.0", registryWith("screensaver"))
+	if err != nil || len(report.Migrations) != 2 {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	for _, entry := range report.Migrations {
+		if entry.State != Done {
+			t.Fatalf("%s = %s: %s", entry.ID, entry.State, entry.Detail)
+		}
+	}
+	if report, err = Run(root, "3.10.0", registryWith("screensaver")); err != nil || len(report.Migrations) != 0 {
+		t.Fatalf("recorded migrations ran again: %+v, %v", report, err)
+	}
+}

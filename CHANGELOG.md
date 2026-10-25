@@ -56,6 +56,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A laboratory created with 3.10.0 or later no longer sees "Manual change:
+  The lab screensaver uses ttfx…" at every update. Its screensaver already
+  had both changes, but the first screensaver migration knew only the older
+  forms and read the newer one as changed by hand.
 - USB installation of a computer with a configured network card that is
   connected through another card now reaches the screen that offers to save
   the observed card, instead of failing with "declared NIC changed", also when
