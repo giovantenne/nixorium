@@ -548,7 +548,7 @@ func (model dashboardModel) updateSettingsReviewKey(key tea.KeyPressMsg) (tea.Mo
 		model.message = "Settings apply cancelled; no file changed."
 		model.screen = dashboardSettings
 	case "c":
-		if len(model.settings.plan.NetworkPreflight.Missing()) > 0 {
+		if len(model.settings.plan.NetworkPreflight.Missing()) > 0 && len(model.settings.plan.NetworkPreflight.Wireless()) == 0 {
 			model.settings.saveAnyway = !model.settings.saveAnyway
 			model.message = ""
 		}

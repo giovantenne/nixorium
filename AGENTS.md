@@ -341,9 +341,10 @@ that release's notes, so a release is not finished until the site follows it.
   Minimal on computers with 4 GB of RAM or less: the live system keeps the
   installer files in memory). Bind the
   reviewed live address to the declared interface. The laboratory network is
-  wired: the lab profile is Ethernet, the settings review refuses a Wi-Fi card
-  as a controller or client interface, and the USB flow never offers to save
-  one; Wi-Fi in the live ISO serves only the installation of a computer without
+  wired: the lab profile is Ethernet, settings validation refuses Wi-Fi card
+  names (`wl…`) for every interface field, the settings review also refuses a
+  reachable client whose named device is wireless, and the USB flow never
+  offers to save a Wi-Fi card; Wi-Fi in the live ISO serves only the installation of a computer without
   an explicit interface name. Wi-Fi credentials are not imported from the live
   ISO.
   Preserve physical-console

@@ -117,7 +117,7 @@ func (model dashboardModel) settingsNetworkCheckLines() []string {
 			lines = append(lines, "  "+tuiStatus(client.Name+"  not reachable: check it at its screen before updating it", tuiStatusNeutral, model.isDark))
 		}
 	}
-	if missing := preflight.Missing(); len(missing) > 0 {
+	if missing := preflight.Missing(); len(missing) > 0 && len(preflight.Wireless()) == 0 {
 		if model.settings.saveAnyway {
 			lines = append(lines, "  "+tuiStatus("Saving anyway for "+strings.Join(missing, ", ")+": updated with this name, a computer without the device loses the laboratory network.", tuiStatusAttention, model.isDark))
 		} else {

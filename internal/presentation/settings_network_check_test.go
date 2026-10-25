@@ -349,6 +349,8 @@ func TestControllerInterfaceIsChosenAmongItsWiredCards(t *testing.T) {
 func TestSettingsReviewRefusesAClientWiFiCard(t *testing.T) {
 	preflight := &domain.NetworkPreflight{Clients: []domain.ClientNetworkCheck{
 		domain.CheckClientInterface(domain.HostMeta{Name: "pc01", IP: "10.0.0.1", Interface: "wlp2s0"}, "", networkCheckDevices()),
+		// A missing device elsewhere must not offer "save anyway" past the Wi-Fi card.
+		domain.CheckClientInterface(domain.HostMeta{Name: "pc02", IP: "10.0.0.2", Interface: "wlp2s0"}, "", domain.NetworkObservation{Reachable: true}),
 	}}
 	saved := []domain.ConfigPlanReport{}
 	model := networkReviewModel(t, func(lab *domain.LabSettings) { lab.ClientInterfaceName = "wlp2s0" }, preflight, &saved)
@@ -364,5 +366,8 @@ func TestSettingsReviewRefusesAClientWiFiCard(t *testing.T) {
 	model, command := pressReviewKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if command != nil || len(saved) != 0 || !strings.Contains(model.message, "Wi-Fi card on pc01") {
 		t.Fatalf("Wi-Fi card saved: message=%q", model.message)
+	}
+	if model, _ = pressReviewKey(t, model, tea.KeyPressMsg{Code: 'c', Text: "c"}); model.settings.saveAnyway {
+		t.Fatal("c acknowledged past a Wi-Fi card")
 	}
 }

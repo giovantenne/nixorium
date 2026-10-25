@@ -205,8 +205,7 @@ one-time adoption for older deployments, independent packages and recovery.
 - **Network.** The controller and the clients share the lab network, which is
   wired: every computer is connected with an Ethernet cable. Wi-Fi is not a
   laboratory network (no network boot, no Switch on, and an installed
-  computer never takes its laboratory address on a Wi-Fi card); the
-  controller may use Wi-Fi only for its own Internet connection. The
+  computer never takes its laboratory address on a Wi-Fi card). The
   controller needs Internet for preparation and updates. It also gives the
   clients the correct time (UDP 123, laboratory network only), taken from
   Internet time servers that the school firewall must let it reach, so a
@@ -1274,8 +1273,10 @@ fallback name (the template's `enp0s3` is VirtualBox's) and apply DHCP and their
 static lab address to the wired Ethernet card **whatever its name**, so PCs of
 different models work without any interface setting. The temporary Internet
 block and the SSH rule from the controller are likewise independent of the name.
-Wireless cards, bridges and virtual devices are never selected, and a named
-Wi-Fi card is refused by the settings review: the laboratory network is wired. A computer with
+Wireless cards, bridges and virtual devices are never selected, and the
+settings refuse a Wi-Fi card name (`wl…`, such as `wlp2s0` or `wlan0`), here and
+in the controller's and fallback names: the laboratory network is wired. A
+computer with
 more than one wired card gets the lab address on only one of them (the first to
 come up, which can differ between boots) and no automatic DHCP on the others;
 give such a PC a `hostIfaceNames` entry. Set `clientIfaceName` only when every

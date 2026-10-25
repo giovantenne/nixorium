@@ -9,11 +9,19 @@ The project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - The laboratory network is wired, and the documentation now says so: every
-  computer needs an Ethernet cable. The settings review refuses a Wi-Fi card as
-  a client's network card, as it already did for the controller, because the
+  computer needs an Ethernet cable. The settings refuse a Wi-Fi card name
+  (`wl…`) for the controller, the clients and single computers, and the review
+  refuses a client whose named card turns out to be wireless, because the
   laboratory profile is an Ethernet profile and a Wi-Fi card never carried the
-  laboratory address (the earlier documentation said it did). USB installation
-  never offers to save a Wi-Fi card: it asks for the cable instead, and after an
+  laboratory address (the earlier documentation said it did). A laboratory
+  with such a name must change it to the wired card before updating.
+
+### Fixed
+
+- USB installation of a computer with a configured network card that is
+  connected through another card now reaches the screen that offers to save
+  the observed card, instead of failing with "declared NIC changed". When the
+  observed card is a Wi-Fi card it asks for the cable instead, and after an
   installation over Wi-Fi the review says to connect the cable before the
   restart.
 

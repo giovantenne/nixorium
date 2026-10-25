@@ -518,7 +518,7 @@ func (model dashboardModel) settingsReviewView() string {
 		question = "Saving is blocked by the network check"
 		actions = nil
 	}
-	if len(model.settings.plan.NetworkPreflight.Missing()) > 0 {
+	if len(model.settings.plan.NetworkPreflight.Missing()) > 0 && len(model.settings.plan.NetworkPreflight.Wireless()) == 0 {
 		label := "Save anyway for the computers listed"
 		if model.settings.saveAnyway {
 			label = "Do not save anyway"

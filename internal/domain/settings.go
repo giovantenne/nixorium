@@ -248,8 +248,12 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 			}
 		}
 	}
+	// The laboratory profile is an Ethernet profile: a Wi-Fi card never
+	// carries the laboratory address (modules/networking.nix).
 	if !interfaceNamePattern.MatchString(lab.InterfaceName) {
 		add("lab.ifaceName", "must be a valid Linux interface name of at most 15 characters")
+	} else if WirelessInterfaceName(lab.InterfaceName) {
+		add("lab.ifaceName", "is a Wi-Fi card name; the laboratory network is wired, so choose a wired card")
 	}
 	for _, networkInterface := range []struct {
 		field string
@@ -260,6 +264,8 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	} {
 		if networkInterface.value != "" && !interfaceNamePattern.MatchString(networkInterface.value) {
 			add(networkInterface.field, "must be a valid Linux interface name of at most 15 characters")
+		} else if WirelessInterfaceName(networkInterface.value) {
+			add(networkInterface.field, "is a Wi-Fi card name; the laboratory network is wired, so choose a wired card")
 		}
 	}
 	validateUser := func(field, value string) {
@@ -316,6 +322,8 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 			add("lab.hostIfaceNames."+host, "must name a configured client or controller")
 		} else if !interfaceNamePattern.MatchString(interfaceName) {
 			add("lab.hostIfaceNames."+host, "must be a valid Linux interface name of at most 15 characters")
+		} else if WirelessInterfaceName(interfaceName) {
+			add("lab.hostIfaceNames."+host, "is a Wi-Fi card name; the laboratory network is wired, so choose a wired card")
 		}
 	}
 	return issues

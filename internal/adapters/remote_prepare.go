@@ -290,8 +290,12 @@ func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts d
 			hostInterface = live
 		}
 	}
-	if facts.BootID != session.Facts.BootID || !remoteFactsHaveAddress(facts, hostInterface, session.Address) {
-		return result, errors.New("live boot identity, declared NIC, or DHCP address changed during preparation")
+	// A computer with an explicit name that is connected through another card
+	// is still prepared: the dashboard then offers to save the observed card,
+	// or asks for the cable when it is a Wi-Fi card, and a plan for the
+	// declared card is refused (remoteInterfaceHasAddress in the app).
+	if facts.BootID != session.Facts.BootID || !remoteLiveAddressPresent(facts, hostInterface, session.Address) {
+		return result, errors.New("live boot identity or DHCP address changed during preparation")
 	}
 	if err := domain.CheckRemoteLiveResources(facts, artifacts.BundleClosureBytes); err != nil {
 		return result, err
@@ -575,6 +579,12 @@ func remoteFactsInterfaceWithAddress(facts domain.RemoteMachineFacts, address st
 		found = networkInterface.Name
 	}
 	return found
+}
+
+// remoteLiveAddressPresent reports whether the live address is still on the
+// declared card, or on exactly one other card.
+func remoteLiveAddressPresent(facts domain.RemoteMachineFacts, interfaceName, address string) bool {
+	return remoteFactsHaveAddress(facts, interfaceName, address) || remoteFactsInterfaceWithAddress(facts, address) != ""
 }
 
 func remoteFactsHaveAddress(facts domain.RemoteMachineFacts, interfaceName, address string) bool {

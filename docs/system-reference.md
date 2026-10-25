@@ -334,7 +334,7 @@ controller's static address.
 The declared client interface must carry the reviewed live IPv4 address.
 The laboratory network is wired: the `nixorium-lab` NetworkManager profile is
 an Ethernet profile, so a Wi-Fi card never carries the laboratory address, and
-the settings review refuses a client interface name that is a Wi-Fi card.
+the settings refuse a Wi-Fi card name (`wl…`) for any interface.
 Without an explicit name (see [Network interfaces](#network-interfaces)) the
 live ISO may reach the controller over Wi-Fi for the installation itself; the
 installed client then uses its wired card, which must be connected before the

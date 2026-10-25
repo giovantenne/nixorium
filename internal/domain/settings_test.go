@@ -67,6 +67,22 @@ func TestLabSettingsValidation(t *testing.T) {
 	}
 }
 
+func TestLabSettingsRefuseWiFiCardNames(t *testing.T) {
+	for field, change := range map[string]func(*LabSettingsFile){
+		"lab.ifaceName":           func(s *LabSettingsFile) { s.Lab.InterfaceName = "wlp2s0" },
+		"lab.controllerIfaceName": func(s *LabSettingsFile) { s.Lab.ControllerInterfaceName = "wlan0" },
+		"lab.clientIfaceName":     func(s *LabSettingsFile) { s.Lab.ClientInterfaceName = "wlo1" },
+		"lab.hostIfaceNames.pc01": func(s *LabSettingsFile) { s.Lab.HostInterfaceNames = map[string]string{"pc01": "wlx001122334455"} },
+	} {
+		s := validSettings()
+		change(&s)
+		issues := s.Validate()
+		if len(issues) != 1 || issues[0].Field != field || !strings.Contains(issues[0].Message, "Wi-Fi card name") {
+			t.Fatalf("%s: %+v", field, issues)
+		}
+	}
+}
+
 func TestDHCPMustStayOutsideTheStaticLabPrefix(t *testing.T) {
 	for _, address := range []string{"10.0.0.0", "10.0.0.1", "10.0.0.255"} {
 		s := validSettings()
