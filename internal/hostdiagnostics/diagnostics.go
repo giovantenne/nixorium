@@ -127,7 +127,7 @@ func allowedUnit(name, area string, controller bool) bool {
 // environment/command lines, scrub common private identifiers, then bound text.
 // The consent describes the remaining best-effort privacy limitation.
 var sensitive = regexp.MustCompile(`(?i)(password|passwd|passphrase|secret|token|authorization|credential|private.key|BEGIN [A-Z ]*KEY|environment=|execstart=|command.line|https?://[^\s]*@)`)
-var privateIdentifiers = regexp.MustCompile(`(?:[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|(?:https?|ssh|file)://[^\s"'<>]+|/[A-Za-z0-9._~+%:@/\-=]+|SHA256:[A-Za-z0-9+/=]+)`)
+var privateIdentifiers = regexp.MustCompile(`(?:(?i:\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b)|[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|(?:https?|ssh|file)://[^\s"'<>]+|/[A-Za-z0-9._~+%:@/\-=]+|SHA256:[A-Za-z0-9+/=]+)`)
 var quotedText = regexp.MustCompile(`"[^"\n]*"|'[^'\n]*'`)
 
 func Scrub(text string) string {
@@ -507,11 +507,21 @@ func Encode(report Report) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for len(data) > MaxBytes-512 && (len(report.Journal) > 0 || len(report.PciDevices) > 0) {
-		if len(report.Journal) > 0 {
+	// Drop the least useful evidence first until the report fits.
+	for len(data) > MaxBytes-512 && err == nil {
+		switch {
+		case len(report.Journal) > 0:
 			report.Journal = report.Journal[:len(report.Journal)-1]
-		} else {
+		case len(report.PciDevices) > 0:
 			report.PciDevices = report.PciDevices[:len(report.PciDevices)-1]
+		case len(report.UsbDevices) > 0:
+			report.UsbDevices = report.UsbDevices[:len(report.UsbDevices)-1]
+		case len(report.Printers) > 0:
+			report.Printers = report.Printers[:len(report.Printers)-1]
+		case len(report.AudioCards) > 0:
+			report.AudioCards = report.AudioCards[:len(report.AudioCards)-1]
+		default:
+			return nil, errors.New("diagnostics exceed limit")
 		}
 		report.Truncated = true
 		data, err = json.Marshal(report)
@@ -521,6 +531,13 @@ func Encode(report Report) ([]byte, error) {
 	}
 	return data, nil
 }
+
+// ErrHelperOutdated means the computer's helper does not know the area.
+var ErrHelperOutdated = errors.New("diagnostics helper is outdated")
+
+// HelperRefusal is the fixed sentence an older helper prints for an area it
+// does not know.
+const HelperRefusal = "Choose one supported diagnostics area."
 
 // Decode refuses malformed or foreign observations and scrubs excerpts again
 // at the controller boundary, before anything enters a transcript.
@@ -567,7 +584,11 @@ func Decode(data []byte, area string, controller bool) (Report, error) {
 	}
 	for _, item := range r.Unavailable {
 		switch item {
-		case "unsupported_area", "unsupported_role", "boot_id", "boot_changed", "revision", "disk:/", "disk:/nix/store", "disk:/home", "home_reset_pending", "restart_notice", "service_state", "journal", "usb", "pci", "displays", "audio", "printers", "kernel_log":
+		case "unsupported_area", "unsupported_role", "boot_id", "boot_changed", "revision", "disk:/", "disk:/nix/store", "disk:/home", "home_reset_pending", "restart_notice", "service_state", "journal":
+		case "usb", "pci", "displays", "audio", "printers", "kernel_log":
+			if area != "hardware" {
+				return r, fmt.Errorf("invalid unavailable observation")
+			}
 		default:
 			return r, fmt.Errorf("invalid unavailable observation")
 		}

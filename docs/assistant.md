@@ -256,9 +256,17 @@ instead of being reported as empty:
 - `journal`: at most 50 kernel messages of the current boot (`kernel` source
   only) about USB, graphics, sound, HID and CUPS.
 
-Serial numbers are never read: the USB `serial` attribute is not opened, and
-any label, kernel message or printer address that mentions a serial number is
-dropped, because a serial can identify a student's personal device. Printer
+When a computer still has an older helper that does not know an area, the tool
+answers `helper_outdated` (distinct from `diagnostics_unavailable`, which also
+covers a computer that is off, SSH failures and timeouts); applying the current
+configuration through ordinary reviews installs the new helper.
+
+Serial numbers are never read, because a serial can identify a student's
+personal device: the USB `serial` attribute is not opened, and any label,
+kernel message or printer address that carries a serial value
+("SerialNumber: ...") is dropped. Names such as "USB Serial" are kept. Kernel
+messages about Bluetooth are dropped (they carry device names and addresses),
+and hardware (MAC) addresses are redacted in all text. Printer
 addresses keep only scheme, host, port and path; credentials
 (`user:password@`), query strings and fragments are removed. The computer
 chooses the files and commands; the model chooses only the computer and the

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -79,7 +80,12 @@ var (
 	printerName  = regexp.MustCompile(`^[A-Za-z0-9_.\-]{1,127}$`)
 	// Serial numbers can identify a student's personal device: nothing that
 	// mentions one is ever kept, from sysfs, kernel messages or a URI.
-	serialText = regexp.MustCompile(`(?i)serial`)
+	// Only serial values are dropped; names such as "USB Serial" stay useful.
+	serialText    = regexp.MustCompile(`(?i)serial\s*(?:number|no\b|num\b|#|:|=)`)
+	bluetoothText = regexp.MustCompile(`(?i)bluetooth|\bhci`)
+	uriScheme     = regexp.MustCompile(`^[a-z][a-z0-9+.\-]{0,31}$`)
+	uriSchemeHead = regexp.MustCompile(`^[a-z][a-z0-9+.\-]*:`)
+	audioID       = regexp.MustCompile(`^[A-Za-z0-9_\-]{1,32}$`)
 	// Kernel messages about the device families Assistant can advise on.
 	kernelPattern = `(?i)(\busb\b|\bdrm\b|\[drm|i915|amdgpu|nouveau|radeon|\bsnd\b|snd_|\bsound\b|\bhid\b|hid-|\bcups\b)`
 )
@@ -101,15 +107,41 @@ func readHex(path string, pattern *regexp.Regexp, strip string) (string, bool) {
 	text = strings.TrimPrefix(strings.ToLower(text), strip)
 	return text, ok && pattern.MatchString(text)
 }
-func readLabel(path string) string {
-	text, ok := readText(path, 256)
-	if !ok || serialText.MatchString(text) {
+
+const maxLabelRunes = 126 // the USB string descriptor maximum
+
+// cleanLabel scrubs a free-text device label. A serial value becomes empty,
+// and text the scrubber withholds becomes a neutral placeholder.
+func cleanLabel(text string) string {
+	if serialText.MatchString(text) {
 		return ""
 	}
-	if text = Scrub(text); strings.Contains(text, "omitted]") {
-		return ""
+	text = Scrub(text)
+	if text == "[sensitive journal entry omitted]" {
+		return "[omitted]"
+	}
+	if runes := []rune(text); len(runes) > maxLabelRunes {
+		text = strings.TrimSpace(string(runes[:maxLabelRunes]))
 	}
 	return text
+}
+func validLabel(text string) bool {
+	if len([]rune(text)) > maxLabelRunes {
+		return false
+	}
+	for _, r := range text {
+		if !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
+}
+func readLabel(path string) string {
+	text, ok := readText(path, 256)
+	if !ok {
+		return ""
+	}
+	return cleanLabel(text)
 }
 func listDir(path string) ([]string, bool) {
 	entries, err := os.ReadDir(path)
@@ -255,10 +287,7 @@ func audioCards(root string) ([]AudioCard, bool, bool) {
 			break
 		}
 		index, _ := strconv.Atoi(match[1])
-		name := Scrub(match[4])
-		if serialText.MatchString(name) || strings.Contains(name, "omitted]") {
-			name = ""
-		}
+		name := cleanLabel(match[4])
 		driver := match[3]
 		if !driverName.MatchString(driver) {
 			driver = ""
@@ -277,7 +306,16 @@ var (
 // serial number there) and fragments, keeping scheme, host, port and path.
 func SanitizePrinterURI(raw string) string {
 	u, err := url.Parse(raw)
-	if err != nil || !regexp.MustCompile(`^[a-z][a-z0-9+.\-]{0,31}$`).MatchString(u.Scheme) {
+	if err != nil && uriSchemeHead.MatchString(raw) {
+		// Percent-escapes in the host (dnssd names) fail to parse; keep only
+		// the scheme.
+		head := raw[:strings.Index(raw, ":")+1]
+		if strings.HasPrefix(raw[len(head):], "//") {
+			head += "//"
+		}
+		return head + "[omitted]"
+	}
+	if err != nil || !uriScheme.MatchString(u.Scheme) {
 		return "[unparseable uri]"
 	}
 	out := u.Scheme + ":"
@@ -366,25 +404,6 @@ func collectHardware(ctx context.Context, config Config, r Report, execute runne
 	r.AudioCards, ok, cut = audioCards(root.Proc)
 	note("audio", ok, cut)
 
-	r.Printers = nil
-	if config.Lpstat == "" {
-		note("printers", false, false)
-	} else {
-		// lpstat fails when there is no queue at all, so first ask whether the
-		// scheduler answers; only then is an empty list a real "no printers".
-		running, cutRunning, errRunning := execute(ctx, config.Lpstat, "-r")
-		devices, cutDevices, errDevices := execute(ctx, config.Lpstat, "-v")
-		states, cutStates, errStates := execute(ctx, config.Lpstat, "-p")
-		noQueue := func(data []byte, err error) bool { return err != nil && strings.TrimSpace(string(data)) == "" }
-		if errRunning != nil || cutRunning || !strings.Contains(string(running), "scheduler is running") || cutDevices || cutStates || (errDevices != nil && !noQueue(devices, errDevices)) || (errStates != nil && !noQueue(states, errStates)) {
-			note("printers", false, cutRunning || cutDevices || cutStates)
-		} else {
-			var cutList bool
-			r.Printers, cutList = parsePrinters(string(devices), string(states))
-			note("printers", true, cutList)
-		}
-	}
-
 	if r.BootID == "" {
 		r.Unavailable = append(r.Unavailable, "kernel_log")
 	} else {
@@ -399,8 +418,23 @@ func collectHardware(ctx context.Context, config Config, r Report, execute runne
 			truncated = truncated || incomplete
 		}
 	}
+	// One lpstat call: the scheduler must answer before an empty list means
+	// "no printers", and lpstat exits non-zero when no queue exists.
+	r.Printers = nil
+	if config.Lpstat == "" {
+		note("printers", false, false)
+	} else {
+		data, cutList, _ := execute(ctx, config.Lpstat, "-r", "-v", "-p")
+		if cutList || !strings.Contains(string(data), "scheduler is running") {
+			note("printers", false, cutList)
+		} else {
+			var cutPrinters bool
+			r.Printers, cutPrinters = parsePrinters(string(data), string(data))
+			note("printers", true, cutPrinters)
+		}
+	}
 	r.Truncated = r.Truncated || truncated
-	if boot, err := readFixed("/proc/sys/kernel/random/boot_id", 128); err != nil || strings.TrimSpace(string(boot)) != r.BootID {
+	if boot, err := readFixed("/proc/sys/kernel/random/boot_id", 128); r.BootID != "" && (err != nil || strings.TrimSpace(string(boot)) != r.BootID) {
 		r.Journal = []Entry{}
 		r.Revision = ""
 		r.Unavailable = append(r.Unavailable, "boot_changed", "kernel_log", "revision")
@@ -432,7 +466,7 @@ func parseKernel(data []byte) ([]Entry, bool) {
 			incomplete = true
 			continue
 		}
-		if serialText.MatchString(message) {
+		if serialText.MatchString(message) || bluetoothText.MatchString(message) {
 			continue
 		}
 		excerpt := Scrub(message)
@@ -468,11 +502,10 @@ func validateHardware(r *Report) error {
 			}
 		}
 		for _, text := range []*string{&d.Manufacturer, &d.Product} {
-			if serialText.MatchString(*text) {
-				*text = ""
-			} else if *text != "" {
-				*text = Scrub(*text)
+			if !validLabel(*text) {
+				return bad
 			}
+			*text = cleanLabel(*text)
 		}
 	}
 	for _, d := range r.PciDevices {
@@ -492,10 +525,13 @@ func validateHardware(r *Report) error {
 	}
 	for i := range r.AudioCards {
 		c := &r.AudioCards[i]
-		if c.Index < 0 || c.Index > 99 || !regexp.MustCompile(`^[A-Za-z0-9_\-]{1,32}$`).MatchString(c.ID) || c.Driver != "" && !driverName.MatchString(c.Driver) {
+		if c.Index < 0 || c.Index > 99 || !audioID.MatchString(c.ID) || c.Driver != "" && !driverName.MatchString(c.Driver) {
 			return bad
 		}
-		c.Name = Scrub(c.Name)
+		if !validLabel(c.Name) {
+			return bad
+		}
+		c.Name = cleanLabel(c.Name)
 	}
 	for i := range r.Printers {
 		p := &r.Printers[i]

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"regexp"
 	"time"
@@ -62,6 +63,9 @@ func (diagnostics AssistantDiagnostics) Execute(ctx context.Context, repository,
 		return failure("unsupported_role")
 	}
 	report, err := diagnostics.Source.HostDiagnostics(ctx, selected, controller, area)
+	if errors.Is(err, hostdiagnostics.ErrHelperOutdated) {
+		return failure("helper_outdated")
+	}
 	if err != nil || ctx.Err() != nil {
 		return failure("diagnostics_unavailable")
 	}

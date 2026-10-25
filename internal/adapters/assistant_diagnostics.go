@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -33,7 +35,11 @@ func hostDiagnostics(ctx context.Context, host domain.HostMeta, controller bool,
 		args[len(args)-1] = "nixorium-host-diagnostics " + area
 		args = append([]string{"-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=2"}, args...)
 	}
-	stdout, _, err := run(ctx, hostdiagnostics.MaxBytes, name, args...)
+	stdout, stderr, err := run(ctx, hostdiagnostics.MaxBytes, name, args...)
+	var exit *exec.ExitError
+	if err != nil && errors.As(err, &exit) && exit.ExitCode() == 1 && strings.Contains(stderr, hostdiagnostics.HelperRefusal) {
+		return hostdiagnostics.Report{}, hostdiagnostics.ErrHelperOutdated
+	}
 	if err != nil || ctx.Err() != nil {
 		return hostdiagnostics.Report{}, errors.New("authenticated diagnostics unavailable")
 	}

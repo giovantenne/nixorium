@@ -36,7 +36,7 @@ func fakeTree(t *testing.T) hardwareRoot {
 	put(t, sys, usb+"1-2:1.1/bInterfaceClass", "0a\n")
 	put(t, sys, "bus/usb/devices/1-3/idVendor", "046d\n")
 	put(t, sys, "bus/usb/devices/1-3/idProduct", "c077\n")
-	put(t, sys, "bus/usb/devices/1-3/product", "Mouse with serial 99\n")
+	put(t, sys, "bus/usb/devices/1-3/product", "USB Serial SerialNumber: 99\n")
 	put(t, sys, "bus/usb/devices/1-3:1.0/bInterfaceClass", "03\n") // an interface directory is not a device
 	put(t, sys, "bus/usb/devices/notadevice/idVendor", "ffff\n")
 	pci := "bus/pci/devices/0000:00:02.0/"
@@ -63,7 +63,7 @@ func TestUSBPCIDisplayAndAudioFromFakeTrees(t *testing.T) {
 		t.Fatal(usb)
 	}
 	if usb[1].Product != "" {
-		t.Fatal("label mentioning a serial number kept", usb[1])
+		t.Fatal("label carrying a serial value kept", usb[1])
 	}
 	pci, ok, _ := pciDevices(root.Sys)
 	if !ok || len(pci) != 1 || pci[0] != (PciDevice{"0000:00:02.0", "8086", "9a49", "030000", "i915"}) {
@@ -202,14 +202,8 @@ func TestHardwareCollectUsesOnlyFixedReadOnlyCommandsAndRoundTrips(t *testing.T)
 		calls = append(calls, name+" "+strings.Join(args, " "))
 		switch name {
 		case "fixed-lpstat":
-			if len(args) == 1 && args[0] == "-r" {
-				return []byte("scheduler is running\n"), false, nil
-			}
-			if len(args) == 1 && args[0] == "-v" {
-				return []byte("device for office: ipp://u:p@host/printers/office\n"), false, nil
-			}
-			if len(args) == 1 && args[0] == "-p" {
-				return []byte("printer office is idle.  enabled since x\n"), false, nil
+			if strings.Join(args, " ") == "-r -v -p" {
+				return []byte("scheduler is running\ndevice for office: ipp://u:p@host/printers/office\nprinter office is idle.  enabled since x\n"), false, nil
 			}
 		case "fixed-journalctl":
 			joined := strings.Join(args, " ")
@@ -221,7 +215,7 @@ func TestHardwareCollectUsesOnlyFixedReadOnlyCommandsAndRoundTrips(t *testing.T)
 		t.Fatal("unexpected command", name, args)
 		return nil, false, nil
 	}, root)
-	if len(calls) != 4 || len(r.Journal) != 1 || len(r.Printers) != 1 || r.Printers[0].URI != "ipp://host/printers/office" {
+	if len(calls) != 2 || len(r.Journal) != 1 || len(r.Printers) != 1 || r.Printers[0].URI != "ipp://host/printers/office" {
 		t.Fatal(calls, r)
 	}
 	data, err := Encode(r)
@@ -250,5 +244,179 @@ func TestHardwareCollectUsesOnlyFixedReadOnlyCommandsAndRoundTrips(t *testing.T)
 	// as the refusal today's controllers already expect.
 	if !ValidArea("hardware") || !Supported("hardware", true) || !Supported("hardware", false) {
 		t.Fatal("hardware must be valid for both roles")
+	}
+}
+
+func TestKeptLabelsAndSerialValues(t *testing.T) {
+	sys := t.TempDir()
+	put(t, sys, "bus/usb/devices/1-1/idVendor", "1a86")
+	put(t, sys, "bus/usb/devices/1-1/idProduct", "7523")
+	put(t, sys, "bus/usb/devices/1-1/product", "USB-SERIAL CH340")
+	put(t, sys, "bus/usb/devices/1-1/manufacturer", "USB Serial")
+	usb, _, _ := usbDevices(sys)
+	if len(usb) != 1 || usb[0].Product != "USB-SERIAL CH340" || usb[0].Manufacturer != "USB Serial" {
+		t.Fatal(usb)
+	}
+	entries, _ := parseKernel([]byte(`{"_TRANSPORT":"kernel","__REALTIME_TIMESTAMP":"1780000000000000","PRIORITY":"6","MESSAGE":"usb 1-1: SerialNumber: ABC123"}` + "\n" +
+		`{"_TRANSPORT":"kernel","__REALTIME_TIMESTAMP":"1780000000000000","PRIORITY":"6","MESSAGE":"usb 1-1: Product: USB-SERIAL CH340"}` + "\n"))
+	if len(entries) != 1 || !strings.Contains(entries[0].Excerpt, "USB-SERIAL CH340") {
+		t.Fatal(entries)
+	}
+}
+
+func TestBluetoothLinesAreDroppedAndMACAddressesRedacted(t *testing.T) {
+	line := func(message string) string {
+		data, _ := json.Marshal(map[string]string{"_TRANSPORT": "kernel", "__REALTIME_TIMESTAMP": "1780000000000000", "PRIORITY": "6", "MESSAGE": message})
+		return string(data) + "\n"
+	}
+	input := line("hid-generic 0005:05AC:0267.0004: input,hidraw3: BLUETOOTH HID v0.50 Keyboard [Mario's Magic Keyboard] on 00:11:22:33:44:55") +
+		line("Bluetooth: hci0: unexpected event") + line("usb 1-1: reset by AA:BB:CC:DD:EE:FF adapter") + line("usb 1-1: hub ok")
+	entries, _ := parseKernel([]byte(input))
+	data, _ := json.Marshal(entries)
+	if len(entries) != 2 || strings.Contains(string(data), "Mario") || strings.Contains(strings.ToLower(string(data)), "aa:bb") || strings.Contains(string(data), "00:11") || !strings.Contains(string(data), "[REDACTED]") {
+		t.Fatal(string(data))
+	}
+	if got := Scrub("label 00:11:22:33:44:55"); strings.Contains(got, "00:11") {
+		t.Fatal(got)
+	}
+}
+
+func TestPrinterURIFallbackKeepsOnlyScheme(t *testing.T) {
+	for raw, want := range map[string]string{
+		"dnssd://HP%20LaserJet%20Pro._ipp._tcp.local/?uuid=1234": "dnssd://[omitted]",
+		"ipps://my%20printer.local:631/ipp/print":                "ipps://[omitted]",
+		"nonsense": "[unparseable uri]",
+	} {
+		got := SanitizePrinterURI(raw)
+		if got != want || SanitizePrinterURI(got) != got {
+			t.Fatal(raw, got, want)
+		}
+	}
+}
+
+func TestPrinterModes(t *testing.T) {
+	config := Config{Journalctl: "j", Lpstat: "lp"}
+	run := func(out string, cut bool, err error) runner {
+		return func(_ context.Context, name string, _ ...string) ([]byte, bool, error) {
+			if name == "lp" {
+				return []byte(out), cut, err
+			}
+			return nil, false, errors.New("no journal")
+		}
+	}
+	empty := t.TempDir()
+	for _, test := range []struct {
+		name        string
+		out         string
+		cut         bool
+		err         error
+		unavailable bool
+		printers    int
+	}{
+		{"running with queues", "scheduler is running\ndevice for a: socket://h:9100\nprinter a is idle\n", false, nil, false, 1},
+		{"no queue, lpstat exit 1", "scheduler is running\n", false, errors.New("exit 1"), false, 0},
+		{"queues but -v exit 1", "scheduler is running\nprinter a is idle\n", false, errors.New("exit 1"), false, 1},
+		{"scheduler stopped", "scheduler is not running\n", false, errors.New("exit 1"), true, 0},
+		{"no output", "", false, errors.New("exit 1"), true, 0},
+		{"truncated", "scheduler is running\n", true, nil, true, 0},
+	} {
+		r := collectHardware(t.Context(), config, Report{Unavailable: []string{}}, run(test.out, test.cut, test.err), hardwareRoot{Sys: empty, Proc: empty})
+		has := strings.Contains(strings.Join(r.Unavailable, ","), "printers")
+		if has != test.unavailable || len(r.Printers) != test.printers {
+			t.Fatal(test.name, r.Unavailable, r.Printers)
+		}
+	}
+}
+
+func TestMissingBootIDDoesNotInventBootChange(t *testing.T) {
+	empty := t.TempDir()
+	r := collectHardware(t.Context(), Config{Journalctl: "j"}, Report{Unavailable: []string{"boot_id", "revision"}}, func(context.Context, string, ...string) ([]byte, bool, error) {
+		t.Fatal("journal queried without a boot id")
+		return nil, false, nil
+	}, hardwareRoot{Sys: empty, Proc: empty})
+	count := map[string]int{}
+	for _, code := range r.Unavailable {
+		count[code]++
+	}
+	if count["boot_changed"] != 0 || count["kernel_log"] != 1 || count["revision"] != 1 {
+		t.Fatal(r.Unavailable)
+	}
+}
+
+func hardwareBase() Report {
+	return Report{SchemaVersion: 1, Area: "hardware", GeneratedAt: time.Now().UTC().Format(time.RFC3339), Space: []Space{}, Units: []Unit{}, Journal: []Entry{}, Unavailable: []string{"boot_id", "revision", "disk:/", "disk:/nix/store", "disk:/home"}}
+}
+
+func TestDecodeRefusesMalformedHardwareFields(t *testing.T) {
+	good := UsbDevice{Path: "1-2", VendorID: "2341", ProductID: "0043", Class: "02"}
+	var tooMany []string
+	for i := 0; i < 9; i++ {
+		tooMany = append(tooMany, "03")
+	}
+	for name, modify := range map[string]func(*Report){
+		"usb path":       func(r *Report) { d := good; d.Path = "../../etc"; r.UsbDevices = []UsbDevice{d} },
+		"usb vendor":     func(r *Report) { d := good; d.VendorID = "zzzz"; r.UsbDevices = []UsbDevice{d} },
+		"usb class":      func(r *Report) { d := good; d.Class = "0x2"; r.UsbDevices = []UsbDevice{d} },
+		"interfaces":     func(r *Report) { d := good; d.InterfaceClasses = tooMany; r.UsbDevices = []UsbDevice{d} },
+		"long label":     func(r *Report) { d := good; d.Product = strings.Repeat("a", 127); r.UsbDevices = []UsbDevice{d} },
+		"control label":  func(r *Report) { d := good; d.Product = "a\x1b[31mb"; r.UsbDevices = []UsbDevice{d} },
+		"pci slot":       func(r *Report) { r.PciDevices = []PciDevice{{Slot: "x", VendorID: "8086", DeviceID: "1234"}} },
+		"display status": func(r *Report) { r.Displays = []Display{{Connector: "card0-HDMI-A-1", Status: "on"}} },
+		"display mode": func(r *Report) {
+			r.Displays = []Display{{Connector: "card0-HDMI-A-1", Status: "connected", Modes: []string{"big"}}}
+		},
+		"audio label":     func(r *Report) { r.AudioCards = []AudioCard{{ID: "x", Name: "a\nb"}} },
+		"printer state":   func(r *Report) { r.Printers = []Printer{{Name: "p", State: "on fire"}} },
+		"hardware code":   func(r *Report) { r.Unavailable = append(r.Unavailable, "bogus") },
+		"foreign journal": func(r *Report) { r.Journal = []Entry{{"sshd.service", r.GeneratedAt, 3, "x"}} },
+	} {
+		r := hardwareBase()
+		modify(&r)
+		data, _ := json.Marshal(r)
+		if _, err := Decode(data, "hardware", false); err == nil {
+			t.Fatal(name, string(data))
+		}
+	}
+	// Hardware unavailable codes belong only to the hardware area.
+	r := Report{SchemaVersion: 1, Area: "system", GeneratedAt: time.Now().UTC().Format(time.RFC3339), Space: []Space{}, Units: []Unit{}, Journal: []Entry{}, Unavailable: []string{"usb"}}
+	data, _ := json.Marshal(r)
+	if _, err := Decode(data, "system", false); err == nil {
+		t.Fatal("usb code accepted in system area")
+	}
+	// A label the scrubber withholds shows a neutral placeholder.
+	r = hardwareBase()
+	r.UsbDevices = []UsbDevice{{Path: "1-1", VendorID: "1234", ProductID: "5678", Product: "Token2 FIDO"}}
+	data, _ = json.Marshal(r)
+	decoded, err := Decode(data, "hardware", false)
+	if err != nil || decoded.UsbDevices[0].Product != "[omitted]" {
+		t.Fatal(err, decoded.UsbDevices)
+	}
+}
+
+func TestEncodeTrimsAnOversizedHardwareReport(t *testing.T) {
+	r := hardwareBase()
+	label := strings.Repeat("x", maxLabelRunes)
+	for i := 0; i < maxUsb; i++ {
+		r.UsbDevices = append(r.UsbDevices, UsbDevice{Path: fmt.Sprintf("1-%d", i+1), VendorID: "1234", ProductID: "5678", Manufacturer: label, Product: label, InterfaceClasses: []string{"01", "02", "03", "04", "05", "06", "07", "08"}})
+	}
+	for i := 0; i < maxPrinters; i++ {
+		r.Printers = append(r.Printers, Printer{Name: fmt.Sprintf("printer%d", i), URI: "socket://" + strings.Repeat("h", 150), State: "idle"})
+	}
+	for i := 0; i < maxAudio; i++ {
+		r.AudioCards = append(r.AudioCards, AudioCard{Index: i, ID: "card", Driver: "HDA-Intel", Name: label})
+	}
+	for i := 0; i < 50; i++ {
+		r.Journal = append(r.Journal, Entry{"kernel", r.GeneratedAt, 6, strings.Repeat("usb ", 60)})
+	}
+	if raw, _ := json.Marshal(r); len(raw) <= MaxBytes {
+		t.Skip("fixture is not oversized", len(raw))
+	}
+	data, err := Encode(r)
+	if err != nil || len(data) > MaxBytes {
+		t.Fatal(len(data), err)
+	}
+	decoded, err := Decode(data, "hardware", false)
+	if err != nil || !decoded.Truncated {
+		t.Fatal(err, decoded.Truncated)
 	}
 }
