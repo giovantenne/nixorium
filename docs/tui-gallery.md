@@ -254,9 +254,9 @@ Inventory, updating computers, Internet access and power
 Assistant                                                                                              Not activated
 
 Try asking, for example:
-  Set the browser homepage on the student computers
-  Show the update state of pc03
-  Rename the teacher account
+  Add Python with pandas and Jupyter for class 4B
+  Students need access to the Arduino boards on pc05–pc12
+  The projector on the teacher's desk is not detected
 
 
 
@@ -330,9 +330,9 @@ Enter activate · Esc back
 Assistant · Example laboratory                                                             Free trial · 3 of 10 left
 
 Try asking, for example:
-  Set the browser homepage on the student computers
-  Show the update state of pc03
-  Rename the teacher account
+  Add Python with pandas and Jupyter for class 4B
+  Students need access to the Arduino boards on pc05–pc12
+  The projector on the teacher's desk is not detected
 
 
 
@@ -362,9 +362,9 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 Assistant · Example laboratory                                                                      Free trial ended
 
 Try asking, for example:
-  Set the browser homepage on the student computers
-  Show the update state of pc03
-  Rename the teacher account
+  Add Python with pandas and Jupyter for class 4B
+  Students need access to the Arduino boards on pc05–pc12
+  The projector on the teacher's desk is not detected
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ! Your free trial has ended. Subscribe to continue:                                                              │
 │ https://assistant.nixorium.org/u/EjRWeJASNEjRWeJASNEjRWeJASNEjRWeJASNEjRW                                        │
@@ -451,7 +451,7 @@ Comment (optional, max 500 characters)
 ```text
 Assistant · Your school                                                                            982 requests left
 
- Set the browser homepage on the student computers
+ Add Python with pandas and Jupyter for class 4B
 
 ● Preparing the proposal for native review
 
@@ -484,7 +484,7 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 Nixorium  /  Assistant  /  Review the proposal
 
 What changes
-• lab-settings.json changed
+• lab-software.json changed
 
 Computers affected
 pc01–pc02
@@ -505,7 +505,7 @@ choose the computers.
 Nixorium  /  Assistant  /  Review the proposal
 
 What changes
-• lab-settings.json changed
+• lab-software.json changed
 
 Computers affected
 pc01–pc02
@@ -525,12 +525,12 @@ choose the computers.
 ```text
 Assistant · Example laboratory                                                                     982 requests left
 
- Show the update state of pc03
+ The projector on the teacher's desk is not detected
 
-● Reading pc03 update evidence
+● Reading the devices of pc99
 
-● pc03 is out of date. Its observed revision is 000000000000; desired 0123456789ab. Nothing was changed.
-
+● No display is connected to the HDMI port of pc99. The computer sees the port, so check the cable and the
+  projector's input source. Nothing was changed.
 
 
 
@@ -557,9 +557,9 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```text
 Assistant · Example laboratory                                                                     982 requests left
 
- Rename the teacher account
+ Students need access to the Arduino boards on pc05–pc12
 
-● Proposal ready: 1 file changed.
+● Proposal ready: 2 files changed.
 
   Review and save first. Deployment is a separate review; nothing is installed yet.
 
@@ -576,7 +576,7 @@ Assistant · Example laboratory                                                 
 
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Proposal ready · 1 file changed                                                                 Ctrl+R to review │
+│ Proposal ready · 2 files changed                                                                Ctrl+R to review │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │

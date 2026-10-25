@@ -21,7 +21,7 @@ func TestAssistantDemosPreserveScopeAndProposalBoundary(t *testing.T) {
 			t.Fatalf("proposal affects host outside demo inventory: %s", host)
 		}
 	}
-	if len(plan.ChangedHosts) != 2 || !strings.Contains(plan.Diff, "homepageUrl") {
+	if len(plan.ChangedHosts) != 2 || !strings.Contains(plan.Diff, `"group": "4B"`) {
 		t.Fatal("demo proposal lost its host scope or settings diff")
 	}
 	text := ""
@@ -43,16 +43,10 @@ func TestAssistantDemosPreserveScopeAndProposalBoundary(t *testing.T) {
 	if !strings.Contains(saved.Text, "Computers were not updated") {
 		t.Fatal(saved.Text)
 	}
-	diagnosis := demoFrameWithLabel(scenario.Frames, "Show observed update evidence")
-	for _, expected := range []string{"observed revision", "Nothing was changed"} {
+	diagnosis := demoFrameWithLabel(scenario.Frames, "Diagnose a device from what the computer sees")
+	for _, expected := range []string{"HDMI port of pc99", "Nothing was changed"} {
 		if !strings.Contains(strings.Join(strings.Fields(diagnosis.Text), " "), expected) {
 			t.Fatalf("diagnosis omits evidence limit or next step %q", expected)
-		}
-	}
-	pc03 := model.computers.hosts.Hosts[2]
-	for _, expected := range []string{shortRevision(pc03.CurrentRevision), shortRevision(pc03.DesiredRevision)} {
-		if !strings.Contains(diagnosis.Text, expected) {
-			t.Fatalf("diagnosis contradicts inventory: missing %s", expected)
 		}
 	}
 	second := demoFrameWithLabel(scenario.Frames, "A second proposal awaits review")
@@ -70,7 +64,7 @@ func TestAssistantCaptureFramesAndHintsFit(t *testing.T) {
 			}
 		}
 		empty := demoFrameWithLabel(scenario.Frames, "The chat opens first, even before activation")
-		for _, meaningful := range []string{"browser homepage", "pc03", "teacher account"} {
+		for _, meaningful := range []string{"Jupyter", "Arduino", "projector"} {
 			if !strings.Contains(strings.Join(strings.Fields(empty.Text), " "), meaningful) {
 				t.Fatalf("%dx%d hint omits %q:\n%s", size[0], size[1], meaningful, empty.Text)
 			}

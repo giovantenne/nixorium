@@ -9,10 +9,12 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// Examples are requests the menu does not cover; they show requests only,
+// never how the service answers them.
 var assistantExamples = []string{
-	"Set the browser homepage on the student computers",
-	"Show the update state of pc03",
-	"Rename the teacher account",
+	"Add Python with pandas and Jupyter for class 4B",
+	"Students need access to the Arduino boards on pc05–pc12",
+	"The projector on the teacher's desk is not detected",
 }
 var assistantCommands = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/help", "/name", "/code"}
 

@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -62,18 +61,17 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r.model.assistant = newAssistantModel()
 	r.model.assistant.account = domain.AssistantAccount{Name: "Example laboratory", Plan: "annual", Status: "active", TurnsRemaining: 982}
 	r.model.computers.hosts = demoExploreHosts(revision)
-	pc03 := r.model.computers.hosts.Hosts[2]
-	r.model.assistant.entries = []assistantEntry{
-		{role: "user", text: assistantExamples[1]},
-		{role: "activity", text: "● Reading pc03 update evidence"},
-		{role: "assistant", text: fmt.Sprintf("**pc03 is out of date.** Its observed revision is `%s`; desired `%s`. Nothing was changed.", shortRevision(pc03.CurrentRevision), shortRevision(pc03.DesiredRevision))},
-	}
-	r.capture("Show observed update evidence", 3500)
 	r.model.assistant.entries = []assistantEntry{
 		{role: "user", text: assistantExamples[2]},
-		{role: "assistant", text: "**Proposal ready:** 1 file changed.\n\nReview and save first. Deployment is a separate review; nothing is installed yet."},
+		{role: "activity", text: "● Reading the devices of pc99"},
+		{role: "assistant", text: "**No display is connected to the HDMI port of pc99.** The computer sees the port, so check the cable and the projector's input source. Nothing was changed."},
 	}
-	r.model.assistant.changedFiles = 1
+	r.capture("Diagnose a device from what the computer sees", 3500)
+	r.model.assistant.entries = []assistantEntry{
+		{role: "user", text: assistantExamples[1]},
+		{role: "assistant", text: "**Proposal ready:** 2 files changed.\n\nReview and save first. Deployment is a separate review; nothing is installed yet."},
+	}
+	r.model.assistant.changedFiles = 2
 	r.capture("A second proposal awaits review", 3500)
 	return DemoScenario{ID: "assistant-menu", Title: "Optional administrator Assistant", Description: "The controller offers the fifth administrator area by default; the classroom dashboard never offers it.", Frames: r.frames}
 }
@@ -81,12 +79,12 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 // This is an illustrative candidate, not a file installed by the demo.
 func demoAssistantPlan() domain.AssistantSavePlan {
 	return domain.AssistantSavePlan{
-		State: "ready", Changed: []string{"lab-settings.json"},
+		State: "ready", Changed: []string{"lab-software.json"},
 		ChangedHosts: []string{"pc01", "pc02"}, Evaluation: domain.AssistantEvaluation{OK: true},
-		Diff: `--- a/lab-settings.json
-+++ b/lab-settings.json
--    "homepageUrl": "https://nixorium.org",
-+    "homepageUrl": "https://www.example.edu",`,
+		Diff: `--- a/lab-software.json
++++ b/lab-software.json
++    { "package": "python3Packages.jupyter", "scope": { "kind": "group", "group": "4B" } },
++    { "package": "python3Packages.pandas", "scope": { "kind": "group", "group": "4B" } },`,
 	}
 }
 
@@ -101,7 +99,7 @@ func setDemoAssistantProposal(model *dashboardModel, hosts string) {
 	model.assistant.entries = []assistantEntry{{role: "user", text: assistantExamples[0]}}
 	model.assistant.entries = append(model.assistant.entries, demoAssistantActivities(hosts)...)
 	model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "assistant", text: demoAssistantAnswer(hosts)})
-	model.assistant.summary = "Browser homepage changed in lab-settings.json."
+	model.assistant.summary = "Python with pandas and Jupyter for class 4B in lab-software.json."
 	model.assistant.changedFiles = 1
 }
 
@@ -123,11 +121,11 @@ type AssistantPricingDemo struct {
 func RenderAssistantPricingDemos() []AssistantPricingDemo {
 	type localized struct{ code, school, prompt, answer string }
 	copies := []localized{
-		{"en", "Your school", assistantExamples[0], demoAssistantAnswer("")},
-		{"it", "La tua scuola", "Imposta la pagina iniziale del browser sui computer degli studenti", "**Proposta pronta:** 1 file modificato.\n\nCtrl+R per rivedere e salvare la proposta. La distribuzione richiede una revisione separata; nulla è ancora installato."},
-		{"es", "Tu escuela", "Establece la página de inicio del navegador en los equipos de los estudiantes", "**Propuesta lista:** 1 archivo modificado.\n\nCtrl+R para revisar y guardar la propuesta. El despliegue requiere otra revisión; aún no se ha instalado nada."},
-		{"fr", "Votre école", "Définis la page d’accueil du navigateur sur les postes des élèves", "**Proposition prête :** 1 fichier modifié.\n\nCtrl+R pour vérifier et enregistrer la proposition. Le déploiement exige une autre validation ; rien n’est encore installé."},
-		{"de", "Ihre Schule", "Lege die Startseite des Browsers auf den Schüler-PCs fest", "**Vorschlag bereit:** 1 Datei geändert.\n\nStrg+R zum Prüfen und Speichern des Vorschlags. Bereitstellung separat prüfen; noch nichts installiert."},
+		{"en", "Your school", "Block YouTube and TikTok on the student computers", "**Proposal ready:** 1 file changed.\n\nCtrl+R reviews and saves the proposal. Deployment needs a separate review; nothing is installed yet."},
+		{"it", "La tua scuola", "Blocca YouTube e TikTok sui computer degli studenti", "**Proposta pronta:** 1 file modificato.\n\nCtrl+R per rivedere e salvare la proposta. La distribuzione richiede una revisione separata; nulla è ancora installato."},
+		{"es", "Tu escuela", "Bloquea YouTube y TikTok en los equipos de los estudiantes", "**Propuesta lista:** 1 archivo modificado.\n\nCtrl+R para revisar y guardar la propuesta. El despliegue requiere otra revisión; aún no se ha instalado nada."},
+		{"fr", "Votre école", "Bloque YouTube et TikTok sur les postes des élèves", "**Proposition prête :** 1 fichier modifié.\n\nCtrl+R pour vérifier et enregistrer la proposition. Le déploiement exige une autre validation ; rien n’est encore installé."},
+		{"de", "Ihre Schule", "Sperre YouTube und TikTok auf den Schüler-PCs", "**Vorschlag bereit:** 1 Datei geändert.\n\nStrg+R zum Prüfen und Speichern des Vorschlags. Bereitstellung separat prüfen; noch nichts installiert."},
 	}
 	demos := make([]AssistantPricingDemo, 0, len(copies))
 	for _, copy := range copies {

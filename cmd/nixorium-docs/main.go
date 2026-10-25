@@ -211,7 +211,7 @@ func renderGallery() string {
 		{title: "Assistant candidate ready", scenarioID: "assistant-menu", label: "A candidate is ready for native review"},
 		{title: "Assistant proposal review", scenarioID: "assistant-menu", label: "Review evaluated changes before saving"},
 		{title: "Assistant evaluation failure", scenarioID: "assistant-menu", label: "A failed evaluation prevents saving"},
-		{title: "Assistant diagnosis from evidence", scenarioID: "assistant-menu", label: "Show observed update evidence"},
+		{title: "Assistant diagnosis from evidence", scenarioID: "assistant-menu", label: "Diagnose a device from what the computer sees"},
 		{title: "Assistant second proposal", scenarioID: "assistant-menu", label: "A second proposal awaits review"},
 		{title: "Assistant saved configuration", scenarioID: "assistant-menu", label: "A local commit and backup precede separate application"},
 		{title: "Pinned package search", scenarioID: "software-all-clients", label: "Find Inkscape in the pinned package set"},
