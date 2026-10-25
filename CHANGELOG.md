@@ -59,6 +59,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Preparing npm packages works behind a school proxy: the controller reads the
+  npm registry through the system proxy settings (`http_proxy`, `https_proxy`,
+  `no_proxy`), like its other Internet requests.
 - A laboratory created with 3.10.0 or later no longer sees "Manual change:
   The lab screensaver uses ttfx…" at every update. Its screensaver already
   had both changes, but the first screensaver migration knew only the older
