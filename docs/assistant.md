@@ -5,8 +5,6 @@ changes from the administrator's Nixorium menu. It works on a private candidate
 workspace. You review the actual changes and choose whether to save them.
 Saving records a local Git commit and a backup; applying systems is separate.
 
-Assistant uses the generated [menu map](menu-map.md) for exact menu paths.
-
 ## Availability on the controller
 
 Assistant is offered by default on new installations. Existing deployments
@@ -81,7 +79,7 @@ laboratories of one school can be told apart; an empty name removes it.
 
 The service sets the size and length of the free trial and shows them when you
 activate: on the trial choice in Assistant, on the `/trial` page and in the
-email with your code (currently ten requests for thirty days). There is one
+email with your code. There is one
 trial per laboratory: the same email address can register several laboratories,
 each under its own name, and a trial keeps the requests and end date it started
 with. Register with your email, school name and privacy consent on the
@@ -128,11 +126,7 @@ core units are diagnostic inputs; arbitrary logs, student home files and other
 files outside the workspace are not tool inputs.
 Assistant sees only the lab configuration folder on the controller (normally
 `/home/admin/nixorium-deployment`; the exact path is recorded in
-`/etc/nixorium/deployment-path`), never your home folder or `Downloads`. For a
-program available from an official download, such as an AppImage, it proposes
-a package that the controller downloads with a pinned hash when it builds the
-update; a private file must first be copied into that folder and committed to
-its Git before a new chat can use it.
+`/etc/nixorium/deployment-path`), never your home folder or `Downloads`.
 
 ## Subscription and payments
 
@@ -189,14 +183,6 @@ The model has fixed tools, with no shell or system-operation tool:
 | `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
 | `vscode_marketplace` | Capable controllers only, after the updated consent: one VS Code extension (`publisher.name`) resolved in the public Marketplace for the deployment's pinned editor and downloaded into the controller's Nix store; returns the pin for `vscode.marketplace` in `workspace-profile.json`, its dependencies and whether it ships native programs |
 
-Assistant never changes the laboratory network; for a new network address or
-prefix it refers the administrator to the guided change (Maintenance → Change
-network addressing, `nixorium network migrate`).
-
-A program downloaded by hand runs on these computers thanks to nix-ld, but
-that is a convenience for one user; the `prefetch` route remains the one that
-puts a program on every computer.
-
 The wire-level step context and service messages are specified in the
 [assistant protocol v2.5](assistant-protocol-v25.md); the tool schemas are in
 [assistant-tools-v1.json](assistant-tools-v1.json).
@@ -234,9 +220,8 @@ remain explicit; an empty journal is not proof of service health. Apply an
 updated configuration through ordinary reviews to install the helper on older
 computers. This tool never restarts a service, changes a system or runs a queue.
 
-The `hardware` area works on the controller and on every client and answers
-questions about devices (USB devices for udev rules such as an Arduino or a
-tablet, monitors and projectors, sound, printers). It adds these optional lists
+The `hardware` area works on the controller and on every client and
+lists USB, PCI, display, audio and printer facts. It adds these optional lists
 to the report, each bounded; a source that cannot be read is named in
 `unavailable` (`usb`, `pci`, `displays`, `audio`, `printers`, `kernel_log`)
 instead of being reported as empty:
@@ -315,8 +300,7 @@ The `home_files_v1` advisory capability uses the optional HTTP header; discovery
 reads only the input's pure `lib.homeFilesVersion` marker, with offline,
 no-lock-update and no-IFD evaluation, once per immutable conversation baseline.
 It never runs during TUI startup. Absent or unavailable metadata omits the
-capability, and the service gives clear Update Nixorium guidance rather than
-proposing declarations or ordinary-file copy services on older controllers.
+capability.
 The existing evaluate, build and reviewed SAVE boundaries still apply.
 
 Local imports are opaque to model-facing file tools: `home-files/imports/` and
@@ -344,10 +328,8 @@ autostart entry.
 (default `latest`). It resolves the tag once using the deployment's pinned
 Node/npm, and writes five bounded text files under `npm/<id>/`: package and
 lock declarations, a manifest, a Nix package, and a deployment-owned module.
-Import the module explicitly for the requested hosts before ordinary evaluation,
-build and SAVE review. Preparing alone changes no system or home. To update a
-baseline, prepare a new `id`, replace the scoped import, and remove the old
-generated files in the reviewed proposal.
+Preparing alone changes no system or home; the files go through ordinary
+evaluation, build and SAVE review.
 Controllers advertise support through the optional `X-Nixorium-Capabilities`
 HTTP header. Request/share JSON keeps its original schema: older services ignore
 the header and continue ordinary chats; newer services offer this tool only to
@@ -360,10 +342,8 @@ are refused. Every required tarball has SHA-512 integrity and confined archive
 validation. Install hooks and CLI version/help tests run in separate Bubblewrap
 namespaces with no controller home, credentials or external network. Hooks
 requiring downloads or unavailable build tools fail. Optional dependencies are
-omitted and listed, which can remove features such as Pi's native clipboard
-support. CLI smoke tests do not certify every feature or package safety; additional
-runtime programs may be needed. Pi's normal file tools need pinned `fd` and
-`ripgrep` in the same host scope, so they do not try to download binaries.
+omitted and listed, which can remove features. CLI smoke tests do not certify
+every feature or package safety; additional runtime programs may be needed.
 
 Preparation allows 512 lock entries, 512 KiB of lock text, 8 MiB of metadata per
 package/64 MiB total, 128 MiB per tarball/512 MiB total, and 50,000 archive
@@ -391,30 +371,24 @@ exclusions remain intact.
 ### VS Code extensions for students
 
 Students' VS Code extensions are listed in `vscode.extensions` of
-`workspace-profile.json`; the TUI no longer edits them. Assistant adds or
-removes them on request. Extensions packaged in the deployment's package
+`workspace-profile.json`; the TUI no longer edits them. Extensions packaged in the deployment's package
 collection are found with `search_packages` (`vscode-extensions.<text>`). For
 one that exists only in the public Marketplace, controllers advertise
 `vscode_marketplace_v1` and the `vscode_marketplace` tool resolves the newest
 stable Linux version that the pinned VS Code accepts, downloads it into the
 controller's Nix store and returns its pin (publisher, name, version, hash and
 platform when needed), its dependencies and extension pack members, and whether
-it ships native programs. Assistant writes the pin in `vscode.marketplace` and
-the lowercase identifier in `vscode.extensions` of its candidate, then
-evaluates. Pins do not follow package-base updates: after an editor update,
-ask Assistant to check them again. The tool writes no deployment file, uses the
+it ships native programs. Pins in `vscode.marketplace` do not follow
+package-base updates. The tool writes no deployment file, uses the
 controller's Internet access only when called, and requires the updated
 consent; failures are reported as `not_resolved` with a one-line reason,
 `consent_required` or `marketplace_unavailable`.
 
 ### Prefetched downloads
 
-Controllers advertise `prefetch_v1` through the same optional header. For a
-program its publisher distributes as an AppImage, `.deb` package or tarball at
-a fixed-version address, `prefetch` downloads that one file on the controller
-and returns its `sha256-…` hash, its size in bytes and its Nix store path. The
-Assistant puts the hash in the module it writes, so the administrator never
-computes it. The tool does not read the file or send it to the service, and it
+Controllers advertise `prefetch_v1` through the same optional header. `prefetch`
+downloads one file on the controller and returns its `sha256-…` hash, its size
+in bytes and its Nix store path for a proposal. The tool does not read the file or send it to the service, and it
 installs or activates nothing. Like computer diagnostics, it requires the
 updated consent.
 
@@ -574,27 +548,11 @@ previous conversation remains tied to its original base commit.
 
 ### Core override mode
 
-By default the Assistant only extends Nixorium's supported mechanisms. In
-extreme cases it can propose overriding a NixOS option that the Nixorium core
-sets, from a private module in your deployment (`lib.mkForce` or
-`lib.mkOverride` in `sharedModules`, `clientModules`, `controllerModules`,
-`groupModules` or `hostModules`). This mode is off by default and applies to one
-conversation only. You enable it by writing "I accept core overrides" (Italian:
-"Accetto override del core"); it ends with "I no longer accept core overrides"
-or a new chat.
-
-Each such proposal includes a **Core override** section listing the forced
-options and the affected computers, why the change is unsupported (it is outside
-Nixorium's tests, and a Nixorium update can change the option and silently void
-the override) and the rollback path. The review also shows a warning, with the
-files that mention `mkForce` or `mkOverride`, above the save choices. The check
-is a plain text match, so a mention in a comment or a string counts too; the
-warning is informational and the save flow is unchanged.
-
-The Assistant never edits or patches Nixorium itself, and never overrides the
-controller's management channel (SSH access, keys, firewall protection, cache
-signing), credentials, or the student home reset in a way that could block
-login.
+Core override mode is off by default and is enabled per conversation by an
+explicit phrase. When a proposal contains `mkForce` or `mkOverride`, the review
+shows a warning above the save choices with the files that mention them; the
+check is a plain text match, so a mention in a comment or a string counts too,
+and the save flow is unchanged.
 
 Evaluation and build prove that the configuration builds, not that it boots or
 works: update one computer first. If a PC does not boot or loses the network

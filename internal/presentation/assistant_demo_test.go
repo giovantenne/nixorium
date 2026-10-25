@@ -11,7 +11,7 @@ import (
 func TestAssistantDemosPreserveScopeAndProposalBoundary(t *testing.T) {
 	revision := strings.Repeat("a", 40)
 	model := demoExploreModel(revision, 120, 30, false)
-	plan := demoAssistantWebPlan()
+	plan := demoAssistantPlan()
 	for _, host := range plan.ChangedHosts {
 		found := false
 		for _, observed := range model.computers.hosts.Hosts {
@@ -21,14 +21,14 @@ func TestAssistantDemosPreserveScopeAndProposalBoundary(t *testing.T) {
 			t.Fatalf("proposal affects host outside demo inventory: %s", host)
 		}
 	}
-	if len(plan.ChangedHosts) != 2 || !strings.Contains(plan.Diff, `iifname "${labSettings.ifaceName}" ip saddr`) || strings.Contains(plan.Diff, "allowedTCPPorts") {
-		t.Fatal("web proposal lost its exact host scope or interface/LAN restriction")
+	if len(plan.ChangedHosts) != 2 || !strings.Contains(plan.Diff, "homepageUrl") {
+		t.Fatal("demo proposal lost its host scope or settings diff")
 	}
 	text := ""
 	for _, entry := range model.assistant.entries {
 		text += entry.text + "\n"
 	}
-	for _, expected := range []string{"Node.js on pc01–pc02", "controller and other PCs are unchanged", "separate review", "nothing is installed yet"} {
+	for _, expected := range []string{"Proposal ready", "separate review", "nothing is installed yet"} {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("graph proposal omits %q", expected)
 		}
@@ -43,8 +43,8 @@ func TestAssistantDemosPreserveScopeAndProposalBoundary(t *testing.T) {
 	if !strings.Contains(saved.Text, "Computers were not updated") {
 		t.Fatal(saved.Text)
 	}
-	diagnosis := demoFrameWithLabel(scenario.Frames, "Diagnose from observed evidence and name the next check")
-	for _, expected := range []string{"observed revision", "No failure log", "read-only updates diagnostic", "nix-daemon.service", "current-boot journal", "Nothing was changed"} {
+	diagnosis := demoFrameWithLabel(scenario.Frames, "Show observed update evidence")
+	for _, expected := range []string{"observed revision", "Nothing was changed"} {
 		if !strings.Contains(strings.Join(strings.Fields(diagnosis.Text), " "), expected) {
 			t.Fatalf("diagnosis omits evidence limit or next step %q", expected)
 		}
@@ -55,11 +55,9 @@ func TestAssistantDemosPreserveScopeAndProposalBoundary(t *testing.T) {
 			t.Fatalf("diagnosis contradicts inventory: missing %s", expected)
 		}
 	}
-	lesson := demoFrameWithLabel(scenario.Frames, "Offline lesson proposal with boot restoration")
-	for _, expected := range []string{"Jupyter + pandas", "home-files.json", "controller before going offline", "deploy separately", "Student edits are lost", "No running session was reset"} {
-		if !strings.Contains(strings.Join(strings.Fields(lesson.Text), " "), expected) {
-			t.Fatalf("offline proposal omits %q", expected)
-		}
+	second := demoFrameWithLabel(scenario.Frames, "A second proposal awaits review")
+	if !strings.Contains(strings.Join(strings.Fields(second.Text), " "), "Proposal ready") {
+		t.Fatal("second proposal omits its readiness")
 	}
 }
 
@@ -72,7 +70,7 @@ func TestAssistantCaptureFramesAndHintsFit(t *testing.T) {
 			}
 		}
 		empty := demoFrameWithLabel(scenario.Frames, "The chat opens first, even before activation")
-		for _, meaningful := range []string{"Node.js", "lab LAN", "next check", "Jupyter + pandas", "baseline at boot"} {
+		for _, meaningful := range []string{"browser homepage", "pc03", "teacher account"} {
 			if !strings.Contains(strings.Join(strings.Fields(empty.Text), " "), meaningful) {
 				t.Fatalf("%dx%d hint omits %q:\n%s", size[0], size[1], meaningful, empty.Text)
 			}
@@ -84,7 +82,7 @@ func TestAssistantCaptureFramesAndHintsFit(t *testing.T) {
 	}
 	for _, demo := range demos {
 		typed := utf8.RuneCountInString(demo.Prompt)
-		if len(demo.Frames) != typed+9 {
+		if len(demo.Frames) != typed+4 {
 			t.Fatalf("%s: missing typing or activity frames", demo.Locale)
 		}
 		for index, frame := range demo.Frames {
@@ -92,12 +90,12 @@ func TestAssistantCaptureFramesAndHintsFit(t *testing.T) {
 				t.Fatalf("%s/%d overflows", demo.Locale, index)
 			}
 			running := strings.Contains(frame.Text, "Working… 0s")
-			if running != (index >= typed+1 && index <= typed+7) {
+			if running != (index >= typed+1 && index <= typed+2) {
 				t.Fatalf("%s/%d: wrong running phase", demo.Locale, index)
 			}
 		}
 		final := demo.Frames[len(demo.Frames)-1].Text
-		if !strings.Contains(final, "pc01–pc06") || strings.Contains(final, "Build check passed") {
+		if !strings.Contains(final, "1") || strings.Contains(final, "Build check passed") {
 			t.Fatalf("invalid %s proposal:\n%s", demo.Locale, final)
 		}
 	}

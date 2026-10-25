@@ -153,7 +153,7 @@ func updateMenuMap(repository string, write bool) (bool, error) {
 func renderMenuMap() string {
 	var output strings.Builder
 	output.WriteString("Generated from the TUI by scripts/generate-docs.sh; do not edit it by hand.\n")
-	output.WriteString("Nixorium Assistant reads it at the laboratory's pinned release to give exact menu paths.\n")
+	output.WriteString("It is for tools and documentation that need exact menu paths.\n")
 	for _, section := range presentation.MenuMap() {
 		fmt.Fprintf(&output, "\n## %s\n\n", section.Title)
 		for _, entry := range section.Entries {
@@ -211,8 +211,8 @@ func renderGallery() string {
 		{title: "Assistant candidate ready", scenarioID: "assistant-menu", label: "A candidate is ready for native review"},
 		{title: "Assistant proposal review", scenarioID: "assistant-menu", label: "Review evaluated changes before saving"},
 		{title: "Assistant evaluation failure", scenarioID: "assistant-menu", label: "A failed evaluation prevents saving"},
-		{title: "Assistant diagnosis from evidence", scenarioID: "assistant-menu", label: "Diagnose from observed evidence and name the next check"},
-		{title: "Assistant offline lesson proposal", scenarioID: "assistant-menu", label: "Offline lesson proposal with boot restoration"},
+		{title: "Assistant diagnosis from evidence", scenarioID: "assistant-menu", label: "Show observed update evidence"},
+		{title: "Assistant second proposal", scenarioID: "assistant-menu", label: "A second proposal awaits review"},
 		{title: "Assistant saved configuration", scenarioID: "assistant-menu", label: "A local commit and backup precede separate application"},
 		{title: "Pinned package search", scenarioID: "software-all-clients", label: "Find Inkscape in the pinned package set"},
 		{title: "Additive software profile review", scenarioID: "software-profile", label: "Review the complete profile addition"},

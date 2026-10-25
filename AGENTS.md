@@ -27,6 +27,12 @@ examples, and agent instructions shipped with the site template. Preserve proper
 names and intentional configuration/test data. Private planning documents are
 not public documentation and must not be copied into this repository.
 
+## Service logic stays private
+
+The Assistant service (instructions, recipes, prompts, routing, model, provider, costs) lives outside this repository. Public text describes only what the controller does and enforces: tools, schemas, wire protocol, consent, redaction, limits, review and save. Never write what the Assistant does with a tool, which requests it handles, which files or modules it writes, how it answers or refuses, or which documents it reads; at most one marketing sentence per capability in README and the administrator guide. Do not name the private repository's files. Demos and fixtures use generic transcripts, never the service's answer shape. A behaviour the service must change is a note for the private repository, not a sentence here.
+
+CHANGELOG rule: describe the controller feature (tool, what it reads, refuses, returns, the review, the consent); name the Assistant only as the caller ("available to the Assistant after the usual update"). Never say which requests it serves, which modules it writes, what it reads to answer, or how it answers.
+
 ## Project Structure
 
 ```
@@ -519,71 +525,20 @@ that release's notes, so a release is not finished until the site follows it.
   deployment mode 0700, exclude the student, reject repository/address/command
   selection over IPC, and never expose administrative TUI callbacks there.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
-- `lab.assistant` is on unless explicitly false and preserved by settings saves.
-  New installations and upgraded deployments with an omitted setting offer the
-  administrator menu after controller application. Only an enabled controller
-  installs `/etc/nixorium/assistant.json` and its private state directory;
-  account activation and consent remain explicit and separate. Service and
-  subscription URL overrides are for staging/tests.
-  Account checks send no draft or files. Conversation saving is On by default
-  (consent text version 4, pre-selected on the consent screen, switch "Save
-  conversations on the service: On/Off" in /share, kept for 90 days) and still
-  requires saved consent; an older consent text is asked once again; reports require their own whole-chat
-  disclosure and confirmation. Upload only redacted saved transcripts through
-  typed callbacks, never the laboratory token; upload failures stay silent and
-  never block a turn. Report/share contents are kept by the service for 90 days.
-  Trial size, length, quota and purchase links come from the service; never
-  hard-code them in the client, which sends `X-Nixorium-Client-Version` so the
-  service keeps older controllers on their fixed ten-request offer. Conversion
-  preserves activation, and annual quota exhaustion
-  requires renewal or a manual agreement rather than a second subscription.
-- Assistant tools write only the private candidate, never the deployment.
-  Preserve relative-path confinement, hidden credentials/untracked files and
-  read-only locks/instructions, plus filtering of model-facing
-  content and separation of the laboratory token. Fixed typed tools only:
-  no arbitrary shell, service control, activation or student-home file access.
-  Capability-gated diagnostics use fresh declared inventory, strict existing
-  SSH trust, fixed core units, bounded current-boot journal excerpts, numeric
-  disk state and typed reset/update evidence. The `hardware` area reads fixed
-  sysfs/procfs files and `lpstat` for USB, PCI, display, audio and printer
-  facts plus kernel messages; it never reads a `serial` attribute and removes
-  URI credentials and queries. Never read arbitrary app logs,
-  environment or command-line fields; keep missing evidence explicit. Journal
-  filtering is best effort and the renewed version-2 consent must disclose that
-  personal or sensitive text can remain. Read-only Git history stays within
-  ancestors of the conversation base, visible safe paths and bounded sanitized
-  diffs; it never changes Git or contacts a remote. New observations require
-  renewed consent before entering the model transcript.
-  Consent- and capability-gated `read_system_file` (ADR 0032) reads one path
-  of a declared computer through the fixed helper `nixorium-host-diagnostics
-  file`: only the allowlisted system locations of `internal/systemfiles`,
-  never homes, `/root`, secrets, keys, Wi-Fi connections or snapshots, links
-  followed only into the Nix store, secret-bearing lines withheld, and every
-  answer re-validated on the controller. Never widen the allowlist without
-  a new disclosure version.
-  Consent- and capability-gated `prefetch` downloads one public https file into
-  the controller store: keep public-host and per-redirect checks, the 1 GiB,
-  15-minute and one-at-a-time bounds, and return only hash, size and store path.
-  Settings are read-only except the `settings_v1` and `settings_v2` fields
-  (homepage, time zone, locales, keyboard layout, Git identities, classroom
-  view, number of computers, teacher and student user names): `write_file` of
-  `lab-settings.json` merges only those fields onto the saved file
-  (`domain.MergeAssistantSettings`), refuses any other changed field by name,
-  and the save review repeats the native transition rules and impacts
-  (`domain.ReviewAssistantSettings`).
-  Evaluate a temporary clone with IFD disabled and bounded time/output; compare
-  `nixoriumHostClasses` representatives. `groupModules` assigns common module
-  paths to existing clientGroups; compose overlaps deterministically, preserve
-  controller exclusion and offline serialization, and include applicable module
-  groups in Assistant/update/workspace class keys. Host-name-dependent exceptions must
-  declare hostModules or updateValidationHosts. Only the native reviewed save
-  can commit, after evaluation/token checks, under the operation gate,
-  with a durable backup and shared recovery journal. The review may reuse only
-  the conversation's mode-0600 evaluation receipt of a successful check whose
-  overlay digest, base, flake.lock digest and Nixorium version all still match;
-  every overlay write removes it first. Keep startup free of Nix
-  evaluation and keep controller/client application separately reviewed.
-  See docs/assistant.md; the external maintainer skill remains proposal-only.
+- `lab.assistant` is on unless explicitly `false`; settings saves preserve it; only an enabled controller installs `/etc/nixorium/assistant.json` and the private state directory; service/subscription URL overrides are staging/test only.
+- Activation, consent (text version 4) and conversation saving are explicit, separate, local choices; saving is on by default but still needs saved consent; an older consent text is asked once more; account checks send no draft or files; reports need their own whole-chat disclosure and confirmation.
+- The laboratory token authenticates requests and never enters bodies, transcripts or uploads; uploads carry only redacted saved transcripts through typed callbacks, fail silently and never block a turn.
+- Trial size, quota and purchase links are data announced by the service, never hard-coded; the client sends `X-Nixorium-Client-Version` and `X-Nixorium-Capabilities` and nothing else about itself.
+- The wire contract is `docs/assistant-protocol-v25.md` and `docs/assistant-tools-v1.json`: fixed typed tools, arguments validated locally, `read_core` never executed by the client.
+- Tools write only the private candidate, never the deployment: relative-path confinement, hidden credentials/untracked/ignored files, read-only locks and instruction files, imported home-file payloads withheld across Git ancestry.
+- No tool runs a shell, controls services, activates, deploys, reads student homes or changes Git.
+- Model-facing output is redacted (secrets, hashes, keys, MAC addresses, URI credentials); redaction is best effort and the consent text says so. New observations need renewed consent before entering the transcript.
+- Diagnostics and `read_system_file` use fresh declared inventory, existing strict SSH trust, fixed helpers, the `internal/systemfiles` allowlist, bounded sizes and timeouts; they never read arbitrary app logs, environment or command-line fields, and missing evidence stays explicit; the hardware area never reads a `serial` attribute; widening an allowlist needs a new consent version and an ADR amendment (ADR 0032).
+- `git_history` reads only ancestors of the conversation base with sanitized bounded diffs and never contacts a remote; `prefetch` and the Marketplace resolver contact only public hosts or the fixed gallery, only when invoked, write only the Nix store and return only hash, size and store path (prefetch keeps its 1 GiB, 15-minute, one-at-a-time bounds and per-redirect checks).
+- `write_file` of `lab-settings.json` merges only the `settings_v1`/`settings_v2` fields (`domain.MergeAssistantSettings`), refuses every other field by name, and the save review repeats the native settings rules (`domain.ReviewAssistantSettings`).
+- Evaluation runs in a temporary clone with IFD disabled and bounded time/output, comparing `nixoriumHostClasses` representatives. `groupModules` assigns common module paths to existing clientGroups; compose overlaps deterministically, preserve controller exclusion and offline serialization, and include applicable module groups in Assistant/update/workspace class keys. Host-name-dependent exceptions must declare hostModules or updateValidationHosts. A review may reuse only a matching mode-0600 receipt (overlay digest, base, flake.lock digest, Nixorium version); every overlay write removes it first.
+- Only the native reviewed save commits, under the operation gate, with a durable backup and the shared recovery journal; controller and client application stay separate reviews; TUI startup never evaluates Nix. The external maintainer skill remains proposal-only. See docs/assistant.md.
+- The core documents what the controller does and enforces; the service's instructions, recipes and routing are private (see "Service logic stays private").
 - Adoption telemetry is controller-only and off without explicit administrator
   consent. The first administrator launch acknowledges the operational disclaimer before
   offering telemetry. Enter/e accepts, n declines, Esc skips to the menu and q

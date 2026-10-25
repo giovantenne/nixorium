@@ -65,7 +65,6 @@ controllers that advertise `system_files_v1`:
   the operator copying files.
 - Everyone who uses Assistant is asked to consent again once.
 - On the controller, root-only files (for example the boot menu on the EFI
-  partition) are reported as not readable; Assistant asks for them or reads
-  the same file on a client.
+  partition) are reported as not readable.
 - Widening the allowlist is a privacy change: it needs a new disclosure
   version and an amendment of this record.

@@ -39,24 +39,17 @@ code shown after payment and accept its separate data-sharing consent. Review ea
 saving creates a local commit and backup, with separate system-application
 and computer-update reviews afterwards.
 You can also activate the free trial with its emailed code. The service shows
-the trial size and length when you activate (currently 30 requests for 90
-days). Assistant shows the remaining requests and a purchase link when the trial
-ends; conversion keeps the controller activated. Each account enables one lab.
+the trial size and length when you activate. Each account enables one lab.
 Conversations are saved on the Assistant service by default for 90 days to
 find and fix Assistant's mistakes; in the chat, `/share` switches saving off and
 `/report` reports a final answer with your explicit consent. Reports are kept
 for 90 days too.
-Capable controllers can prepare a public npm CLI package/tag into an offline
-baseline restored after the normal student-home reset; review its exact version,
-scope and reported optional-feature limitations before saving.
 Assistant can inspect declared computer diagnostics and saved configuration
 history. Updated consent covers limited recent system logs and historical
 configuration contents; filtering is best effort, so sensitive text may remain.
 Student home files are not read. These observations do not change systems or Git.
-In extreme cases, and only after you write "I accept core overrides" in a
-conversation, Assistant may propose a private module that forces an option set
-by the Nixorium core; this is unsupported, the review warns about it, and you
-should update one computer first (see the guide for the rollback path).
+A conversation can be switched into an unsupported core-override mode only by
+an explicit phrase; the review warns about it (see the guide).
 
 Read the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md)
 for privacy, host classes, tool limits, local retention and interrupted-save

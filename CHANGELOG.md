@@ -8,23 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- The Assistant can now look at the devices of a computer: the `hardware`
-  area of the computer diagnostics lists USB devices (so it can write udev
-  rules for an Arduino or a tablet), graphics cards, connected monitors and
-  projectors with their modes, sound cards, printer queues and recent kernel
-  messages about them. It only reads, it never reads serial numbers, and
-  passwords in printer addresses are removed. Computers need the usual update
-  to get the new helper.
-- `docs/menu-map.md`, generated from the TUI's own menu definitions by
-  `scripts/generate-docs.sh` and checked for staleness with the TUI gallery, so
-  the Assistant can give exact menu paths without a hand-kept table.
-- The Assistant can now also turn the classroom view on or off, change the
-  number of client computers and rename the teacher and student accounts, as
-  the menu does, through the same review. The review shows the same warnings
-  as the menu (computers no longer managed, a renamed account gets a new, empty
-  home, what the classroom view stops). The network, the interface names, the
-  controller number, passwords and the other settings stay in the menu.
-  Controllers tell the service with the new `settings_v2` capability.
+- Computer diagnostics gain a read-only hardware area (USB, PCI, displays, audio cards, printer queues, related kernel messages; no serial numbers, printer credentials removed), available to the Assistant; computers need the usual update.
+- `docs/menu-map.md` is generated from the TUI menu definitions and checked for staleness.
+- Assistant proposals may now change the classroom view, the number of computers and the account names in lab-settings.json, with the same review and warnings as the menu (settings_v2); the network, interfaces, controller number and passwords stay in the menu.
 - The classroom view can be turned on or off from **Maintenance → Change
   settings → Classroom view**, instead of editing `lab-settings.json` by hand.
   The review says what stops (the classroom view page, locking screens,
@@ -427,9 +413,7 @@ below, with `v3.10.0-beta.3` in both places.
 ### Added
 
 - Assistant can read system configuration files of the controller and the
-  computers, such as the boot menu or the settings in `/etc`, so it can, for
-  example, make Windows the default boot entry without asking you to look
-  anything up. It never reads home folders, passwords, keys or Wi-Fi
+  computers, such as the boot menu or the settings in `/etc`. It never reads home folders, passwords, keys or Wi-Fi
   credentials. Assistant asks once more for consent because of this.
 - **Update Nixorium** can now change your own deployment files when a release
   needs it, instead of asking you to edit them by hand. The new release brings

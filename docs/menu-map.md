@@ -1,5 +1,5 @@
 Generated from the TUI by scripts/generate-docs.sh; do not edit it by hand.
-Nixorium Assistant reads it at the laboratory's pinned release to give exact menu paths.
+It is for tools and documentation that need exact menu paths.
 
 ## Administrator menu
 

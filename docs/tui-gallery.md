@@ -254,9 +254,9 @@ Inventory, updating computers, Internet access and power
 Assistant                                                                                              Not activated
 
 Try asking, for example:
-  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
-  pc03 missed the last update: show the evidence and the next check
-  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+  Set the browser homepage on the student computers
+  Show the update state of pc03
+  Rename the teacher account
 
 
 
@@ -330,9 +330,9 @@ Enter activate · Esc back
 Assistant · Example laboratory                                                             Free trial · 3 of 10 left
 
 Try asking, for example:
-  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
-  pc03 missed the last update: show the evidence and the next check
-  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+  Set the browser homepage on the student computers
+  Show the update state of pc03
+  Rename the teacher account
 
 
 
@@ -362,9 +362,9 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 Assistant · Example laboratory                                                                      Free trial ended
 
 Try asking, for example:
-  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
-  pc03 missed the last update: show the evidence and the next check
-  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+  Set the browser homepage on the student computers
+  Show the update state of pc03
+  Rename the teacher account
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ! Your free trial has ended. Subscribe to continue:                                                              │
 │ https://assistant.nixorium.org/u/EjRWeJASNEjRWeJASNEjRWeJASNEjRWeJASNEjRW                                        │
@@ -451,26 +451,26 @@ Comment (optional, max 500 characters)
 ```text
 Assistant · Your school                                                                            982 requests left
 
- Prepare Node.js on pc01–pc02; open port 3000 only to the lab LAN
+ Set the browser homepage on the student computers
 
-● Reading flake.nix and client scopes
-● Reading the lab network and interface
-● Resolving Node.js from the pinned package set
-● Drafting modules/web-lab.nix
-● Scoping the proposal to pc01–pc02
 ● Preparing the proposal for native review
 
-● Proposal ready: Node.js on pc01–pc02.
-
-  - TCP 3000 accepts only the lab LAN on its declared interface.
-  - The controller and other PCs are unchanged.
+● Proposal ready: 1 file changed.
 
   Ctrl+R reviews and saves the proposal. Deployment needs a separate review; nothing is installed yet.
 
 
 
+
+
+
+
+
+
+
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Proposal ready · 2 files changed                                                                Ctrl+R to review │
+│ Proposal ready · 1 file changed                                                                 Ctrl+R to review │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │
@@ -484,8 +484,7 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 Nixorium  /  Assistant  /  Review the proposal
 
 What changes
-• modules/web-lab.nix added
-• flake.nix changed
+• lab-settings.json changed
 
 Computers affected
 pc01–pc02
@@ -506,8 +505,7 @@ choose the computers.
 Nixorium  /  Assistant  /  Review the proposal
 
 What changes
-• modules/web-lab.nix added
-• flake.nix changed
+• lab-settings.json changed
 
 Computers affected
 pc01–pc02
@@ -527,14 +525,14 @@ choose the computers.
 ```text
 Assistant · Example laboratory                                                                     982 requests left
 
- pc03 missed the last update: show the evidence and the next check
+ Show the update state of pc03
 
 ● Reading pc03 update evidence
 
-● pc03 is out of date. Its observed revision is 000000000000; desired 0123456789ab. The cause is not established.
+● pc03 is out of date. Its observed revision is 000000000000; desired 0123456789ab. Nothing was changed.
 
-  No failure log was supplied. Next: run the read-only updates diagnostic on pc03; check nix-daemon.service and its
-  current-boot journal before reviewing a retry. Nothing was changed.
+
+
 
 
 
@@ -554,20 +552,20 @@ Assistant · Example laboratory                                                 
 Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```
 
-## Assistant offline lesson proposal
+## Assistant second proposal
 
 ```text
 Assistant · Example laboratory                                                                     982 requests left
 
- Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+ Rename the teacher account
 
-● Lesson proposal: a pinned Python environment with Jupyter + pandas, plus a notebook and CSV in home-files.json.
+● Proposal ready: 1 file changed.
 
-  Review and save first. Prepare all dependencies and lesson files on the controller before going offline; deploy
-  separately. Lessons then need no downloads.
+  Review and save first. Deployment is a separate review; nothing is installed yet.
 
-  At boot, the student home returns to the lesson baseline. Student edits are lost; save work elsewhere before
-  restarting. No running session was reset.
+
+
+
 
 
 
@@ -578,7 +576,7 @@ Assistant · Example laboratory                                                 
 
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Proposal ready · 3 files changed                                                                Ctrl+R to review │
+│ Proposal ready · 1 file changed                                                                 Ctrl+R to review │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │

@@ -1015,8 +1015,8 @@ func demoAssistantOffer() domain.AssistantOffer {
 		TrialURL: "https://assistant.nixorium.org/trial", SubscribeURL: "https://nixorium.org/pricing/"}
 }
 
-// demoAssistantChat fills the four-client graph with a scoped synthetic proposal.
+// demoAssistantChat fills the four-client graph with a generic synthetic proposal.
 // It never calls a model, evaluates Nix or changes a computer.
 func demoAssistantChat(model *dashboardModel) {
-	setDemoAssistantWebProposal(model, "pc01–pc02")
+	setDemoAssistantProposal(model, "")
 }

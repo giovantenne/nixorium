@@ -10,9 +10,9 @@ import (
 )
 
 var assistantExamples = []string{
-	"Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN",
-	"pc03 missed the last update: show the evidence and the next check",
-	"Prepare offline Jupyter + pandas lessons; restore the student baseline at boot",
+	"Set the browser homepage on the student computers",
+	"Show the update state of pc03",
+	"Rename the teacher account",
 }
 var assistantCommands = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/help", "/name", "/code"}
 
