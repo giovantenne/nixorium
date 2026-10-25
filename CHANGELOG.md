@@ -33,7 +33,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   with such a name must change it to the wired card before updating.
 - The classroom view stops asking for the screens while its page is hidden
   (minimized window or background tab): the student computers stop being
-  captured within about a minute (at once when the controller's channel closes), and capture resumes when the page is shown
+  captured about 15 seconds later (the controller closes its channels when the page stops asking and each computer stops at once; a broken channel is noticed within 30 seconds more), and capture resumes when the page is shown
   again. The enlarged window and take control follow the same rule.
 - While the teacher controls a computer with the keyboard and mouse, the
   student's screen shows a small "Teacher in control" label under the top bar,

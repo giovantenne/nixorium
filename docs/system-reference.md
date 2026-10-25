@@ -762,7 +762,7 @@ session, not to the controller's connection, and logging out clears it.
 
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a
-frame and stops after 30 seconds without requests. While it runs, GNOME shows
+frame and stops after 30 seconds without requests, or as soon as the controller's last channel closes. While it runs, GNOME shows
 its screen sharing indicator in the top bar; the
 `nixorium-classroom@nixorium.org` Shell extension, enabled in every client
 session, keeps that indicator visible but removes its stop button, so a

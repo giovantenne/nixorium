@@ -148,7 +148,7 @@ func TestJqIsAddedToEveryLaboratoryOnce(t *testing.T) {
 }
 
 func TestTeacherDockMigrationAppliesOnceAndRespectsEdits(t *testing.T) {
-	dock := Registry[len(Registry)-1:]
+	dock := registryWith("teacher-dock")
 	old := "  teacherFavorites = lib.optionals isController\n    [ (if labSettings.classroomView or true then \"nixorium-classroom.desktop\" else \"nixorium.desktop\") ]\n    ++ studentFavorites;\n"
 	root := treeWith(t, map[string]string{"modules/workstation.nix": old})
 	report, err := Run(root, "3.10.0", dock)
@@ -165,4 +165,16 @@ func TestTeacherDockMigrationAppliesOnceAndRespectsEdits(t *testing.T) {
 	if err == nil && !strings.Contains(string(template), "    [ \"nixorium-classroom.desktop\" ]\n") {
 		t.Fatal("the template lacks the migrated line")
 	}
+}
+
+// registryWith selects the migrations whose id contains part, so new entries
+// never shift a test onto another migration.
+func registryWith(part string) []Migration {
+	var found []Migration
+	for _, migration := range Registry {
+		if strings.Contains(migration.ID, part) {
+			found = append(found, migration)
+		}
+	}
+	return found
 }

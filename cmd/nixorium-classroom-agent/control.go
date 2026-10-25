@@ -61,20 +61,21 @@ func (flag *extensionFlag) Set(on bool) {
 	}
 }
 
-// Refresh applies a wanted "on" again: GNOME disables the extension on the
+// Refresh applies a wanted "on" again, and any state that is unknown (a
+// failed call): GNOME disables the extension on the
 // lock screen and enables it with its flags off, which the agent cannot see.
 func (flag *extensionFlag) Refresh() {
 	if flag == nil {
 		return
 	}
 	flag.mutex.Lock()
-	on := flag.want
-	if on {
+	want, retry := flag.want, flag.unknown || flag.want
+	if want {
 		flag.unknown = true
 	}
 	flag.mutex.Unlock()
-	if on {
-		flag.Set(true)
+	if retry {
+		flag.Set(want)
 	}
 }
 

@@ -681,6 +681,12 @@ async function frameLoop() {
         viewerImage.src = url;
         if (frameURL) URL.revokeObjectURL(frameURL);
         frameURL = url;
+        // A control that the hidden page ended resumes with the first frame:
+        // the hub starts a control only for a computer that is being viewed.
+        if (resumeControl) {
+          resumeControl = false;
+          setControl(true);
+        }
       }
       frameSince = Number(response.headers.get('X-Frame') || frameSince);
     } catch (error) {
@@ -1020,10 +1026,6 @@ document.addEventListener('visibilitychange', () => {
     refreshing = null;
     if (frameRequest) frameRequest.abort();
   } else {
-    if (resumeControl) {
-      setControl(true);
-      resumeControl = false;
-    }
     refresh();
     if (frameResume) frameResume();
   }

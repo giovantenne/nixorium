@@ -297,7 +297,7 @@ func TestHiddenPageEndsTheControlAndResumesIt(t *testing.T) {
 	// a hidden page causes, so the control ends with the page and comes back.
 	for _, words := range []string{
 		"if (controlling) {\n      send([], true);\n      setControl(false);\n      resumeControl = true;\n    }",
-		"if (resumeControl) {\n      setControl(true);\n      resumeControl = false;\n    }",
+		"if (resumeControl) {\n          resumeControl = false;\n          setControl(true);\n        }",
 	} {
 		if !strings.Contains(string(script), words) {
 			t.Fatalf("app.js lacks %s", words)

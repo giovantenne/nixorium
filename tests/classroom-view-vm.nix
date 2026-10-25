@@ -217,6 +217,9 @@ pkgs.testers.runNixOSTest {
     # arrive with explicit modes, links stay out, and the student keeps
     # every file.
     client.succeed("ln -s /etc/shadow /home/student/Desktop/shadow && install -d /tmp/collected")
+    # Nothing was collected yet: the student is told only after the files
+    # have gone.
+    client.succeed(classroom_property + "NoticeKind' | grep -vF collect")
     client.succeed("${agent} probe --collect /tmp/collected nixorium-classroom-connect | tee /dev/stderr | grep -F 'collect.done Lesson, Lesson (2), run (2).sh, run.sh skipped=0'")
     client.succeed("grep -qx notes /tmp/collected/Lesson/notes.txt && grep -qx notes '/tmp/collected/Lesson (2)/notes.txt' && test ! -e /tmp/collected/shadow")
     # The student's screen told it, with the extension's own words, and the

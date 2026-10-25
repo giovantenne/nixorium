@@ -201,3 +201,50 @@ func TestCollectionEndsWithTheConnection(t *testing.T) {
 		t.Fatal("the connection did not end")
 	}
 }
+
+func TestCollectNoticeComesOnlyAfterDataWasHandedOver(t *testing.T) {
+	home, desktop := studentHome(t)
+	if err := os.MkdirAll(desktop, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(desktop, "a.txt"), []byte("abc"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	notice := &fakeMessenger{}
+	server, client := net.Pipe()
+	go handle(server, agentContext{userName: "student", home: home, capture: fakeCapture{}, lock: &fakeLocker{}, notice: notice})
+	t.Cleanup(func() { _ = client.Close() })
+	exchange := func(message classroomview.Message) classroomview.Message {
+		t.Helper()
+		if err := classroomview.Write(client, message); err != nil {
+			t.Fatal(err)
+		}
+		reply, err := classroomview.Read(client)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+	seen := func() int {
+		notice.mutex.Lock()
+		defer notice.mutex.Unlock()
+		return len(notice.notices)
+	}
+	// A review that is opened and closed tells the student nothing.
+	exchange(classroomview.Message{Type: classroomview.TypeCollectList})
+	exchange(classroomview.Message{Type: classroomview.TypeCollectEnd})
+	if seen() != 0 {
+		t.Fatalf("a review without data showed %v", notice.notices)
+	}
+	exchange(classroomview.Message{Type: classroomview.TypeCollectList})
+	if reply := exchange(classroomview.Message{Type: classroomview.TypeCollectChunk, Index: 0}); reply.Type != classroomview.TypeCollectData {
+		t.Fatalf("piece = %+v", reply)
+	}
+	if seen() != 0 {
+		t.Fatal("the notice came before the end")
+	}
+	exchange(classroomview.Message{Type: classroomview.TypeCollectEnd})
+	if seen() != 1 || notice.notices[0] != classroomview.NoticeCollect {
+		t.Fatalf("notices = %v", notice.notices)
+	}
+}

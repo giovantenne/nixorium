@@ -127,3 +127,22 @@ func TestRefreshReappliesAWantedFlag(t *testing.T) {
 		t.Fatalf("calls = %v", notifier.seen())
 	}
 }
+
+func TestRefreshRetriesAFailedHide(t *testing.T) {
+	notifier := &fakeControlNotifier{}
+	banner := newExtensionFlag(notifier.SetControlled)
+	banner.Set(true)
+	waitForCalls(t, notifier, 1)
+	notifier.mutex.Lock()
+	notifier.fail = true
+	notifier.mutex.Unlock()
+	banner.Set(false)
+	time.Sleep(50 * time.Millisecond)
+	notifier.mutex.Lock()
+	notifier.fail = false
+	notifier.mutex.Unlock()
+	banner.Refresh()
+	if calls := waitForCalls(t, notifier, 2); calls[1] {
+		t.Fatalf("calls = %v", calls)
+	}
+}
