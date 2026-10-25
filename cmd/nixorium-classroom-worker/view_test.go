@@ -287,3 +287,20 @@ func TestSharedClipboardEndpoints(t *testing.T) {
 		t.Fatalf("get after control = %d", response.Code)
 	}
 }
+
+func TestHiddenPageEndsTheControlAndResumesIt(t *testing.T) {
+	script, err := viewAssets.ReadFile("view/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The clipboard of a control does not survive the capture restart that
+	// a hidden page causes, so the control ends with the page and comes back.
+	for _, words := range []string{
+		"if (controlling) {\n      send([], true);\n      setControl(false);\n      resumeControl = true;\n    }",
+		"if (resumeControl) {\n      setControl(true);\n      resumeControl = false;\n    }",
+	} {
+		if !strings.Contains(string(script), words) {
+			t.Fatalf("app.js lacks %s", words)
+		}
+	}
+}

@@ -86,6 +86,9 @@ func newMutterCapture(notifier stateNotifier) *mutterCapture {
 	if notifier != nil {
 		capture.banner = newExtensionFlag(notifier.SetControlled)
 		capture.sharing = newExtensionFlag(notifier.SetSharing)
+		// An agent that restarted mid-control left its flags on.
+		capture.banner.Set(false)
+		capture.sharing.Set(false)
 	}
 	go capture.stopWhenIdle()
 	return capture
@@ -216,6 +219,10 @@ var errLocked = errors.New("the screen is locked")
 func (capture *mutterCapture) stopWhenIdle() {
 	for range time.Tick(5 * time.Second) {
 		capture.mutex.Lock()
+		if capture.running {
+			capture.sharing.Refresh()
+			capture.banner.Refresh()
+		}
 		if capture.running && time.Since(capture.lastRequest) > captureIdle {
 			capture.stopLocked()
 			if !capture.wokeAt.IsZero() {
@@ -224,6 +231,15 @@ func (capture *mutterCapture) stopWhenIdle() {
 			}
 		}
 		capture.mutex.Unlock()
+	}
+}
+
+// StopCapture ends the capture now (the last controller channel closed).
+func (capture *mutterCapture) StopCapture() {
+	capture.mutex.Lock()
+	defer capture.mutex.Unlock()
+	if capture.running {
+		capture.stopLocked()
 	}
 }
 

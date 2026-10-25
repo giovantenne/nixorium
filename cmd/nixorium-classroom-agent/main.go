@@ -183,6 +183,9 @@ func serve(runtimeDirectory string) error {
 	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(lock), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}, notice: lock})
 }
 
+// captureStopper is a capturer that can end its capture at once.
+type captureStopper interface{ StopCapture() }
+
 // agentContext is what every connection of the session's agent shares.
 type agentContext struct {
 	userName string
@@ -196,6 +199,7 @@ type agentContext struct {
 
 func serveConnections(listener net.Listener, agent agentContext) error {
 	slots := make(chan struct{}, maxConnections)
+	var open atomic.Int32
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
@@ -203,9 +207,19 @@ func serveConnections(listener net.Listener, agent agentContext) error {
 		}
 		select {
 		case slots <- struct{}{}:
+			open.Add(1)
 			go func() {
 				defer func() { <-slots }()
 				handle(connection, agent)
+				// The hub holds its channel while it polls and closes it
+				// when the page stops asking, so the last channel closing
+				// ends the capture (a dead channel only delays this to the
+				// idle timeout).
+				if open.Add(-1) == 0 {
+					if stopper, ok := agent.capture.(captureStopper); ok {
+						stopper.StopCapture()
+					}
+				}
 			}()
 		default:
 			_ = connection.SetWriteDeadline(time.Now().Add(time.Second))

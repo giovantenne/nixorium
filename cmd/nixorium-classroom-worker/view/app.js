@@ -1005,13 +1005,25 @@ async function refresh() {
 
 // Hidden page: stop asking for the computers and their pictures; ask again
 // as soon as the page is shown.
+// A control ends while the page is hidden (the computer's clipboard goes off
+// when its capture restarts) and comes back with the page.
+let resumeControl = false;
 document.addEventListener('visibilitychange', () => {
   if (pageHidden()) {
+    if (controlling) {
+      send([], true);
+      setControl(false);
+      resumeControl = true;
+    }
     clearTimeout(refreshTimer);
     if (refreshing) refreshing.abort();
     refreshing = null;
     if (frameRequest) frameRequest.abort();
   } else {
+    if (resumeControl) {
+      setControl(true);
+      resumeControl = false;
+    }
     refresh();
     if (frameResume) frameResume();
   }

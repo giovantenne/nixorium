@@ -49,4 +49,13 @@ var Registry = []Migration{
 				"  # Effects advance once per frame, so the frame rate is also their speed: 60\n  # keeps them lively for half the drawing that 120 cost the terminal.\n  ttfx -i \"$SCREENSAVER_TEXT\" \\\n    --frame-rate 60 \\\n")
 		},
 	},
+	{
+		ID:          "2026-10-teacher-dock-classroom-launcher",
+		Description: "The teacher's dock icon is always the classroom launcher, which opens the Nixorium menu when the classroom view is off.",
+		Apply: func(tree Tree) Outcome {
+			return ReplaceExact(tree, "modules/workstation.nix",
+				"  teacherFavorites = lib.optionals isController\n    [ (if labSettings.classroomView or true then \"nixorium-classroom.desktop\" else \"nixorium.desktop\") ]\n",
+				"  teacherFavorites = lib.optionals isController\n    [ \"nixorium-classroom.desktop\" ]\n")
+		},
+	},
 }

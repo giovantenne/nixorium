@@ -146,3 +146,23 @@ func TestJqIsAddedToEveryLaboratoryOnce(t *testing.T) {
 		t.Fatalf("broken = %+v, %v", report, err)
 	}
 }
+
+func TestTeacherDockMigrationAppliesOnceAndRespectsEdits(t *testing.T) {
+	dock := Registry[len(Registry)-1:]
+	old := "  teacherFavorites = lib.optionals isController\n    [ (if labSettings.classroomView or true then \"nixorium-classroom.desktop\" else \"nixorium.desktop\") ]\n    ++ studentFavorites;\n"
+	root := treeWith(t, map[string]string{"modules/workstation.nix": old})
+	report, err := Run(root, "3.10.0", dock)
+	if err != nil || report.Migrations[0].State != Applied || !strings.Contains(read(t, root, "modules/workstation.nix"), "    [ \"nixorium-classroom.desktop\" ]\n") {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	edited := strings.Replace(old, "nixorium.desktop", "other.desktop", 1)
+	report, err = Run(treeWith(t, map[string]string{"modules/workstation.nix": edited}), "3.10.0", dock)
+	if err != nil || report.Migrations[0].State != Manual {
+		t.Fatalf("an edited line was not left alone: %+v, %v", report, err)
+	}
+	// The template of this release has the migrated line.
+	template, err := os.ReadFile(filepath.Join("..", "..", "templates", "site", "modules", "workstation.nix"))
+	if err == nil && !strings.Contains(string(template), "    [ \"nixorium-classroom.desktop\" ]\n") {
+		t.Fatal("the template lacks the migrated line")
+	}
+}

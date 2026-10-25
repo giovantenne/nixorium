@@ -104,7 +104,7 @@ func TestAMigratedScreensaverIsTheTemplateOfThisRelease(t *testing.T) {
 	// the template's own files. When the template changes again, this test
 	// points at the need for a new migration.
 	root := treeWith(t, releasedScreensaver(t))
-	report, err := Run(root, "3.10.0", Registry[2:])
+	report, err := Run(root, "3.10.0", Registry[2:4])
 	if err != nil {
 		t.Fatal(err)
 	}

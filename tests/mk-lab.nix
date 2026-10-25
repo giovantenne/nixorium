@@ -642,6 +642,9 @@ assert lib.hasInfix "tcp dport 22 accept"
 # The controller records whether it offers the classroom view; clients do not.
 assert builtins.fromJSON classroomViewLab.nixosConfigurations.pc99.config.environment.etc."nixorium/classroom-view.json".text
   == { schemaVersion = 1; enabled = true; };
+# The agent of the view opens the file without following links, so it must
+# stay a regular file.
+assert classroomViewLab.nixosConfigurations.pc99.config.environment.etc."nixorium/classroom-view.json".mode == "0444";
 assert (builtins.fromJSON (mkLab (baseArgs // { labConfig = labConfig // { classroomView = false; }; })).nixosConfigurations.pc99.config.environment.etc."nixorium/classroom-view.json".text).enabled == false;
 assert !(classroomViewLab.nixosConfigurations.pc01.config.environment.etc ? "nixorium/classroom-view.json");
 # The teacher's icon stays in both states (with the view off it opens the

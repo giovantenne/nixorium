@@ -623,3 +623,47 @@ func TestConnectKeepsRelayingToAHealthyAgent(t *testing.T) {
 		}
 	}
 }
+
+type stoppingCapture struct {
+	fakeCapture
+	stopped chan struct{}
+}
+
+func (capture stoppingCapture) StopCapture() { capture.stopped <- struct{}{} }
+
+func TestLastConnectionClosingStopsCapture(t *testing.T) {
+	listener, err := net.Listen("unix", filepath.Join(t.TempDir(), SocketName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	capture := stoppingCapture{stopped: make(chan struct{}, 4)}
+	go func() {
+		_ = serveConnections(listener, agentContext{userName: "student", capture: capture, lock: &fakeLocker{}})
+	}()
+	dial := func() net.Conn {
+		connection, err := net.Dial("unix", listener.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion})
+		_ = connection.SetDeadline(time.Now().Add(2 * time.Second))
+		if _, err := classroomview.Read(connection); err != nil {
+			t.Fatal(err)
+		}
+		return connection
+	}
+	first, second := dial(), dial()
+	first.Close()
+	select {
+	case <-capture.stopped:
+		t.Fatal("capture stopped while a channel was still open")
+	case <-time.After(300 * time.Millisecond):
+	}
+	second.Close()
+	select {
+	case <-capture.stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("capture kept running after the last channel closed")
+	}
+}

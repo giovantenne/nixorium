@@ -31,11 +31,14 @@ type extensionFlag struct {
 	mutex sync.Mutex
 	want  bool
 	shown bool
-	wake  chan struct{}
+	// unknown is set when the extension's state is not known to be shown:
+	// before the first answer, after a failed call, after a refresh.
+	unknown bool
+	wake    chan struct{}
 }
 
 func newExtensionFlag(apply func(bool) error) *extensionFlag {
-	flag := &extensionFlag{apply: apply, wake: make(chan struct{}, 1)}
+	flag := &extensionFlag{apply: apply, wake: make(chan struct{}, 1), unknown: true}
 	go flag.run()
 	return flag
 }
@@ -47,7 +50,7 @@ func (flag *extensionFlag) Set(on bool) {
 		return
 	}
 	flag.mutex.Lock()
-	changed := flag.want != on || flag.shown != on
+	changed := flag.want != on || flag.shown != on || flag.unknown
 	flag.want = on
 	flag.mutex.Unlock()
 	if changed {
@@ -58,18 +61,35 @@ func (flag *extensionFlag) Set(on bool) {
 	}
 }
 
+// Refresh applies a wanted "on" again: GNOME disables the extension on the
+// lock screen and enables it with its flags off, which the agent cannot see.
+func (flag *extensionFlag) Refresh() {
+	if flag == nil {
+		return
+	}
+	flag.mutex.Lock()
+	on := flag.want
+	if on {
+		flag.unknown = true
+	}
+	flag.mutex.Unlock()
+	if on {
+		flag.Set(true)
+	}
+}
+
 func (flag *extensionFlag) run() {
 	for range flag.wake {
 		flag.mutex.Lock()
-		want, shown := flag.want, flag.shown
+		want, shown, unknown := flag.want, flag.shown, flag.unknown
 		flag.mutex.Unlock()
-		if want == shown {
+		if want == shown && !unknown {
 			continue
 		}
-		if err := flag.apply(want); err == nil {
-			flag.mutex.Lock()
-			flag.shown = want
-			flag.mutex.Unlock()
-		}
+		err := flag.apply(want)
+		flag.mutex.Lock()
+		// A failed call may have been half done: forget what was shown.
+		flag.shown, flag.unknown = want, err != nil
+		flag.mutex.Unlock()
 	}
 }

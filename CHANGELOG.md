@@ -16,7 +16,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   controller with Apply to controller and the student computers with Update
   computers. With the view off, the teacher's dock icon stays and opens the
   Nixorium menu, and the menu and the commands no longer offer the classroom
-  view: they answer that it is turned off in the settings.
+  view: they answer that it is turned off in the settings. The teacher's dock
+  pin is now always the classroom launcher; the deployment migration
+  `2026-10-teacher-dock-classroom-launcher` changes it in existing
+  laboratories (if you edited that line, the review shows a manual change:
+  pin `nixorium-classroom.desktop` for the teacher).
 
 ### Changed
 
@@ -29,7 +33,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   with such a name must change it to the wired card before updating.
 - The classroom view stops asking for the screens while its page is hidden
   (minimized window or background tab): the student computers stop being
-  captured a few seconds later, and capture resumes when the page is shown
+  captured within about a minute (at once when the controller's channel closes), and capture resumes when the page is shown
   again. The enlarged window and take control follow the same rule.
 - While the teacher controls a computer with the keyboard and mouse, the
   student's screen shows a small "Teacher in control" label under the top bar,
