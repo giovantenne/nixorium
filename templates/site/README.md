@@ -264,7 +264,7 @@ in the settings editor.
 Clients expose only SSH (22) to the controller's static IPv4 address on the
 lab interface; IPv6 cannot bypass this restriction. The classroom view reaches
 each student's session through that access, and GNOME shows its sharing
-notice while the teacher watches. Changes to the classroom Shell extension
+notice while the classroom view page is open and visible. Changes to the classroom Shell extension
 apply at the student's next login. A computer whose classroom view was
 stopped from the student's terminal shows "Monitoring stopped on this PC" and
 starts it again by itself within seconds. In a computer's window of the classroom

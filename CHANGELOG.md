@@ -15,6 +15,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   laboratory profile is an Ethernet profile and a Wi-Fi card never carried the
   laboratory address (the earlier documentation said it did). A laboratory
   with such a name must change it to the wired card before updating.
+- The classroom view stops asking for the screens while its page is hidden
+  (minimized window or background tab): the student computers stop being
+  captured a few seconds later, and capture resumes when the page is shown
+  again. The enlarged window and take control follow the same rule.
 
 ### Fixed
 

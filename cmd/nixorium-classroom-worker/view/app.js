@@ -654,14 +654,26 @@ for (const button of document.querySelectorAll('.viewer-actions button[data-acti
 let frameSince = 0;
 let frameURL = null;
 let frameLoopRunning = false;
+let frameRequest = null;
+let frameResume = null;
+
+// A minimized window or a background tab asks for nothing: the computers
+// stop being captured a few seconds later.
+const pageHidden = () => document.visibilityState === 'hidden';
 
 async function frameLoop() {
   if (frameLoopRunning) return;
   frameLoopRunning = true;
   while (selected) {
+    if (pageHidden()) {
+      await new Promise((resolve) => { frameResume = resolve; });
+      frameResume = null;
+      continue;
+    }
     const name = selected;
     try {
-      const response = await fetch('/api/frame?name=' + encodeURIComponent(name) + '&since=' + frameSince, { cache: 'no-store' });
+      frameRequest = new AbortController();
+      const response = await fetch('/api/frame?name=' + encodeURIComponent(name) + '&since=' + frameSince, { cache: 'no-store', signal: frameRequest.signal });
       if (name !== selected) continue;
       if (response.status === 200) {
         const blob = await response.blob();
@@ -672,7 +684,7 @@ async function frameLoop() {
       }
       frameSince = Number(response.headers.get('X-Frame') || frameSince);
     } catch (error) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (!pageHidden()) await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
   frameLoopRunning = false;
@@ -988,8 +1000,22 @@ async function refresh() {
   }
   if (request !== refreshing) return;
   refreshing = null;
-  refreshTimer = setTimeout(refresh, 2000);
+  if (!pageHidden()) refreshTimer = setTimeout(refresh, 2000);
 }
+
+// Hidden page: stop asking for the computers and their pictures; ask again
+// as soon as the page is shown.
+document.addEventListener('visibilitychange', () => {
+  if (pageHidden()) {
+    clearTimeout(refreshTimer);
+    if (refreshing) refreshing.abort();
+    refreshing = null;
+    if (frameRequest) frameRequest.abort();
+  } else {
+    refresh();
+    if (frameResume) frameResume();
+  }
+});
 
 if (screenMode) showScreen(screenName);
 refresh();
