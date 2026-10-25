@@ -5,10 +5,10 @@
 # nixpkgs ships the release, use the official build from go.dev instead of
 # compiling Go on every controller after each package update.
 let
-  minimum = "1.26.9";
+  minimum = "1.26.10";
   platform = "${stdenv.hostPlatform.go.GOOS}-${stdenv.hostPlatform.go.GOARCH}";
   binaryHashes = {
-    linux-amd64 = "sha256-QtFYtNj3thrAqDBWfJQKhgmPt6rFLkZ6Xr7APvXML40=";
+    linux-amd64 = "sha256-zP566CLSwvQfT+fJVhmZZ6Tawi0O4NKyv9tECqs7IMU=";
   };
   tools = "share/go/pkg/tool/${stdenv.hostPlatform.go.GOOS}_${stdenv.hostPlatform.go.GOARCH}";
 
@@ -57,6 +57,6 @@ else go_1_26.overrideAttrs (_: {
   version = minimum;
   src = fetchurl {
     url = "https://go.dev/dl/go${minimum}.src.tar.gz";
-    hash = "sha256-lzXX3Ntls10/pXfwQGRzfAO4nPGitx5uaf4vPG+f1Mo=";
+    hash = "sha256-/WPog7ovK/ypPBZGsx6+9j4rHk0rMXyXidl2po2B828=";
   };
 })

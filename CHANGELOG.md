@@ -9,10 +9,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Installing a controller and **Update system and packages** no longer compile
-  Go on the computer. While the package set has a Go older than the 1.26.9
-  that Nixorium requires for security fixes, Nixorium uses the official Go
-  1.26.9 from go.dev instead of building it from source, which took several
-  minutes after each package update. The programs still use the system's own
+  Go on the computer. While the package set has a Go older than the one
+  Nixorium requires for security fixes, Nixorium uses the official build from
+  go.dev instead of building it from source, which took several minutes after
+  each package update. The required Go is now 1.26.10 (was 1.26.9), which
+  fixes GO-2026-6809. The programs still use the system's own
   loader, as with the Go of the package set.
 - The working indicator turns four times a second instead of ten. Without a
   graphics card the terminal redraws the whole window on the processor for
