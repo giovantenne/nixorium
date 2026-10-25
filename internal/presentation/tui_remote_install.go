@@ -972,7 +972,19 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 		remote.plan = *message.response.Plan
 		remote.stage = remoteInstallReview
 		remote.confirmation = ""
-	case "apply", "status", "reconcile", "verify", "reboot", "close":
+	case "reconcile":
+		remote.stage = remoteInstallResult
+		// A reopened session that was prepared on another card gets the same
+		// card screen as a fresh preparation, instead of a refused plan.
+		if session := message.response.Session; message.response.State == "prepared" && session != nil && session.Preparation != nil {
+			preparation := session.Preparation
+			if live := remoteLiveInterface(preparation.Facts, preparation.Host.LiveIP); live != "" && live != preparation.Host.Interface {
+				remote.host = preparation.Host.Name
+				remote.liveInterface = live
+				remote.stage = remoteInstallInterfaceMismatch
+			}
+		}
+	case "apply", "status", "verify", "reboot", "close":
 		remote.stage = remoteInstallResult
 	case "cancel":
 		remote.stage = remoteInstallResult

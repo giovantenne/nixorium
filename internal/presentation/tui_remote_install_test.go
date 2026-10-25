@@ -652,6 +652,26 @@ func TestUSBInstallNeverSavesAWiFiCard(t *testing.T) {
 	}
 }
 
+func TestUSBInstallReopenedSessionShowsTheCardScreen(t *testing.T) {
+	response := remoteTUITestPreparedResponse("prepared")
+	response.Session.Preparation.Facts.Interfaces = []domain.RemoteNetworkInterface{{Name: "wlp2s0", Addresses: []string{"192.0.2.20"}}}
+	model := dashboardModel{width: 120, height: 30, screen: dashboardUSBInstall, installation: installationModel{remote: remoteInstallationModel{stage: remoteInstallBootstrap, operationID: remoteTUITestOperationID}}}
+	next, _ := model.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "reconcile", response: response})
+	model = next.(dashboardModel)
+	if model.installation.remote.stage != remoteInstallInterfaceMismatch || model.installation.remote.host != "pc01" {
+		t.Fatalf("stage=%d host=%q", model.installation.remote.stage, model.installation.remote.host)
+	}
+	if view := model.View().Content; !strings.Contains(view, "through the Wi-Fi card wlp2s0") {
+		t.Fatalf("reopened session view:\n%s", view)
+	}
+	response = remoteTUITestPreparedResponse("prepared")
+	response.Session.Preparation.Facts.Interfaces = []domain.RemoteNetworkInterface{{Name: "enp1s0", Addresses: []string{"192.0.2.20"}}}
+	next, _ = dashboardModel{width: 120, height: 30, screen: dashboardUSBInstall}.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "reconcile", response: response})
+	if stage := next.(dashboardModel).installation.remote.stage; stage != remoteInstallResult {
+		t.Fatalf("matching card left the result: stage %d", stage)
+	}
+}
+
 func TestUSBInstallReviewAsksForTheCableAfterAWiFiInstallation(t *testing.T) {
 	host := domain.RemoteInstallHost{Name: "pc01", Interface: "wlp2s0", StaticIP: "10.0.0.1"}
 	if got := remoteInstallAddressAfterwards(host); !strings.Contains(got, "10.0.0.1 on the wired card") {

@@ -20,7 +20,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 - USB installation of a computer with a configured network card that is
   connected through another card now reaches the screen that offers to save
-  the observed card, instead of failing with "declared NIC changed". When the
+  the observed card, instead of failing with "declared NIC changed", also when
+  a prepared installation is reopened. When the
   observed card is a Wi-Fi card it asks for the cable instead, and after an
   installation over Wi-Fi the review says to connect the cable before the
   restart.
