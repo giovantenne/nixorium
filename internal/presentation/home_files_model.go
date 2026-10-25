@@ -449,9 +449,9 @@ func (model dashboardModel) discardHomeFilesCaptures(ids []string) tea.Cmd {
 }
 func homeFilesMode(f domain.HomeFile) string {
 	if f.Executable {
-		return "0700 · executable"
+		return "executable"
 	}
-	return "0600 · not executable"
+	return "not executable"
 }
 func homeFilesSize(n int64) string {
 	if n < 1024 {

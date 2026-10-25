@@ -8,6 +8,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Settings → Student workspace** no longer offers VS Code preferences (font
+  size, tab size, other settings and the rest): VS Code may not be installed.
+  Ask the Assistant to change students' VS Code settings and extensions; the
+  ones already in the profile are kept when you save, and a review still names
+  their changes.
+- **Initial files** explains itself in plain words: files and folders every
+  student finds in their home, on every computer, back at each start. The
+  screens say "folder" and "executable" instead of permission numbers, and
+  "add", "replace" and "save" instead of import, capture and declaration.
 - Sharing the teacher's screen follows changes sooner: the page sends each
   new picture as soon as the previous one has left, up to fifteen a second
   instead of at most five with a pause after each. Each computer still gets

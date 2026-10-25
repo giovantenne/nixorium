@@ -1047,20 +1047,20 @@ Space Toggle  ·  i Inherit  ·  c Clear  ·  ⏎ Enter Keep draft  ·  Esc Canc
 Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
-Captured 2 files · 2 directories · 8.1 KiB
-Captured copies are reviewed below; executability starts off.
+Copied 2 files, 2 folders, 8.1 KiB
+Check the list. Files start as not executable: press Space on programs.
 
-› Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-  Documents/Lessons/run.sh · 96 B · 0600 · not executable
-  Documents/Lessons/ · 0700
-  Documents/Lessons/Empty/ · 0700
-1–4 of 4 captured entries
+› Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+  Documents/Lessons/run.sh · 96 B · not executable
+  Documents/Lessons/
+  Documents/Lessons/Empty/
+1–4 of 4
 
-Student ownership; source owner/group, permissions, ACLs and attributes
-are not inherited. Links and special files are rejected.
+The copies belong to the student. Original owners and permissions
+are not kept; links and special files are refused.
 
-↑/↓ Select  ·  Space Executable  ·  ⏎ Enter Keep copies in draft
-Esc Cancel  ·  F1 Help
+↑/↓ Select  ·  Space Executable  ·  ⏎ Enter Add to draft  ·  Esc Cancel
+F1 Help
 ```
 
 ## Initial-file path completion
@@ -1069,11 +1069,11 @@ Esc Cancel  ·  F1 Help
 Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
-Choose a local controller file or directory.
-Import only non-secret educational materials.
-Copies are saved in Git, the Nix store, installer and cache.
+Choose a file or a folder on this computer.
+Nixorium keeps a copy in the lab configuration and on every computer:
+add teaching materials only, never passwords or keys.
 
-Source: /demo/materials/Lessons/_
+Path: /demo/materials/Lessons/_
 /demo/materials/Lessons/
 
 Tab Complete path  ·  ⏎ Enter Continue  ·  Esc Cancel  ·  F1 Help
@@ -1085,19 +1085,19 @@ Tab Complete path  ·  ⏎ Enter Continue  ·  Esc Cancel  ·  F1 Help
 Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
-Captured 2 files · 2 directories · 8.1 KiB
-Captured copies are reviewed below; executability starts off.
+Copied 2 files, 2 folders, 8.1 KiB
+Check the list. Files start as not executable: press Space on programs.
 
-  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-› Documents/Lessons/run.sh · 96 B · 0700 · executable
-  Documents/Lessons/ · 0700
-  Documents/Lessons/Empty/ · 0700
-1–4 of 4 captured entries
+  Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+› Documents/Lessons/run.sh · 96 B · executable
+  Documents/Lessons/
+  Documents/Lessons/Empty/
+1–4 of 4
 
-Student ownership; source owner/group, permissions, ACLs and attributes
-are not inherited. Links and special files are rejected.
+The copies belong to the student. Original owners and permissions
+are not kept; links and special files are refused.
 
-↑/↓ Select  ·  Space Executable  ·  ⏎ Enter Keep copies in draft  ·  Esc Cancel  ·  F1 Help
+↑/↓ Select  ·  Space Executable  ·  ⏎ Enter Add to draft  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file declaration review
@@ -1107,24 +1107,25 @@ Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
 Initial files review: READY
-Student: student · controller + 2 clients (shared seed)
-Declaration changes:
-  add Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-  add Documents/Lessons/run.sh · 96 B · 0700 · executable
-  add Documents/Lessons/Empty/ · 0 B · 0700 directory
-Student-owned files 0600; executable files 0700; directories 0700.
-Source owner/group, permissions, ACLs, attributes and links are not inherited.
-Copies enter Git, the Nix store, installer and cache. Never import secrets.
-Save changes local configuration only. Apply systems separately; files restore at next boot.
-Complete draft: 2 files · 2 directories · 8.1 KiB
-  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-  Documents/Lessons/run.sh · 96 B · 0700 · executable
-  Documents/Lessons/ · 0700
+Student: student · the controller and 2 clients
+Changes:
+  add Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+  add Documents/Lessons/run.sh · 96 B · executable
+  add Documents/Lessons/Empty/
+The copies belong to the student; original owners, permissions and links are not kept.
+Copies are kept in the lab configuration and on every computer: never add passwords or keys.
+Saving changes only the configuration. After you update the computers, students get the files at the next
+start.
+All initial files: 2 files, 2 folders, 8.1 KiB
+  Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+  Documents/Lessons/run.sh · 96 B · executable
+  Documents/Lessons/
 Review lines 1–14 of 21
 
-Enter saves and records the manifest and reviewed copies locally.
+Enter saves the files in the lab configuration. Computers change
+only when you update them.
 
-↑/↓ Scroll  ·  ⏎ Enter Save copies  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Save  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file removal and mode-change review
@@ -1134,24 +1135,25 @@ Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
 Initial files review: READY
-Student: student · controller + 2 clients (shared seed)
-Declaration changes:
-  remove Documents/Lessons/previous.pdf · 4.0 KiB · 0600 · not executable
-  replace Documents/Lessons/lesson.pdf · 4.0 KiB → 8.0 KiB · 0600 · not executable → 0600 · not executable
-  permissions Documents/Lessons/run.sh · 0600 · not executable → 0700 · executable
-  add Documents/Lessons/Empty/ · 0 B · 0700 directory
-Student-owned files 0600; executable files 0700; directories 0700.
-Source owner/group, permissions, ACLs, attributes and links are not inherited.
-Copies enter Git, the Nix store, installer and cache. Never import secrets.
-Save changes local configuration only. Apply systems separately; files restore at next boot.
-Complete draft: 2 files · 2 directories · 8.1 KiB
-  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-  Documents/Lessons/run.sh · 96 B · 0700 · executable
+Student: student · the controller and 2 clients
+Changes:
+  remove Documents/Lessons/previous.pdf · 4.0 KiB · not executable
+  replace Documents/Lessons/lesson.pdf · 4.0 KiB → 8.0 KiB
+  change Documents/Lessons/run.sh · not executable → executable
+  add Documents/Lessons/Empty/
+The copies belong to the student; original owners, permissions and links are not kept.
+Copies are kept in the lab configuration and on every computer: never add passwords or keys.
+Saving changes only the configuration. After you update the computers, students get the files at the next
+start.
+All initial files: 2 files, 2 folders, 8.1 KiB
+  Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+  Documents/Lessons/run.sh · 96 B · executable
 Review lines 1–14 of 22
 
-Enter saves and records the manifest and reviewed copies locally.
+Enter saves the files in the lab configuration. Computers change
+only when you update them.
 
-↑/↓ Scroll  ·  ⏎ Enter Save copies  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Save  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file protected save
@@ -1181,8 +1183,8 @@ Initial-file manifest and reviewed copies saved and recorded locally.
 ! This controller — Needs applying
 ○ Client computers — Not updated here; unknown until checked
 
-Current student sessions stay unchanged. After system application,
-the saved files are restored at the next boot.
+Students who are signed in keep their current files. After you update
+the computers, each one gets the new files at its next start.
 
 ⏎ Enter Apply to this controller  ·  Esc Workspace  ·  F1 Help
 ```
@@ -1199,10 +1201,10 @@ Captured copies saved; the local Git record could not be confirmed. Inspect Git 
 ! Configuration — Save needs recovery
 ○ This controller — Unknown; not checked here
 ○ Client computers — Unknown until checked; none updated here
-Inspect the local record before applying systems; never replay this save.
+Check the saved configuration before updating the computers; do not save again.
 
-Current student sessions stay unchanged. After system application,
-the saved files are restored at the next boot.
+Students who are signed in keep their current files. After you update
+the computers, each one gets the new files at its next start.
 
 g Inspect Git state  ·  Esc Workspace  ·  F1 Help
 ```
@@ -1213,11 +1215,11 @@ g Inspect Git state  ·  Esc Workspace  ·  F1 Help
 Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
-Choose a local controller file or directory.
-Import only non-secret educational materials.
-Copies are saved in Git, the Nix store, installer and cache.
+Choose a file or a folder on this computer.
+Nixorium keeps a copy in the lab configuration and on every computer:
+add teaching materials only, never passwords or keys.
 
-Source: /demo/materials_
+Path: /demo/materials_
 
 ! The folder contains a symbolic link. Choose a clean materials folder without links, keys or credentials; no
 copies were added.

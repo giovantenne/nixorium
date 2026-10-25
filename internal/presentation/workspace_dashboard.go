@@ -246,7 +246,7 @@ func (model dashboardModel) workspaceView() string {
 		resolved := w.loaded.Inspection.Resolution
 		switch w.stage {
 		case workspaceOverview:
-			fixed = "Ask the Assistant to add or remove students' VS Code extensions."
+			fixed = "Ask the Assistant to change students' VS Code settings and extensions."
 			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %s", resolved.StudentUser, countNoun(len(resolved.Targets)-1, "client")), workspaceApplicationText(), "")
 			if w.loaded.Inspection.Base == nil {
 				lines = append(lines, "No saved profile; this is a new draft.")
@@ -268,12 +268,7 @@ func (model dashboardModel) workspaceView() string {
 		case workspaceFieldEdit:
 			lines = append(lines, w.field.label, "")
 			actions = []tuiAction{{key: "Enter", label: "Keep draft"}, {key: "Esc", label: "Cancel field"}, {key: "F1", label: "Help"}}
-			if w.field.kind == "settings" {
-				settingLines, settingFixed, settingActions := w.settings.view(width, capacity, model.isDark)
-				lines = append(lines, settingLines...)
-				fixed = settingFixed
-				actions = append(settingActions, tuiAction{key: "F1", label: "Help"})
-			} else if w.field.kind == "number" {
+			if w.field.kind == "number" {
 				lines = append(lines, "Value: "+w.number+"_", "Leave empty to inherit the deployment baseline.")
 			} else {
 				multiple := w.field.kind == "favorites"

@@ -291,12 +291,12 @@ func TestHomeFilesReviewNamesRemovalsAndPermissionChangesFirst(t *testing.T) {
 	var text bytes.Buffer
 	HomeFilesPlanText(&text, p)
 	review := text.String()
-	for _, want := range []string{"remove Documents/removed.txt", "permissions bin/lesson · 0600 · not executable → 0700 · executable", "replace Documents/lesson.txt · 3 B → 8 B"} {
-		if !strings.Contains(review, want) || strings.Index(review, want) > strings.Index(review, "Complete draft:") {
+	for _, want := range []string{"remove Documents/removed.txt", "change bin/lesson · not executable → executable", "replace Documents/lesson.txt · 3 B → 8 B"} {
+		if !strings.Contains(review, want) || strings.Index(review, want) > strings.Index(review, "All initial files:") {
 			t.Fatalf("change hidden behind candidate: %s", review)
 		}
 	}
-	if !strings.Contains(review, "Declaration metadata changed; file bytes and permissions stay the same.") || strings.Contains(review, "replace home-files.json") {
+	if !strings.Contains(review, "Only the list was rewritten; the files stay the same.") || strings.Contains(review, "replace home-files.json") {
 		t.Fatal("provenance change presented as a byte replacement")
 	}
 	if strings.Index(review, "Declaration changes:") > strings.Index(review, "Target computers:") {

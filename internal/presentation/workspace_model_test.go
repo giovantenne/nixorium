@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -72,7 +73,7 @@ func TestWorkspaceFieldsPreserveInheritanceAndReviewedObjects(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Fatal("editing mutated the reviewed candidate")
 	}
-	ext := workspaceReviewOnlyFields[0]
+	ext := workspaceReviewOnlyFields[slices.IndexFunc(workspaceReviewOnlyFields, func(field workspaceField) bool { return field.kind == "extensions" })]
 	updated, err := workspaceSetValue(p, ext, []string{"z.last", "a.first"})
 	if err != nil || !reflect.DeepEqual(*updated.VSCode.Extensions, []string{"a.first", "z.last"}) {
 		t.Fatal("extension normalization was bypassed")
@@ -124,7 +125,7 @@ func TestWorkspaceFieldSelectionOrderInheritanceAndNumericInput(t *testing.T) {
 	if m.workspace.candidate.Desktop != nil {
 		t.Fatal("cancel changed the draft")
 	}
-	m.workspace.group, m.workspace.cursor = 3, 0
+	m.workspace.group, m.workspace.cursor = 2, 0
 	m.workspace.startField()
 	if !reflect.DeepEqual(m.workspace.choices, []string{"Inherit", "firefox.desktop"}) {
 		t.Fatal("non-browser offered as default")
@@ -267,8 +268,8 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					want := []string{"Student workspace", "F1", "Help", "Esc"}
 					switch state {
 					case "fields":
-						w.group, w.cursor, w.stage = 2, 6, workspaceFieldList
-						want = append(want, "Auto save", "Review")
+						w.group, w.cursor, w.stage = 1, 5, workspaceFieldList
+						want = append(want, "Show mounts", "Review")
 					case "favorites", "empty":
 						if state == "empty" {
 							w.loaded.Inspection.Resolution.Catalog.Applications = nil

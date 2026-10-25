@@ -23,20 +23,20 @@ func (model dashboardModel) homeFilesView() string {
 			actions = []tuiAction{{key: "F1", label: "Help"}}
 		}
 	} else if m.loaded.HasErrors() || m.loaded.Candidate == nil {
-		lines = append(lines, "", "Initial files could not be loaded.", "If the deployment pin lacks this feature, update Nixorium:", "Maintenance → Update Nixorium.")
+		lines = append(lines, "", "Initial files could not be loaded.", "If this lab runs an older Nixorium, update it:", "Maintenance → Update Nixorium.")
 		actions = append([]tuiAction{{key: "r", label: "Retry"}}, actions...)
 	} else {
 		switch m.stage {
 		case "overview":
-			lines = append(lines, "Student: "+safeWorkspaceText(m.loaded.StudentUser)+" · controller and all client computers", "Draft declarations; current sessions stay unchanged.", "")
+			lines = append(lines, "Files and folders that the student "+safeWorkspaceText(m.loaded.StudentUser)+" finds in their home,", "on the controller and on every client computer.", "")
 			entries := m.destinations()
 			if len(entries) == 0 {
-				lines = append(lines, "No initial files declared.", "Import a file or a clean folder of educational materials.")
+				lines = append(lines, "No files yet. Press a to add a file or a folder from this computer.")
 			}
 			start, end := listWindow(len(entries), m.cursor, max(1, (capacity-2)/2))
 			for i := start; i < end; i++ {
 				label := entries[i] + "/"
-				detail := "Directory · 0700"
+				detail := "Folder"
 				for _, f := range m.draft.Profile.Files {
 					if f.Destination == entries[i] {
 						label = f.Destination
@@ -51,18 +51,18 @@ func (model dashboardModel) homeFilesView() string {
 				lines = append(lines, tuiSelection(workspaceShort(label, width-2), i == m.cursor, model.isDark), tuiMuted("  "+detail, model.isDark))
 			}
 			if len(entries) > 0 {
-				lines = append(lines, fmt.Sprintf("%d–%d of %d declarations", start+1, end, len(entries)))
+				lines = append(lines, fmt.Sprintf("%d–%d of %d", start+1, end, len(entries)))
 			}
-			fixed = "Student-owned files 0600; executable files and directories 0700.\nChanges take effect at the next boot after system application."
-			actions = []tuiAction{{key: "Enter", label: "Choose source"}, {key: "a", label: "Import"}, {key: "v", label: "Review"}, {key: "Esc", label: "Workspace"}, {key: "F1", label: "Help"}}
+			fixed = "Changes stay in a draft until you review and save them with v.\nAfter you update the computers, students find them at the next start."
+			actions = []tuiAction{{key: "Enter", label: "Add"}, {key: "a", label: "Add file or folder"}, {key: "v", label: "Review"}, {key: "Esc", label: "Workspace"}, {key: "F1", label: "Help"}}
 			if len(entries) > 0 {
-				actions[0].label = "Update source"
-				actions = append([]tuiAction{{key: "↑/↓", label: "Select"}, {key: "u", label: "Update"}, {key: "d", label: "Remove"}, {key: "Space", label: "Executable"}}, actions...)
+				actions[0].label = "Replace"
+				actions = append([]tuiAction{{key: "↑/↓", label: "Select"}, {key: "u", label: "Replace"}, {key: "d", label: "Remove"}, {key: "Space", label: "Executable"}}, actions...)
 			}
 		case "source":
-			lines = append(lines, "Choose a local controller file or directory.", "Import only non-secret educational materials.", "Copies are saved in Git, the Nix store, installer and cache.", "", "Source: "+homeFilesInput(m.source, width-9))
+			lines = append(lines, "Choose a file or a folder on this computer.", "Nixorium keeps a copy in the lab configuration and on every computer:", "add teaching materials only, never passwords or keys.", "", "Path: "+homeFilesInput(m.source, width-7))
 			if m.replace != "" {
-				lines = append(lines, "Replace draft declaration: "+safeWorkspaceText(m.replace))
+				lines = append(lines, "Replaces: "+safeWorkspaceText(m.replace))
 			}
 			if m.source == "" {
 				lines = append(lines, tuiMuted("Example: /home/admin/Teaching/Lessons", model.isDark))
@@ -78,21 +78,21 @@ func (model dashboardModel) homeFilesView() string {
 				actions = append([]tuiAction{{key: "Tab", label: "Complete path"}}, actions...)
 			}
 		case "destination":
-			lines = append(lines, "Where should the copies appear in the student's home?", "Enter a relative file name or folder path.", "", "Destination: "+homeFilesInput(m.destination, width-14))
+			lines = append(lines, "Where should it appear in the student's home?", "Write a path inside the home.", "", "In the home: "+homeFilesInput(m.destination, width-14))
 			if m.destination == "" {
 				lines = append(lines, tuiMuted("Example: Documents/Lessons", model.isDark))
 			}
-			actions = []tuiAction{{key: "Enter", label: "Capture copies"}, {key: "Esc", label: "Source"}, {key: "F1", label: "Help"}}
+			actions = []tuiAction{{key: "Enter", label: "Copy"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		case "capture":
 			total := int64(0)
 			for _, e := range m.pending.Entries {
 				total += e.Size
 			}
-			lines = append(lines, fmt.Sprintf("Captured %s · %s · %s", countNoun(len(m.pending.Files), "file"), homeFilesDirectoryCount(len(m.pending.Directories)), homeFilesSize(total)))
+			lines = append(lines, fmt.Sprintf("Copied %s, %s, %s", countNoun(len(m.pending.Files), "file"), homeFilesDirectoryCount(len(m.pending.Directories)), homeFilesSize(total)))
 			if m.replace != "" {
-				lines = append(lines, "Replaces the declared subtree: "+safeWorkspaceText(m.replace))
+				lines = append(lines, "Replaces: "+safeWorkspaceText(m.replace))
 			}
-			lines = append(lines, "Captured copies are reviewed below; executability starts off.", "")
+			lines = append(lines, "Check the list. Files start as not executable: press Space on programs.", "")
 			count := len(m.pending.Files) + len(m.pending.Directories)
 			start, end := listWindow(count, m.cursor, max(1, capacity-4))
 			for i := start; i < end; i++ {
@@ -107,13 +107,13 @@ func (model dashboardModel) homeFilesView() string {
 					}
 					label = f.Destination + " · " + homeFilesSize(size) + " · " + homeFilesMode(f)
 				} else {
-					label = m.pending.Directories[i-len(m.pending.Files)] + "/ · 0700"
+					label = m.pending.Directories[i-len(m.pending.Files)] + "/"
 				}
 				lines = append(lines, tuiSelection(workspaceShort(label, width-2), i == m.cursor, model.isDark))
 			}
-			lines = append(lines, fmt.Sprintf("%d–%d of %d captured entries", start+1, end, count))
-			fixed = "Student ownership; source owner/group, permissions, ACLs and attributes\nare not inherited. Links and special files are rejected."
-			actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Space", label: "Executable"}, {key: "Enter", label: "Keep copies in draft"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+			lines = append(lines, fmt.Sprintf("%d–%d of %d", start+1, end, count))
+			fixed = "The copies belong to the student. Original owners and permissions\nare not kept; links and special files are refused."
+			actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Space", label: "Executable"}, {key: "Enter", label: "Add to draft"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 		case "review":
 			var review bytes.Buffer
 			displayed := m.plan
@@ -123,10 +123,10 @@ func (model dashboardModel) homeFilesView() string {
 			start := min(m.scroll, max(0, len(wrapped)-capacity))
 			lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
 			lines = append(lines, fmt.Sprintf("Review lines %d–%d of %d", start+1, min(len(wrapped), start+capacity), len(wrapped)))
-			fixed = "Enter saves and records the manifest and reviewed copies locally."
-			label := "Save copies"
+			fixed = "Enter saves the files in the lab configuration. Computers change\nonly when you update them."
+			label := "Save"
 			if m.plan.State == "unchanged" {
-				fixed = "Declarations unchanged; student homes were not checked."
+				fixed = "Nothing changed."
 				label = "Back"
 			}
 			actions = []tuiAction{{key: "↑/↓", label: "Scroll"}, {key: "Enter", label: label}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
@@ -143,10 +143,10 @@ func (model dashboardModel) homeFilesView() string {
 			for _, issue := range m.result.Issues {
 				lines = append(lines, safeWorkspaceText(issue.Message))
 			}
-			fixed = "Current student sessions stay unchanged. After system application,\nthe saved files are restored at the next boot."
+			fixed = "Students who are signed in keep their current files. After you update\nthe computers, each one gets the new files at its next start."
 			actions = model.saveFollowupActions("Workspace")
 			if homeFilesNeedsInspection(m.result) && model.actions.LoadGitReview != nil {
-				lines = append(lines, "Inspect the local record before applying systems; never replay this save.")
+				lines = append(lines, "Check the saved configuration before updating the computers; do not save again.")
 				actions = append([]tuiAction{{key: "g", label: "Inspect Git state"}}, actions...)
 			} else if m.result.State != "saved" && !m.result.RecoveryRequired {
 				actions = append([]tuiAction{{key: "r", label: "Reload"}}, actions...)
@@ -164,13 +164,13 @@ func (model dashboardModel) homeFilesView() string {
 
 func HomeFilesPlanText(writer io.Writer, report domain.HomeFilesPlanReport) {
 	fmt.Fprintf(writer, "Initial files review: %s\n", strings.ToUpper(report.State))
-	fmt.Fprintf(writer, "Student: %s · controller + %s (shared seed)\n", safeWorkspaceText(report.StudentUser), countNoun(max(0, len(report.Targets)-1), "client"))
-	fmt.Fprintln(writer, "Declaration changes:")
+	fmt.Fprintf(writer, "Student: %s · the controller and %s\n", safeWorkspaceText(report.StudentUser), countNoun(max(0, len(report.Targets)-1), "client"))
+	fmt.Fprintln(writer, "Changes:")
 	if len(report.Changes) == 0 {
 		if report.State == "ready" {
-			fmt.Fprintln(writer, "  Declaration metadata changed; file bytes and modes stay the same.")
+			fmt.Fprintln(writer, "  Only the list was rewritten; the files stay the same.")
 		} else {
-			fmt.Fprintln(writer, "  No declarations changed.")
+			fmt.Fprintln(writer, "  Nothing changed.")
 		}
 	}
 	for _, change := range report.Changes {
@@ -181,21 +181,32 @@ func HomeFilesPlanText(writer io.Writer, report domain.HomeFilesPlanReport) {
 		}
 		switch change.Kind {
 		case "declaration":
-			fmt.Fprintln(writer, "  Declaration metadata changed; file bytes and permissions stay the same.")
+			fmt.Fprintln(writer, "  Only the list was rewritten; the files stay the same.")
 		case "added":
-			fmt.Fprintf(writer, "  add %s · %s · %s\n", name, homeFilesSize(change.AfterSize), after)
+			if change.AfterDirectory {
+				fmt.Fprintf(writer, "  add %s\n", name)
+			} else {
+				fmt.Fprintf(writer, "  add %s · %s · %s\n", name, homeFilesSize(change.AfterSize), after)
+			}
 		case "removed":
-			fmt.Fprintf(writer, "  remove %s · %s · %s\n", name, homeFilesSize(change.BeforeSize), before)
+			if change.BeforeDirectory {
+				fmt.Fprintf(writer, "  remove %s\n", name)
+			} else {
+				fmt.Fprintf(writer, "  remove %s · %s · %s\n", name, homeFilesSize(change.BeforeSize), before)
+			}
 		case "permissions":
-			fmt.Fprintf(writer, "  permissions %s · %s → %s\n", name, before, after)
+			fmt.Fprintf(writer, "  change %s · %s → %s\n", name, before, after)
 		default:
-			fmt.Fprintf(writer, "  replace %s · %s → %s · %s → %s\n", name, homeFilesSize(change.BeforeSize), homeFilesSize(change.AfterSize), before, after)
+			mode := ""
+			if before != after {
+				mode = " · " + before + " → " + after
+			}
+			fmt.Fprintf(writer, "  replace %s · %s → %s%s\n", name, homeFilesSize(change.BeforeSize), homeFilesSize(change.AfterSize), mode)
 		}
 	}
-	fmt.Fprintln(writer, "Student-owned files 0600; executable files 0700; directories 0700.")
-	fmt.Fprintln(writer, "Source owner/group, permissions, ACLs, attributes and links are not inherited.")
-	fmt.Fprintln(writer, "Copies enter Git, the Nix store, installer and cache. Never import secrets.")
-	fmt.Fprintln(writer, "Save changes local configuration only. Apply systems separately; files restore at next boot.")
+	fmt.Fprintln(writer, "The copies belong to the student; original owners, permissions and links are not kept.")
+	fmt.Fprintln(writer, "Copies are kept in the lab configuration and on every computer: never add passwords or keys.")
+	fmt.Fprintln(writer, "Saving changes only the configuration. After you update the computers, students get the files at the next start.")
 	if report.Candidate != nil {
 		profile := report.Candidate.Profile
 		total := int64(0)
@@ -204,16 +215,16 @@ func HomeFilesPlanText(writer io.Writer, report domain.HomeFilesPlanReport) {
 			sizes[e.Destination] = e.Size
 			total += e.Size
 		}
-		fmt.Fprintf(writer, "Complete draft: %s · %s · %s\n", countNoun(len(profile.Files), "file"), homeFilesDirectoryCount(len(profile.Directories)), homeFilesSize(total))
+		fmt.Fprintf(writer, "All initial files: %s, %s, %s\n", countNoun(len(profile.Files), "file"), homeFilesDirectoryCount(len(profile.Directories)), homeFilesSize(total))
 		for _, f := range profile.Files {
 			fmt.Fprintf(writer, "  %s · %s · %s\n", safeWorkspaceText(f.Destination), homeFilesSize(sizes[f.Destination]), homeFilesMode(f))
 		}
 		for _, dir := range profile.Directories {
-			fmt.Fprintf(writer, "  %s/ · 0700\n", safeWorkspaceText(dir))
+			fmt.Fprintf(writer, "  %s/\n", safeWorkspaceText(dir))
 		}
 	}
 	if len(report.Targets) > 0 {
-		fmt.Fprintln(writer, "Target computers:")
+		fmt.Fprintln(writer, "Computers:")
 		for _, target := range report.Targets {
 			fmt.Fprintf(writer, "  %s (%s)\n", safeWorkspaceText(target.Name), safeWorkspaceText(target.Role))
 		}
@@ -237,9 +248,9 @@ func HomeFilesApplyText(writer io.Writer, report domain.HomeFilesApplyReport) {
 
 func homeFilesDirectoryCount(n int) string {
 	if n == 1 {
-		return "1 directory"
+		return "1 folder"
 	}
-	return fmt.Sprintf("%d directories", n)
+	return fmt.Sprintf("%d folders", n)
 }
 
 func homeFilesInput(value string, width int) string {
@@ -256,7 +267,7 @@ func homeFilesInput(value string, width int) string {
 
 func homeFilesChangeMode(directory, executable bool) string {
 	if directory {
-		return "0700 directory"
+		return "folder"
 	}
 	return homeFilesMode(domain.HomeFile{Executable: executable})
 }
