@@ -270,7 +270,9 @@ stopped from the student's terminal shows "Monitoring stopped on this PC" and
 starts it again by itself within seconds. While you control a computer with
 your keyboard and mouse, its screen shows the banner "Your teacher is
 controlling this computer" until you stop. GNOME hides its sharing icon while a window is full screen; then
-the screen shows a small "Classroom view open" label instead. In a computer's window of the classroom
+the screen shows a small "Classroom view open" label instead. When you save a screenshot or collect the files on a desktop, that
+computer's screen says so for a few seconds ("Your teacher saved a picture of
+this screen", "Your teacher collected the files on your desktop"). In a computer's window of the classroom
 view page, **Save screenshot** keeps a picture of its screen in
 `Nixorium/Screenshots` of your home folder, such as
 `pc03-2026-10-15-10.30.12.jpg`; a page not opened from Nixorium downloads the

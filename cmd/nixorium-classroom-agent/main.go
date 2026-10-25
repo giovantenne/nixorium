@@ -11,7 +11,8 @@
 //	         desktop (--send DIR), collects the desktop into a folder
 //	         (--collect DIR), shows a picture as the teacher's screen for
 //	         some seconds (--show JPEG SECONDS), takes control for some
-//	         seconds (--control SECONDS), or shows (--message TEXT
+//	         seconds (--control SECONDS), shows a notice (--notice
+//	         screenshot|collect), or shows (--message TEXT
 //	         SECONDS|unlock) or removes (--message-hide) the teacher's
 //	         message; used by tests and diagnostics.
 package main
@@ -87,6 +88,9 @@ func runProbe(ctx context.Context, arguments []string, output io.Writer) error {
 			return errors.New("--show needs a JPEG file and 0–60 seconds")
 		}
 		return probeShow(ctx, arguments[3:], arguments[1], time.Duration(seconds)*time.Second, output)
+	}
+	if len(arguments) >= 2 && arguments[0] == "--notice" {
+		return probeNotice(ctx, arguments[2:], arguments[1], output)
 	}
 	if len(arguments) >= 3 && arguments[0] == "--message" {
 		return probeMessage(ctx, arguments[3:], true, arguments[1], arguments[2], output)
@@ -291,6 +295,10 @@ func handle(connection net.Conn, agent agentContext) {
 			if err := classroomview.Write(connection, messageReply(agent.notice, message)); err != nil {
 				return
 			}
+		case classroomview.TypeNotice:
+			if err := classroomview.Write(connection, noticeReply(agent.notice, message)); err != nil {
+				return
+			}
 		case classroomview.TypeBroadcastFrame, classroomview.TypeBroadcastStop:
 			reply := classroomview.Message{Type: classroomview.TypeBroadcastShown}
 			switch {
@@ -317,7 +325,11 @@ func handle(connection net.Conn, agent agentContext) {
 				return
 			}
 		case classroomview.TypeCollectList, classroomview.TypeCollectChunk, classroomview.TypeCollectEnd:
-			if err := classroomview.Write(connection, collectReply(&outgoing, agent.home, message)); err != nil {
+			reply := collectReply(&outgoing, agent.home, message)
+			if message.Type == classroomview.TypeCollectList && reply.Type == classroomview.TypeCollectListed && len(reply.Entries) > 0 {
+				_ = showNotice(agent.notice, classroomview.NoticeCollect)
+			}
+			if err := classroomview.Write(connection, reply); err != nil {
 				return
 			}
 		case classroomview.TypeInput:

@@ -21,6 +21,7 @@ type fakeMessenger struct {
 	mutex       sync.Mutex
 	shown       []shownMessage
 	hides       int
+	notices     []string
 	unavailable bool
 }
 
@@ -41,6 +42,16 @@ func (notice *fakeMessenger) HideMessage() error {
 		return errMessageUnavailable
 	}
 	notice.hides++
+	return nil
+}
+
+func (notice *fakeMessenger) ShowNotice(kind string) error {
+	notice.mutex.Lock()
+	defer notice.mutex.Unlock()
+	if notice.unavailable {
+		return errMessageUnavailable
+	}
+	notice.notices = append(notice.notices, kind)
 	return nil
 }
 
@@ -151,5 +162,24 @@ func TestProbeMessageRefusesAnUnknownDuration(t *testing.T) {
 	}
 	if err := probeMessage(context.Background(), nil, true, "Wait", "0", &strings.Builder{}); err == nil || errors.Is(err, errMessageUnavailable) {
 		t.Fatalf("a probe without a command = %v", err)
+	}
+}
+
+func TestAgentShowsOnlyKnownNotices(t *testing.T) {
+	notice := &fakeMessenger{}
+	exchange := messageChannel(t, agentContext{userName: "student", capture: fakeCapture{}, lock: &fakeLocker{}, notice: notice})
+	if reply := exchange(classroomview.Message{Type: classroomview.TypeNotice, Notice: classroomview.NoticeScreenshot}); reply.Type != classroomview.TypeNoticeShown {
+		t.Fatalf("screenshot reply = %+v", reply)
+	}
+	// The extension owns the words: anything else is refused.
+	if reply := exchange(classroomview.Message{Type: classroomview.TypeNotice, Notice: "Free text"}); reply.Code != classroomview.CodeBadRequest {
+		t.Fatalf("free text reply = %+v", reply)
+	}
+	if len(notice.notices) != 1 || notice.notices[0] != classroomview.NoticeScreenshot {
+		t.Fatalf("notices = %v", notice.notices)
+	}
+	unavailable := messageChannel(t, agentContext{userName: "student", capture: fakeCapture{}, lock: &fakeLocker{}, notice: &fakeMessenger{unavailable: true}})
+	if reply := unavailable(classroomview.Message{Type: classroomview.TypeNotice, Notice: classroomview.NoticeCollect}); reply.Code != classroomview.CodeMessageUnavailable {
+		t.Fatalf("unavailable reply = %+v", reply)
 	}
 }

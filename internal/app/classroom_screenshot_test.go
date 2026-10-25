@@ -40,8 +40,9 @@ func TestScreenshotAsksALiveComputerForAFullSizePicture(t *testing.T) {
 	hub := NewClassroomViewHub(func(context.Context) ([]domain.HostMeta, error) { return nil, nil }, &fakeAgentConnector{})
 	var mutex sync.Mutex
 	widths, pending := []int{}, 1
+	var notes []string
 	session := func(code string) classroomview.Session {
-		return screenshotSession{fakeAgentSession: fakeAgentSession{mutex: &mutex, closed: new(int), inputs: new(int)}, mutex: &mutex, widths: &widths, pending: &pending, code: code}
+		return screenshotSession{fakeAgentSession: fakeAgentSession{mutex: &mutex, closed: new(int), inputs: new(int), clip: &notes}, mutex: &mutex, widths: &widths, pending: &pending, code: code}
 	}
 	hub.computers["pc01"] = &ClassroomComputer{Name: "pc01", State: ClassroomViewing}
 	hub.sessions["pc01"] = session("")
@@ -65,5 +66,9 @@ func TestScreenshotAsksALiveComputerForAFullSizePicture(t *testing.T) {
 	}
 	if _, _, err := hub.Screenshot("pc09"); !errors.Is(err, ErrClassroomUnknown) {
 		t.Fatalf("unknown = %v", err)
+	}
+	// Only the computer that gave its picture tells its student, once.
+	if len(notes) != 1 || notes[0] != "notice:"+classroomview.NoticeScreenshot {
+		t.Fatalf("notices = %v", notes)
 	}
 }

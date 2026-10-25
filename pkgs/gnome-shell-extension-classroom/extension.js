@@ -30,6 +30,11 @@
 // bar (a video, a game), a small "Classroom view open" label in a corner of
 // the screen takes the place of the sharing icon. It takes no clicks or keys.
 //
+// When the teacher saves a picture of the screen or collects the files on
+// the desktop, a short notice at the bottom of the screen says so for a few
+// seconds. The agent sends only the kind; the words are here. The notice
+// takes no clicks or keys.
+//
 // When an update from the controller replaces the running system, the system
 // writes /run/nixorium/update-notice.json; a notification tells the person at
 // the computer, with a Restart button when a restart finishes the update.
@@ -53,6 +58,12 @@ const NoticeFile = 'update-notice.json';
 const RecentNoticeSeconds = 30 * 60;
 // A message that stays until the student closes it offers Close after this.
 const MessageCloseSeconds = 10;
+// The notice of a screenshot or a collection stays this long.
+const NoticeSeconds = 6;
+const NoticeTexts = {
+    screenshot: 'Your teacher saved a picture of this screen',
+    collect: 'Your teacher collected the files on your desktop',
+};
 
 // Decoded pictures of the teacher's screen live in native memory that the
 // JavaScript collector does not count: without a collection every few
@@ -87,6 +98,10 @@ const Interface = `<node>
       <arg type="b" direction="in" name="sharing"/>
     </method>
     <property name="IndicatorShown" type="b" access="read"/>
+    <method name="ShowNotice">
+      <arg type="s" direction="in" name="kind"/>
+    </method>
+    <property name="NoticeKind" type="s" access="read"/>
   </interface>
 </node>`;
 
@@ -110,6 +125,7 @@ export default class NixoriumClassroomExtension extends Extension {
         this._notice = null;
         this.HideMessage();
         this.SetControlled(false);
+        this._hideNotice();
         this._sharing = false;
         this._updateChip();
         Main.layoutManager.panelBox.disconnectObject(this);
@@ -489,6 +505,60 @@ export default class NixoriumClassroomExtension extends Extension {
 
     get Controlled() {
         return Boolean(this._control);
+    }
+
+    // D-Bus: called by the classroom agent, which has checked the kind.
+    ShowNotice(kind) {
+        const text = NoticeTexts[kind];
+        if (!text)
+            throw new Error('Unexpected notice');
+        this._hideNotice();
+        const layer = new St.Widget({
+            name: 'nixoriumClassroomNotice',
+            layout_manager: new Clutter.BinLayout(),
+        });
+        layer.add_constraint(new Clutter.BindConstraint({
+            source: global.stage,
+            coordinate: Clutter.BindCoordinate.ALL,
+        }));
+        layer.add_child(new St.Label({
+            text,
+            style: 'background-color: #20242b; border: 2px solid #78aef0; color: #ffffff; font-size: 18px; padding: 10px 24px; border-radius: 12px; margin-bottom: 48px;',
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.END,
+            x_expand: true,
+            y_expand: true,
+        }));
+        Main.layoutManager.uiGroup.add_child(layer);
+        Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+        const raiseId = Main.layoutManager.uiGroup.connect('child-added', () => {
+            Main.layoutManager.uiGroup.set_child_above_sibling(layer, null);
+            this._updateMessage();
+        });
+        const notice = {kind, layer, raiseId, timer: 0};
+        notice.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, NoticeSeconds, () => {
+            notice.timer = 0;
+            this._hideNotice();
+            return GLib.SOURCE_REMOVE;
+        });
+        this._noticeShown = notice;
+        this._service?.emit_property_changed('NoticeKind', GLib.Variant.new_string(kind));
+    }
+
+    get NoticeKind() {
+        return this._noticeShown?.kind ?? '';
+    }
+
+    _hideNotice() {
+        const notice = this._noticeShown;
+        if (!notice)
+            return;
+        this._noticeShown = null;
+        if (notice.timer)
+            GLib.source_remove(notice.timer);
+        Main.layoutManager.uiGroup.disconnect(notice.raiseId);
+        notice.layer.destroy();
+        this._service?.emit_property_changed('NoticeKind', GLib.Variant.new_string(''));
     }
 
     // D-Bus: called by the classroom agent while a capture session exists.
