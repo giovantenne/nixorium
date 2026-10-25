@@ -282,6 +282,33 @@ func TestClassroomViewIsOnUnlessTurnedOff(t *testing.T) {
 	}
 }
 
+func TestClassroomViewImpactNamesWhatStopsAndWhatStays(t *testing.T) {
+	base := validSettings()
+	off := false
+	candidate := base
+	candidate.Lab.ClassroomView = &off
+	found := ""
+	for _, impact := range SettingsImpacts(base, candidate, DiffLabSettings(base, candidate)) {
+		if impact.Kind == "classroom-view" {
+			found = impact.Detail
+		}
+	}
+	for _, want := range []string{"locking screens", "messages", "sending files", "collecting files", "dock icon", "Internet pause", "schedule", "Apply to controller", "Update computers"} {
+		if !strings.Contains(found, want) {
+			t.Fatalf("impact lacks %q: %q", want, found)
+		}
+	}
+	found = ""
+	for _, impact := range SettingsImpacts(candidate, base, DiffLabSettings(candidate, base)) {
+		if impact.Kind == "classroom-view" {
+			found = impact.Detail
+		}
+	}
+	if !strings.HasPrefix(found, "Classroom view on") {
+		t.Fatalf("turning it back on: %q", found)
+	}
+}
+
 func TestAssistantDefaultsOnAndSurvivesSettingsSave(t *testing.T) {
 	settings := validSettings()
 	data, err := MarshalLabSettings(settings)

@@ -411,7 +411,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	if model.screen != dashboardSettings || len(model.settings.menu.list.Items()) != len(routineSettingsGroups) || !strings.Contains(model.View().Content, "Regional") {
 		t.Fatalf("settings categories missing:\n%s", model.View().Content)
 	}
-	model.settings.menu.list.Select(5)
+	model.settings.menu.list.Select(6)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardSettingsEdit || !strings.Contains(demoANSI.ReplaceAllString(model.View().Content, ""), "Settings  /  Git") {

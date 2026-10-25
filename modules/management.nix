@@ -186,8 +186,8 @@ let
   # The dashboard's terminal window carries this class, so the Nixorium icon
   # brings an open dashboard forward instead of starting another.
   dashboardWindowClass = "org.nixorium.Nixorium";
-  nixoriumOpen = pkgs.writeShellApplication {
-    name = "nixorium-open";
+  nixoriumOpenAs = { name, class }: pkgs.writeShellApplication {
+    inherit name;
     # GNOME Console is the launcher's own fallback, so it is there even where
     # the desktop leaves it out.
     runtimeInputs = [ pkgs.coreutils pkgs.gnugrep (pkgs.callPackage ../pkgs/nixorium-console.nix { }) ];
@@ -202,7 +202,7 @@ let
         # context"), and it exits with status 0 either way. Watch its first
         # seconds and open another terminal instead.
         log=$(mktemp -t nixorium-open.XXXXXX)
-        ghostty --class=${dashboardWindowClass} --title=Nixorium --maximize=true -e "$SESSION" 2> >(tee "$log" >&2) &
+        ghostty --class=${class} --title=Nixorium --maximize=true -e "$SESSION" 2> >(tee "$log" >&2) &
         pid=$!
         cannot_draw() {
           grep -qE 'OpenGL version is too old|OpenGLOutdated|gtk-opengl-context|create a GL context' "$log"
@@ -238,6 +238,11 @@ let
       exit 1
     '';
   };
+  nixoriumOpen = nixoriumOpenAs { name = "nixorium-open"; class = dashboardWindowClass; };
+  # The teacher's icon opens this when the classroom view is off. Its window
+  # carries the classroom icon's class, so the dock groups it with the icon.
+  classroomDashboardOpen = nixoriumOpenAs { name = "nixorium-classroom-dashboard"; class = classroomWindowClass; };
+  classroomWindowClass = "nixorium-classroom";
   nixoriumLauncher = pkgs.makeDesktopItem {
     name = "nixorium";
     desktopName = "Nixorium";
@@ -257,14 +262,22 @@ let
       ${nixoriumPackage}/bin/nixorium classroom-view >/dev/null || exec ${nixoriumOpen}/bin/nixorium-open
     '';
   };
+  # The same desktop file name in both states, so the teacher's pinned icon
+  # keeps working. With the classroom view off it opens the Nixorium menu
+  # (power, Internet, schedule) directly.
+  classroomViewOn = labSettings.classroomView or true;
   classroomLauncher = pkgs.makeDesktopItem {
     name = "nixorium-classroom";
-    desktopName = "Classroom view";
-    comment = "See and manage the student computers of this classroom";
-    exec = "${classroomOpen}/bin/nixorium-classroom-open";
+    desktopName = if classroomViewOn then "Classroom view" else "Nixorium classroom";
+    comment = if classroomViewOn
+      then "See and manage the student computers of this classroom"
+      else "Switch computers on and off, pause Internet, set the schedule";
+    exec = if classroomViewOn
+      then "${classroomOpen}/bin/nixorium-classroom-open"
+      else "${classroomDashboardOpen}/bin/nixorium-classroom-dashboard";
     icon = "${../assets/nixorium-icon.svg}";
     categories = [ "Education" ];
-    startupWMClass = "nixorium-classroom";
+    startupWMClass = classroomWindowClass;
   };
 
   # Remove this controller's old system generations reviewed under the
@@ -303,6 +316,17 @@ in
     users.users.admin.extraGroups = [ "nixorium-operations" "nixorium-classroom" ];
     users.users.${labSettings.teacherUser}.extraGroups = [ "nixorium-classroom" ];
 
+    # Whether this controller offers the classroom view, for the TUI, the
+    # commands and the classroom worker. Written by apply to the controller,
+    # like the dock icon below; a missing file means off.
+    environment.etc."nixorium/classroom-view.json" = {
+      mode = "0444";
+      text = builtins.toJSON {
+        schemaVersion = 1;
+        enabled = labSettings.classroomView or true;
+      };
+    };
+
     environment.etc."nixorium/deployment-path" = {
       text = "${cfg.deploymentPath}\n";
       mode = "0444";
@@ -314,8 +338,8 @@ in
       nixoriumPackage
       nixoriumLauncher
       pkgs.git
-    ] ++ lib.optionals (labSettings.classroomView or true) [
       classroomLauncher
+    ] ++ lib.optionals classroomViewOn [
       # The classroom view's Send files opens it to choose a file or folder.
       pkgs.zenity
     ];

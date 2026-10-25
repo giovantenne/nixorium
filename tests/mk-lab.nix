@@ -639,6 +639,21 @@ assert (
 # It adds no network port: the controller reaches it through SSH.
 assert lib.hasInfix "tcp dport 22 accept"
   classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
+# The controller records whether it offers the classroom view; clients do not.
+assert builtins.fromJSON classroomViewLab.nixosConfigurations.pc99.config.environment.etc."nixorium/classroom-view.json".text
+  == { schemaVersion = 1; enabled = true; };
+assert (builtins.fromJSON (mkLab (baseArgs // { labConfig = labConfig // { classroomView = false; }; })).nixosConfigurations.pc99.config.environment.etc."nixorium/classroom-view.json".text).enabled == false;
+assert !(classroomViewLab.nixosConfigurations.pc01.config.environment.etc ? "nixorium/classroom-view.json");
+# The teacher's icon stays in both states (with the view off it opens the
+# Nixorium menu); the file chooser of Send files is installed only with it.
+assert
+  let
+    has = name: lab: builtins.any (package: lib.hasPrefix name (package.name or ""))
+      lab.nixosConfigurations.pc99.config.environment.systemPackages;
+    offLab = mkLab (baseArgs // { labConfig = labConfig // { classroomView = false; }; });
+  in
+  has "nixorium-classroom" classroomViewLab && has "nixorium-classroom" offLab
+  && has "zenity" classroomViewLab && !(has "zenity" offLab);
 # Assistant defaults on for controllers; explicit false and client roles stay off.
 assert plainLab.nixosConfigurations.pc99.config.environment.etc ? "nixorium/assistant.json";
 assert controllerOnly.environment.etc ? "nixorium/assistant.json";

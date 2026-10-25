@@ -157,6 +157,9 @@ func SettingsImpacts(base, candidate LabSettingsFile, changes []SettingChange) [
 		impacts = append(impacts, SettingImpact{Kind: "computers-added",
 			Detail: fmt.Sprintf("Install the new computers %s after preparing network installation again.", computerRange(base.Lab.PCCount+1, candidate.Lab.PCCount))})
 	}
+	if changed["lab.classroomView"] {
+		impacts = append(impacts, ClassroomViewImpact(candidate.Lab.ClassroomViewOn()))
+	}
 	if passwords {
 		impacts = append(impacts, SettingImpact{Kind: "passwords", Detail: "Passwords change on this controller when applied and on each computer when it is updated."})
 	}
@@ -174,4 +177,13 @@ func computerRange(first, last int) string {
 		return fmt.Sprintf("pc%02d", first)
 	}
 	return strings.Join([]string{fmt.Sprintf("pc%02d", first), fmt.Sprintf("pc%02d", last)}, "–")
+}
+
+// ClassroomViewImpact says in plain words what the classroom view setting
+// turns on or off, what does not depend on it and when it takes effect.
+func ClassroomViewImpact(on bool) SettingImpact {
+	if on {
+		return SettingImpact{Kind: "classroom-view", Detail: "Classroom view on: the classroom view page (screen previews, taking control of a computer, shared text, screenshots, showing your screen), locking screens, messages, sending files and collecting files work again, and the teacher's dock icon opens the classroom view. Internet pause, switching computers on and off and the schedule never depended on it. It starts on the controller after Apply to controller, and on the student computers after Update computers; students already signed in may need to sign in again."}
+	}
+	return SettingImpact{Kind: "classroom-view", Detail: "Classroom view off: the classroom view page (screen previews, taking control of a computer, shared text, screenshots, showing your screen), locking screens, messages, sending files and collecting files stop working, and the monitoring program is removed from the student computers. The teacher's dock icon stays and opens the Nixorium menu instead. Internet pause, switching computers on and off and the schedule keep working. It takes effect on the controller after Apply to controller, and on the student computers after Update computers; students already signed in may need to sign in again."}
 }

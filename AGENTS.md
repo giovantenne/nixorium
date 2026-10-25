@@ -895,6 +895,13 @@ that release's notes, so a release is not finished until the site follows it.
   both controller addresses are used during a change of laboratory network.
   Controller-only mode keeps the NixOS defaults. Never list an Internet pool
   on a client: it has none of its own.
+- The controller learns whether the classroom view is on from
+  `/etc/nixorium/classroom-view.json`, written by `modules/management.nix`
+  (read with `adapters.ClassroomViewApplied`, which fails closed), never from
+  `lab-settings.json`: the TUI, `nixorium lock`, the classroom worker and the
+  open page all follow what was applied. With it off the teacher's dock icon
+  (same desktop file) opens the Nixorium menu, which offers no view, lock or
+  send; Internet, power, switch on and the schedule do not depend on it.
 - The classroom view (`lab.classroomView`, on unless set to false) adds
   only a client user-session agent on a private Unix socket. The controller
   reaches it solely through its existing SSH access with the fixed

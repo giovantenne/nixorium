@@ -23,6 +23,13 @@ type settingsField struct {
 	// detected lists observed values; a typed value outside it gets a
 	// warning (the controller DHCP address).
 	detected []string
+	// closed lists only the choices above: no entry for a typed value.
+	closed bool
+}
+
+var classroomViewChoices = []settingsChoice{
+	{value: "on", label: "On", description: "See, control and lock the students' screens, show yours, send and collect files"},
+	{value: "off", label: "Off", description: "No classroom view; Internet pause, switch on and off and the schedule keep working"},
 }
 
 type settingsChoice struct {
@@ -187,7 +194,9 @@ func (model *settingsWizardModel) prepareCurrentField() {
 			other.description = "Type a device name that is not listed"
 		}
 	}
-	items = append(items, other)
+	if !field.closed {
+		items = append(items, other)
+	}
 	delegate := tuiListDelegate(model.isDark)
 	model.selector = list.New(items, delegate, model.choiceWidth(), model.choiceHeight())
 	model.selector.Title = field.label
@@ -497,6 +506,9 @@ func (model settingsWizardModel) shell() tuiShell {
 	actions := []tuiAction{}
 	if len(field.choices) > 0 && !model.custom {
 		prompt := "Choose a suggested value, or press / to search."
+		if field.closed {
+			prompt = "Choose one."
+		}
 		if field.detected != nil {
 			prompt = "Choose one of the controller's current addresses, or " + strings.TrimSuffix(field.other, "…") + " to type one."
 			if field.id == "lab.controllerIfaceName" {
@@ -698,6 +710,11 @@ func settingFieldValue(settings domain.LabSettingsFile, field string) string {
 		return settings.Lab.KeyboardLayout
 	case "lab.consoleKeyMap":
 		return settings.Lab.ConsoleKeyMap
+	case "lab.classroomView":
+		if settings.Lab.ClassroomViewOn() {
+			return "on"
+		}
+		return "off"
 	default:
 		return ""
 	}
@@ -767,6 +784,20 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		// An existing value is kept in step so older releases still evaluate.
 		if settings.Lab.ConsoleKeyMap != "" {
 			settings.Lab.ConsoleKeyMap = value
+		}
+	case "lab.classroomView":
+		switch value {
+		case "on":
+			// Back to the default: the key is left out of the file, as
+			// ClassroomViewOn reads a missing key as on. An explicit true stays.
+			if !settings.Lab.ClassroomViewOn() {
+				settings.Lab.ClassroomView = nil
+			}
+		case "off":
+			off := false
+			settings.Lab.ClassroomView = &off
+		default:
+			return settings, errors.New("must be on or off")
 		}
 	default:
 		return settings, errors.New("unsupported setting")

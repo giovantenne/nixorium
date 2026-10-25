@@ -297,7 +297,6 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 
 func runDashboardProgram(ctx context.Context, repository string, setupMode bool, stderr io.Writer) int {
 	deps := newDashboardDeps(ctx, repository, setupMode)
-	local := deps.local
 	var actions presentation.DashboardActions
 	wireAssistantActions(&actions, deps)
 	wireOverviewActions(&actions, deps)
@@ -310,7 +309,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	wireUpdatesActions(&actions, deps)
 	wireBackupActions(&actions, deps)
 	// Locking screens needs the classroom agents on the clients.
-	if !classroomViewSetting(local, repository) {
+	if !adapters.ClassroomViewApplied() {
 		actions.PlanLock, actions.ApplyLock = nil, nil
 		actions.PlanShare, actions.ApplyShare = nil, nil
 	}

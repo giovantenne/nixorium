@@ -19,18 +19,15 @@ type lockSource struct {
 	adapters.ClassroomAgentConnector
 }
 
-// classroomViewSetting reads only the classroomView switch; a missing or
-// unreadable settings file means it is off.
-func classroomViewSetting(reader interface{ ReadSettings(string) ([]byte, error) }, repository string) bool {
-	data, err := reader.ReadSettings(repository)
-	if err != nil {
-		return false
-	}
-	settings, _ := domain.DecodeLabSettings(data)
-	return settings.Lab.ClassroomViewOn()
-}
-
 func runLockCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
+	if !adapters.ClassroomViewApplied() {
+		if options.json {
+			_ = presentation.JSON(stdout, domain.LockPlan{SchemaVersion: domain.SchemaVersion, Operation: "lock-plan", State: "blocked", Action: options.lockAction, Message: domain.ClassroomViewOffMessage, Issues: []domain.ValidationIssue{{Field: "classroom", Message: domain.ClassroomViewOffMessage}}})
+		} else {
+			fmt.Fprintln(stderr, domain.ClassroomViewOffMessage)
+		}
+		return 1
+	}
 	manager := app.NewLockManager(lockSource{})
 	plan := manager.Plan(ctx, repository, options.on, options.lockAction)
 	if options.subcommand == "plan" || plan.HasErrors() {

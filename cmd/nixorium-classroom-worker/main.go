@@ -51,7 +51,7 @@ func run() error {
 	worker := classroomWorker{
 		repository: repository,
 		view:       newViewServer(hub),
-		viewOn:     func() bool { return classroomViewEnabled(adapters.Local{}, repository) },
+		viewOn:     adapters.ClassroomViewApplied,
 		inspector:  app.NewInspector(local),
 		power:      app.NewShutdownManager(local),
 		internet:   app.NewInternetManager(local),
@@ -83,6 +83,7 @@ func run() error {
 		},
 	}
 	// Showing the teacher's screen starts only from the page.
+	worker.view.enabled = worker.viewOn
 	worker.view.broadcasts = &broadcaster{manager: app.NewBroadcastManager(lockSource{local, adapters.ClassroomAgentConnector{}}), repository: repository, viewOn: worker.viewOn}
 	return adapters.NewClassroomIPCServer(adapters.ClassroomSocketPath, worker.handle).Serve(ctx)
 }
@@ -254,15 +255,4 @@ func classroomStatus(report domain.StatusReport) domain.StatusReport {
 		Meta:          report.Meta,
 		PXE:           report.PXE,
 	}
-}
-
-// classroomViewEnabled reads only the classroomView switch; a missing or
-// unreadable settings file means the view stays off.
-func classroomViewEnabled(reader interface{ ReadSettings(string) ([]byte, error) }, repository string) bool {
-	data, err := reader.ReadSettings(repository)
-	if err != nil {
-		return false
-	}
-	settings, _ := domain.DecodeLabSettings(data)
-	return settings.Lab.ClassroomViewOn()
 }
