@@ -165,6 +165,9 @@ Validation reuses a persistent evaluation cache, creates no persistent result
 roots, and must never garbage-collect the shared Nix store automatically.
 Run `git diff --check`; there is no automatic repository-wide formatter.
 
+Generated docs (`docs/tui-gallery.md`, `docs/menu-map.md`): after any TUI menu change run
+`scripts/generate-docs.sh --write`; it also refreshes `docs/menu-map.md`.
+
 Lab operation commands belong in the
 [administrator guide](templates/site/README.md) and the
 [maintainer skill](skills/nixorium-maintainer/SKILL.md), not in the upstream

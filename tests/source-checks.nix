@@ -37,7 +37,7 @@ let
   });
   documentationSource = pkgs.lib.fileset.toSource {
     root = ../.;
-    fileset = ../docs/tui-gallery.md;
+    fileset = pkgs.lib.fileset.unions [ ../docs/tui-gallery.md ../docs/menu-map.md ];
   };
 in
 {

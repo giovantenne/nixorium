@@ -5,6 +5,8 @@ changes from the administrator's Nixorium menu. It works on a private candidate
 workspace. You review the actual changes and choose whether to save them.
 Saving records a local Git commit and a backup; applying systems is separate.
 
+Assistant uses the generated [menu map](menu-map.md) for exact menu paths.
+
 ## Availability on the controller
 
 Assistant is offered by default on new installations. Existing deployments

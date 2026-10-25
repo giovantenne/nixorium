@@ -17,6 +17,7 @@ const (
 	generatedStart = "<!-- BEGIN GENERATED: tui-gallery -->"
 	generatedEnd   = "<!-- END GENERATED: tui-gallery -->"
 	galleryPath    = "docs/tui-gallery.md"
+	menuMapPath    = "docs/menu-map.md"
 	demoRevision   = "0123456789abcdef0123456789abcdef01234567"
 	demoDate       = "2026-09-23"
 )
@@ -37,6 +38,15 @@ func main() {
 	}
 	if *check && changed {
 		fmt.Fprintln(os.Stderr, "nixorium-docs: generated TUI gallery is stale; run scripts/generate-docs.sh --write")
+		os.Exit(1)
+	}
+	mapChanged, err := updateMenuMap(*repository, *write)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "nixorium-docs:", err)
+		os.Exit(1)
+	}
+	if *check && mapChanged {
+		fmt.Fprintln(os.Stderr, "nixorium-docs: generated menu map is stale; run scripts/generate-docs.sh --write")
 		os.Exit(1)
 	}
 }
@@ -86,6 +96,71 @@ func updateGallery(repository string, write bool) (bool, error) {
 		return false, fmt.Errorf("replace gallery: %w", err)
 	}
 	return true, nil
+}
+
+// updateMenuMap reports whether docs/menu-map.md differs from the generated
+// menu map and, in write mode, replaces the whole file atomically. A missing
+// file counts as stale.
+func updateMenuMap(repository string, write bool) (bool, error) {
+	path := filepath.Join(repository, menuMapPath)
+	expected := renderMenuMap()
+	info, err := os.Lstat(path)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+	case err != nil:
+		return false, fmt.Errorf("inspect %s: %w", menuMapPath, err)
+	case info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular():
+		return false, errors.New("docs/menu-map.md must be a regular file, not a symlink")
+	default:
+		current, err := os.ReadFile(path)
+		if err != nil {
+			return false, fmt.Errorf("read %s: %w", menuMapPath, err)
+		}
+		if string(current) == expected {
+			return false, nil
+		}
+	}
+	if !write {
+		return true, nil
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".menu-map-*.tmp")
+	if err != nil {
+		return false, fmt.Errorf("create temporary menu map: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if _, err := temporary.WriteString(expected); err != nil {
+		_ = temporary.Close()
+		return false, fmt.Errorf("write temporary menu map: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return false, fmt.Errorf("sync temporary menu map: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return false, fmt.Errorf("close temporary menu map: %w", err)
+	}
+	if err := os.Chmod(temporaryPath, 0o644); err != nil {
+		return false, fmt.Errorf("set menu map permissions: %w", err)
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return false, fmt.Errorf("replace menu map: %w", err)
+	}
+	return true, nil
+}
+
+// renderMenuMap lists every menu row of the TUI as "Area → Entry (key): text".
+func renderMenuMap() string {
+	var output strings.Builder
+	output.WriteString("Generated from the TUI by scripts/generate-docs.sh; do not edit it by hand.\n")
+	output.WriteString("Nixorium Assistant reads it at the laboratory's pinned release to give exact menu paths.\n")
+	for _, section := range presentation.MenuMap() {
+		fmt.Fprintf(&output, "\n## %s\n\n", section.Title)
+		for _, entry := range section.Entries {
+			fmt.Fprintf(&output, "%s (%s): %s\n", strings.Join(entry.Path, " → "), entry.Key, entry.Description)
+		}
+	}
+	return output.String()
 }
 
 func replaceGeneratedRegion(document, generated string) (string, error) {

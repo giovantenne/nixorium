@@ -96,3 +96,56 @@ func TestGalleryRejectsAmbiguousMarkersAndSymlink(t *testing.T) {
 		t.Fatal("symlink gallery was accepted")
 	}
 }
+
+func TestMenuMapIsDeterministicAndListsKnownEntries(t *testing.T) {
+	first := renderMenuMap()
+	if first != renderMenuMap() {
+		t.Fatal("identical menu definitions produced different bytes")
+	}
+	for _, expected := range []string{
+		"## Administrator menu",
+		"## Teacher dashboard",
+		"Maintenance → Update Nixorium (u): ",
+		"Computers → Classroom view (v): ",
+		"Maintenance → Change settings → Network (n): ",
+		"Maintenance → Change settings → Accounts (a): ",
+		"Maintenance → Change settings → Accounts → Change account passwords (p): ",
+		"Maintenance → Change settings → Student workspace (w): ",
+	} {
+		if !strings.Contains(first, expected) {
+			t.Fatalf("generated menu map omits %q", expected)
+		}
+	}
+	teacher := first[strings.Index(first, "## Teacher dashboard"):]
+	if !strings.Contains(teacher, "Computers → Classroom view (v): ") || strings.Contains(teacher, "Maintenance") {
+		t.Fatal("teacher section must list only classroom Computers entries")
+	}
+}
+
+func TestMenuMapCheckFailsWhenFileDiffers(t *testing.T) {
+	repository := t.TempDir()
+	path := filepath.Join(repository, menuMapPath)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := updateMenuMap(repository, false)
+	if err != nil || !changed {
+		t.Fatalf("missing file check = changed %t, err %v", changed, err)
+	}
+	if err := os.WriteFile(path, []byte("stale\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changed, err = updateMenuMap(repository, false)
+	if err != nil || !changed {
+		t.Fatalf("stale check = changed %t, err %v", changed, err)
+	}
+	if data, _ := os.ReadFile(path); string(data) != "stale\n" {
+		t.Fatal("check mode modified the menu map")
+	}
+	if changed, err = updateMenuMap(repository, true); err != nil || !changed {
+		t.Fatalf("write = changed %t, err %v", changed, err)
+	}
+	if changed, err = updateMenuMap(repository, false); err != nil || changed {
+		t.Fatalf("check after write = changed %t, err %v", changed, err)
+	}
+}

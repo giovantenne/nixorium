@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `docs/menu-map.md`, generated from the TUI's own menu definitions by
+  `scripts/generate-docs.sh` and checked for staleness with the TUI gallery, so
+  the Assistant can give exact menu paths without a hand-kept table.
 - The Assistant can now also turn the classroom view on or off, change the
   number of client computers and rename the teacher and student accounts, as
   the menu does, through the same review. The review shows the same warnings
