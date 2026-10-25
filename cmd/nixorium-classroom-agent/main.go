@@ -339,13 +339,10 @@ func handle(connection net.Conn, agent agentContext) {
 				return
 			}
 		case classroomview.TypeCollectList, classroomview.TypeCollectChunk, classroomview.TypeCollectEnd:
-			// Only a collection that handed data over is told to the
-			// student; a review that is opened and closed is not.
-			handedOver := message.Type == classroomview.TypeCollectEnd && outgoing != nil && (outgoing.index > 0 || outgoing.sent > 0)
+			// The controller asks for the collect notice (notice.show)
+			// once a collection succeeded: a review also lists and ends,
+			// and a desktop of folders or empty files hands no bytes over.
 			reply := collectReply(&outgoing, agent.home, message)
-			if handedOver {
-				_ = showNotice(agent.notice, classroomview.NoticeCollect)
-			}
 			if err := classroomview.Write(connection, reply); err != nil {
 				return
 			}

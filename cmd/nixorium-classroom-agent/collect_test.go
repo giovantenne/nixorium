@@ -202,7 +202,7 @@ func TestCollectionEndsWithTheConnection(t *testing.T) {
 	}
 }
 
-func TestCollectNoticeComesOnlyAfterDataWasHandedOver(t *testing.T) {
+func TestCollectShowsNoNoticeByItself(t *testing.T) {
 	home, desktop := studentHome(t)
 	if err := os.MkdirAll(desktop, 0o755); err != nil {
 		t.Fatal(err)
@@ -225,26 +225,18 @@ func TestCollectNoticeComesOnlyAfterDataWasHandedOver(t *testing.T) {
 		}
 		return reply
 	}
-	seen := func() int {
-		notice.mutex.Lock()
-		defer notice.mutex.Unlock()
-		return len(notice.notices)
-	}
-	// A review that is opened and closed tells the student nothing.
+	// The controller asks for the notice once a collection succeeded; a
+	// review (list, end) and a collection (list, piece, end) show nothing.
 	exchange(classroomview.Message{Type: classroomview.TypeCollectList})
 	exchange(classroomview.Message{Type: classroomview.TypeCollectEnd})
-	if seen() != 0 {
-		t.Fatalf("a review without data showed %v", notice.notices)
-	}
 	exchange(classroomview.Message{Type: classroomview.TypeCollectList})
 	if reply := exchange(classroomview.Message{Type: classroomview.TypeCollectChunk, Index: 0}); reply.Type != classroomview.TypeCollectData {
 		t.Fatalf("piece = %+v", reply)
 	}
-	if seen() != 0 {
-		t.Fatal("the notice came before the end")
-	}
 	exchange(classroomview.Message{Type: classroomview.TypeCollectEnd})
-	if seen() != 1 || notice.notices[0] != classroomview.NoticeCollect {
+	notice.mutex.Lock()
+	defer notice.mutex.Unlock()
+	if len(notice.notices) != 0 {
 		t.Fatalf("notices = %v", notice.notices)
 	}
 }

@@ -217,13 +217,15 @@ pkgs.testers.runNixOSTest {
     # arrive with explicit modes, links stay out, and the student keeps
     # every file.
     client.succeed("ln -s /etc/shadow /home/student/Desktop/shadow && install -d /tmp/collected")
-    # Nothing was collected yet: the student is told only after the files
-    # have gone.
     client.succeed(classroom_property + "NoticeKind' | grep -vF collect")
     client.succeed("${agent} probe --collect /tmp/collected nixorium-classroom-connect | tee /dev/stderr | grep -F 'collect.done Lesson, Lesson (2), run (2).sh, run.sh skipped=0'")
     client.succeed("grep -qx notes /tmp/collected/Lesson/notes.txt && grep -qx notes '/tmp/collected/Lesson (2)/notes.txt' && test ! -e /tmp/collected/shadow")
-    # The student's screen told it, with the extension's own words, and the
-    # notice goes by itself.
+    # The agent does not tell by itself (a review lists and ends too): the
+    # controller asks for the notice once a collection succeeded, which the
+    # probe stands in for here. The notice uses the extension's own words
+    # and goes by itself.
+    client.succeed(classroom_property + "NoticeKind' | grep -vF collect")
+    client.succeed("${agent} probe --notice collect nixorium-classroom-connect | grep -F 'notice.shown'")
     client.succeed(classroom_property + "NoticeKind' | grep -F collect")
     client.sleep(1)
     client.screenshot("classroom-notice-collect")

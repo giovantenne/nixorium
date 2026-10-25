@@ -267,6 +267,10 @@ func (m *CollectManager) collect(ctx context.Context, host domain.HostMeta, coll
 		outcome.Detail = "The copy was interrupted; nothing was collected from this computer."
 		return outcome
 	}
+	// The student's screen tells that the desktop was collected, folders
+	// and empty files included; a review never reaches this point. A
+	// computer that cannot show it keeps its collection.
+	_ = session.Notice(classroomview.NoticeCollect)
 	files, bytes := collectSize(entries)
 	outcome.State, outcome.Items, outcome.Bytes = domain.CollectCollected, files, bytes
 	outcome.Detail = collectDescription(files, bytes, skipped)
