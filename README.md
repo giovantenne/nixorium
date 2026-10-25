@@ -100,6 +100,9 @@ together. Open **Nixorium** for the restricted classroom dashboard.
   one in its own window, take control or save a screenshot of it, lock
   screens, show students a message, collect students' files from their desktops,
   share your own screen, and send a file or folder to the students' desktops.
+  Students can tell when the classroom view is open: while it is, GNOME shows
+  its screen-sharing indicator at the top of their screen. Screens are shown,
+  not recorded, and nothing leaves the laboratory network.
 - **Control the room.** See which PCs are on, switch them on from the
   classroom view, pause or restore Internet on selected PCs, and shut them
   down or restart them. Teacher controls do not change the laboratory
