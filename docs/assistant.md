@@ -540,11 +540,15 @@ The new commit is `Save reviewed Assistant proposal`. Its parent and a durable
 `refs/nixorium/assistant-backups/…` ref preserve the previous committed tree.
 The result displays the backup. Nothing is built or activated by saving.
 
-The next action opens the ordinary **Apply to this controller** review. After
-verified application at the saved revision, **Update computers** opens client
-selection with fresh inventory and another review. Neither action runs
-automatically. Use a new chat for further proposals after saving, since the
-previous conversation remains tied to its original base commit.
+With **Save and update the controller**, a clean controller review is applied
+without another key press. After verified application at the saved revision,
+the client review opens with fresh inventory and only the computers whose
+system the change alters selected; computers are never updated without that
+review's confirmation. When the change alters no client computer, the flow
+stops at the controller and says the computers need no update. With **Save
+only**, nothing runs: apply and update later from the menus. Use a new chat
+for further proposals after saving, since the previous conversation remains
+tied to its original base commit.
 
 ### Core override mode
 

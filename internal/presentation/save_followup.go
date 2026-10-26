@@ -124,28 +124,77 @@ func (model dashboardModel) continueSaved(auto bool) (tea.Model, tea.Cmd) {
 	})
 }
 
+// assistantChangedClients returns the client computers whose system the
+// reviewed Assistant change alters, or nil when the review cannot say. It
+// reads the controller's name from the inventory the review loaded.
+func (model dashboardModel) assistantChangedClients() map[string]bool {
+	plan := model.assistant.review.plan
+	controller := model.report.Meta.Controller.Name
+	if !plan.Evaluation.OK || plan.ChangedHosts == nil || controller == "" {
+		return nil
+	}
+	clients := map[string]bool{}
+	for _, host := range plan.ChangedHosts {
+		if host != controller {
+			clients[host] = true
+		}
+	}
+	return clients
+}
+
+// assistantClientsUnchanged reports a saved Assistant change that alters no
+// client computer, so the computers need no update for it.
+func (model dashboardModel) assistantClientsUnchanged() bool {
+	clients := model.assistant.review.changedClients
+	return clients != nil && len(clients) == 0
+}
+
 func (model dashboardModel) openSavedDeployment(auto bool) (tea.Model, tea.Cmd) {
 	if model.actions.LoadInventory == nil || model.actions.PlanDeployment == nil {
 		model.message = "Computer deployment is unavailable in this session."
 		return model, nil
 	}
 	origin := model.screen
+	// The Assistant path selects only the computers its review found changed,
+	// and stops at the controller when there are none.
+	var changed map[string]bool
+	if auto && origin == dashboardAssistantReview {
+		changed = model.assistant.review.changedClients
+		if changed != nil && len(changed) == 0 {
+			model.message = ""
+			return model, nil
+		}
+	}
 	return model.loadInventoryThen(func(ready dashboardModel) (tea.Model, tea.Cmd) {
 		if len(ready.report.Meta.Clients.Hosts) == 0 {
 			ready.message = "No client computers are configured."
 			return ready, nil
 		}
+		names := []string{}
+		if auto {
+			for _, host := range ready.report.Meta.Clients.Hosts {
+				if changed == nil || changed[host.Name] {
+					names = append(names, host.Name)
+				}
+			}
+			if len(names) == 0 {
+				ready.screen, ready.message = origin, ""
+				return ready, nil
+			}
+		}
 		ready.screen = dashboardDeploy
 		ready.deployment = deploymentModel{chosen: map[string]bool{}, origin: origin, context: "Saved configuration: select computers, review again and confirm. Student-home and keyboard changes may require the next computer start."}
+		if changed != nil {
+			ready.deployment.context = "Saved configuration: the computers whose system this change alters are selected; review again and confirm. Student-home and keyboard changes may require the next computer start."
+		}
 		ready.confirmation, ready.message, ready.navigation.pageScroll = "", "", 0
 		if !auto {
 			return ready, nil
 		}
-		// Every configured computer starts selected, as on the deployment review.
-		names := make([]string, 0, len(ready.report.Meta.Clients.Hosts))
-		for _, host := range ready.report.Meta.Clients.Hosts {
-			ready.deployment.chosen[host.Name] = true
-			names = append(names, host.Name)
+		// Every computer the change alters starts selected; without a review,
+		// every configured computer, as on the deployment review.
+		for _, name := range names {
+			ready.deployment.chosen[name] = true
 		}
 		requested := strings.Join(names, ",")
 		if ready.actions.LoadRemoteInstall != nil {

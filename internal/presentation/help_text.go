@@ -32,7 +32,7 @@ var screenHelp = map[dashboardScreen]helpText{
 	}},
 	dashboardHome: helpText{},
 	dashboardAssistantReview: helpText{head: []string{
-		"Choose Technical details to scroll the full comparison.", "Save and update the controller (Ctrl+R, then Enter) saves a local commit and a backup, updates this controller, then lets you choose the computers.", "Save only keeps the change; update computers later from Computers → Update computers. Esc goes back.",
+		"Choose Technical details to scroll the full comparison.", "Save and update the controller (Ctrl+R, then Enter) saves a local commit and a backup, updates this controller, then opens the computer review with the computers the change alters selected; when it alters none, no computer needs updating.", "Save only keeps the change; update computers later from Computers → Update computers. Esc goes back.",
 		"After saving, update one computer first and check it before the others.",
 	}},
 	dashboardAssistant: helpText{tail: []string{

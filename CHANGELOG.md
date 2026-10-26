@@ -27,6 +27,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- After an Assistant proposal is saved and applied to the controller, the
+  client review selects only the computers whose system the change alters,
+  instead of every computer. When the change alters no client computer, the
+  flow stops at the controller and says the computers need no update.
 - The laboratory network is wired, and the documentation now says so: every
   computer needs an Ethernet cable. The settings refuse a Wi-Fi card name
   (`wl…`) for the controller, the clients and single computers, and the review

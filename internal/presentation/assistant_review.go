@@ -21,6 +21,9 @@ type assistantReviewModel struct {
 	cursor   int
 	scroll   int
 	saving   bool
+	// changedClients holds, once saved, the client computers whose system
+	// the reviewed change alters; nil when the review could not say.
+	changedClients map[string]bool
 }
 type assistantSavePlanMsg struct{ plan domain.AssistantSavePlan }
 type assistantSaveResultMsg struct{ result domain.TemplateResetResult }
@@ -50,6 +53,8 @@ func (model dashboardModel) finishAssistantSave(msg assistantSaveResultMsg) (tea
 	model.busy, model.message = "", ""
 	model.navigation.pageScroll = 0
 	if msg.result.State == "saved" && !msg.result.RecoveryRequired {
+		// Read before noteControllerSave forgets the reviewed inventory.
+		model.assistant.review.changedClients = model.assistantChangedClients()
 		model.noteControllerSave(msg.result.Revision)
 		model.assistant.changedFiles = 0
 		model.assistant.saved = true
@@ -62,6 +67,16 @@ func (model dashboardModel) finishAssistantSave(msg assistantSaveResultMsg) (tea
 		return model.continueSaved(true)
 	}
 	return model, nil
+}
+
+// assistantSavedDone reports a saved change with nothing left to do here:
+// saved only, or applied to the controller and altering no client computer.
+func (model dashboardModel) assistantSavedDone() bool {
+	saved, revision := model.saveFollowupState()
+	if !saved {
+		return false
+	}
+	return model.assistant.review.saveOnly || (controllerVerifiedForSave(revision, model.controller.result) && model.assistantClientsUnchanged())
 }
 
 func (model dashboardModel) assistantBackToChat() (tea.Model, tea.Cmd) {
@@ -96,7 +111,7 @@ func (model dashboardModel) updateAssistantReviewKey(key tea.KeyPressMsg) (tea.M
 			return model.openResetRecovery()
 		}
 		if key.String() == "enter" {
-			if saved, _ := model.saveFollowupState(); saved && r.saveOnly {
+			if model.assistantSavedDone() {
 				return model.assistantBackToChat()
 			}
 			return model.continueSavedConfiguration()
@@ -270,6 +285,8 @@ func (model dashboardModel) assistantReviewView() string {
 			switch {
 			case r.saveOnly:
 				body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". Computers were not updated.\nYou can update them later from Computers → Update computers: try one computer first, check it, then update the others."
+			case controllerVerifiedForSave(r.result.Revision, model.controller.result) && model.assistantClientsUnchanged():
+				body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". The controller is up to date.\nThe client computers do not change with this save: they need no update."
 			case controllerVerifiedForSave(r.result.Revision, model.controller.result):
 				body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". The controller is up to date.\nUpdate the computers from Computers → Update computers: try one computer first, check it, then update the others."
 			default:
@@ -279,7 +296,7 @@ func (model dashboardModel) assistantReviewView() string {
 			body += "\nBackup: " + r.result.BackupRef
 		}
 		actions = model.saveFollowupActions("Chat")
-		if saved, _ := model.saveFollowupState(); saved && r.saveOnly {
+		if model.assistantSavedDone() {
 			actions = []tuiAction{{key: "Enter", label: "Chat"}, {key: "F1", label: "Help"}}
 		}
 		if r.result.RecoveryRequired {

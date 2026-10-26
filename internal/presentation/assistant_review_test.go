@@ -225,6 +225,7 @@ type assistantChain struct {
 	planReport                                  domain.ControllerRebuildPlanReport
 	applyReport                                 domain.ControllerRebuildExecutionReport
 	clients                                     []domain.HostMeta
+	requested                                   string
 }
 
 func assistantChainFixture(t testing.TB, c *assistantChain) dashboardModel {
@@ -251,7 +252,12 @@ func assistantChainFixture(t testing.TB, c *assistantChain) dashboardModel {
 	}
 	m.actions.PlanDeployment = func(_ context.Context, requested string) domain.DeploymentPlanReport {
 		c.deploys++
-		return domain.DeploymentPlanReport{State: "ready", Requested: requested, Targets: []domain.DeploymentTarget{{Name: "pc01"}, {Name: "pc02"}}}
+		c.requested = requested
+		targets := []domain.DeploymentTarget{}
+		for _, name := range strings.Split(requested, ",") {
+			targets = append(targets, domain.DeploymentTarget{Name: name})
+		}
+		return domain.DeploymentPlanReport{State: "ready", Requested: requested, Targets: targets}
 	}
 	return m
 }
@@ -299,11 +305,31 @@ func TestAssistantSaveAndUpdateControllerWithOneEnter(t *testing.T) {
 	if c.saves != 1 || c.plans != 1 || c.applies != 1 || c.inventories != 1 || c.deploys != 1 {
 		t.Fatalf("calls: %+v", *c)
 	}
-	if m.screen != dashboardDeployReview || len(m.deployment.chosen) != 2 || !m.deployment.chosen["pc01"] || !m.deployment.chosen["pc02"] {
-		t.Fatalf("screen=%v chosen=%v message=%s", m.screen, m.deployment.chosen, m.message)
+	// Only the computer the review found changed starts selected.
+	if m.screen != dashboardDeployReview || len(m.deployment.chosen) != 1 || !m.deployment.chosen["pc01"] || c.requested != "pc01" {
+		t.Fatalf("screen=%v chosen=%v requested=%q message=%s", m.screen, m.deployment.chosen, c.requested, m.message)
 	}
 	if !m.assistant.saved || m.assistant.changedFiles != 0 || m.controller.autoApply || m.controller.fromSave {
 		t.Fatal("assistant or controller flags not settled")
+	}
+}
+
+func TestAssistantChainStopsAtControllerWhenNoClientChanges(t *testing.T) {
+	c := &assistantChain{}
+	m := assistantChainFixture(t, c)
+	m.assistant.review.plan.ChangedHosts = []string{"pc99"}
+	m = runChain(t, m)
+	if c.applies != 1 || c.inventories != 0 || c.deploys != 0 || m.screen != dashboardAssistantReview {
+		t.Fatalf("calls: %+v screen=%v", *c, m.screen)
+	}
+	view := strings.Join(strings.Fields(ansi.Strip(m.View().Content)), " ")
+	if !strings.Contains(view, "The controller is up to date") || !strings.Contains(view, "they need no update") || strings.Contains(view, "Update computers") {
+		t.Fatal(view)
+	}
+	updated, _ := m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	if m.screen != dashboardAssistant || c.inventories != 0 {
+		t.Fatalf("Enter did not return to the chat: %v", m.screen)
 	}
 }
 
