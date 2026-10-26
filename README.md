@@ -56,6 +56,13 @@ in plain language and review them before saving.
 
 The **Community Edition** is free and open source.
 
+Assistant grew out of the maintainer's own lab: for customizations the menu
+does not offer, asking an AI had become more common than editing the
+configuration by hand, so it became a bounded, reviewed part of the product.
+It is paid because every request runs on a commercial AI model; the
+subscription also supports Nixorium's development, and Nixorium stays complete
+and MIT-licensed without it.
+
 ![The Nixorium administrator menu, with Computers, Installation, Software, Maintenance and the optional Assistant area enabled](docs/images/nixorium-tui.png)
 
 - **One description, every PC.** Add software or change the student desktop
