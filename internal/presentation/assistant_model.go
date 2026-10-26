@@ -61,6 +61,7 @@ type assistantModel struct {
 	labName                      textinput.Model
 	initialized                  bool
 	changedFiles                 int
+	unfinished, turnAdmitted     bool
 	review                       assistantReviewModel
 	state                        string
 	input                        textarea.Model
@@ -346,6 +347,11 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 		if message.conversation.ID != "" {
 			model.assistant.conversation = message.conversation
 		}
+		// Only an admitted turn can change the proposal; one refused before it
+		// started leaves the previous state as it was.
+		if model.assistant.turnAdmitted {
+			model.assistant.unfinished = message.result == nil || message.result.Outcome != "final"
+		}
 		if message.result != nil {
 			if model.assistant.summary == "" && message.result.Summary != "" {
 				model.assistant.appendSummary(message.result.Summary)
@@ -374,6 +380,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 	}
 	switch event.Type {
 	case "turn_started":
+		model.assistant.turnAdmitted = true
 		model.assistant.input.Reset()
 	case "transcript_size":
 		model.assistant.maxRequestBytes = event.MaxRequestBytes
@@ -615,6 +622,7 @@ func (model dashboardModel) startAssistantRunner() (tea.Model, tea.Cmd) {
 	actions := model.actions.AssistantService
 	conversationID := model.assistant.conversation.ID
 	model.assistant.canReport = false
+	model.assistant.turnAdmitted = false
 	model.assistant.streamed, model.assistant.summary = "", ""
 	model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "user", text: model.assistant.input.Value()})
 	model.assistant.historyScroll = 0

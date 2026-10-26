@@ -600,3 +600,41 @@ func TestAssistantQuotaHeaderUsesServiceStateAndRecovers(t *testing.T) {
 		}
 	}
 }
+
+func TestAssistantProposalIncompleteAfterAnUnfinishedAdmittedTurn(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) {})
+	turn := func(admitted bool, result *domain.AssistantTurnResult, err error) {
+		m.assistant.turnAdmitted = false
+		m.assistant.state = "running"
+		if admitted {
+			updated, _ := m.finishAssistantStream(assistantStreamMsg{id: m.assistant.id, event: domain.AssistantEvent{Type: "turn_started"}})
+			m = updated.(dashboardModel)
+		}
+		updated, _ := m.finishAssistantStream(assistantStreamMsg{id: m.assistant.id, done: true, changedFiles: 2, result: result, err: err})
+		m = updated.(dashboardModel)
+	}
+	banner := func() string {
+		view := ansi.Strip(m.View().Content)
+		switch {
+		case strings.Contains(view, "Proposal incomplete · 2 files changed"):
+			return "incomplete"
+		case strings.Contains(view, "Proposal ready · 2 files changed"):
+			return "ready"
+		}
+		return view
+	}
+	failure := &domain.AssistantError{Code: "protocol_error", Message: "Synthetic invalid response"}
+	turn(true, &domain.AssistantTurnResult{}, failure)
+	if banner() != "incomplete" || !m.assistant.unfinished {
+		t.Fatal("failed turn advertised a ready proposal", banner())
+	}
+	// A request refused before it starts cannot change the proposal.
+	turn(false, nil, &domain.AssistantError{Code: "quota_exhausted"})
+	if banner() != "incomplete" {
+		t.Fatal("refused request hid the unfinished proposal")
+	}
+	turn(true, &domain.AssistantTurnResult{Outcome: "final", Summary: "Done"}, nil)
+	if banner() != "ready" {
+		t.Fatal("finished turn not ready", banner())
+	}
+}

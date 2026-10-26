@@ -116,7 +116,7 @@ func TestAssistantHistoryActivityAnswerAndSavedState(t *testing.T) {
 		t.Fatal(err)
 	}
 	h, err := store.ConversationHistory(t.Context(), repo, old.ID)
-	if err != nil || h.Conversation.LastActivityAt == old.LastActivityAt || h.Conversation.Title != "Original title" || *h.Conversation.LastAnswer != strings.Repeat("é", 1999)+"…" {
+	if err != nil || h.Conversation.LastActivityAt == old.LastActivityAt || h.Conversation.Unfinished || h.Conversation.Title != "Original title" || *h.Conversation.LastAnswer != strings.Repeat("é", 1999)+"…" {
 		t.Fatal(h, err)
 	}
 	partial := append(messages, domain.AssistantMessage{Role: "user", Content: "Later question"}, domain.AssistantMessage{Role: "assistant", Content: "Failed partial"})
@@ -127,7 +127,7 @@ func TestAssistantHistoryActivityAnswerAndSavedState(t *testing.T) {
 		t.Fatal(err)
 	}
 	h, err = store.ConversationHistory(t.Context(), repo, old.ID)
-	if err != nil || strings.Contains(*h.Conversation.LastAnswer, "Failed partial") || h.Conversation.Title != "Original title" {
+	if err != nil || strings.Contains(*h.Conversation.LastAnswer, "Failed partial") || h.Conversation.Title != "Original title" || !h.Conversation.Unfinished {
 		t.Fatal(h, err)
 	}
 	if err := store.markConversationSaved(old.ID); err != nil {

@@ -222,6 +222,12 @@ func (model dashboardModel) assistantProposalHosts() string {
 	return text
 }
 
+// The last turn ended without a final answer: the files may be half changed.
+const (
+	assistantUnfinishedBanner = "Proposal incomplete · "
+	assistantUnfinishedReview = "⚠ Assistant stopped before finishing: this proposal may be incomplete. Check what changes, or return to the chat and ask Assistant to continue."
+)
+
 const assistantCoreOverrideWarning = "⚠ Core override: this proposal forces NixOS options set by Nixorium. It is unsupported and may stop working after a Nixorium update. Update one computer first; if it does not boot or loses the network, pick the previous generation in the GRUB menu on that computer."
 
 // assistantCoreOverrideNotice is empty unless the plan lists files that
@@ -325,6 +331,9 @@ func (model dashboardModel) assistantReviewView() string {
 		}
 		if notice := model.assistantCoreOverrideNotice(); notice != "" {
 			fixed = notice + "\n"
+		}
+		if model.assistant.unfinished {
+			fixed += assistantUnfinishedReview + "\n"
 		}
 		switch {
 		case !r.plan.Evaluation.OK:

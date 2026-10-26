@@ -393,9 +393,12 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 		fixed = append(fixed, model.activitySpinner.View()+fmt.Sprintf(" Working… %ds · Esc to stop", seconds))
 	}
 	if model.assistant.changedFiles > 0 {
-		left := "Proposal ready · " + countNoun(model.assistant.changedFiles, "file") + " changed"
+		left, status := "Proposal ready · "+countNoun(model.assistant.changedFiles, "file")+" changed", tuiStatusSuccess
+		if model.assistant.unfinished {
+			left, status = assistantUnfinishedBanner+countNoun(model.assistant.changedFiles, "file")+" changed", tuiStatusAttention
+		}
 		right := "Ctrl+R to review"
-		fixed = append(fixed, model.assistantBox(left+strings.Repeat(" ", max(1, width-4-lipgloss.Width(left)-len(right)))+right, width, tuiStatusSuccess))
+		fixed = append(fixed, model.assistantBox(left+strings.Repeat(" ", max(1, width-4-lipgloss.Width(left)-len(right)))+right, width, status))
 	}
 	fixed = append(fixed, inputBox)
 	if model.assistant.state == "history" {

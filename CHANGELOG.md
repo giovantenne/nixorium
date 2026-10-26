@@ -63,6 +63,7 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Assistant no longer shows a green "Proposal ready" when a request ended without its final answer (an error, Esc or a limit): the box turns yellow, "Proposal incomplete", and the review warns that the proposal may be half done before you save it. Conversations that end this way are now also shared with the Assistant service, when sharing is on; a request you stop with Esc is not.
 - Preparing npm packages works behind a school proxy: the controller reads the
   npm registry through the system proxy settings (`http_proxy`, `https_proxy`,
   `no_proxy`), like its other Internet requests.

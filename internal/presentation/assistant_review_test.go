@@ -534,3 +534,16 @@ func TestAssistantSaveFlowIsUnchangedByCoreOverrideWarning(t *testing.T) {
 		t.Fatalf("calls: %+v screen=%v", *c, m.screen)
 	}
 }
+
+func TestAssistantReviewWarnsAboutAnUnfinishedProposal(t *testing.T) {
+	m := assistantReviewFixture(t)
+	m.width, m.height = 80, 24
+	if view := ansi.Strip(m.View().Content); strings.Contains(view, "Assistant stopped before finishing") {
+		t.Fatal("finished proposal warned", view)
+	}
+	m.assistant.unfinished = true
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(strings.Join(strings.Fields(view), " "), "⚠ Assistant stopped before finishing: this proposal may be incomplete.") || !strings.Contains(view, "Save and update the controller") || lipgloss.Height(view) > 24 {
+		t.Fatal(view)
+	}
+}

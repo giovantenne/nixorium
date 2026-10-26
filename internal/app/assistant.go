@@ -105,9 +105,12 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 	if runner.Store == nil || runner.Client == nil || runner.Tools == nil {
 		return result, errors.New("Assistant is not configured.")
 	}
+	// An admitted turn is shared however it ends, a transport or protocol
+	// failure included, unless the technician stopped it.
+	admitted, stopped := false, ctx
 	if runner.Sharing != nil {
 		defer func() {
-			if result.Outcome == "final" || result.Outcome == "error" {
+			if result.Outcome == "final" || result.Outcome == "error" || (admitted && runErr != nil && stopped.Err() == nil) {
 				runner.Sharing.ShareCompleted(conversation)
 			}
 		}()
@@ -153,6 +156,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 	if err != nil {
 		return result, err
 	}
+	admitted = true
 	// Local UI acknowledgement; emitted only after the service admits the turn.
 	defer func() {
 		var answer *string

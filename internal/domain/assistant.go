@@ -186,6 +186,9 @@ type AssistantConversation struct {
 	Title          string  `json:"title,omitempty"`
 	SavedAt        string  `json:"savedAt,omitempty"`
 	LastAnswer     *string `json:"lastAnswer,omitempty"`
+	// Unfinished records that the last admitted turn ended without a final
+	// answer (error, stop or limit): the proposal may be half done.
+	Unfinished bool `json:"unfinished,omitempty"`
 }
 
 type AssistantConversationHistory struct {
