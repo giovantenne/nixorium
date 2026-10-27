@@ -40,3 +40,28 @@ func TestAssistantRedactsKnownSecrets(t *testing.T) {
 		t.Fatal("ordinary content changed")
 	}
 }
+
+func TestAssistantRedactionPatterns(t *testing.T) {
+	secretKey := "cache.example-1:" + strings.Repeat("A1b+", 21) + "xY" + "=="
+	publicKey := "cache.example-1:" + strings.Repeat("A1b+", 10) + "xyz="
+	for _, test := range []struct{ name, input, want string }{
+		{"yescrypt", "hash = \"$y$j9T$salt$digest\";", "hash = \"[REDACTED]\";"},
+		{"sha256 crypt", "x $5$salt$digest y", "x [REDACTED] y"},
+		{"bcrypt", "$2b$12$abcdefghijklmnopqrstuv", "[REDACTED]"},
+		{"bcrypt 2y", "$2y$10$abcdefghijklmnopqrstuv", "[REDACTED]"},
+		{"age", "key AGE-SECRET-KEY-1QQQQ3QQQ9 end", "key [REDACTED] end"},
+		{"cache secret", "secret-key-file: " + secretKey + "\n", "secret-key-file: [REDACTED]\n"},
+		{"psk unquoted", "psk=hunter2hunter2\nssid=lab", "psk=[REDACTED]\nssid=lab"},
+		{"psk quoted", "networking.wireless.networks.lab.psk = \"two words\";", "networking.wireless.networks.lab.psk = [REDACTED];"},
+		{"wpa_passphrase", "wpa_passphrase=abc12345", "wpa_passphrase=[REDACTED]"},
+		{"public cache key", "trusted-public-keys = " + publicKey, "trusted-public-keys = " + publicKey},
+		{"ordinary base64", "data: " + strings.Repeat("QUJD", 30) + "==", "data: " + strings.Repeat("QUJD", 30) + "=="},
+		{"sha256 hash", "sha256-" + strings.Repeat("A1b+", 10) + "xyz=", "sha256-" + strings.Repeat("A1b+", 10) + "xyz="},
+		{"dollar variable", "echo $5 $y $2", "echo $5 $y $2"},
+		{"psk file option", "pskFile = /run/keys/psk;", "pskFile = /run/keys/psk;"},
+	} {
+		if got := RedactForModel(test.input); got != test.want {
+			t.Errorf("%s: got %q want %q", test.name, got, test.want)
+		}
+	}
+}

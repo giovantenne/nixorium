@@ -55,14 +55,22 @@ func AssistantReadOnlyPath(path string) bool {
 
 var assistantRedactions = []*regexp.Regexp{
 	regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)`),
-	regexp.MustCompile(`\$6\$[^\s"'\\]+`),
+	// Password hashes: SHA-512, SHA-256, yescrypt and bcrypt crypt formats.
+	regexp.MustCompile(`\$(?:6|5|y|2[aby])\$[^\s"'\\]+`),
 	regexp.MustCompile(`(?i)Bearer[ \t]+[A-Za-z0-9._~+/=-]+`),
 	regexp.MustCompile(`(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]+`),
+	regexp.MustCompile(`AGE-SECRET-KEY-1[A-Z0-9]+`),
+	// Nix cache secret keys are name:base64 of 64 bytes (88 characters); the
+	// 44-character public keys do not match.
+	regexp.MustCompile(`[A-Za-z0-9][A-Za-z0-9._-]*:[A-Za-z0-9+/]{86}==`),
 }
+
+// assistantValueRedaction keeps the key and hides only the value.
+var assistantValueRedaction = regexp.MustCompile(`(?i)(\b(?:psk|wpa_passphrase)[ \t]*=[ \t]*)("[^"\n]*"|[^\s]+)`)
 
 func RedactForModel(text string) string {
 	for _, pattern := range assistantRedactions {
 		text = pattern.ReplaceAllString(text, "[REDACTED]")
 	}
-	return text
+	return assistantValueRedaction.ReplaceAllString(text, "${1}[REDACTED]")
 }
