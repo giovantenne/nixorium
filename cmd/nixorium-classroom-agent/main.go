@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
+	"golang.org/x/sys/unix"
 )
 
 // SocketName is the agent socket inside the user's runtime directory.
@@ -500,18 +501,32 @@ func activeSeatUser(ctx context.Context, run commandRunner) (int, error) {
 	return uid, nil
 }
 
-// agentSocket returns the socket of uid after checking it without following links.
-func agentSocket(runtimeBase string, uid int) (string, error) {
-	path := filepath.Join(runtimeBase, strconv.Itoa(uid), SocketName)
-	info, err := os.Lstat(path)
+// agentSocket pins the socket of uid without ever following a link and returns
+// a path that stays bound to that very socket until release is called. The
+// runtime directory belongs to the student, who can replace the socket's name
+// at any moment, so checking the name and connecting to it afterwards would
+// let a link send this root process to any other socket. Instead the directory
+// and then the socket are opened with O_PATH|O_NOFOLLOW and checked through
+// their descriptors; /proc/self/fd/N names the checked socket itself.
+func agentSocket(runtimeBase string, uid int) (path string, release func(), err error) {
+	directory, err := unix.Open(filepath.Join(runtimeBase, strconv.Itoa(uid)), unix.O_PATH|unix.O_NOFOLLOW|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
 	if err != nil {
-		return "", errors.New("the classroom agent is not running in the active session")
+		return "", nil, errors.New("the classroom agent is not running in the active session")
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if info.Mode()&os.ModeSocket == 0 || !ok || int(stat.Uid) != uid {
-		return "", errors.New("the classroom agent socket is not owned by the session user")
+	defer unix.Close(directory)
+	var stat unix.Stat_t
+	if unix.Fstat(directory, &stat) != nil || int(stat.Uid) != uid {
+		return "", nil, errors.New("the classroom agent socket is not owned by the session user")
 	}
-	return path, nil
+	socket, err := unix.Openat(directory, SocketName, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return "", nil, errors.New("the classroom agent is not running in the active session")
+	}
+	if unix.Fstat(socket, &stat) != nil || stat.Mode&unix.S_IFMT != unix.S_IFSOCK || int(stat.Uid) != uid {
+		unix.Close(socket)
+		return "", nil, errors.New("the classroom agent socket is not owned by the session user")
+	}
+	return "/proc/self/fd/" + strconv.Itoa(socket), func() { unix.Close(socket) }, nil
 }
 
 // connect relays the controller's stream to the active session's agent. A
@@ -525,10 +540,11 @@ func connect(ctx context.Context, input io.Reader, output io.Writer, run command
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoSession, Detail: err.Error()})
 	}
-	path, err := agentSocket(runtimeBase, uid)
+	path, release, err := agentSocket(runtimeBase, uid)
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: err.Error()})
 	}
+	defer release()
 	connection, err := (&net.Dialer{Timeout: dialTimeout}).DialContext(ctx, "unix", path)
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: "the classroom agent does not answer"})

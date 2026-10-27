@@ -71,6 +71,7 @@ func noteServer(t *testing.T) (*viewServer, *noteLab, string, string) {
 		view:       newViewServer(fakeViewSource{}),
 		viewOn:     func() bool { return true },
 		message:    app.NewMessageManager(lab),
+		plans:      newPlanStore(),
 	}
 	worker.view.actions = worker.handle
 	address, err := worker.view.Open(1000)

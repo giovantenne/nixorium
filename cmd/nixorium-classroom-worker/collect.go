@@ -31,6 +31,7 @@ func (worker classroomWorker) handleCollect(ctx context.Context, request domain.
 		}
 		plan := worker.collect.Plan(ctx, worker.repository, request.Requested, request.CollectFolder)
 		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
+		rememberPlan(worker.plans, "collect", plan.ReviewToken, plan.ExpiresAt, plan)
 		response.CollectPlan = &plan
 	case domain.ClassroomCollectApplyOperation:
 		if worker.collect == nil || worker.collected == nil {
@@ -39,7 +40,11 @@ func (worker classroomWorker) handleCollect(ctx context.Context, request domain.
 		if request.CollectPlan == nil || request.CollectPlan.Repository != worker.repository {
 			return classroomFailure(errors.New("collect review does not belong to the fixed deployment"))
 		}
-		report := worker.collect.Apply(ctx, *request.CollectPlan, request.CollectPlan.ReviewToken)
+		plan, err := takePlan[domain.CollectPlan](worker.plans, "collect", request.CollectPlan.ReviewToken)
+		if err != nil {
+			return classroomFailure(err)
+		}
+		report := worker.collect.Apply(ctx, plan, plan.ReviewToken)
 		if report.Save != "" {
 			collection := report.Save
 			report.Save = ""
