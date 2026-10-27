@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -459,8 +460,12 @@ func sshCurrentSystemArguments(host domain.HostMeta, timeout time.Duration) []st
 	}
 }
 
+// systemPathPattern is a full store path: Nix's base32 hash (no e, o, t, u)
+// and the characters a store name may hold, so it is safe inside a shell word.
+var systemPathPattern = regexp.MustCompile(`^/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+$`)
+
 func validSystemPath(path string) bool {
-	return strings.HasPrefix(path, "/nix/store/") && filepath.Clean(path) == path && !strings.ContainsAny(path, " \t\r\n")
+	return systemPathPattern.MatchString(path)
 }
 
 func validGitRevision(revision string) bool {
