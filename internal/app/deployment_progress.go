@@ -89,6 +89,12 @@ func (m *DeploymentManager) runPhase(ctx context.Context, plan domain.Deployment
 			return err
 		case <-ticker.C:
 			emitDeploymentProgress(observe, capture.snapshot(progress))
+		case <-ctx.Done():
+			// The phase still owns the cleanup and reconciliation after a
+			// cancellation, so wait for its own result rather than abandoning it.
+			err := <-finished
+			emitDeploymentProgress(observe, capture.snapshot(progress))
+			return err
 		}
 	}
 }

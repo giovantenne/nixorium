@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"sync"
 	"syscall"
 	"time"
 
@@ -35,49 +34,7 @@ func (server *ClassroomIPCServer) Serve(ctx context.Context) error {
 	if err := validateClassroomSocketDirectory(server.socketPath); err != nil {
 		return err
 	}
-	if info, err := os.Lstat(server.socketPath); err == nil {
-		stat, ok := info.Sys().(*syscall.Stat_t)
-		if !ok || info.Mode()&os.ModeSocket == 0 || info.Mode().Perm() != 0660 || stat.Uid != uint32(os.Geteuid()) || stat.Gid != uint32(os.Getegid()) {
-			return errors.New("existing classroom socket is unsafe")
-		}
-		if err := os.Remove(server.socketPath); err != nil {
-			return fmt.Errorf("remove stale classroom socket: %w", err)
-		}
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: server.socketPath, Net: "unix"})
-	if err != nil {
-		return fmt.Errorf("listen on classroom socket: %w", err)
-	}
-	defer func() {
-		_ = listener.Close()
-		_ = os.Remove(server.socketPath)
-	}()
-	if err := os.Chmod(server.socketPath, 0660); err != nil {
-		return fmt.Errorf("secure classroom socket: %w", err)
-	}
-	go func() {
-		<-ctx.Done()
-		_ = listener.Close()
-	}()
-	var clients sync.WaitGroup
-	defer clients.Wait()
-	for {
-		connection, err := listener.AcceptUnix()
-		if err != nil {
-			if ctx.Err() != nil {
-				return nil
-			}
-			return fmt.Errorf("accept classroom IPC client: %w", err)
-		}
-		clients.Add(1)
-		go func() {
-			defer clients.Done()
-			defer connection.Close()
-			server.serveConnection(ctx, connection)
-		}()
-	}
+	return serveUnixSocket(ctx, server.socketPath, "classroom", 0660, true, server.serveConnection)
 }
 
 type classroomPeerKey struct{}
@@ -96,15 +53,8 @@ func WithClassroomPeerUID(ctx context.Context, uid int) context.Context {
 
 // peerUID reads the kernel's record of the connecting process's user.
 func peerUID(connection *net.UnixConn) (int, bool) {
-	raw, err := connection.SyscallConn()
+	credentials, err := peerCredentials(connection)
 	if err != nil {
-		return 0, false
-	}
-	var credentials *syscall.Ucred
-	var credentialsErr error
-	if err := raw.Control(func(descriptor uintptr) {
-		credentials, credentialsErr = syscall.GetsockoptUcred(int(descriptor), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
-	}); err != nil || credentialsErr != nil {
 		return 0, false
 	}
 	return int(credentials.Uid), true

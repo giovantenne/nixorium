@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"sync"
 	"syscall"
 	"time"
 
@@ -35,49 +34,7 @@ func (server *RemoteInstallIPCServer) Serve(ctx context.Context) error {
 	if err := validateRemoteSocketDirectory(server.socketPath); err != nil {
 		return err
 	}
-	if info, err := os.Lstat(server.socketPath); err == nil {
-		stat, ok := info.Sys().(*syscall.Stat_t)
-		if !ok || info.Mode()&os.ModeSocket == 0 || info.Mode().Perm() != 0600 || stat.Uid != uint32(os.Geteuid()) {
-			return errors.New("existing remote installation socket is unsafe")
-		}
-		if err := os.Remove(server.socketPath); err != nil {
-			return fmt.Errorf("remove stale remote installation socket: %w", err)
-		}
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: server.socketPath, Net: "unix"})
-	if err != nil {
-		return fmt.Errorf("listen on remote installation socket: %w", err)
-	}
-	defer func() {
-		_ = listener.Close()
-		_ = os.Remove(server.socketPath)
-	}()
-	if err := os.Chmod(server.socketPath, 0600); err != nil {
-		return fmt.Errorf("secure remote installation socket: %w", err)
-	}
-	go func() {
-		<-ctx.Done()
-		_ = listener.Close()
-	}()
-	var clients sync.WaitGroup
-	defer clients.Wait()
-	for {
-		connection, err := listener.AcceptUnix()
-		if err != nil {
-			if ctx.Err() != nil {
-				return nil
-			}
-			return fmt.Errorf("accept remote installation IPC client: %w", err)
-		}
-		clients.Add(1)
-		go func() {
-			defer clients.Done()
-			defer connection.Close()
-			server.serveConnection(ctx, connection)
-		}()
-	}
+	return serveUnixSocket(ctx, server.socketPath, "remote installation", 0600, false, server.serveConnection)
 }
 
 func (server *RemoteInstallIPCServer) serveConnection(ctx context.Context, connection *net.UnixConn) {
@@ -248,18 +205,11 @@ func readRemoteIPCSecret(reader io.Reader) (*LivePassword, error) {
 }
 
 func requireSameUIDPeer(connection *net.UnixConn) error {
-	raw, err := connection.SyscallConn()
+	credentials, err := peerCredentials(connection)
 	if err != nil {
 		return err
 	}
-	var credentials *syscall.Ucred
-	var controlErr error
-	if err := raw.Control(func(descriptor uintptr) {
-		credentials, controlErr = syscall.GetsockoptUcred(int(descriptor), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
-	}); err != nil {
-		return err
-	}
-	if controlErr != nil || credentials == nil || credentials.Uid != uint32(os.Geteuid()) {
+	if credentials.Uid != uint32(os.Geteuid()) {
 		return errors.New("remote installation IPC peer is not the worker user")
 	}
 	return nil

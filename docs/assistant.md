@@ -120,7 +120,11 @@ files. Untracked and ignored files, private-key paths, `keys/`, `.git`, `.ssh`,
 locks, instruction files and Git control files are read-only, and so are the
 settings except the few listed under [Laboratory settings](#laboratory-settings).
 Sensitive settings fields are withheld; known token formats, password hashes and
-private key material are redacted from model-facing output. The laboratory token is
+private key material are redacted from model-facing output, including Nix
+cache secret keys, `age` secret keys and Wi-Fi `psk` or `wpa_passphrase` values.
+Redaction is pattern-based, so a secret in a format the controller does not
+recognise can still be sent: do not keep secrets in tracked files of the
+deployment, because Assistant reads only those. The laboratory token is
 kept separate from the transcript. Only bounded journal excerpts from fixed
 core units are diagnostic inputs; arbitrary logs, student home files and other
 files outside the workspace are not tool inputs.

@@ -125,6 +125,7 @@ type assistantStreamMsg struct {
 	err          error
 	result       *domain.AssistantTurnResult
 	changedFiles int
+	changedErr   error
 	conversation domain.AssistantConversation
 }
 
@@ -368,6 +369,9 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			updated, _ := model.finishAssistantAccess(assistantAccessMsg{id: message.id, err: message.err})
 			model = updated.(dashboardModel)
 			return model, model.refreshAssistantAccount()
+		}
+		if message.changedErr != nil {
+			model.message = "Could not count the files changed in this session."
 		}
 		return model, model.refreshAssistantAccount()
 	}
@@ -662,11 +666,12 @@ func (model dashboardModel) finishAssistantPrepared(message assistantPreparedMsg
 				}
 			})
 			changedFiles := 0
+			var changedErr error
 			if actions.ChangedFiles != nil {
-				changedFiles, _ = actions.ChangedFiles(message.conversation.ID)
+				changedFiles, changedErr = actions.ChangedFiles(message.conversation.ID)
 			}
 			select {
-			case events <- assistantStreamMsg{id: id, done: true, result: &result, changedFiles: changedFiles, conversation: message.conversation, err: err}:
+			case events <- assistantStreamMsg{id: id, done: true, result: &result, changedFiles: changedFiles, changedErr: changedErr, conversation: message.conversation, err: err}:
 			case <-ctx.Done():
 			}
 		}()
