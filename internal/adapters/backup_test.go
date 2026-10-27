@@ -150,6 +150,15 @@ func TestRestoreRefusesLinksThatLeaveTheDeployment(t *testing.T) {
 	if report := (Local{}).RestoreBackup(escaping, passphrase, filepath.Join(t.TempDir(), "restored")); report.State == "completed" {
 		t.Fatal("a link escaping the restore root was restored")
 	}
+	// Each link stays inside on its own, but c/b is created where c points.
+	chained := craft(t, []domain.BackupFile{directory, {Path: "deployment/c", Link: "."}, {Path: "deployment/c/b", Link: "../.."}, {Path: "deployment/c/b/z", Link: "x"}}, nil)
+	chainedTarget := filepath.Join(t.TempDir(), "restored")
+	if report := (Local{}).RestoreBackup(chained, passphrase, chainedTarget); report.State == "completed" {
+		t.Fatal("a link inside another link was restored")
+	}
+	if _, err := os.Lstat(filepath.Join(filepath.Dir(chainedTarget), "z")); err == nil {
+		t.Fatal("restore created a link outside the target")
+	}
 	inside := craft(t, []domain.BackupFile{directory, {Path: "deployment/link", Link: "real"}, regular("deployment/real")}, map[string]string{"deployment/real": content})
 	target := filepath.Join(t.TempDir(), "restored")
 	if report := (Local{}).RestoreBackup(inside, passphrase, target); report.State != "completed" {

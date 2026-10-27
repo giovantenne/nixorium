@@ -429,6 +429,15 @@ func (Local) RestoreBackup(name string, passphrase []byte, target string) domain
 			return errors.Join(copyErr, syncErr, closeErr)
 		}
 	})
+	// A link inside another link would be created wherever that one points,
+	// so a chain of in-tree links could still place one outside the target.
+	for _, link := range links {
+		for _, parent := range links {
+			if err == nil && strings.HasPrefix(link.Path, parent.Path+"/") {
+				err = fmt.Errorf("the backup contains a link inside another link: %s", link.Path)
+			}
+		}
+	}
 	for _, link := range links {
 		if err == nil {
 			err = os.Symlink(link.Link, filepath.Join(target, filepath.FromSlash(link.Path)))
