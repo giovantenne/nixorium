@@ -371,7 +371,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			return model, model.refreshAssistantAccount()
 		}
 		if message.changedErr != nil {
-			model.message = "Could not count the files changed in this session.."
+			model.message = "Could not count the files changed in this session."
 		}
 		return model, model.refreshAssistantAccount()
 	}
