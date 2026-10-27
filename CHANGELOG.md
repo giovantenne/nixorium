@@ -63,6 +63,7 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Update computers works without Internet on the controller when the change needs nothing new from the Internet. Before, the build stopped at "Could not resolve host: cache.nixos.org", even for a system the controller could build by itself. The controller now builds such systems locally (Nix `fallback`). A change that adds software the controller does not have still needs Internet. The fix reaches the controller with Apply to controller.
 - Update Nixorium now brings the ttfx screensaver to laboratories created with 3.5.0 or older too. The migration `2026-10-ttfx-screensaver` knew only the screensaver files of 3.6.0 and later, so in those laboratories the review showed "Manual change" and kept the old tte screensaver. The unused `scripts/launch-screensaver.sh` of those laboratories stays; it can be deleted.
 - Assistant no longer shows a green "Proposal ready" when a request ended without its final answer (an error, Esc or a limit): the box turns yellow, "Proposal incomplete", and the review warns that the proposal may be half done before you save it. Conversations that end this way are now also shared with the Assistant service, when sharing is on; a request you stop with Esc is not.
 - Preparing npm packages works behind a school proxy: the controller reads the

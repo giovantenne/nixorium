@@ -398,6 +398,9 @@ assert subnetLab.nixosConfigurations.pc01.config.nix.settings.substituters == [ 
 assert transitionClient.nix.settings.substituters == [ "http://10.1.0.99:5000" "http://10.0.0.99:5000" ];
 assert roleInterfaceLab.nixosConfigurations.pc01.config.nix.settings.substituters == [ "http://10.0.0.99:5000" ];
 assert builtins.elem "https://cache.nixos.org/" subnetLab.nixosConfigurations.pc99.config.nix.settings.substituters;
+# Without Internet the controller builds locally; a client never builds.
+assert subnetLab.nixosConfigurations.pc99.config.nix.settings.fallback;
+assert !(subnetLab.nixosConfigurations.pc01.config.nix.settings ? fallback);
 assert import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; } == ''
   table inet nixorium_internet {
     chain output {

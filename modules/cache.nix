@@ -15,6 +15,10 @@ in
       (address: "http://${address}:${toString labSettings.cachePort}")
       ([ labSettings.masterIp ] ++ lib.optional (transition != null) transition.masterIp));
     trusted-public-keys = if labSettings.cachePublicKey == null then [] else [ labSettings.cachePublicKey ];
+    # Without Internet the controller still builds what it has the sources
+    # for: once Nix knows cache.nixos.org, an unreachable cache is otherwise a
+    # fatal error, even for a system that needs nothing from it.
+    fallback = lib.mkIf isController true;
   };
 
   services.harmonia.cache = lib.mkIf (isController && laboratoryEnabled) {
