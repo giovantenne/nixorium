@@ -319,7 +319,7 @@ func assistantSettingsPlan(t *testing.T, w *AssistantWorkspace, store AssistantW
 		t.Fatal(err)
 	}
 	assistantWriteReceipt(t, w, assistantEvaluationReceipt{SchemaVersion: 1, Key: key, VerifiedAt: time.Now().UTC(), Evaluation: domain.AssistantEvaluation{OK: true, ChangedHosts: []string{"pc01", "pc02", "pc99"}}})
-	return planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t))
+	return planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t), assistantNoNix(t))
 }
 
 func TestAssistantSavePlanShowsSettingsImpactsAndSaves(t *testing.T) {
@@ -438,7 +438,7 @@ func TestAssistantSavePlanRefusesWhatANativeSettingsSaveRefuses(t *testing.T) {
 			w, store, repo, _ := assistantSettingsFixture(t)
 			assistantSettingsTamper(t, w, test.data, test.executable)
 			before := assistantGitSnapshot(t, repo)
-			plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t))
+			plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t), assistantNoNix(t))
 			if plan.State != "blocked" || !strings.Contains(plan.Message, test.want) || plan.ReviewToken != "" {
 				t.Fatalf("plan: %+v", plan)
 			}

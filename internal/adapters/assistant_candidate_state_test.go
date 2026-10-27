@@ -49,7 +49,7 @@ func TestAssistantOverlayDigestBindsContentModeAndDeletion(t *testing.T) {
 
 func TestAssistantCandidateEvaluationStateAndFailedEvaluation(t *testing.T) {
 	w, _, _ := assistantEvaluationFixture(t, false)
-	result, err := evaluateAssistantCandidate(t.Context(), w, runBoundedNix)
+	result, err := evaluateAssistantCandidate(t.Context(), w, runBoundedNix, runBoundedNix)
 	if err != nil || !result.OK {
 		t.Fatal(result, err)
 	}
@@ -76,7 +76,7 @@ func TestAssistantCandidateEvaluationStateAndFailedEvaluation(t *testing.T) {
 		}
 		return runBoundedNix(ctx, limit, args...)
 	}
-	result, err = evaluateAssistantCandidate(t.Context(), w, run)
+	result, err = evaluateAssistantCandidate(t.Context(), w, run, run)
 	if err == nil || result.OK {
 		t.Fatal(result, err)
 	}
