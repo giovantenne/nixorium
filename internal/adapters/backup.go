@@ -362,6 +362,47 @@ func safeBackupLink(name, target string) bool {
 	return resolved != ".." && !strings.HasPrefix(resolved, "../")
 }
 
+// backupLinkInside resolves the link name as the kernel would, following the
+// other links of the same backup (no other entry is a link), and reports
+// whether every step stays inside the restore root. A lexical check alone
+// passes "b -> a/../../x" when a is itself a link.
+func backupLinkInside(links map[string]string, name string) bool {
+	hops := 0
+	var walk func(current []string, target string) ([]string, bool)
+	walk = func(current []string, target string) ([]string, bool) {
+		current = append([]string(nil), current...)
+		for _, part := range strings.Split(target, "/") {
+			switch part {
+			case "", ".":
+				continue
+			case "..":
+				if len(current) == 0 {
+					return nil, false
+				}
+				current = current[:len(current)-1]
+				continue
+			}
+			current = append(current, part)
+			if next, ok := links[strings.Join(current, "/")]; ok {
+				if hops++; hops > 40 || path.IsAbs(next) {
+					return nil, false
+				}
+				var inside bool
+				if current, inside = walk(current[:len(current)-1], next); !inside {
+					return nil, false
+				}
+			}
+		}
+		return current, true
+	}
+	parent := []string{}
+	if directory := path.Dir(name); directory != "." {
+		parent = strings.Split(directory, "/")
+	}
+	_, inside := walk(parent, links[name])
+	return inside
+}
+
 func (Local) VerifyBackup(name string, passphrase []byte) domain.BackupReport {
 	report := domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-verify", State: "blocked", Path: name, PrivateKeys: []string{}, Issues: []domain.ValidationIssue{}}
 	manifest, err := readBackup(name, passphrase, func(domain.BackupFile, io.Reader) error { return nil })
@@ -430,12 +471,20 @@ func (Local) RestoreBackup(name string, passphrase []byte, target string) domain
 		}
 	})
 	// A link inside another link would be created wherever that one points,
-	// so a chain of in-tree links could still place one outside the target.
+	// so a chain of in-tree links could still place one outside the target;
+	// and a link through other links must still end inside the target.
+	targets := map[string]string{}
+	for _, link := range links {
+		targets[link.Path] = link.Link
+	}
 	for _, link := range links {
 		for _, parent := range links {
 			if err == nil && strings.HasPrefix(link.Path, parent.Path+"/") {
 				err = fmt.Errorf("the backup contains a link inside another link: %s", link.Path)
 			}
+		}
+		if err == nil && !backupLinkInside(targets, link.Path) {
+			err = fmt.Errorf("the backup contains a link that leaves the deployment: %s", link.Path)
 		}
 	}
 	for _, link := range links {

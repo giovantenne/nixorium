@@ -66,7 +66,7 @@ var assistantRedactions = []*regexp.Regexp{
 }
 
 // assistantValueRedaction keeps the key and hides only the value.
-var assistantValueRedaction = regexp.MustCompile(`(?i)(\b(?:psk|wpa_passphrase)[ \t]*=[ \t]*)("[^"\n]*"|[^\s]+)`)
+var assistantValueRedaction = regexp.MustCompile(`(?i)(\b(?:psk|pskRaw|wpa_passphrase)[ \t]*=[ \t]*)("[^"\n]*"|[^\s]+)`)
 
 func RedactForModel(text string) string {
 	for _, pattern := range assistantRedactions {

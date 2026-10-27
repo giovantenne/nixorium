@@ -159,6 +159,16 @@ func TestRestoreRefusesLinksThatLeaveTheDeployment(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(filepath.Dir(chainedTarget), "z")); err == nil {
 		t.Fatal("restore created a link outside the target")
 	}
+	// Each target stays inside on its own, but b passes through a, a link to
+	// the parent directory, and so leaves the target.
+	viaLink := craft(t, []domain.BackupFile{directory, {Path: "deployment/a", Link: ".."}, {Path: "deployment/b", Link: "a/../../etc/passwd"}}, nil)
+	if report := (Local{}).RestoreBackup(viaLink, passphrase, filepath.Join(t.TempDir(), "restored")); report.State == "completed" {
+		t.Fatal("a link leaving the target through another link was restored")
+	}
+	looping := craft(t, []domain.BackupFile{directory, {Path: "deployment/x", Link: "y"}, {Path: "deployment/y", Link: "x"}}, nil)
+	if report := (Local{}).RestoreBackup(looping, passphrase, filepath.Join(t.TempDir(), "restored")); report.State == "completed" {
+		t.Fatal("a link loop was restored")
+	}
 	inside := craft(t, []domain.BackupFile{directory, {Path: "deployment/link", Link: "real"}, regular("deployment/real")}, map[string]string{"deployment/real": content})
 	target := filepath.Join(t.TempDir(), "restored")
 	if report := (Local{}).RestoreBackup(inside, passphrase, target); report.State != "completed" {

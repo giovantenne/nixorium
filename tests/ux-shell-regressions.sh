@@ -161,6 +161,10 @@ grep -F 'as_admin env GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null' "$APPLY
 grep -F -- '-c core.fsmonitor=false -c core.hooksPath=/dev/null' "$APPLY_SCRIPT" >/dev/null
 [[ "$(grep -n '^as_admin()' "$APPLY_SCRIPT" | cut -d: -f1)" -lt \
    "$(grep -n 'repo_git status' "$APPLY_SCRIPT" | head -1 | cut -d: -f1)" ]]
+PXE_SCRIPT="$REPO_ROOT/scripts/prepare-pxe.sh"
+[[ "$(grep -cE '(^|[^_a-z-])git ' "$PXE_SCRIPT")" == 1 ]] \
+  || { echo "prepare-pxe.sh runs git outside repo_git" >&2; exit 1; }
+grep -F -- '-c core.fsmonitor=false -c core.hooksPath=/dev/null' "$PXE_SCRIPT" >/dev/null
 grep -F 'runuser -u admin -- env HOME=/tmp XDG_CACHE_HOME=/tmp' "$REPO_ROOT/modules/management.nix" >/dev/null \
   || { echo "install-secrets must verify keys as admin" >&2; exit 1; }
 

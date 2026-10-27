@@ -84,16 +84,18 @@ to controller and Update computers as usual.
   the proposal cannot make the controller send requests while you review it.
 - Assistant hides more secrets from what it sends to the model: yescrypt,
   SHA-256 and bcrypt password hashes, age secret keys, Nix cache signing keys
-  and Wi-Fi passphrases (`psk=`, `wpa_passphrase=`).
+  and Wi-Fi passphrases (`psk`, `pskRaw`, `wpa_passphrase`).
 - The classroom view applies only the review it issued itself: an apply that
   sends back a changed review with a matching token is refused, and a review
-  applies once.
+  applies once. A review left open while Nixorium restarts its classroom
+  service (for example after Update Nixorium) must be made again.
 - The classroom agent on a student computer checks the student's session
   socket and connects to that same socket, so swapping it for a link between
   the check and the connection no longer sends the root process elsewhere.
 - Restoring an offline backup refuses links that point outside the restored
-  deployment or sit inside another link, and creates links only after every
-  file, so a crafted backup cannot write outside the target folder.
+  deployment, also through other links, or that sit inside another link, and
+  creates links only after every file, so a crafted backup cannot write
+  outside the target folder.
 - The system path that starts an update on a student computer must be a
   well-formed Nix store path and is quoted in the command.
 

@@ -103,7 +103,8 @@ func (refusal *assistantPrefetchRefusal) result() string {
 // runs here, not in Nix: every connection goes only to addresses checked at
 // that moment, so neither a redirect nor a host name that resolves again to a
 // different address reaches the laboratory network. Through a school proxy
-// the proxy resolves the host, and only the host check applies.
+// the proxy makes the connection, so only the checks of the host name, which
+// still resolves on the controller, apply.
 type assistantPrefetcher struct {
 	Resolve func(context.Context, string) ([]netip.Addr, error)
 	Dial    func(context.Context, string, string) (net.Conn, error)

@@ -409,8 +409,8 @@ address. Nixorium downloads the file itself (at most five redirects, each
 checked by the same rules), one at a time on the controller, within 15
 minutes, and every connection goes only to an address it has just checked, so
 a host name that resolves again to a local address is never contacted.
-Through a school proxy the proxy resolves the host, and only the host check
-applies. A file whose reported size exceeds 1 GiB is refused before it is
+Through a school proxy the proxy makes the connection, so only the checks of
+the host name (which still resolves on the controller) apply. A file whose reported size exceeds 1 GiB is refused before it is
 downloaded, and a download that turns out larger is stopped at the limit. The
 file then enters the Nix store with `nix store add-file`, under the name Nix
 itself would give it (the last component of the address path).

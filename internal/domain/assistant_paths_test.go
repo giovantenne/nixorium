@@ -54,6 +54,7 @@ func TestAssistantRedactionPatterns(t *testing.T) {
 		{"psk unquoted", "psk=hunter2hunter2\nssid=lab", "psk=[REDACTED]\nssid=lab"},
 		{"psk quoted", "networking.wireless.networks.lab.psk = \"two words\";", "networking.wireless.networks.lab.psk = [REDACTED];"},
 		{"wpa_passphrase", "wpa_passphrase=abc12345", "wpa_passphrase=[REDACTED]"},
+		{"pskRaw", "pskRaw = \"0123456789abcdef\";", "pskRaw = [REDACTED];"},
 		{"public cache key", "trusted-public-keys = " + publicKey, "trusted-public-keys = " + publicKey},
 		{"ordinary base64", "data: " + strings.Repeat("QUJD", 30) + "==", "data: " + strings.Repeat("QUJD", 30) + "=="},
 		{"sha256 hash", "sha256-" + strings.Repeat("A1b+", 10) + "xyz=", "sha256-" + strings.Repeat("A1b+", 10) + "xyz="},
