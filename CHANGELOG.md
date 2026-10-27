@@ -61,6 +61,42 @@ The project follows [Semantic Versioning](https://semver.org/).
   login) and are asked for with a new classroom view message, so a computer
   not yet updated just shows no notice.
 
+### Security
+
+These changes need nothing from the administrator: Update Nixorium, then Apply
+to controller and Update computers as usual.
+
+- The controller no longer accepts the administrator's SSH key for `root`;
+  only the student computers do, because the controller manages them as root.
+  A service running as `admin` on the controller can therefore no longer
+  become root through SSH. `admin` keeps its own SSH access.
+- Apply to controller and PXE preparation read the deployment repository with
+  Git as `admin`, with Git hooks, `core.fsmonitor` and system or global Git
+  configuration turned off, so a setting in the repository's `.git/config`
+  can no longer run a command as root. The check of the installed keys also
+  parses the key files as `admin`.
+- Assistant's `prefetch` downloads the file itself and connects only to
+  addresses it has just checked, also after each redirect, so a host name that
+  resolves to a local address on the second lookup no longer reaches the
+  laboratory network. Multicast, reserved, documentation and benchmarking
+  address ranges are refused too. The result for Assistant is unchanged.
+- Assistant evaluates a proposal without network, so a download written into
+  the proposal cannot make the controller send requests while you review it.
+- Assistant hides more secrets from what it sends to the model: yescrypt,
+  SHA-256 and bcrypt password hashes, age secret keys, Nix cache signing keys
+  and Wi-Fi passphrases (`psk=`, `wpa_passphrase=`).
+- The classroom view applies only the review it issued itself: an apply that
+  sends back a changed review with a matching token is refused, and a review
+  applies once.
+- The classroom agent on a student computer checks the student's session
+  socket and connects to that same socket, so swapping it for a link between
+  the check and the connection no longer sends the root process elsewhere.
+- Restoring an offline backup refuses links that point outside the restored
+  deployment or sit inside another link, and creates links only after every
+  file, so a crafted backup cannot write outside the target folder.
+- The system path that starts an update on a student computer must be a
+  well-formed Nix store path and is quoted in the command.
+
 ### Fixed
 
 - Update computers works without Internet on the controller when the change needs nothing new from the Internet. Before, the build stopped at "Could not resolve host: cache.nixos.org", even for a system the controller could build by itself. The controller now builds such systems locally (Nix `fallback`). A change that adds software the controller does not have still needs Internet. The fix reaches the controller with Apply to controller.
