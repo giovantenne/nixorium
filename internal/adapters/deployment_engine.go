@@ -504,7 +504,7 @@ func clientActivationStartCommand(system, activationID string) string {
 		`systemd-run --unit=` + strings.TrimSuffix(clientActivationUnit, ".service") + ` --description=Nixorium-activation --service-type=exec ` +
 		`--property=RemainAfterExit=yes --expand-environment=no --no-block --quiet ` +
 		`--setenv=PATH=/run/current-system/sw/bin:/run/wrappers/bin ` +
-		`--setenv=NIXORIUM_ACTIVATION=` + activationID + ` --setenv=NIXORIUM_SYSTEM=` + system + ` ` +
+		`--setenv=NIXORIUM_ACTIVATION=` + activationID + ` '--setenv=NIXORIUM_SYSTEM=` + strings.ReplaceAll(system, `'`, `'\''`) + `' ` +
 		`/bin/sh -c '` + clientActivationScript + `' && echo ` + clientActivationStarted + ` || exit ` + fmt.Sprint(clientActivationStartFailedStatus)
 }
 

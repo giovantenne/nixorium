@@ -293,3 +293,25 @@ func TestCurrentSystemObservationBoundsConcurrencyAndKeepsEveryHost(t *testing.T
 		t.Fatalf("maximum concurrency = %d, want 2..%d", maximum, maximumConcurrentSSHProbes)
 	}
 }
+
+func TestValidSystemPathRejectsShellAndMalformedPaths(t *testing.T) {
+	hash := strings.Repeat("a", 32)
+	for _, path := range []string{
+		"/nix/store/" + hash + "-x;reboot", "/nix/store/" + hash + "-$(id)", "/nix/store/" + hash + "-`id`",
+		"/nix/store/" + hash + "-a'b", "/nix/store/" + hash + "-a\nb", "/nix/store/" + hash + "-a/../b",
+		"/nix/store/" + hash + "/..", "/tmp/" + hash + "-x", "/nix/store/" + hash[:31] + "-x", "/nix/store/" + hash + "a-x",
+		"/nix/store/" + strings.Repeat("e", 32) + "-x", "/nix/store/" + hash + "-", "/nix/store/" + hash + "-a b",
+	} {
+		if validSystemPath(path) {
+			t.Fatalf("%q must be rejected", path)
+		}
+	}
+	for _, path := range []string{
+		"/nix/store/" + hash + "-nixos-system-pc01-26.05.20261020.abcdef1",
+		"/nix/store/0123456789abcdfghijklmnpqrsvwxyz-tool-1.2.3.AppImage",
+	} {
+		if !validSystemPath(path) {
+			t.Fatalf("%q must be accepted", path)
+		}
+	}
+}

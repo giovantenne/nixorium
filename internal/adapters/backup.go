@@ -352,6 +352,16 @@ func safeBackupPath(name string) bool {
 		(name == backupDeployment || strings.HasPrefix(name, backupDeployment+"/") || name == backupKnownHosts || strings.HasPrefix(name, backupKnownHosts+"/"))
 }
 
+// safeBackupLink accepts only a relative target that stays inside the restore
+// root when resolved from the directory holding the link.
+func safeBackupLink(name, target string) bool {
+	if target == "" || path.IsAbs(target) || strings.ContainsRune(target, 0) {
+		return false
+	}
+	resolved := path.Join(path.Dir(name), target)
+	return resolved != ".." && !strings.HasPrefix(resolved, "../")
+}
+
 func (Local) VerifyBackup(name string, passphrase []byte) domain.BackupReport {
 	report := domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-verify", State: "blocked", Path: name, PrivateKeys: []string{}, Issues: []domain.ValidationIssue{}}
 	manifest, err := readBackup(name, passphrase, func(domain.BackupFile, io.Reader) error { return nil })
@@ -391,12 +401,18 @@ func (Local) RestoreBackup(name string, passphrase []byte, target string) domain
 	if err := os.MkdirAll(target, 0o700); err != nil {
 		return fail(err.Error())
 	}
+	// Links are created last so that no entry is ever written through one.
+	var links []domain.BackupFile
 	_, err := readBackup(name, passphrase, func(entry domain.BackupFile, content io.Reader) error {
 		destination := filepath.Join(target, filepath.FromSlash(entry.Path))
 		mode := fs.FileMode(entry.Mode)
 		switch {
 		case entry.Link != "":
-			return os.Symlink(entry.Link, destination)
+			if !safeBackupLink(entry.Path, entry.Link) {
+				return fmt.Errorf("the backup contains a link that leaves the deployment: %s", entry.Path)
+			}
+			links = append(links, entry)
+			return nil
 		case mode&fs.ModeDir != 0:
 			return os.MkdirAll(destination, mode.Perm()|0o700)
 		default:
@@ -413,6 +429,20 @@ func (Local) RestoreBackup(name string, passphrase []byte, target string) domain
 			return errors.Join(copyErr, syncErr, closeErr)
 		}
 	})
+	// A link inside another link would be created wherever that one points,
+	// so a chain of in-tree links could still place one outside the target.
+	for _, link := range links {
+		for _, parent := range links {
+			if err == nil && strings.HasPrefix(link.Path, parent.Path+"/") {
+				err = fmt.Errorf("the backup contains a link inside another link: %s", link.Path)
+			}
+		}
+	}
+	for _, link := range links {
+		if err == nil {
+			err = os.Symlink(link.Link, filepath.Join(target, filepath.FromSlash(link.Path)))
+		}
+	}
 	if err != nil {
 		return fail("the restore stopped: " + err.Error() + "; remove the partial target before trying again")
 	}
