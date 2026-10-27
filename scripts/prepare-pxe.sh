@@ -86,15 +86,20 @@ fail() {
 publish_progress running starting "Starting PXE preparation" 0 0
 publish_progress running validate "Validating the reviewed deployment" 0 0
 
+repo_git() {
+  GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+    git -c core.fsmonitor=false -c core.hooksPath=/dev/null -C "$REPOSITORY" "$@"
+}
+
 [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
   || fail "configured deployment path is not a real directory"
 [[ -f "$REPOSITORY/flake.nix" && -d "$REPOSITORY/.git" ]] \
   || fail "configured deployment path is not a Git Flake"
 [[ "$(stat -c '%U' "$REPOSITORY")" == admin ]] \
   || fail "deployment repository must be owned by admin"
-[[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
+[[ -z "$(repo_git status --porcelain=v1 --untracked-files=normal)" ]] \
   || fail "deployment worktree must be clean before PXE preparation"
-[[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
+[[ -z "$(repo_git ls-files -- \
     secret-key admin-ssh lab-credentials.json)" ]] \
   || fail "private key files must not be tracked by Git"
 
@@ -104,7 +109,7 @@ publish_progress running validate "Validating the reviewed deployment" 0 0
 export XDG_CACHE_HOME=/var/cache/nixorium/admin
 export NIX_CONFIG="experimental-features = nix-command flakes"
 
-REVISION="$(git -C "$REPOSITORY" rev-parse HEAD)" \
+REVISION="$(repo_git rev-parse HEAD)" \
   || fail "could not resolve deployment revision"
 FLAKE_URL="$(nixorium config source --repo "$REPOSITORY" --revision "$REVISION")"
 
@@ -209,8 +214,8 @@ while IFS=$'\t' read -r name client_path; do
   root_path "client-$name" "$client_path"
 done <"$CLIENTS_FILE"
 
-[[ "$(git -C "$REPOSITORY" rev-parse HEAD)" == "$REVISION" \
-    && -z "$(git -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
+[[ "$(repo_git rev-parse HEAD)" == "$REVISION" \
+    && -z "$(repo_git status --porcelain=v1 --untracked-files=normal)" ]] \
   || fail "deployment changed during preparation; prepare the reviewed revision again"
 
 jq -n \

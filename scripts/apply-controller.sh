@@ -87,19 +87,30 @@ fail() {
 publish_progress running starting "Starting controller apply" 0
 publish_progress running validate "Validating the reviewed controller configuration" 0
 
+as_admin() {
+  runuser -u admin -- "$@"
+}
+
+# Repository checks run as admin, never root: the repository is admin-owned
+# and its .git/config must not be able to execute code (fsmonitor, hooks) as root.
+repo_git() {
+  as_admin env GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+    git -c core.fsmonitor=false -c core.hooksPath=/dev/null -C "$REPOSITORY" "$@"
+}
+
 [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
   || fail "configured deployment path is not a real directory"
 [[ -f "$REPOSITORY/flake.nix" && -d "$REPOSITORY/.git" ]] \
   || fail "configured deployment path is not a Git Flake"
 [[ "$(stat -c '%U' "$REPOSITORY")" == admin ]] \
   || fail "deployment repository must be owned by admin"
-[[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
+[[ -z "$(repo_git status --porcelain=v1 --untracked-files=normal)" ]] \
   || fail "deployment worktree must be clean before controller apply"
-[[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
+[[ -z "$(repo_git ls-files -- \
     secret-key admin-ssh lab-credentials.json)" ]] \
   || fail "private key files must not be tracked by Git"
 
-REVISION="$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)"
+REVISION="$(repo_git rev-parse HEAD)"
 [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]] \
   || fail "deployment HEAD is not a full Git object ID"
 if [[ -n "$EXPECTED_REVISION" ]]; then
@@ -116,10 +127,6 @@ fi
   || fail "administrator Nix cache directory has unsafe ownership or permissions"
 export XDG_CACHE_HOME=/var/cache/nixorium/admin
 export NIX_CONFIG="experimental-features = nix-command flakes"
-
-as_admin() {
-  runuser -u admin -- "$@"
-}
 
 FLAKE_URL="$(as_admin nixorium config source --repo "$REPOSITORY" --revision "$REVISION")"
 
@@ -180,8 +187,8 @@ SYSTEM_PATH="$(as_admin nix build "$FLAKE_URL#nixosConfigurations.$CONTROLLER_NA
 [[ "$SYSTEM_PATH" == /nix/store/* && "$SYSTEM_PATH" != *[[:space:]]* \
     && -x "$SYSTEM_PATH/bin/switch-to-configuration" ]] \
   || fail "controller build did not return one valid NixOS system closure"
-[[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" \
-    && "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)" == "$REVISION" ]] \
+[[ -z "$(repo_git status --porcelain=v1 --untracked-files=normal)" \
+    && "$(repo_git rev-parse HEAD)" == "$REVISION" ]] \
   || fail "deployment changed while the controller was building; activation refused"
 
 publish_progress running activate "Built controller system; beginning activation" 2

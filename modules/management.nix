@@ -76,7 +76,9 @@ let
       [[ "$(stat -c '%U' "$REPOSITORY")" == admin ]] \
         || fail "deployment repository must be owned by admin"
 
-      nixorium setup keys --verify-only --repo "$REPOSITORY" --json >/dev/null \
+      # Parse the admin-owned key files as admin; only the copy below runs as root.
+      runuser -u admin -- env HOME=/tmp XDG_CACHE_HOME=/tmp \
+        nixorium setup keys --verify-only --repo "$REPOSITORY" --json >/dev/null \
         || fail "deployment key correspondence verification failed"
 
       install_checked() {
@@ -420,7 +422,7 @@ in
           "/var/lib/nixorium/coordination"
         ];
         NoNewPrivileges = true;
-        CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_DAC_OVERRIDE" "CAP_FOWNER" ];
+        CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_DAC_OVERRIDE" "CAP_FOWNER" "CAP_SETUID" "CAP_SETGID" ];
       };
     };
 
