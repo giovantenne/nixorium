@@ -41,8 +41,9 @@ const (
 
 var idPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[a-z0-9-]{1,64}$`)
 
-// Migration is one change. Released migrations are never edited or removed:
-// their ids are recorded in deployments.
+// Migration is one change. Released migrations are never removed and what
+// they write never changes: their ids are recorded in deployments. One may
+// only be widened to recognise more released forms of its files.
 type Migration struct {
 	ID          string
 	Description string

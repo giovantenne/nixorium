@@ -209,9 +209,17 @@ migration is applied once and recorded by the migrator in the deployment's
 anything else a deployment owns, must reach existing deployments, add a
 migration in the same change:
 
-- Append to `Registry`; never edit or remove a released entry. Its id is
-  already recorded in deployments, and deployments that skip releases still
-  need it. To correct a mistake, add a new entry.
+- Append to `Registry`; never remove a released entry or change what it
+  writes. Its id is already recorded in deployments, and deployments that skip
+  releases still need it. To correct what it writes, add a new entry. A
+  released entry may only be widened to recognise more released forms of the
+  files it replaces (`Released`, `Later`): deployments that recorded it never
+  run it again, and those where it was a "Manual change" did not record it, so
+  the next update applies it.
+- `TestEveryStableReleaseMigratesToThisTemplate` runs every migration on the
+  template of each stable release from 3.0.0 and expects the current template,
+  apart from the files listed in `releasedDrift`. A template change without a
+  migration, or a migration that misses an old form, fails it.
 - `ID` starts with the year and month: `2026-10-short-slug`. `Description` is
   one sentence an administrator understands.
 - For a text replacement use `ReplaceExact`. Its `from` is the exact text of

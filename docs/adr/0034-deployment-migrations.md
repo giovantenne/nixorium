@@ -110,8 +110,10 @@ fixed rules, shows it in the review and saves it with the update.
   because the release being installed brings its own code. The installed
   release checks the result, not the method.
 - A deployment that skipped releases still receives every migration it has not
-  recorded, because entries are never removed. A released entry is never edited
-  either: its id is already recorded in deployments.
+  recorded, because entries are never removed. What a released entry writes
+  never changes either: its id is already recorded in deployments. It may be
+  widened to recognise more released forms of its files; a deployment where it
+  was a manual change did not record it and receives it at the next update.
 - **Limit.** A controller that runs a release without the mechanism (3.9.0 or
   older) cannot run it during Update Nixorium. For that one step, in the
   deployment folder run

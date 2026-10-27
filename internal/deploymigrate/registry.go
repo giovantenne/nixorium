@@ -1,7 +1,8 @@
 package deploymigrate
 
 // Registry is the list of migrations of this release, in the order they
-// run. Append new migrations at the end; never edit or remove a released one.
+// run. Append new migrations at the end; never remove a released one or change
+// what it writes (widening the forms it recognises is allowed).
 var Registry = []Migration{
 	{
 		ID:          "2026-10-workstation-is-controller",
@@ -23,20 +24,26 @@ var Registry = []Migration{
 		ID:          "2026-10-ttfx-screensaver",
 		Description: "The lab screensaver uses ttfx, the faster Rust version of its text effects, at 30 frames per second, and stops when the screen goes blank after 30 idle minutes.",
 		Apply: func(tree Tree) Outcome {
-			// Released forms: 3.6.0, and 3.6.1 up to 3.10.0-beta.3.
+			// Released forms: 2.0.0-beta.4 up to 3.5.0 (the tte screensaver that
+			// locked the session), 3.6.0, and 3.6.1 up to 3.10.0-beta.3. The
+			// forms before 3.6.0 were added after release: they only widen which
+			// files are replaced, the new content is unchanged.
 			const id = "2026-10-ttfx-screensaver"
 			return ReplaceWholeFiles(tree, []WholeFile{
 				{Path: "modules/screensaver.nix", Content: frozen(id, "screensaver.nix"), Released: []string{
+					"57b3b2f31d51ac0fed7e4875effff51484a0c7b3efbb543cda920a87c2a77086",
 					"5080f60ffc5dfe4244ea197886b6b0dab8d3199957d475d5b131c2ced14ba9ca",
 					"a65abcd56b3624cd8159bad89c99bc9bd993e9f7e350d818e95281efc8cf3b4c",
 				}},
 				{Path: "scripts/cmd-screensaver.sh", Content: frozen(id, "cmd-screensaver.sh"), Released: []string{
+					"e91fe6ce438d4f8589cea1da3b41162333824c48c480917275d415a191296310",
 					"c4bc7fb93494dd55f2e4a1209032abb2783d8d69764a83d4697f5c52da5dcc8d",
 				}, Later: []string{
 					// 2026-10-screensaver-60-fps applied, as released in 3.10.0.
 					"29f1b0ff986cc02d91db8f39dc48531b1d48c08ef5788548be7d19d352b395f6",
 				}},
 				{Path: "scripts/screensaver-monitor.sh", Content: frozen(id, "screensaver-monitor.sh"), Released: []string{
+					"102183eaefdd54f35799f4ec0c5be605a54de6e35347fbec9de3a5212084d0c8",
 					"1ca0eda66faa35f0cc974da0bc92b97d1a4cd9d1081901905b1a0f3a0a3ac128",
 					"9a8d5fd89b6ddd475d6f0bfb5b767cee9fd7ba67b1ab6d0b92b58d09ea954359",
 				}},

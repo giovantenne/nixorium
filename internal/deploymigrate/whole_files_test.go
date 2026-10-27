@@ -13,6 +13,11 @@ var ttfxOnly = Registry[2:3]
 
 // releasedScreensaver is the 3.6.1 form of the three screensaver files.
 func releasedScreensaver(t *testing.T) map[string]string {
+	return screensaverForm(t, "2026-10-ttfx-screensaver")
+}
+
+// screensaverForm reads one released form of the three screensaver files.
+func screensaverForm(t *testing.T, directory string) map[string]string {
 	t.Helper()
 	tree := map[string]string{}
 	for path, name := range map[string]string{
@@ -20,7 +25,7 @@ func releasedScreensaver(t *testing.T) map[string]string {
 		"scripts/cmd-screensaver.sh":     "cmd-screensaver.sh",
 		"scripts/screensaver-monitor.sh": "screensaver-monitor.sh",
 	} {
-		content, err := os.ReadFile(filepath.Join("testdata", "2026-10-ttfx-screensaver", name))
+		content, err := os.ReadFile(filepath.Join("testdata", directory, name))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,30 +105,34 @@ func TestTheScreensaverMigrationIsManualWithoutTheFiles(t *testing.T) {
 }
 
 func TestAMigratedScreensaverIsTheTemplateOfThisRelease(t *testing.T) {
-	// A 3.6.1 deployment that runs every screensaver migration ends up with
-	// the template's own files. When the template changes again, this test
-	// points at the need for a new migration.
-	root := treeWith(t, releasedScreensaver(t))
-	report, err := Run(root, "3.10.0", registryWith("screensaver"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range report.Migrations {
-		if entry.State != Applied {
-			t.Fatalf("%s = %s: %s", entry.ID, entry.State, entry.Detail)
-		}
-	}
-	for _, file := range []string{"modules/screensaver.nix", "scripts/cmd-screensaver.sh", "scripts/screensaver-monitor.sh"} {
-		template, err := os.ReadFile(filepath.Join("..", "..", "templates", "site", file))
-		if os.IsNotExist(err) {
-			t.Skip("the template is not in this source tree (the package build)")
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		if read(t, root, file) != string(template) {
-			t.Errorf("a migrated templates/site/%s differs from the template: add a migration", file)
-		}
+	// A deployment with any released screensaver that runs every screensaver
+	// migration ends up with the template's own files. When the template
+	// changes again, this test points at the need for a new migration.
+	for _, directory := range []string{"2026-10-ttfx-screensaver-3.5.0", "2026-10-ttfx-screensaver"} {
+		t.Run(directory, func(t *testing.T) {
+			root := treeWith(t, screensaverForm(t, directory))
+			report, err := Run(root, "3.10.0", registryWith("screensaver"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range report.Migrations {
+				if entry.State != Applied {
+					t.Fatalf("%s = %s: %s", entry.ID, entry.State, entry.Detail)
+				}
+			}
+			for _, file := range []string{"modules/screensaver.nix", "scripts/cmd-screensaver.sh", "scripts/screensaver-monitor.sh"} {
+				template, err := os.ReadFile(filepath.Join("..", "..", "templates", "site", file))
+				if os.IsNotExist(err) {
+					t.Skip("the template is not in this source tree (the package build)")
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if read(t, root, file) != string(template) {
+					t.Errorf("a migrated templates/site/%s differs from the template: add a migration", file)
+				}
+			}
+		})
 	}
 }
 
