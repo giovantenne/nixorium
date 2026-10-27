@@ -123,7 +123,8 @@ func TestAgentSocketRefusesLinksAndOtherFiles(t *testing.T) {
 	if err := os.Symlink(target, filepath.Join(runtime, SocketName)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := agentSocket(base, uid); err == nil {
+	if _, release, err := agentSocket(base, uid); err == nil {
+		release()
 		t.Fatal("a symbolic link was accepted as the agent socket")
 	}
 	if err := os.Remove(filepath.Join(runtime, SocketName)); err != nil {
@@ -132,11 +133,98 @@ func TestAgentSocketRefusesLinksAndOtherFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(runtime, SocketName), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := agentSocket(base, uid); err == nil {
+	if _, release, err := agentSocket(base, uid); err == nil {
+		release()
 		t.Fatal("a regular file was accepted as the agent socket")
 	}
 	if err := serve(runtime); err == nil {
 		t.Fatal("serve replaced a file that is not its socket")
+	}
+}
+
+func TestAgentSocketRefusesALinkedRuntimeDirectory(t *testing.T) {
+	base := t.TempDir()
+	uid := os.Getuid()
+	real := filepath.Join(base, "real")
+	if err := os.Mkdir(real, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(real, SocketName), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, filepath.Join(base, strconv.Itoa(uid))); err != nil {
+		t.Fatal(err)
+	}
+	if _, release, err := agentSocket(base, uid); err == nil {
+		release()
+		t.Fatal("a symbolic link was accepted as the runtime directory")
+	}
+	// A session user other than the directory's owner is refused too.
+	other := t.TempDir()
+	if err := os.Mkdir(filepath.Join(other, strconv.Itoa(uid+1)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, release, err := agentSocket(other, uid+1); err == nil {
+		release()
+		t.Fatal("a runtime directory of another owner was accepted")
+	}
+}
+
+func TestAgentSocketPinsTheCheckedSocket(t *testing.T) {
+	// Unix socket paths are short: a name from t.TempDir would not fit.
+	base, err := os.MkdirTemp("", "pin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(base)
+	uid := os.Getuid()
+	runtime := filepath.Join(base, strconv.Itoa(uid))
+	if err := os.Mkdir(runtime, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", filepath.Join(runtime, SocketName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	other, err := net.Listen("unix", filepath.Join(base, "other.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	path, release, err := agentSocket(base, uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	// Swapping the name for a link after the check changes nothing.
+	if err := os.Remove(filepath.Join(runtime, SocketName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(base, "other.sock"), filepath.Join(runtime, SocketName)); err != nil {
+		t.Fatal(err)
+	}
+	accepted := make(chan string, 2)
+	for name, socket := range map[string]net.Listener{"agent": listener, "other": other} {
+		go func() {
+			if connection, err := socket.Accept(); err == nil {
+				connection.Close()
+				accepted <- name
+			}
+		}()
+	}
+	connection, err := net.Dial("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection.Close()
+	select {
+	case name := <-accepted:
+		if name != "agent" {
+			t.Fatalf("connected to the %s socket", name)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("nothing accepted the connection")
 	}
 }
 

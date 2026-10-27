@@ -50,6 +50,7 @@ func run() error {
 	hub.Answered = func(host domain.HostMeta) { local.LearnWakeAddresses([]domain.HostMeta{host}) }
 	worker := classroomWorker{
 		repository: repository,
+		plans:      newPlanStore(),
 		view:       newViewServer(hub),
 		viewOn:     adapters.ClassroomViewApplied,
 		inspector:  app.NewInspector(local),
@@ -90,6 +91,7 @@ func run() error {
 
 type classroomWorker struct {
 	repository string
+	plans      *planStore // the plans issued, by review token
 	view       *viewServer
 	viewOn     func() bool
 	inspector  *app.Inspector
@@ -134,12 +136,17 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 	case domain.ClassroomPowerPlanOperation:
 		plan := worker.power.PlanAction(ctx, worker.repository, request.Requested, request.SessionPolicy, request.PowerAction)
 		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
+		rememberPlan(worker.plans, "power", plan.ReviewToken, plan.ExpiresAt, plan)
 		response.PowerPlan = &plan
 	case domain.ClassroomPowerApplyOperation:
 		if request.PowerPlan == nil || request.PowerPlan.Repository != worker.repository {
 			return classroomFailure(errors.New("power review does not belong to the fixed deployment"))
 		}
-		report := worker.power.ApplyPlan(ctx, *request.PowerPlan, request.PowerPlan.ReviewToken)
+		plan, err := takePlan[domain.ShutdownPlanReport](worker.plans, "power", request.PowerPlan.ReviewToken)
+		if err != nil {
+			return classroomFailure(err)
+		}
+		report := worker.power.ApplyPlan(ctx, plan, plan.ReviewToken)
 		if err := app.RecordOperationOutcome(worker.records, report); err != nil {
 			report.Message += " The operation finished, but its history record could not be saved."
 		}
@@ -148,12 +155,17 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 	case domain.ClassroomInternetPlanOperation:
 		plan := worker.internet.Plan(ctx, worker.repository, request.Requested, request.InternetAction)
 		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
+		rememberPlan(worker.plans, "internet", plan.ReviewToken, plan.ExpiresAt, plan)
 		response.InternetPlan = &plan
 	case domain.ClassroomInternetApplyOperation:
 		if request.InternetPlan == nil || request.InternetPlan.Repository != worker.repository {
 			return classroomFailure(errors.New("Internet review does not belong to the fixed deployment"))
 		}
-		report := worker.internet.Apply(ctx, *request.InternetPlan, request.InternetPlan.ReviewToken)
+		plan, err := takePlan[domain.InternetPlan](worker.plans, "internet", request.InternetPlan.ReviewToken)
+		if err != nil {
+			return classroomFailure(err)
+		}
+		report := worker.internet.Apply(ctx, plan, plan.ReviewToken)
 		if err := app.RecordOperationOutcome(worker.records, report); err != nil {
 			report.Message += " The operation finished, but its history record could not be saved."
 		}
@@ -165,12 +177,17 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		}
 		plan := worker.lock.Plan(ctx, worker.repository, request.Requested, request.LockAction)
 		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
+		rememberPlan(worker.plans, "lock", plan.ReviewToken, plan.ExpiresAt, plan)
 		response.LockPlan = &plan
 	case domain.ClassroomLockApplyOperation:
 		if request.LockPlan == nil || request.LockPlan.Repository != worker.repository {
 			return classroomFailure(errors.New("lock review does not belong to the fixed deployment"))
 		}
-		report := worker.lock.Apply(ctx, *request.LockPlan, request.LockPlan.ReviewToken)
+		plan, err := takePlan[domain.LockPlan](worker.plans, "lock", request.LockPlan.ReviewToken)
+		if err != nil {
+			return classroomFailure(err)
+		}
+		report := worker.lock.Apply(ctx, plan, plan.ReviewToken)
 		report.Message = teacherMessage(report.Message)
 		response.LockReport = &report
 	case domain.ClassroomShareBeginOperation:
@@ -196,14 +213,19 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 	case domain.ClassroomSharePlanOperation:
 		plan := worker.share.Plan(ctx, worker.repository, request.Requested, request.ShareTransfer)
 		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
+		rememberPlan(worker.plans, "share", plan.ReviewToken, plan.ExpiresAt, plan)
 		response.SharePlan = &plan
 	case domain.ClassroomShareApplyOperation:
 		if request.SharePlan == nil || request.SharePlan.Repository != worker.repository {
 			return classroomFailure(errors.New("share review does not belong to the fixed deployment"))
 		}
-		report := worker.share.Apply(ctx, *request.SharePlan, request.SharePlan.ReviewToken)
+		plan, err := takePlan[domain.SharePlan](worker.plans, "share", request.SharePlan.ReviewToken)
+		if err != nil {
+			return classroomFailure(err)
+		}
+		report := worker.share.Apply(ctx, plan, plan.ReviewToken)
 		if report.State == "completed" {
-			worker.shares.Remove(request.SharePlan.Transfer)
+			worker.shares.Remove(plan.Transfer)
 		}
 		response.ShareReport = &report
 	case domain.ClassroomSaveItemsOperation, domain.ClassroomSaveReadOperation, domain.ClassroomSaveDoneOperation:

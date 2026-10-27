@@ -60,6 +60,7 @@ func collectWorker(t *testing.T) classroomWorker {
 		view:       newViewServer(fakeViewSource{}),
 		viewOn:     func() bool { return true },
 		collect:    app.NewCollectManager(deskLab{}, store),
+		plans:      newPlanStore(),
 		collected:  store,
 	}
 	worker.view.actions = worker.handle
