@@ -17,6 +17,9 @@ let
     publicKeys = { cache = null; ssh = null; };
   });
   controllerOnly = controllerOnlyLab.nixosConfigurations.pc99.config;
+  adminKeyLab = mkLab (baseArgs // {
+    publicKeys = { cache = null; ssh = ./fixtures/remote-vm-admin.pub; };
+  });
   insecureController = mkLab (baseArgs // {
     labConfig = labConfig // { deploymentMode = "controller"; pcCount = 0; };
   });
@@ -401,6 +404,11 @@ assert builtins.elem "https://cache.nixos.org/" subnetLab.nixosConfigurations.pc
 # Without Internet the controller builds locally; a client never builds.
 assert subnetLab.nixosConfigurations.pc99.config.nix.settings.fallback;
 assert !(subnetLab.nixosConfigurations.pc01.config.nix.settings ? fallback);
+# The admin key reaches root only on clients; the controller has no root key.
+assert adminKeyLab.nixosConfigurations.pc99.config.users.users.root.openssh.authorizedKeys.keys == [ ];
+assert adminKeyLab.nixosConfigurations.pc01.config.users.users.root.openssh.authorizedKeys.keys
+  == [ (lib.removeSuffix "\n" (builtins.readFile ./fixtures/remote-vm-admin.pub)) ];
+assert adminKeyLab.nixosConfigurations.pc99.config.users.users.admin.openssh.authorizedKeys.keys != [ ];
 assert import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; } == ''
   table inet nixorium_internet {
     chain output {

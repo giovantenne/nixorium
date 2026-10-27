@@ -33,7 +33,8 @@ in
   users.users.root = {
     hashedPassword = "!";
     openssh.authorizedKeys.keys =
-      if labSettings.adminSshKey == null then
+      # The controller deploys to clients as root; nothing logs in to it as root.
+      if isController || labSettings.adminSshKey == null then
         []
       else
         [ labSettings.adminSshKey ];
