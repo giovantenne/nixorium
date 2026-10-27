@@ -195,7 +195,10 @@ Paths must be relative, with no traversal, backslashes or control characters;
 the limit is 12 components and 512 bytes. A file cannot replace a directory
 that still contains visible files. Tools cannot activate a system,
 manage services, deploy computers, or save a proposal into the deployment.
-Evaluation errors are redacted and limited to 8 KiB. Passing evaluation proves
+The candidate is evaluated without network (a network namespace of its own,
+through bubblewrap), so a fetch written into the proposal cannot make the
+controller send requests during the review; the committed base is evaluated
+normally. Evaluation errors are redacted and limited to 8 KiB. Passing evaluation proves
 that Nix can evaluate the candidate; it does not prove a successful build,
 activation, boot or safe behavior of arbitrary configuration code.
 
@@ -401,12 +404,16 @@ no user name, password, fragment, spaces or control characters. Hosts written
 as IP addresses, `localhost` and names ending in `.localhost`, `.local`,
 `.internal` or `.lan` are refused, and so is a host with any loopback, private
 (10/8, 172.16/12, 192.168/16, IPv6 unique-local), link-local, carrier-grade NAT
-(100.64/10) or unspecified address. A first HEAD request (10 seconds, at most
-five redirects, each redirect checked by the same rules) refuses a file whose
-reported size exceeds 1 GiB; a missing size is allowed, and a download that
-turns out larger is refused afterwards. These checks cover the address and the
-redirects seen by the HEAD request; Nix then performs the download itself with
-`nix store prefetch-file`, one at a time on the controller, within 15 minutes.
+(100.64/10), multicast, reserved, documentation, benchmarking or unspecified
+address. Nixorium downloads the file itself (at most five redirects, each
+checked by the same rules), one at a time on the controller, within 15
+minutes, and every connection goes only to an address it has just checked, so
+a host name that resolves again to a local address is never contacted.
+Through a school proxy the proxy resolves the host, and only the host check
+applies. A file whose reported size exceeds 1 GiB is refused before it is
+downloaded, and a download that turns out larger is stopped at the limit. The
+file then enters the Nix store with `nix store add-file`, under the name Nix
+itself would give it (the last component of the address path).
 Refusals and failures are reported as `invalid_url`, `host_refused`,
 `too_large`, `busy`, `consent_required`, `download_failed` (with a one-line
 reason) or `timeout`.

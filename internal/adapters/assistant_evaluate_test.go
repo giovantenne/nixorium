@@ -100,7 +100,7 @@ func TestAssistantEvaluationUsesClassesAndCachesBase(t *testing.T) {
 	}
 	evaluate := func(expected []string) {
 		t.Helper()
-		got, err := evaluateAssistantCandidate(t.Context(), w, run)
+		got, err := evaluateAssistantCandidate(t.Context(), w, run, run)
 		if err != nil || !got.OK || !reflect.DeepEqual(got.ChangedHosts, expected) {
 			t.Fatalf("evaluation=%+v error=%v want=%v", got, err, expected)
 		}
@@ -167,7 +167,7 @@ func TestAssistantEvaluationUsesClassesAndCachesBase(t *testing.T) {
 		}
 		return run(ctx, limit, args...)
 	}
-	got, err := evaluateAssistantCandidate(t.Context(), w, inspect)
+	got, err := evaluateAssistantCandidate(t.Context(), w, inspect, inspect)
 	if err != nil || !got.OK || !inspected {
 		t.Fatal(got, err, inspected)
 	}
@@ -191,7 +191,7 @@ func TestAssistantEvaluationFallbackCache(t *testing.T) {
 		}
 		return runBoundedNix(ctx, limit, args...)
 	}
-	result, err := evaluateAssistantCandidate(t.Context(), w, run)
+	result, err := evaluateAssistantCandidate(t.Context(), w, run, run)
 	if err != nil || !result.OK || len(result.ChangedHosts) != 0 {
 		t.Fatal(result, err)
 	}
@@ -217,7 +217,7 @@ func TestAssistantEvaluationFallbackCache(t *testing.T) {
 		t.Fatal("fallback output must be cached", string(data), err)
 	}
 	calls = nil
-	result, err = evaluateAssistantCandidate(t.Context(), w, run)
+	result, err = evaluateAssistantCandidate(t.Context(), w, run, run)
 	if err != nil || !result.OK {
 		t.Fatal(result, err)
 	}
@@ -245,7 +245,7 @@ func TestAssistantEvaluationIgnoresV2Cache(t *testing.T) {
 		}
 		return runBoundedNix(ctx, limit, args...)
 	}
-	result, err := evaluateAssistantCandidate(t.Context(), w, run)
+	result, err := evaluateAssistantCandidate(t.Context(), w, run, run)
 	if err != nil || !result.OK || len(result.ChangedHosts) != 0 || baseBatches != 2 {
 		t.Fatal("v2 cache must be ignored", result, err, baseBatches)
 	}
@@ -275,7 +275,7 @@ func TestAssistantEvaluationCachesBaseBeforeCandidateFailure(t *testing.T) {
 		}
 		return runBoundedNix(ctx, limit, args...)
 	}
-	result, err := evaluateAssistantCandidate(t.Context(), w, run)
+	result, err := evaluateAssistantCandidate(t.Context(), w, run, run)
 	if err == nil || result.OK || baseBatches != 2 {
 		t.Fatal(result, err, baseBatches)
 	}
@@ -285,7 +285,7 @@ func TestAssistantEvaluationCachesBaseBeforeCandidateFailure(t *testing.T) {
 		t.Fatal("successful base must remain cached after candidate failure", string(data), err)
 	}
 	failCandidate = false
-	result, err = evaluateAssistantCandidate(t.Context(), w, run)
+	result, err = evaluateAssistantCandidate(t.Context(), w, run, run)
 	if err != nil || !result.OK || baseBatches != 2 {
 		t.Fatal("retry must reuse base cache", result, err, baseBatches)
 	}
@@ -300,7 +300,7 @@ func TestAssistantEvaluationRejectsUnknownCacheOutput(t *testing.T) {
 		t.Fatal("invalid cache must be rejected before Nix calls")
 		return "", nil
 	}
-	result, err := evaluateAssistantCandidate(t.Context(), w, run)
+	result, err := evaluateAssistantCandidate(t.Context(), w, run, run)
 	if err == nil || result.OK || result.Error != "Invalid base evaluation cache." {
 		t.Fatal(result, err)
 	}
@@ -387,7 +387,7 @@ func TestAssistantEvaluationStopsAfterFailedBatch(t *testing.T) {
 				}
 				return runBoundedNix(ctx, limit, args...)
 			}
-			result, err := evaluateAssistantCandidate(ctx, w, run)
+			result, err := evaluateAssistantCandidate(ctx, w, run, run)
 			if err == nil || result.OK || len(result.ChangedHosts) != 0 || candidateCalls != 2 {
 				t.Fatalf("partial evaluation must fail closed: %+v, %v, calls=%d", result, err, candidateCalls)
 			}
@@ -401,5 +401,41 @@ func TestAssistantEvaluationStopsAfterFailedBatch(t *testing.T) {
 				t.Fatal("temporary evaluation remains", matches)
 			}
 		})
+	}
+}
+
+// The model's candidate is evaluated without network; the committed base is not.
+func TestAssistantCandidateEvaluatesWithoutNetwork(t *testing.T) {
+	if _, err := exec.LookPath("bwrap"); err != nil && os.Getenv("NIXORIUM_NPM_BWRAP") == "" {
+		t.Skip("bubblewrap is not available")
+	}
+	if _, err := runIsolatedNix(t.Context(), 64*1024, "eval", "--impure", "--expr", `builtins.fetchurl "https://nixos.org/"`); err == nil {
+		t.Fatal("the isolated evaluation reached the network")
+	}
+	w, _, _ := assistantEvaluationFixture(t, false)
+	var base, candidate []string
+	run := func(ctx context.Context, limit int, args ...string) (string, error) {
+		base = append(base, args[len(args)-1])
+		return runBoundedNix(ctx, limit, args...)
+	}
+	isolated := func(ctx context.Context, limit int, args ...string) (string, error) {
+		candidate = append(candidate, strings.Join(args, " "))
+		return runIsolatedNix(ctx, limit, args...)
+	}
+	if got, err := evaluateAssistantCandidate(t.Context(), w, run, isolated); err != nil || !got.OK {
+		t.Fatalf("evaluation=%+v error=%v", got, err)
+	}
+	if len(candidate) == 0 {
+		t.Fatal("the candidate was not evaluated in isolation")
+	}
+	for _, args := range candidate {
+		if !strings.Contains(args, "/eval-") {
+			t.Fatal("a base evaluation ran isolated", args)
+		}
+	}
+	for _, args := range base {
+		if strings.Contains(args, "/eval-") {
+			t.Fatal("a candidate evaluation reached the network runner", args)
+		}
 	}
 }

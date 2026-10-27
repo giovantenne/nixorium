@@ -583,7 +583,32 @@ func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) 
 }
 
 func runBoundedNix(ctx context.Context, limit int, arguments ...string) (string, error) {
-	command := exec.CommandContext(ctx, "nix", append([]string{"--extra-experimental-features", "nix-command flakes"}, arguments...)...)
+	return runBoundedNixCommand(ctx, limit, exec.CommandContext(ctx, "nix", append([]string{"--extra-experimental-features", "nix-command flakes"}, arguments...)...))
+}
+
+// runIsolatedNix runs nix as runBoundedNix does, but in a network namespace of
+// its own: an Assistant candidate is Nix code written by the model, and a
+// fetch with a fixed hash in it would otherwise make the controller send
+// requests while the change is only being reviewed. The file system, the
+// Nix daemon and its store stay the same, so the result is too.
+func runIsolatedNix(ctx context.Context, limit int, arguments ...string) (string, error) {
+	sandbox := os.Getenv("NIXORIUM_NPM_BWRAP")
+	if sandbox == "" {
+		var err error
+		if sandbox, err = exec.LookPath("bwrap"); err != nil {
+			return "", errors.New("bubblewrap is needed to evaluate Assistant proposals")
+		}
+	}
+	nix, err := exec.LookPath("nix")
+	if err != nil {
+		return "", err
+	}
+	return runBoundedNixCommand(ctx, limit, exec.CommandContext(ctx, sandbox, append([]string{
+		"--dev-bind", "/", "/", "--unshare-net", "--die-with-parent", "--new-session",
+		"--", nix, "--extra-experimental-features", "nix-command flakes"}, arguments...)...))
+}
+
+func runBoundedNixCommand(ctx context.Context, limit int, command *exec.Cmd) (string, error) {
 	configureCommandCancellation(command)
 	stdout := &boundedCommandBuffer{limit: limit}
 	stderr := &boundedCommandBuffer{limit: limit}
