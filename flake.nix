@@ -224,6 +224,7 @@
         programming-profile-vm = import ./tests/programming-profile-vm.nix { inherit pkgs; };
         mysql-workbench-vm = import ./tests/mysql-workbench-vm.nix { inherit pkgs; };
         session-state-vm = import ./tests/session-state-vm.nix { inherit pkgs; };
+        stay-active-vm = import ./tests/stay-active-vm.nix { inherit pkgs; };
         classroom-view-vm = import ./tests/classroom-view-vm.nix { inherit pkgs; };
         onboarding-vm = import ./tests/onboarding-vm.nix { inherit pkgs; };
         console-keyboard-vm = import ./tests/console-keyboard-vm.nix { inherit pkgs; };

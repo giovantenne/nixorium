@@ -46,6 +46,9 @@ var Registry = []Migration{
 					"102183eaefdd54f35799f4ec0c5be605a54de6e35347fbec9de3a5212084d0c8",
 					"1ca0eda66faa35f0cc974da0bc92b97d1a4cd9d1081901905b1a0f3a0a3ac128",
 					"9a8d5fd89b6ddd475d6f0bfb5b767cee9fd7ba67b1ab6d0b92b58d09ea954359",
+				}, Later: []string{
+					// 2026-10-screensaver-idle-inhibitors applied.
+					"ecbe4e02fed27c4eb7e5bfa67c470dd15705410435d062e63babeb715ed27b86",
 				}},
 			})
 		},
@@ -66,6 +69,15 @@ var Registry = []Migration{
 			return ReplaceExact(tree, "modules/workstation.nix",
 				"  teacherFavorites = lib.optionals isController\n    [ (if labSettings.classroomView or true then \"nixorium-classroom.desktop\" else \"nixorium.desktop\") ]\n",
 				"  teacherFavorites = lib.optionals isController\n    [ \"nixorium-classroom.desktop\" ]\n")
+		},
+	},
+	{
+		ID:          "2026-10-screensaver-idle-inhibitors",
+		Description: "The lab screensaver does not start while an application or the Caffeine toggle keeps the screen on.",
+		Apply: func(tree Tree) Outcome {
+			return ReplaceExact(tree, "scripts/screensaver-monitor.sh",
+				"while true; do\n  IDLE_MS=$(get_idle_ms)\n\n  if [[ \"$IDLE_MS\" -ge \"$IDLE_BLANK_MS\" ]]; then\n",
+				"# An application or the Caffeine toggle that keeps the screen on (a session\n# idle inhibitor) keeps the screensaver away too.\nidle_inhibited() {\n  gdbus call --session \\\n    --dest org.gnome.SessionManager \\\n    --object-path /org/gnome/SessionManager \\\n    --method org.gnome.SessionManager.IsInhibited 8 2>/dev/null |\n  grep -q true\n}\n\nwhile true; do\n  IDLE_MS=$(get_idle_ms)\n  if idle_inhibited; then\n    IDLE_MS=0\n  fi\n\n  if [[ \"$IDLE_MS\" -ge \"$IDLE_BLANK_MS\" ]]; then\n")
 		},
 	},
 }

@@ -16,7 +16,7 @@
   checks-home-reset = [ "home-reset-filesystem-vm" "workspace-reset-service-vm" ];
   checks-editor = [ "workspace-editor-vm" "programming-profile-vm" "mysql-workbench-vm" ];
   checks-management = [ "management-vm" "network-migration-vm" "assistant-vm" "host-diagnostics-vm" "telemetry-vm" "onboarding-vm" ];
-  checks-session = [ "console-keyboard-vm" "session-state-vm" "clean-generations-vm" "classroom-view-vm" ];
+  checks-session = [ "console-keyboard-vm" "session-state-vm" "stay-active-vm" "clean-generations-vm" "classroom-view-vm" ];
   checks-installer = [ "client-installer" "client-installer-vm" "client-network-upgrade-vm" "class-network-vm" "network-transition-vm" "boot-fallback-vm" ];
   checks-remote-installer = [ "remote-client-installer-vm" ];
 }

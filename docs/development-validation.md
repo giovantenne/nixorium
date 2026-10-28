@@ -405,7 +405,14 @@ VM:
 ```sh
 nix --extra-experimental-features 'nix-command flakes' \
   build --file tests/source-checks.nix session-state-vm --no-link
-``` Existing lower-level seed/resolution tests retain fast
+```
+
+`stay-active-vm` boots the same kind of GNOME login with the Caffeine
+extension: it is enabled and off at sign-in, turning it on holds a session idle
+inhibitor, and the lab screensaver's own check (taken from the template
+script) sees it; turning it off releases it.
+
+Existing lower-level seed/resolution tests retain fast
 failure coverage without launching the graphical application.
 
 After the automated milestone, follow the documented VirtualBox recipe with

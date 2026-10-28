@@ -124,7 +124,11 @@ built-in profile, including Essential, declares the Ghostty and TTE packages
 that switch the screensaver on; its effects come from `ttfx` (`pkgs/ttfx.nix`,
 until nixpkgs ships it) at 30 frames per second. After 30 idle minutes GNOME
 blanks and switches off the screen and the screensaver stops; the session is
-never locked and the computer does not sleep.
+never locked and the computer does not sleep. Every user has a **Caffeine**
+toggle in the quick settings (the Caffeine GNOME Shell extension, enabled by
+`modules/stay-active.nix`): while it is on, or while an application asks GNOME
+to keep the screen on, neither the screensaver nor the blank screen starts.
+It is off at every sign-in.
 Removing a declaration therefore does not leave an upstream launcher or service
 behind.
 

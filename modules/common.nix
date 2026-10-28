@@ -9,6 +9,7 @@
     ./power.nix
     ./ssh.nix
     ./boot-fallback.nix
+    ./stay-active.nix
   ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];

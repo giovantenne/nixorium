@@ -151,27 +151,32 @@ func TestTheSixtyFramesMigrationAppliesOnceAndRespectsEdits(t *testing.T) {
 	}
 }
 
-func TestALaboratoryCreatedAtSixtyFramesNeedsNoScreensaverChange(t *testing.T) {
-	// A laboratory created from a template that already had both changes
-	// (3.10.0 and later) is not "changed by hand": both migrations are done
-	// and recorded, so later updates do not mention them again.
+func TestALaboratoryCreatedWithTheLaterScreensaverNeedsNoChange(t *testing.T) {
+	// A laboratory created from a template that already had the later changes
+	// (sixty frames from 3.10.0, idle inhibitors after 3.11.0) is not "changed
+	// by hand": every screensaver migration is done and recorded, so later
+	// updates do not mention them again.
 	current := map[string]string{
 		"modules/screensaver.nix":        string(frozen("2026-10-ttfx-screensaver", "screensaver.nix")),
 		"scripts/cmd-screensaver.sh":     string(frozen("2026-10-ttfx-screensaver", "cmd-screensaver.sh")),
 		"scripts/screensaver-monitor.sh": string(frozen("2026-10-ttfx-screensaver", "screensaver-monitor.sh")),
 	}
-	// The sixty-frames form is what that migration makes of the frozen file.
+	// The later forms are what those migrations make of the frozen files.
 	root := treeWith(t, current)
-	if report, err := Run(root, "3.10.0", registryWith("screensaver")); err != nil || len(report.Migrations) != 2 {
+	if report, err := Run(root, "3.10.0", registryWith("screensaver")); err != nil || len(report.Migrations) != 3 {
 		t.Fatalf("report = %+v, %v", report, err)
 	}
 	current["scripts/cmd-screensaver.sh"] = read(t, root, "scripts/cmd-screensaver.sh")
 	if !strings.Contains(current["scripts/cmd-screensaver.sh"], "--frame-rate 60") {
 		t.Fatal("the sixty-frames migration did not apply")
 	}
+	current["scripts/screensaver-monitor.sh"] = read(t, root, "scripts/screensaver-monitor.sh")
+	if !strings.Contains(current["scripts/screensaver-monitor.sh"], "IsInhibited 8") {
+		t.Fatal("the idle inhibitor migration did not apply")
+	}
 	root = treeWith(t, current)
 	report, err := Run(root, "3.10.0", registryWith("screensaver"))
-	if err != nil || len(report.Migrations) != 2 {
+	if err != nil || len(report.Migrations) != 3 {
 		t.Fatalf("report = %+v, %v", report, err)
 	}
 	for _, entry := range report.Migrations {

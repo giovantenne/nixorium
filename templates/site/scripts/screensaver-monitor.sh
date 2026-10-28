@@ -65,8 +65,21 @@ kill_screensaver() {
   pkill -f "$SCREENSAVER_CLASS" 2>/dev/null || true
 }
 
+# An application or the Caffeine toggle that keeps the screen on (a session
+# idle inhibitor) keeps the screensaver away too.
+idle_inhibited() {
+  gdbus call --session \
+    --dest org.gnome.SessionManager \
+    --object-path /org/gnome/SessionManager \
+    --method org.gnome.SessionManager.IsInhibited 8 2>/dev/null |
+  grep -q true
+}
+
 while true; do
   IDLE_MS=$(get_idle_ms)
+  if idle_inhibited; then
+    IDLE_MS=0
+  fi
 
   if [[ "$IDLE_MS" -ge "$IDLE_BLANK_MS" ]]; then
     # The screen is blank: nothing to animate, nothing to spend CPU on.

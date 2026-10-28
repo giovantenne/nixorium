@@ -6,6 +6,17 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Every user has a **Caffeine** toggle in GNOME's quick settings (top right):
+  while it is on, the screen does not blank and the lab screensaver does not
+  start. It is off at every sign-in and can also run for 15, 30 or 60
+  minutes. The student computers and the controller get it with the usual
+  update. The deployment migration `2026-10-screensaver-idle-inhibitors`
+  makes the lab screensaver respect it, and any application that asks GNOME
+  to keep the screen on (if you edited `scripts/screensaver-monitor.sh`, the
+  review shows a manual change).
+
 ### Fixed
 
 - A new installation (controller, or computer from USB or the network) now
