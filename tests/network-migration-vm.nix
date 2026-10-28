@@ -117,7 +117,7 @@ let
       *systemd-run*)
         printf '%s\n' "''${SSH_CONNECTION:-}" >> /tmp/engine-activate.log
         ID="$(printf '%s' "$remote" | ${pkgs.gnused}/bin/sed -n 's/.*NIXORIUM_ACTIVATION=\([0-9a-f]*\).*/\1/p')"
-        SYSTEM="$(printf '%s' "$remote" | ${pkgs.gnused}/bin/sed -n 's/.*NIXORIUM_SYSTEM=\([^ ]*\).*/\1/p')"
+        SYSTEM="$(printf '%s' "$remote" | ${pkgs.gnused}/bin/sed -n "s/.*NIXORIUM_SYSTEM=\([^ ']*\).*/\1/p")"
         NAME="''${SYSTEM##*-nixos-system-pc01-}"
         VARIANT="''${NAME%%-*}"
         REVISION="''${NAME#*-}"
