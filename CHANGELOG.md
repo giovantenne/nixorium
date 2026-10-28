@@ -6,6 +6,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.11.0] - 2026-10-28
+
+From 3.10.0, Update Nixorium, then Apply to controller and Update computers as
+usual; the deployment migrations below run during the update. From 3.9.0 or
+older, first follow the 3.10.0 notes below, with `v3.11.0` in the commands.
+Before updating, a laboratory whose settings name a Wi-Fi card (`wl…`) changes
+it to the wired card (see Changed). The new classroom notices and labels on the
+student computers appear after each student's next login.
+
 ### Added
 
 - Computer diagnostics gain a read-only hardware area (USB, PCI, displays, audio cards, printer queues, related kernel messages; no serial numbers, printer credentials removed), available to the Assistant; computers need the usual update.
@@ -2898,7 +2907,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.10.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.11.0...HEAD
+[3.11.0]: https://github.com/giovantenne/nixorium/compare/v3.10.0...v3.11.0
 [3.10.0]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.4...v3.10.0
 [3.10.0-beta.4]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.3...v3.10.0-beta.4
 [3.10.0-beta.3]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.2...v3.10.0-beta.3
