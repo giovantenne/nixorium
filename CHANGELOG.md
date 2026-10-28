@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A new installation (controller, or computer from USB or the network) now
+  lists Windows on another disk in its first boot menu. Before, the boot
+  loader was set up without the disk information os-prober needs, and Windows
+  appeared only after the first update.
+
 ## [3.11.0] - 2026-10-28
 
 From 3.10.0, Update Nixorium, then Apply to controller and Update computers as

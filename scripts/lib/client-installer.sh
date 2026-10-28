@@ -214,6 +214,33 @@ nixorium_run_disko() {
   fi
 }
 
+# nixos-install installs GRUB inside a chroot of the target that lacks the live
+# system's /run/udev. Without it os-prober cannot read partition types, skips
+# the EFI partition of Windows on another disk, and the boot menu lists Windows
+# only after the first update. This runs a command with that database visible,
+# read-only, inside the target; without it the command still runs.
+nixorium_with_udev_in_target() {
+  local root=$1 status=0
+  local -a as_root=()
+  shift
+  (( EUID == 0 )) || as_root=(sudo)
+  if [[ -d /run/udev ]] && {
+    "${as_root[@]}" mkdir -p "$root/run" &&
+      "${as_root[@]}" mount -t tmpfs -o mode=0755 nixorium-run "$root/run" &&
+      "${as_root[@]}" mkdir "$root/run/udev" &&
+      "${as_root[@]}" mount --bind /run/udev "$root/run/udev" &&
+      "${as_root[@]}" mount -o remount,bind,ro "$root/run/udev"
+  }; then
+    "$@" || status=$?
+    "${as_root[@]}" umount -R "$root/run" || true
+    return "$status"
+  fi
+  if findmnt -rn --mountpoint "$root/run" >/dev/null 2>&1; then
+    "${as_root[@]}" umount -R "$root/run" || return 1
+  fi
+  "$@"
+}
+
 nixorium_require_clean_install_mount() {
   if findmnt -rn --mountpoint /mnt >/dev/null 2>&1; then
     echo "/mnt is already occupied" >&2

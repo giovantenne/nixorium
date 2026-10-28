@@ -338,7 +338,7 @@ run_plan() {
   # the computer's number from this record then (ADR 0033).
   nixorium_write_identity_record "$host_name"
   echo "Copying the prepared system from the controller (this can take several minutes)..."
-  nixos-install --system "$system_path" \
+  nixorium_with_udev_in_target /mnt nixos-install --system "$system_path" \
     --option substituters "$cache_url" \
     --option trusted-public-keys "$cache_key" \
     --option require-sigs true \

@@ -349,6 +349,7 @@ test_offline_system_resolution_precedes_system_install() (
   }
   sudo() { printf '%s\n' "$@" > "$ACTION_LOG"; }
   nixorium_write_identity_record() { printf '%s\n' "$1" > "${FIXTURE_DIR}/identity-record"; }
+  nixorium_with_udev_in_target() { printf '%s\n' "$1" > "${FIXTURE_DIR}/udev-target"; shift; "$@"; }
 
   resolve_system
   INSTALL_LOG="${FIXTURE_DIR}/install.log"
@@ -368,6 +369,8 @@ test_offline_system_resolution_precedes_system_install() (
   test "$SYSTEM_CLOSURE_BYTES" -eq 10737418240
   test "$REQUIRED_DISK_BYTES" -eq 12884901888
   test "$(printf '%s\n' nixos-install --system /nix/store/00000000000000000000000000000000-nixos-system-pc01-test --option substituters http://192.0.2.10:5000 --option trusted-public-keys "$CACHE_KEY" --option fallback false --no-channel-copy --no-root-passwd)" = "$(cat "$ACTION_LOG")"
+  # The boot loader step sees the live udev database, so os-prober finds Windows.
+  test "$(cat "${FIXTURE_DIR}/udev-target")" = /mnt
   ! grep -q -- '--flake' "$ACTION_LOG"
 )
 
@@ -456,6 +459,7 @@ test_install_output_goes_to_the_log() (
   LAB_CACHE_PORT=5000
   CACHE_KEY=cache.example:test-key
   nixorium_write_identity_record() { :; }
+  nixorium_with_udev_in_target() { shift; "$@"; }
   local mode=ok
   sudo() {
     echo "these 2 paths will be fetched (1.0 MiB download, 2.0 MiB unpacked):"

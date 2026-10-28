@@ -170,6 +170,28 @@ disk_has_mounted_filesystem() {
   lsblk -nrpo MOUNTPOINT "$CANDIDATE" | awk 'NF { found = 1 } END { exit(found ? 0 : 1) }'
 }
 
+# nixos-install installs GRUB inside a chroot of the target that lacks the live
+# system's /run/udev, so os-prober skips Windows on another disk until the
+# first update. Same as nixorium_with_udev_in_target in the client installers.
+with_udev_in_target() {
+  local STATUS=0
+  if [[ -d /run/udev ]] && {
+    sudo mkdir -p "$TARGET_ROOT/run" &&
+      sudo mount -t tmpfs -o mode=0755 nixorium-run "$TARGET_ROOT/run" &&
+      sudo mkdir "$TARGET_ROOT/run/udev" &&
+      sudo mount --bind /run/udev "$TARGET_ROOT/run/udev" &&
+      sudo mount -o remount,bind,ro "$TARGET_ROOT/run/udev"
+  } 2>> "$INSTALL_LOG"; then
+    "$@" || STATUS=$?
+    sudo umount -R "$TARGET_ROOT/run" >/dev/null 2>&1 || true
+    return "$STATUS"
+  fi
+  if findmnt -rn --mountpoint "$TARGET_ROOT/run" >/dev/null 2>&1; then
+    sudo umount -R "$TARGET_ROOT/run" || return 1
+  fi
+  "$@"
+}
+
 EVALUATION_SOURCE=""
 TEMP_DISKO_LAYOUT=$(mktemp)
 TEMP_DISKO_FILE=$(mktemp)
@@ -377,7 +399,7 @@ CURRENT_STEP="downloading and installing the controller system"
 ui_log "[3/3] Downloading and installing the controller system. This is the longest step."
 ui_note "${UI_MUTED}The system is downloaded and written to the chosen disk; on a slow connection this takes a while.${UI_RESET}"
 ui_note "${UI_MUTED}Technical details are saved in ${INSTALL_LOG}.${UI_RESET}"
-if ! sudo env \
+if ! with_udev_in_target sudo env \
   NIX_CONFIG="$NIX_CONFIG" \
   XDG_CACHE_HOME="$BOOTSTRAP_CACHE" \
   nixos-install \

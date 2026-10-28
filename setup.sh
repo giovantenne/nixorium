@@ -459,7 +459,7 @@ install_system() {
   # the computer's number from this record then (ADR 0033).
   nixorium_write_identity_record "$SELECTED_HOST" || return 1
   ui_log "Copying ${SELECTED_HOST}'s system from the controller and installing the boot loader (several minutes)..."
-  if ! sudo nixos-install --system "$SELECTED_SYSTEM_PATH" \
+  if ! nixorium_with_udev_in_target /mnt sudo nixos-install --system "$SELECTED_SYSTEM_PATH" \
     --option substituters "http://${LAB_CONTROLLER_DHCP_IP}:${LAB_CACHE_PORT}" \
     --option trusted-public-keys "$CACHE_KEY" \
     --option fallback false \

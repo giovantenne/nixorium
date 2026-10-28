@@ -30,7 +30,8 @@ in
         # image no longer carries the system, so leave room (blocks and inodes).
         diskSize = 8192;
         memorySize = 4096;
-        emptyDiskImages = [ 20480 ];
+        # The second disk holds another system's EFI partition (see below).
+        emptyDiskImages = [ 20480 64 ];
         useBootLoader = true;
         useEFIBoot = true;
       };
@@ -46,6 +47,7 @@ in
         pkgs.nixos-install-tools
         pkgs.python3
         pkgs.curl
+        pkgs.dosfstools
         pkgs.sudo
         pkgs.util-linux
       ] ++ diskoRuntimePackages;
@@ -143,6 +145,10 @@ in
     installer.fail("grep -F 'DESTRUCTIVE REVIEW' /tmp/cache-missing.log")
     installer.succeed("systemctl stop empty-cache")
     installer.succeed("test -z \"$(lsblk -nrpo FSTYPE /dev/vdb)\"")
+    # Windows on another disk: its EFI partition holds the Windows boot manager.
+    installer.succeed("printf 'label: gpt\\ntype=C12A7328-F81F-11D2-BA4B-00A0C93EC93B\\n' | sfdisk /dev/vdc")
+    installer.succeed("udevadm settle; mkfs.vfat /dev/vdc1; mkdir -p /tmp/windows-esp; mount /dev/vdc1 /tmp/windows-esp")
+    installer.succeed("mkdir -p /tmp/windows-esp/EFI/Microsoft/Boot; touch /tmp/windows-esp/EFI/Microsoft/Boot/bootmgfw.efi /tmp/windows-esp/EFI/Microsoft/Boot/BCD; umount /tmp/windows-esp")
     # The real controller cache serves the signed closure.
     point_installer_at_cache(cache_ip, 5000)
     installer.succeed("set -o pipefail; /etc/nixorium-test/run-client-installer 2>&1 | tee /tmp/client-installer.log")
@@ -162,6 +168,8 @@ in
     # It reached the target through the cache, never through the netboot store.
     installer.fail("test -e ${clientSystem}")
     installer.succeed("lsblk -nrpo PATH,FSTYPE /dev/vdb | grep -E '/dev/vdb[12] '")
+    # The first boot menu already offers Windows, as later updates do.
+    installer.succeed("grep -F 'Windows Boot Manager' /mnt/boot/grub/grub.cfg")
     installer.succeed("umount -R /mnt")
     installer.succeed("sync")
     installer.shutdown()
