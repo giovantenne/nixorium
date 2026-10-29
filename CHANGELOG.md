@@ -19,6 +19,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Deployment migrations that replace several files (such as the screensaver
+  one) now put every file back as it was if writing one of them fails, instead
+  of leaving the deployment half migrated. The review also no longer reports
+  a migration that only deletes text as a manual change when the text is
+  already gone.
 - Security: the controller and the computers write editor, browser, bookmark
   and screen-layout defaults into the administrator's and teacher's homes as
   those users, not as root. Before, a teacher could leave a link in their own
