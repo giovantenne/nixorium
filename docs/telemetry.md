@@ -10,9 +10,10 @@ choose whether to share it. The first ordinary administrator startup offers
 this choice after the operational disclaimer, until a decision is saved.
 The disclaimer acknowledgement is separate from telemetry consent.
 Press `p` for the exact local JSON and `i` for Privacy & retention. On the overview,
-`e` or Enter explicitly accepts sharing; `n` declines (`d` remains an alias).
-Esc returns from details, or skips the invitation and opens the menu without
-saving a decision. Sharing remains off and the invitation returns at the next
+only `e` accepts sharing; `n` declines (`d` remains an alias). Enter never
+saves a choice. Esc returns from details, and on the first invitation Esc or
+Enter ("Not now") skips it and opens the menu without saving a decision.
+Sharing remains off and the invitation returns at the next
 TUI launch. `q` exits with the same undecided behavior. A saved refusal is not reoffered.
 The first invitation returns to the overview after saving either choice.
 Adoption statistics is the last entry in Maintenance.

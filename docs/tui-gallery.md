@@ -32,8 +32,8 @@ navigable dashboard demonstrates the same proposal on two of its four PCs.
 ## Workflow guide
 
 The first administrator launch shows the operational disclaimer (Enter accepts,
-q exits), then the optional telemetry invitation (Enter accepts, n declines,
-Esc skips to the menu, q exits). Skipping saves no consent and repeats the
+q exits), then the optional telemetry invitation (e accepts, n declines,
+Enter or Esc skips to the menu, q exits). Skipping saves no consent and repeats the
 invitation next launch. A saved refusal is remembered.
 
 The overview opens Computers, Installation, Software and Maintenance. Startup
@@ -163,8 +163,8 @@ Disable anytime in Maintenance. See Privacy & retention for details.
 
 Status: Off — no adoption reports are being sent.
 
-e/Enter Share statistics  ·  n No thanks  ·  p Exact report  ·  i Privacy & retention  ·  ↑/↓ Scroll  ·  Esc Menu
-q Exit  ·  F1 Help
+e Share statistics  ·  n No thanks  ·  ⏎ Enter Not now  ·  p Exact report  ·  i Privacy & retention  ·  ↑/↓ Scroll
+Esc Menu  ·  q Exit  ·  F1 Help
 ```
 
 ## Unconfigured clients

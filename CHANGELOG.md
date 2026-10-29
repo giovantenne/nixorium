@@ -32,6 +32,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   wherever they reach a script that runs as root, so a crafted value (for
   example one proposed to the Assistant) can no longer run commands on the
   computers. Existing labs with ordinary values are not affected.
+- The first adoption statistics invitation no longer turns sharing on when you
+  press Enter. Only `e` accepts; Enter now means "Not now" and leaves the choice
+  undecided, so the invitation returns at the next launch, and the screen says
+  so. In Maintenance, Enter no longer enables sharing either. The privacy
+  notice now names the operator as HardyPress SRL, which maintains Nixorium,
+  instead of a person.
 - A new installation (controller, or computer from USB or the network) now
   lists Windows on another disk in its first boot menu. Before, the boot
   loader was set up without the disk information os-prober needs, and Windows
