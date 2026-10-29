@@ -34,11 +34,16 @@ fi
 EOF
 
 # Create .gitconfig
-cat > "$TEMPLATE_DIR/.gitconfig" << EOF
-[user]
-    name = $GIT_NAME
-    email = $GIT_EMAIL
-EOF
+# Values are quoted so a backslash, quote or comment character stays text.
+git_quote() {
+  local value="${1//\\/\\\\}"
+  printf '"%s"' "${value//\"/\\\"}"
+}
+{
+  printf '[user]\n'
+  printf '    name = %s\n' "$(git_quote "$GIT_NAME")"
+  printf '    email = %s\n' "$(git_quote "$GIT_EMAIL")"
+} > "$TEMPLATE_DIR/.gitconfig"
 
 # Create XDG standard directories using xdg-user-dirs
 HOME="$TEMPLATE_DIR" "$XDG_USER_DIRS_BIN" --force

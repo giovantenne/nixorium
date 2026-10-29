@@ -29,6 +29,16 @@ let
     builtins.match "[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}" value != null;
   isNonEmpty = value:
     builtins.match ".*[^[:space:]].*" value != null;
+  # Git identities and the keyboard layout reach shell scripts and
+  # configuration files; internal/domain/settings.go holds the same rules.
+  # Lengths are in bytes, as in the Go validation.
+  isGitName = value:
+    builtins.stringLength value <= 256 && builtins.match "[^[:cntrl:]]*" value != null;
+  isGitEmail = value:
+    builtins.stringLength value <= 256
+    && builtins.match "[^[:space:][:cntrl:]@]+@[^[:space:][:cntrl:]@]+" value != null;
+  isKeyboardLayout = value:
+    builtins.stringLength value <= 128 && builtins.match "[A-Za-z0-9_,()+-]+" value != null;
   isAbsoluteHttpUrl = value:
     builtins.match "https?://[^/[:space:]]+(/.*)?" value != null;
   # RFC 3339 date-time in the form time.RFC3339 produces and parses.
@@ -279,6 +289,12 @@ assert unknownInterfaceHosts == []
   || throw "hostIfaceNames contains unknown hosts: ${builtins.concatStringsSep ", " unknownInterfaceHosts}";
 assert emptyRequiredFields == []
   || throw "settings must not be empty: ${builtins.concatStringsSep ", " emptyRequiredFields}";
+assert isGitName config.studentGitName && isGitName config.adminGitName
+  || throw "Git names must be at most 256 bytes without control characters";
+assert isGitEmail config.studentGitEmail && isGitEmail config.adminGitEmail
+  || throw "Git emails must look like name@domain, without spaces or control characters, at most 256 bytes";
+assert isKeyboardLayout config.keyboardLayout
+  || throw "keyboardLayout must be an XKB layout name: letters, digits and _ - + , ( ) only, at most 128 bytes";
 assert isUserName config.teacherUser
   || throw "teacherUser must be a valid Unix user name";
 assert isUserName config.studentUser

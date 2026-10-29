@@ -350,3 +350,56 @@ func TestAssistantDefaultsOnAndSurvivesSettingsSave(t *testing.T) {
 		t.Fatalf("disabling Assistant is not reviewed: %+v", changes)
 	}
 }
+
+func TestGitIdentityAndKeyboardLayoutValidation(t *testing.T) {
+	accepted := []struct{ name, field, value string }{
+		{"name with accents quotes and spaces", "name", "José O'Brien \"Jo\" Núñez"},
+		{"plain email", "email", "ada.lovelace+lab@example.org"},
+		{"simple layout", "layout", "us"},
+		{"layout with variant", "layout", "us(intl)"},
+		{"layout list", "layout", "us,it"},
+		{"layout with underscore", "layout", "de_CH-legacy+1"},
+	}
+	rejected := []struct{ name, field, value string }{
+		{"name with shell injection and newline", "name", "x\"; touch /tmp/x #\nname"},
+		{"name with tab", "name", "Ada\tLovelace"},
+		{"name with DEL", "name", "Ada\x7f"},
+		{"name too long", "name", strings.Repeat("a", 257)},
+		{"email with space", "email", "ada lovelace@example.org"},
+		{"email without at", "email", "ada.example.org"},
+		{"email without domain", "email", "ada@"},
+		{"email with two ats", "email", "a@b@c"},
+		{"email with newline", "email", "ada@example.org\n[core]"},
+		{"email too long", "email", "a@" + strings.Repeat("b", 255)},
+		{"layout with quote", "layout", "us')]; touch /tmp/x #"},
+		{"layout with space", "layout", "us intl"},
+		{"layout with newline", "layout", "us\n"},
+		{"layout too long", "layout", strings.Repeat("u", 129)},
+	}
+	apply := func(field, value string) []ValidationIssue {
+		settings := validSettings()
+		switch field {
+		case "name":
+			settings.Lab.StudentGitName, settings.Lab.AdminGitName = value, value
+		case "email":
+			settings.Lab.StudentGitEmail, settings.Lab.AdminGitEmail = value, value
+		default:
+			settings.Lab.KeyboardLayout = value
+		}
+		return settings.Validate()
+	}
+	for _, c := range accepted {
+		t.Run("accepts "+c.name, func(t *testing.T) {
+			if issues := apply(c.field, c.value); len(issues) != 0 {
+				t.Fatalf("%q rejected: %v", c.value, issues)
+			}
+		})
+	}
+	for _, c := range rejected {
+		t.Run("rejects "+c.name, func(t *testing.T) {
+			if issues := apply(c.field, c.value); len(issues) == 0 {
+				t.Fatalf("%q accepted", c.value)
+			}
+		})
+	}
+}

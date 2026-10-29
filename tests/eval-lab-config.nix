@@ -33,6 +33,15 @@ assert !(evaluates (valid // { studentUser = valid.teacherUser; }));
 assert !(evaluates (valid // { adminPassword = "plaintext"; }));
 assert !(evaluates (valid // { homepageUrl = "example.org"; }));
 assert builtins.all (case: !(evaluates (valid // case.overrides))) sharedCases.invalid;
+# Git identities and the keyboard layout reach shell scripts: strict shapes,
+# while ordinary names (accents, quotes, spaces) and XKB layouts stay valid.
+assert evaluates (valid // { adminGitName = "José O'Brien \"Jo\" Núñez"; studentGitEmail = "jose.o+lab@example.org"; });
+assert evaluates (valid // { keyboardLayout = "us"; });
+assert evaluates (valid // { keyboardLayout = "us(intl)"; });
+assert evaluates (valid // { keyboardLayout = "us,it"; });
+assert evaluates (valid // { keyboardLayout = "de_CH-legacy+1"; });
+assert !(evaluates (valid // { adminGitName = "x\"; touch /tmp/x #\nname"; }));
+assert !(evaluates (valid // { keyboardLayout = "us')]; touch /tmp/x #"; }));
 # A change of laboratory network: valid previous network, offset or zoned time.
 assert (evalLabConfig valid).networkTransition == null;
 assert evaluates (valid // { networkTransition = { previousBase = "10.1.0.0"; previousPrefixLength = 24; startedAt = "2026-10-15T08:00:00Z"; }; });

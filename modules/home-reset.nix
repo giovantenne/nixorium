@@ -17,7 +17,12 @@ in
   system.activationScripts.createHomeTemplates = {
     text = ''
       # Create admin template
-      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirAdmin}" "${gitConfigAdmin.name}" "${gitConfigAdmin.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
+      ${pkgs.bash}/bin/bash ${createTemplateScript} ${lib.escapeShellArgs [
+        templateDirAdmin
+        gitConfigAdmin.name
+        gitConfigAdmin.email
+        "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
+      ]}
       chown -R admin:users "${templateDirAdmin}"
 
       # Setup admin home (once, not reset at boot)

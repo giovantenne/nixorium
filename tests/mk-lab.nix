@@ -239,6 +239,18 @@ let
   nativeClientTCP = allInterfaceTCP plainLab.nixosConfigurations.pc01.config.networking.firewall;
   clientUsers = subnetLab.nixosConfigurations.pc01.config.users.users;
   clientPolkit = subnetLab.nixosConfigurations.pc01.config.security.polkit;
+  # Lab text that reaches root's activation script is shell-quoted.
+  hostileName = "x\"; touch /tmp/x #";
+  quotedLayout = "us(intl)";
+  hostileLab = (mkLab (baseArgs // {
+    labConfig = labConfig // {
+      adminGitName = hostileName;
+      adminGitEmail = "a'b@example.org";
+      keyboardLayout = quotedLayout;
+    };
+  })).nixosConfigurations.pc01.config;
+  hostileActivation = hostileLab.system.activationScripts.createHomeTemplates.text;
+  hostileGSettings = hostileLab.services.desktopManager.gnome.extraGSettingsOverrides;
   clientHomeOwnership = subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumUserHomeOwnership;
 in
 assert import ./group-modules.nix { inherit mkLab deploymentSelf labConfig lib; };
@@ -251,6 +263,10 @@ assert hostClassLab.nixoriumHostClasses == [
 ];
 assert lib.sort builtins.lessThan (lib.concatMap (class: class.members) hostClassLab.nixoriumHostClasses)
   == [ "pc01" "pc02" "pc03" "pc04" "pc05" "pc06" "pc99" ];
+assert lib.hasInfix (lib.escapeShellArg hostileName) hostileActivation;
+assert !(lib.hasInfix "\"${hostileName}\"" hostileActivation);
+assert lib.hasInfix (lib.escapeShellArg "a'b@example.org") hostileActivation;
+assert lib.hasInfix "sources=[('xkb', 'us(intl)')]" hostileGSettings;
 assert controllerOnlyLab.nixoriumHostClasses == [ { representative = "pc99"; members = [ "pc99" ]; } ];
 # MySQL Workbench skips the missing keychain on every lab desktop, whatever
 # the site's development module says (labs created before 3.8.0 lack it).
@@ -343,8 +359,8 @@ assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensur
 assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.environmentFiles == [ "/run/nixorium/identity.env" ];
 assert builtins.head subnetLab.nixosConfigurations.pc01._module.specialArgs.labSettings.clientIdentities
   == { number = 1; name = "pc01"; address = "10.23.4.129"; };
-assert lib.hasInfix "1) name=pc01 address=10.23.4.129 previous= ;;" subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumIdentity.text;
-assert lib.hasInfix "20) name=pc20 address=10.23.4.148 previous= ;;" subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumIdentity.text;
+assert lib.hasInfix "1) name=pc01 address=10.23.4.129 previous='' ;;" subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumIdentity.text;
+assert lib.hasInfix "20) name=pc20 address=10.23.4.148 previous='' ;;" subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumIdentity.text;
 assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection.type == "ethernet";
 assert !(subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection ? interface-name);
 assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.settings.main.no-auto-default == "*";

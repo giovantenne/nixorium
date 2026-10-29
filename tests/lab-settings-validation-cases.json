@@ -117,6 +117,50 @@
     {
       "name": "network transition with an unknown field",
       "overrides": { "networkTransition": { "previousBase": "10.1.0.0", "previousPrefixLength": 24, "startedAt": "2026-10-15T08:00:00Z", "previousController": "10.1.0.99" } }
+    },
+    {
+      "name": "Git name with a shell injection and a newline",
+      "overrides": {"adminGitName": "x\"; touch /tmp/x #\nname"}
+    },
+    {
+      "name": "Git name with a tab",
+      "overrides": {"studentGitName": "Ada\tLovelace"}
+    },
+    {
+      "name": "Git name longer than 256 bytes",
+      "overrides": {"adminGitName": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+    },
+    {
+      "name": "Git email with a space",
+      "overrides": {"adminGitEmail": "ada lovelace@example.org"}
+    },
+    {
+      "name": "Git email without an at sign",
+      "overrides": {"studentGitEmail": "ada.example.org"}
+    },
+    {
+      "name": "Git email with a newline",
+      "overrides": {"adminGitEmail": "ada@example.org\n[core]"}
+    },
+    {
+      "name": "Git email without a domain",
+      "overrides": {"studentGitEmail": "ada@"}
+    },
+    {
+      "name": "Git email longer than 256 bytes",
+      "overrides": {"adminGitEmail": "a@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+    },
+    {
+      "name": "keyboard layout with a quote",
+      "overrides": {"keyboardLayout": "us')]; touch /tmp/x #"}
+    },
+    {
+      "name": "keyboard layout with a space",
+      "overrides": {"keyboardLayout": "us intl"}
+    },
+    {
+      "name": "keyboard layout with a newline",
+      "overrides": {"keyboardLayout": "us\n"}
     }
   ]
 }

@@ -26,6 +26,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   update. The deployment migration `2026-10-staff-home-writes-as-owner`
   updates `modules/home-profile.nix` (if you edited it, the review shows a
   manual change: copy the new version from `templates/site`).
+- Git names and emails and the keyboard layout from lab-settings.json are now
+  checked (one line, no control characters, at most 256 bytes; emails shaped
+  `name@domain`; layouts made of letters, digits and `_-+,()`) and are quoted
+  wherever they reach a script that runs as root, so a crafted value (for
+  example one proposed to the Assistant) can no longer run commands on the
+  computers. Existing labs with ordinary values are not affected.
 - A new installation (controller, or computer from USB or the network) now
   lists Windows on another disk in its first boot menu. Before, the boot
   loader was set up without the disk information os-prober needs, and Windows

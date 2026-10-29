@@ -52,7 +52,7 @@ let
     name= address= previous=
     case "$recorded" in
     ${lib.concatMapStrings (identity: ''
-      ${toString identity.number}) name=${identity.name} address=${identity.address} previous=${identity.previousAddress or ""} ;;
+      ${toString identity.number}) name=${lib.escapeShellArg identity.name} address=${lib.escapeShellArg identity.address} previous=${lib.escapeShellArg (identity.previousAddress or "")} ;;
     '') labSettings.clientIdentities}
     esac
     if [ -z "$name" ]; then
