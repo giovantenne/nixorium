@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -80,5 +81,65 @@ func TestTextFormatsOnly(t *testing.T) {
 	}
 	if pickTextMime([]string{"image/png", "text/html"}) != "" || isTextMime("image/png") {
 		t.Fatal("a non-text format was accepted")
+	}
+}
+
+type endCountingCapture struct {
+	fakeCapture
+	ended chan struct{}
+}
+
+func (capture endCountingCapture) ClipboardEnd() error {
+	capture.ended <- struct{}{}
+	return nil
+}
+
+func TestOnlyTheConnectionThatBeganTheClipboardEndsIt(t *testing.T) {
+	capture := endCountingCapture{ended: make(chan struct{}, 4)}
+	agent := agentContext{userName: "student", capture: capture, lock: &fakeLocker{}}
+	open := func() (net.Conn, <-chan struct{}) {
+		server, client := net.Pipe()
+		finished := make(chan struct{})
+		go func() {
+			handle(server, agent)
+			close(finished)
+		}()
+		return client, finished
+	}
+	exchange := func(client net.Conn, message classroomview.Message) classroomview.Message {
+		t.Helper()
+		_ = client.SetDeadline(time.Now().Add(2 * time.Second))
+		if err := classroomview.Write(client, message); err != nil {
+			t.Fatal(err)
+		}
+		reply, err := classroomview.Read(client)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+	control, controlDone := open()
+	if reply := exchange(control, classroomview.Message{Type: classroomview.TypeClipboardBegin}); reply.Type != classroomview.TypeClipboardDone {
+		t.Fatalf("begin = %+v", reply)
+	}
+	// Another channel does its work and closes: the control goes on.
+	other, otherDone := open()
+	if reply := exchange(other, classroomview.Message{Type: classroomview.TypeLock, Locked: true}); reply.Type != classroomview.TypeLockState {
+		t.Fatalf("lock = %+v", reply)
+	}
+	other.Close()
+	<-otherDone
+	select {
+	case <-capture.ended:
+		t.Fatal("another channel closing ended the shared clipboard")
+	case <-time.After(100 * time.Millisecond):
+	}
+	// The control's own channel closing ends it.
+	control.Close()
+	<-controlDone
+	select {
+	case <-capture.ended:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the control closing left the shared clipboard on")
 	}
 }

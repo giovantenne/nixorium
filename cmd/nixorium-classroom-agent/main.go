@@ -263,9 +263,13 @@ func handle(connection net.Conn, agent agentContext) {
 	// A collection of the desktop through this connection ends with it.
 	var outgoing *collector
 	showing := false
+	// The shared clipboard lives only as long as the control that began it:
+	// another channel closing (a lock, a message, a sending) must not end it.
+	clipboardBegun := false
 	defer func() {
-		// The shared clipboard lives only as long as a control does.
-		_ = capture.ClipboardEnd()
+		if clipboardBegun {
+			_ = capture.ClipboardEnd()
+		}
 		if incoming != nil {
 			incoming.abort()
 		}
@@ -352,7 +356,14 @@ func handle(connection net.Conn, agent agentContext) {
 				return
 			}
 		case classroomview.TypeClipboardBegin, classroomview.TypeClipboardSet, classroomview.TypeClipboardGet, classroomview.TypeClipboardEnd:
-			if err := classroomview.Write(connection, clipboardReply(capture, message)); err != nil {
+			reply := clipboardReply(capture, message)
+			switch {
+			case message.Type == classroomview.TypeClipboardBegin && reply.Type == classroomview.TypeClipboardDone:
+				clipboardBegun = true
+			case message.Type == classroomview.TypeClipboardEnd:
+				clipboardBegun = false
+			}
+			if err := classroomview.Write(connection, reply); err != nil {
 				return
 			}
 		default:

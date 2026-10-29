@@ -42,6 +42,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   lists Windows on another disk in its first boot menu. Before, the boot
   loader was set up without the disk information os-prober needs, and Windows
   appeared only after the first update.
+- While you control a student's computer, a message, a lock, a file sent or
+  collected, or a busy refusal no longer turns off the shared clipboard and
+  the "controlled" notice on the student's screen. Only the end of the control
+  does.
 
 ## [3.11.0] - 2026-10-28
 
