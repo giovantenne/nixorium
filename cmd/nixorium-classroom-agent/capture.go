@@ -28,6 +28,25 @@ const (
 	firstFrameMax = 3 * time.Second
 )
 
+// busTimeout bounds one call to the compositor or the classroom extension.
+// Most calls run while the capture's mutex is held, so a stalled gnome-shell
+// must not hold every handler for longer.
+var busTimeout = 5 * time.Second
+
+// callBus calls a D-Bus method with a bounded wait.
+func callBus(object dbus.BusObject, method string, arguments ...any) *dbus.Call {
+	ctx, cancel := context.WithTimeout(context.Background(), busTimeout)
+	defer cancel()
+	return object.CallWithContext(ctx, method, 0, arguments...)
+}
+
+// busProperty reads one property with a bounded wait.
+func busProperty(object dbus.BusObject, iface, name string) (dbus.Variant, error) {
+	var value dbus.Variant
+	err := callBus(object, "org.freedesktop.DBus.Properties.Get", iface, name).Store(&value)
+	return value, err
+}
+
 // capturer provides frames of the session's screen and injects input.
 type capturer interface {
 	// Thumbnail returns the latest frame; image is nil when frame equals since.
@@ -150,7 +169,7 @@ func (capture *mutterCapture) Input(events []classroomview.InputEvent, release b
 	}
 	session := remoteDesktopName + ".Session"
 	call := func(method string, arguments ...any) error {
-		return capture.remote.Call(session+"."+method, 0, arguments...).Err
+		return callBus(capture.remote, session+"."+method, arguments...).Err
 	}
 	for _, event := range events {
 		var err error
@@ -201,12 +220,12 @@ func (capture *mutterCapture) releaseLocked() {
 	session := remoteDesktopName + ".Session"
 	for keysym, down := range capture.keysDown {
 		if down {
-			_ = capture.remote.Call(session+".NotifyKeyboardKeysym", 0, keysym, false).Err
+			_ = callBus(capture.remote, session+".NotifyKeyboardKeysym", keysym, false).Err
 		}
 	}
 	for button, down := range capture.buttonsDown {
 		if down {
-			_ = capture.remote.Call(session+".NotifyPointerButton", 0, buttonCodes[button], false).Err
+			_ = callBus(capture.remote, session+".NotifyPointerButton", buttonCodes[button], false).Err
 		}
 	}
 	capture.keysDown, capture.buttonsDown = map[uint32]bool{}, map[string]bool{}
@@ -269,7 +288,7 @@ func (capture *mutterCapture) startLocked(width int) error {
 	}
 	var remotePath, castPath, streamPath dbus.ObjectPath
 	create := func() error {
-		return connection.Object(remoteDesktopName, "/org/gnome/Mutter/RemoteDesktop").Call(remoteDesktopName+".CreateSession", 0).Store(&remotePath)
+		return callBus(connection.Object(remoteDesktopName, "/org/gnome/Mutter/RemoteDesktop"), remoteDesktopName+".CreateSession").Store(&remotePath)
 	}
 	err = create()
 	// A blank (not locked) screen also inhibits capture: wake it and retry.
@@ -287,16 +306,16 @@ func (capture *mutterCapture) startLocked(width int) error {
 		return fail(fmt.Errorf("remote desktop session: %w", err))
 	}
 	remote := connection.Object(remoteDesktopName, remotePath)
-	sessionID, err := remote.GetProperty(remoteDesktopName + ".Session.SessionId")
+	sessionID, err := busProperty(remote, remoteDesktopName+".Session", "SessionId")
 	if err != nil {
 		return fail(fmt.Errorf("remote desktop session id: %w", err))
 	}
 	options := map[string]dbus.Variant{"remote-desktop-session-id": sessionID}
-	if err := connection.Object(screenCastName, "/org/gnome/Mutter/ScreenCast").Call(screenCastName+".CreateSession", 0, options).Store(&castPath); err != nil {
+	if err := callBus(connection.Object(screenCastName, "/org/gnome/Mutter/ScreenCast"), screenCastName+".CreateSession", options).Store(&castPath); err != nil {
 		return fail(fmt.Errorf("screen cast session: %w", err))
 	}
 	record := map[string]dbus.Variant{"cursor-mode": dbus.MakeVariant(uint32(1))}
-	if err := connection.Object(screenCastName, castPath).Call(screenCastName+".Session.RecordMonitor", 0, "", record).Store(&streamPath); err != nil {
+	if err := callBus(connection.Object(screenCastName, castPath), screenCastName+".Session.RecordMonitor", "", record).Store(&streamPath); err != nil {
 		return fail(fmt.Errorf("record monitor: %w", err))
 	}
 	signals := make(chan *dbus.Signal, 16)
@@ -312,7 +331,7 @@ func (capture *mutterCapture) startLocked(width int) error {
 			return fail(err)
 		}
 	}
-	if err := remote.Call(remoteDesktopName+".Session.Start", 0).Err; err != nil {
+	if err := callBus(remote, remoteDesktopName+".Session.Start").Err; err != nil {
 		return fail(fmt.Errorf("start session: %w", err))
 	}
 	node, err := waitForNode(signals, streamPath)
@@ -360,7 +379,7 @@ func (capture *mutterCapture) startLocked(width int) error {
 	capture.stop = func() {
 		once.Do(func() {
 			stopPipeline()
-			_ = remote.Call(remoteDesktopName+".Session.Stop", 0).Err
+			_ = callBus(remote, remoteDesktopName+".Session.Stop").Err
 			connection.Close()
 		})
 	}
@@ -435,7 +454,7 @@ func waitForNode(signals <-chan *dbus.Signal, streamPath dbus.ObjectPath) (uint3
 // screenSize reads the monitor size of the stream, falling back to 1280×800.
 func screenSize(stream dbus.BusObject) (int, int) {
 	screenWidth, screenHeight := 1280, 800
-	if value, err := stream.GetProperty(screenCastName + ".Stream.Parameters"); err == nil {
+	if value, err := busProperty(stream, screenCastName+".Stream", "Parameters"); err == nil {
 		if parameters, ok := value.Value().(map[string]dbus.Variant); ok {
 			if size, ok := parameters["size"].Value().([]any); ok && len(size) == 2 {
 				if w, ok := size[0].(int32); ok && w > 0 {

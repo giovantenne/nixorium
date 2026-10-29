@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
+	"github.com/godbus/dbus/v5"
 )
 
 func fakeLoginctl(values map[string]string) commandRunner {
@@ -775,5 +776,30 @@ func TestHandleEndsWhenThePeerStopsReading(t *testing.T) {
 	case <-finished:
 	case <-time.After(3 * time.Second):
 		t.Fatal("a peer that stopped reading pinned the handler")
+	}
+}
+
+// stalledObject answers a call only when its context ends, like a
+// gnome-shell that stopped responding.
+type stalledObject struct{ dbus.BusObject }
+
+func (stalledObject) CallWithContext(ctx context.Context, method string, flags dbus.Flags, args ...any) *dbus.Call {
+	<-ctx.Done()
+	return &dbus.Call{Err: ctx.Err()}
+}
+
+func TestBusCallsGiveUpOnAStalledCompositor(t *testing.T) {
+	previous := busTimeout
+	busTimeout = 50 * time.Millisecond
+	defer func() { busTimeout = previous }()
+	started := time.Now()
+	if err := callBus(stalledObject{}, "org.example.Method").Err; !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("call error = %v", err)
+	}
+	if _, err := busProperty(stalledObject{}, "org.example", "Property"); err == nil {
+		t.Fatal("a stalled property read succeeded")
+	}
+	if time.Since(started) > 2*time.Second {
+		t.Fatal("a stalled call was not bounded")
 	}
 }
