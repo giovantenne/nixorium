@@ -1,5 +1,8 @@
 { pkgs, lib, isController, labSettings, labAssets, ... }:
 let
+  # A GVariant string literal: backslash and single quote are escaped.
+  gvariantString = value:
+    "'" + lib.replaceStrings [ "\\" "'" ] [ "\\\\" "\\'" ] value + "'";
   backgroundFiles = builtins.listToAttrs (map (background: {
     name = "lab/backgrounds/${builtins.baseNameOf (builtins.unsafeDiscardStringContext (toString background))}";
     value.source = background;
@@ -91,7 +94,7 @@ in
     idle-dim=false
 
     [org.gnome.desktop.input-sources]
-    sources=[('xkb', '${labSettings.keyboardLayout}')]
+    sources=[('xkb', ${gvariantString labSettings.keyboardLayout})]
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [
     pkgs.gnome-settings-daemon

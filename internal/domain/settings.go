@@ -23,6 +23,10 @@ var (
 	interfaceNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}$`)
 	userNamePattern      = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,30}$`)
 	passwordHashPattern  = regexp.MustCompile(`^\$6\$[^$]+\$[^$]+$`)
+	// Git identities and the keyboard layout reach shell scripts and
+	// configuration files. lib/eval-lab-config.nix holds the same rules.
+	gitEmailPattern       = regexp.MustCompile(`^[^\x00-\x20\x7f@]+@[^\x00-\x20\x7f@]+$`)
+	keyboardLayoutPattern = regexp.MustCompile(`^[A-Za-z0-9_,()+-]+$`)
 )
 
 type LabSettingsFile struct {
@@ -318,6 +322,31 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 			add(required.field, "must not be empty")
 		}
 	}
+	for _, name := range []struct {
+		field string
+		value string
+	}{
+		{"lab.studentGitName", lab.StudentGitName},
+		{"lab.adminGitName", lab.AdminGitName},
+	} {
+		if strings.TrimSpace(name.value) != "" && !validGitText(name.value) {
+			add(name.field, "must be at most 256 bytes without control characters")
+		}
+	}
+	for _, email := range []struct {
+		field string
+		value string
+	}{
+		{"lab.studentGitEmail", lab.StudentGitEmail},
+		{"lab.adminGitEmail", lab.AdminGitEmail},
+	} {
+		if strings.TrimSpace(email.value) != "" && (len(email.value) > maxGitTextBytes || !gitEmailPattern.MatchString(email.value)) {
+			add(email.field, "must look like name@domain, without spaces or control characters, and be at most 256 bytes")
+		}
+	}
+	if strings.TrimSpace(lab.KeyboardLayout) != "" && (len(lab.KeyboardLayout) > maxKeyboardLayoutBytes || !keyboardLayoutPattern.MatchString(lab.KeyboardLayout)) {
+		add("lab.keyboardLayout", "must be an XKB layout name: letters, digits and _ - + , ( ) only, at most 128 bytes")
+	}
 	validHosts := map[string]bool{fmt.Sprintf("pc%02d", lab.MasterHostNumber): true}
 	for number := 1; number <= lab.PCCount; number++ {
 		validHosts[fmt.Sprintf("pc%02d", number)] = true
@@ -332,6 +361,25 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 		}
 	}
 	return issues
+}
+
+const (
+	maxGitTextBytes        = 256
+	maxKeyboardLayoutBytes = 128
+)
+
+// validGitText reports whether a Git author name is short and free of ASCII
+// control characters (newline and tab included).
+func validGitText(value string) bool {
+	if len(value) > maxGitTextBytes {
+		return false
+	}
+	for index := 0; index < len(value); index++ {
+		if value[index] < 0x20 || value[index] == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 func MarshalLabSettings(settings LabSettingsFile) ([]byte, error) {
