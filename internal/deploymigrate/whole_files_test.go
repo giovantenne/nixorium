@@ -188,3 +188,25 @@ func TestALaboratoryCreatedWithTheLaterScreensaverNeedsNoChange(t *testing.T) {
 		t.Fatalf("recorded migrations ran again: %+v, %v", report, err)
 	}
 }
+
+func TestTheStaffHomeMigrationWritesAsTheOwnerAndRespectsEdits(t *testing.T) {
+	migration := registryWith("staff-home-writes-as-owner")
+	released, err := os.ReadFile(filepath.Join("testdata", "2026-10-staff-home-writes-as-owner", "home-profile.nix"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := treeWith(t, map[string]string{"modules/home-profile.nix": string(released)})
+	report, err := Run(root, "3.11.0", migration)
+	if err != nil || len(report.Migrations) != 1 || report.Migrations[0].State != Applied {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	got := read(t, root, "modules/home-profile.nix")
+	if !strings.Contains(got, "setpriv --reuid=") || strings.Contains(got, "install -D -o") {
+		t.Fatalf("home-profile.nix still writes as root: %q", got)
+	}
+	edited := strings.Replace(string(released), "0644", "0640", 1)
+	report, err = Run(treeWith(t, map[string]string{"modules/home-profile.nix": edited}), "3.11.0", migration)
+	if err != nil || report.Migrations[0].State != Manual {
+		t.Fatalf("an edited home profile was not left alone: %+v, %v", report, err)
+	}
+}

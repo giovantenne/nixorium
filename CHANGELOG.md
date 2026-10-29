@@ -19,6 +19,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Security: the controller and the computers write editor, browser, bookmark
+  and screen-layout defaults into the administrator's and teacher's homes as
+  those users, not as root. Before, a teacher could leave a link in their own
+  home that made the controller overwrite a system file at the next start or
+  update. The deployment migration `2026-10-staff-home-writes-as-owner`
+  updates `modules/home-profile.nix` (if you edited it, the review shows a
+  manual change: copy the new version from `templates/site`).
 - A new installation (controller, or computer from USB or the network) now
   lists Windows on another disk in its first boot menu. Before, the boot
   loader was set up without the disk information os-prober needs, and Windows

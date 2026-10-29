@@ -412,6 +412,12 @@ extension: it is enabled and off at sign-in, turning it on holds a session idle
 inhibitor, and the lab screensaver's own check (taken from the template
 script) sees it; turning it off releases it.
 
+`staff-home-writes-vm` runs the root activation steps that write into the
+administrator's and teacher's homes (core users, home-reset and desktop
+modules, and the template's home profile) twice: once on clean homes, where the
+files land owned by their users, and once after the teacher has replaced each
+target with a symbolic link to a system file, which must stay unchanged.
+
 Existing lower-level seed/resolution tests retain fast
 failure coverage without launching the graphical application.
 

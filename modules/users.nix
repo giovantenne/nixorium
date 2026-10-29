@@ -1,20 +1,23 @@
 { isController, labSettings, lib, pkgs, ... }:
 
 let
+  asUser = import ../lib/as-user.nix { inherit pkgs lib; };
   # Master controller: no autologin (teacher selects account)
   normalUsers = [ "admin" labSettings.teacherUser ];
   repairUserHome = user: ''
     HOME_DIR="/home/${user}"
+    # chown -h never follows a link, even one swapped in after the test; the
+    # permission repair then runs as the user, who now owns the tree.
     for PATH_NAME in "$HOME_DIR/.config" "$HOME_DIR/.local" "$HOME_DIR/.vscode"; do
       if [ -d "$PATH_NAME" ] && [ ! -L "$PATH_NAME" ]; then
-        chown ${user}:users "$PATH_NAME"
-        chmod u+rwx "$PATH_NAME"
+        chown -h ${user}:users "$PATH_NAME"
+        ${asUser user ''${pkgs.coreutils}/bin/chmod u+rwx "$PATH_NAME"''}
       fi
     done
     for PATH_NAME in "$HOME_DIR/.config/Code" "$HOME_DIR/.vscode/extensions" "$HOME_DIR/.local/npm"; do
       if [ -d "$PATH_NAME" ] && [ ! -L "$PATH_NAME" ]; then
         chown -hR ${user}:users "$PATH_NAME"
-        chmod -R u+rwX "$PATH_NAME"
+        ${asUser user ''${pkgs.coreutils}/bin/chmod -R u+rwX "$PATH_NAME"''}
       fi
     done
     USER_ID="$(${pkgs.coreutils}/bin/id -u ${user})"

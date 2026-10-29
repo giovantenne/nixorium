@@ -4,6 +4,7 @@ let
     name = "lab/backgrounds/${builtins.baseNameOf (builtins.unsafeDiscardStringContext (toString background))}";
     value.source = background;
   }) labAssets.backgrounds);
+  asUser = import ../lib/as-user.nix { inherit pkgs lib; };
 in
 {
   imports = [
@@ -43,8 +44,7 @@ in
       ADMIN_MONITORS="/home/admin/.config/monitors.xml"
       GDM_CONFIG_DIR="/var/lib/gdm/seat0/config"
       GDM_MONITORS="$GDM_CONFIG_DIR/monitors.xml"
-      TEACHER_CONFIG_DIR="/home/${labSettings.teacherUser}/.config"
-      TEACHER_MONITORS="$TEACHER_CONFIG_DIR/monitors.xml"
+      TEACHER_MONITORS="/home/${labSettings.teacherUser}/.config/monitors.xml"
 
       if [ ! -f "$ADMIN_MONITORS" ]; then
         exit 0
@@ -55,10 +55,8 @@ in
       chmod 0600 "$GDM_MONITORS"
       chown "$(stat -c '%u:%g' "$GDM_CONFIG_DIR")" "$GDM_MONITORS"
 
-      install -d -o "${labSettings.teacherUser}" -g users -m 0700 "$TEACHER_CONFIG_DIR"
-      cp "$ADMIN_MONITORS" "$TEACHER_MONITORS"
-      chmod 0600 "$TEACHER_MONITORS"
-      chown "${labSettings.teacherUser}:users" "$TEACHER_MONITORS"
+      # The teacher's copy is written by the teacher, from what root reads.
+      ${asUser labSettings.teacherUser ''${pkgs.coreutils}/bin/install -D -m 0600 /dev/stdin "$TEACHER_MONITORS" < "$ADMIN_MONITORS"''}
     '';
     path = [ pkgs.coreutils ];
   };

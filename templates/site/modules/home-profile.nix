@@ -9,17 +9,23 @@ let
     { user = "admin"; home = adminHome; }
     { user = labSettings.teacherUser; home = teacherHome; }
   ];
+  # Activation runs as root, but every file in a staff home is written as its
+  # owner: a symbolic link left in the home then cannot point the write at a
+  # system file.
+  asUser = user: command: ''
+    ${pkgs.util-linux}/bin/setpriv --reuid=${lib.escapeShellArg user} --regid=users --init-groups -- ${command} \
+      || echo "Nixorium: could not update a file in the home of ${user}" >&2'';
   installForStaff = path: source: builtins.concatStringsSep "\n" (map (profile:
-    ''install -D -o ${profile.user} -g users -m 0644 ${source} "${profile.home}/${path}"''
+    asUser profile.user ''${pkgs.coreutils}/bin/install -D -m 0644 ${source} "${profile.home}/${path}"''
   ) staffHomes);
   removeForStaff = path: builtins.concatStringsSep "\n" (map (profile:
-    ''rm -f "${profile.home}/${path}"''
+    asUser profile.user ''${pkgs.coreutils}/bin/rm -f "${profile.home}/${path}"''
   ) staffHomes);
-  prepareStaffDirectories = builtins.concatStringsSep "\n" (map (profile: ''
-    install -d -o ${profile.user} -g users -m 0700 "${profile.home}/.config"
-    install -d -o ${profile.user} -g users -m 0755 "${profile.home}/.config/Code/User"
-    install -d -o ${profile.user} -g users -m 0755 "${profile.home}/.vscode/extensions"
-  '') staffHomes);
+  prepareStaffDirectories = builtins.concatStringsSep "\n" (map (profile:
+    asUser profile.user ''${pkgs.coreutils}/bin/install -d -m 0700 "${profile.home}/.config"''
+    + "\n"
+    + asUser profile.user ''${pkgs.coreutils}/bin/install -d -m 0755 "${profile.home}/.config/Code/User" "${profile.home}/.vscode/extensions"''
+  ) staffHomes);
   vscodeArgv = pkgs.writeText "nixorium-site-vscode-argv.json" (builtins.toJSON {
     password-store = "basic";
     enable-crash-reporter = false;
@@ -27,13 +33,14 @@ let
 in
 {
   system.activationScripts.siteHomeProfile = {
-    deps = [ "createHomeTemplates" ];
+    # After the core repairs ownership of the managed folders in staff homes.
+    deps = [ "createHomeTemplates" "nixoriumUserHomeOwnership" ];
     text = ''
       ${lib.optionalString (has "chromium") ''
-        install -D -o admin -g users -m 0644 ${labAssets.mimeApps} "${adminHome}/.config/mimeapps.list"
+        ${asUser "admin" ''${pkgs.coreutils}/bin/install -D -m 0644 ${labAssets.mimeApps} "${adminHome}/.config/mimeapps.list"''}
       ''}
       ${lib.optionalString (!has "chromium") ''
-        rm -f "${adminHome}/.config/mimeapps.list"
+        ${asUser "admin" ''${pkgs.coreutils}/bin/rm -f "${adminHome}/.config/mimeapps.list"''}
       ''}
 
       ${lib.optionalString (has "vscode") ''
@@ -46,12 +53,10 @@ in
         ${removeForStaff ".vscode/argv.json"}
       ''}
       ${lib.optionalString (has "nodejs") ''
-        ${builtins.concatStringsSep "\n        " (map (profile:
-          ''install -d -o ${profile.user} -g users -m 0755 "${profile.home}/.local/npm"''
+        ${builtins.concatStringsSep "\n" (map (profile:
+          asUser profile.user ''${pkgs.coreutils}/bin/install -d -m 0755 "${profile.home}/.local/npm"''
         ) staffHomes)}
       ''}
     '';
   };
-
-  system.activationScripts.nixoriumUserHomeOwnership.deps = lib.mkAfter [ "siteHomeProfile" ];
 }

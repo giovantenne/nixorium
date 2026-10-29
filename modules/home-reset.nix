@@ -1,6 +1,7 @@
-{ pkgs, labSettings, ... }:
+{ pkgs, lib, labSettings, ... }:
 
 let
+  asUser = import ../lib/as-user.nix { inherit pkgs lib; };
   gitConfigAdmin = {
     name = labSettings.adminGitName;
     email = labSettings.adminGitEmail;
@@ -38,15 +39,14 @@ in
   # Add "Snapshots" bookmark in Nautilus sidebar for teacher
   system.activationScripts.teacherSnapshotBookmark = {
     text = ''
-      BOOKMARK_DIR="/home/${labSettings.teacherUser}/.config/gtk-3.0"
-      BOOKMARK_FILE="$BOOKMARK_DIR/bookmarks"
-      ENTRY="file:///var/lib/home-snapshots Snapshots"
-      mkdir -p "$BOOKMARK_DIR"
-      if ! grep -q "home-snapshots" "$BOOKMARK_FILE" 2>/dev/null; then
-        echo "$ENTRY" >> "$BOOKMARK_FILE"
-      fi
-      chown -R ${labSettings.teacherUser}:users "$BOOKMARK_DIR"
+      # Written by the teacher: the bookmark file is in the teacher's home.
+      ${asUser labSettings.teacherUser ''${pkgs.bash}/bin/sh -c ${lib.escapeShellArg ''
+        file="$1/.config/gtk-3.0/bookmarks"
+        mkdir -p "$1/.config/gtk-3.0"
+        grep -q home-snapshots "$file" 2>/dev/null || echo "file:///var/lib/home-snapshots Snapshots" >> "$file"
+      ''} sh "/home/${labSettings.teacherUser}"''}
     '';
-    deps = [ "users" ];
+    # After the repair that gives the teacher back a ~/.config made by root.
+    deps = [ "users" "nixoriumUserHomeOwnership" ];
   };
 }
