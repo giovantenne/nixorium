@@ -236,7 +236,7 @@ The TUI first displays the operational disclaimer: Enter acknowledges it and
 q exits. This acknowledgement is remembered for this administrator and
 deployment, separately from the optional adoption statistics choice.
 
-On the statistics invitation, Enter accepts, n declines, Esc opens the menu
+On the statistics invitation, e accepts, n declines, Enter or Esc opens the menu
 without deciding, and q exits. Skipping leaves sharing off and repeats the
 invitation at the next launch; a saved refusal is not repeated. Exact report
 and Privacy & retention remain available before choosing.
