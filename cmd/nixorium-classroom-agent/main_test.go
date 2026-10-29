@@ -755,3 +755,25 @@ func TestLastConnectionClosingStopsCapture(t *testing.T) {
 		t.Fatal("capture kept running after the last channel closed")
 	}
 }
+
+func TestHandleEndsWhenThePeerStopsReading(t *testing.T) {
+	previous := replyWriteTimeout
+	replyWriteTimeout = 100 * time.Millisecond
+	defer func() { replyWriteTimeout = previous }()
+	server, client := net.Pipe()
+	defer client.Close()
+	finished := make(chan struct{})
+	go func() {
+		handle(server, agentContext{userName: "student", capture: fakeCapture{}, lock: &fakeLocker{}})
+		close(finished)
+	}()
+	// The peer asks and never reads the answer (a pipe holds no bytes).
+	if err := classroomview.Write(client, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-finished:
+	case <-time.After(3 * time.Second):
+		t.Fatal("a peer that stopped reading pinned the handler")
+	}
+}
