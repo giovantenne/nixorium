@@ -27,6 +27,16 @@ func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, reposit
 	}
 	plan, match := manager.Reviewed(plan, expectedToken)
 	if match != app.ReviewMatched {
+		if jsonOutput {
+			// Scripts read the blocked result as JSON; the apply refuses the
+			// token without sending anything.
+			report := manager.ApplyPlan(ctx, plan, expectedToken)
+			if match == app.ReviewExpired {
+				report.Message = "The review expired; review again."
+			}
+			_ = presentation.JSON(stdout, report)
+			return 1
+		}
 		reviewMismatch(stderr, match, "The computers changed after review; create a fresh plan.")
 		return 1
 	}
