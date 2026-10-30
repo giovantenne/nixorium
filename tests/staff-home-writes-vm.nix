@@ -90,6 +90,13 @@ pkgs.testers.runNixOSTest {
         machine.succeed("test ! -L /home/teacher/.config/monitors.xml")
         machine.succeed("test \"$(stat -c %U /home/teacher/.config/monitors.xml)\" = teacher")
 
+    with subtest("a link at ~/.config does not lead the repair into another home"):
+        machine.succeed("mkdir -p /home/admin/.config/Code/User && chown -R admin:users /home/admin/.config")
+        machine.succeed("cd /home/teacher && mv .config .config.real && ln -s /home/admin/.config .config && chown -h teacher:users .config")
+        machine.succeed("timeout 300 ${runSteps}")
+        machine.succeed("test -z \"$(find /home/admin/.config -not -user admin)\"")
+        machine.succeed("cd /home/teacher && rm .config && mv .config.real .config")
+
     with subtest("a FIFO left by the teacher does not stall the steps"):
         machine.succeed("cd /home/teacher/.config/gtk-3.0 && rm -f bookmarks && mkfifo bookmarks && chown -h teacher:users bookmarks")
         machine.succeed("timeout 120 ${runSteps}")
