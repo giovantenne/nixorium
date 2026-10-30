@@ -151,10 +151,6 @@
       "overrides": {"keyboardLayout": "us\n"}
     },
     {
-      "name": "time zone typo without an area",
-      "overrides": {"timeZone": "Rome"}
-    },
-    {
       "name": "time zone with a space",
       "overrides": {"timeZone": "Europe/ Rome"}
     },
@@ -189,6 +185,10 @@
     {
       "name": "extra locale with a space",
       "overrides": {"extraLocale": "it_IT.UTF-8 "}
+    },
+    {
+      "name": "locale modifier before the codeset",
+      "overrides": {"extraLocale": "sr_RS@latin.UTF-8"}
     },
     {
       "name": "password hash with a newline in the salt",
@@ -250,7 +250,15 @@
     },
     {
       "name": "locale with a modifier",
-      "overrides": {"extraLocale": "sr_RS@latin.UTF-8"}
+      "overrides": {"extraLocale": "ca_ES.UTF-8@valencia"}
+    },
+    {
+      "name": "single-name time zones NixOS accepts",
+      "overrides": {"timeZone": "CET"}
+    },
+    {
+      "name": "time zone with a digit",
+      "overrides": {"timeZone": "GMT0"}
     },
     {
       "name": "C.UTF-8 locale",

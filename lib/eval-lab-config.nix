@@ -28,9 +28,9 @@ let
   # Shape checks only, as in internal/domain/settings.go: a typo would
   # otherwise fail at the controller build.
   isTimeZone = value:
-    builtins.match "UTC|[A-Za-z_]+(/[A-Za-z0-9_+-]+){1,2}" value != null;
+    builtins.match "[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+){0,2}" value != null;
   isLocale = value:
-    builtins.match "([a-z]{2,3}_[A-Z]{2}(@[a-z]+)?|C)\\.UTF-8" value != null;
+    builtins.match "[a-z]{2,3}_[A-Z]{2}\\.UTF-8(@[a-z]+)?|C\\.UTF-8" value != null;
   isIfaceName = value:
     builtins.match "[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}" value != null;
   isNonEmpty = value:

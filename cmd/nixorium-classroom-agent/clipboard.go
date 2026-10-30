@@ -36,6 +36,10 @@ var errClipboardOff = errors.New("the shared clipboard is not on")
 // clipboardState is guarded by the capture's mutex.
 type clipboardState struct {
 	on bool
+	// holders counts the connections that began the clipboard and are still
+	// open: a second control (a reconnect while the old channel drains) keeps
+	// it on when the first one closes.
+	holders int
 	// text is what the teacher pasted and the session may fetch.
 	text string
 	// ownerSeq counts the copies made by the session's user; readSeq the
@@ -52,12 +56,13 @@ func (capture *mutterCapture) ClipboardBegin() error {
 	}
 	capture.lastRequest = time.Now()
 	if capture.clipboard.on {
+		capture.clipboard.holders++
 		return nil
 	}
 	if err := callBus(capture.remote, remoteDesktopName+".Session.EnableClipboard", map[string]dbus.Variant{}).Err; err != nil {
 		return err
 	}
-	capture.clipboard = clipboardState{on: true}
+	capture.clipboard = clipboardState{on: true, holders: 1}
 	return nil
 }
 
@@ -66,6 +71,18 @@ func (capture *mutterCapture) ClipboardEnd() error {
 	defer capture.mutex.Unlock()
 	capture.clipboardOffLocked()
 	return nil
+}
+
+// ClipboardRelease is called when a connection that began the clipboard
+// closes: the clipboard ends with the last such connection.
+func (capture *mutterCapture) ClipboardRelease() {
+	capture.mutex.Lock()
+	defer capture.mutex.Unlock()
+	if capture.clipboard.holders > 1 {
+		capture.clipboard.holders--
+		return
+	}
+	capture.clipboardOffLocked()
 }
 
 // clipboardOffLocked turns the clipboard off and forgets any text.

@@ -1,3 +1,15 @@
 secret-key
 id_ed25519
 result*
+
+# Binaries built with `go build ./cmd/...` at the repository root.
+/nixorium
+/nixorium-classroom-agent
+/nixorium-classroom-worker
+/nixorium-demo
+/nixorium-docs
+/nixorium-home-reset
+/nixorium-host-diagnostics
+/nixorium-npm-resolver
+/nixorium-remote-validator
+/nixorium-remote-worker

@@ -317,7 +317,7 @@ func handle(connection net.Conn, agent agentContext) {
 	clipboardBegun := false
 	defer func() {
 		if clipboardBegun {
-			_ = capture.ClipboardEnd()
+			capture.ClipboardRelease()
 		}
 		if incoming != nil {
 			incoming.Abort()

@@ -30,8 +30,11 @@ var (
 	// build only at apply time, so the shape is checked here and in
 	// lib/eval-lab-config.nix. Both stay shape checks: neither side carries
 	// a list of zones or locales.
-	timeZonePattern = regexp.MustCompile(`^(UTC|[A-Za-z_]+(/[A-Za-z0-9_+-]+){1,2})$`)
-	localePattern   = regexp.MustCompile(`^([a-z]{2,3}_[A-Z]{2}(@[a-z]+)?|C)\.UTF-8$`)
+	// Zones include single names NixOS accepts (CET, Japan, GMT0); locales
+	// put the modifier after the codeset, as glibc names them
+	// (ca_ES.UTF-8@valencia).
+	timeZonePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+){0,2}$`)
+	localePattern   = regexp.MustCompile(`^([a-z]{2,3}_[A-Z]{2}\.UTF-8(@[a-z]+)?|C\.UTF-8)$`)
 	// Git identities and the keyboard layout reach shell scripts and
 	// configuration files. lib/eval-lab-config.nix holds the same rules.
 	keyboardLayoutPattern = regexp.MustCompile(`^[A-Za-z0-9_,()+-]+$`)

@@ -13,6 +13,7 @@ import (
 
 func (capture fakeCapture) ClipboardBegin() error { return capture.err }
 func (capture fakeCapture) ClipboardEnd() error   { return nil }
+func (capture fakeCapture) ClipboardRelease()     {}
 func (capture fakeCapture) ClipboardSet(text string) error {
 	if _, err := classroomview.ValidateClipboardText(text); err != nil {
 		return err
@@ -94,6 +95,8 @@ func (capture endCountingCapture) ClipboardEnd() error {
 	return nil
 }
 
+func (capture endCountingCapture) ClipboardRelease() { capture.ended <- struct{}{} }
+
 func TestOnlyTheConnectionThatBeganTheClipboardEndsIt(t *testing.T) {
 	capture := endCountingCapture{ended: make(chan struct{}, 4)}
 	agent := agentContext{userName: "student", capture: capture, lock: &fakeLocker{}}
@@ -141,5 +144,16 @@ func TestOnlyTheConnectionThatBeganTheClipboardEndsIt(t *testing.T) {
 	case <-capture.ended:
 	case <-time.After(2 * time.Second):
 		t.Fatal("the control closing left the shared clipboard on")
+	}
+}
+
+func TestASecondControlKeepsTheClipboardWhenTheFirstCloses(t *testing.T) {
+	capture := &mutterCapture{running: true}
+	capture.clipboard = clipboardState{on: true, holders: 1}
+	// A reconnect begins the clipboard again while the old channel drains.
+	capture.clipboard.holders++
+	capture.ClipboardRelease()
+	if !capture.clipboard.on || capture.clipboard.holders != 1 {
+		t.Fatalf("the old channel closing ended the clipboard: %+v", capture.clipboard)
 	}
 }

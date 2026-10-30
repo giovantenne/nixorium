@@ -58,6 +58,7 @@ type capturer interface {
 	// the computer.
 	ClipboardBegin() error
 	ClipboardEnd() error
+	ClipboardRelease()
 	ClipboardSet(text string) error
 	ClipboardGet() (string, error)
 }

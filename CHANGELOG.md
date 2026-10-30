@@ -70,10 +70,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   (pc01 to pc254), and the network interface name is limited to the 15
   characters Linux allows in the USB installation too.
 - The time zone and the two locales in lab-settings.json are now checked when
-  you plan or save: a typo such as `Rome` or `italian` is refused with a
-  message, instead of failing hours later when the controller applies the
-  change. Password hashes must use the characters a real hash has, so a hash
-  with a space or a line break inside is refused.
+  you plan or save: a malformed value such as `Europe/ Rome` or `italian` is
+  refused with a message, instead of failing hours later when the controller
+  applies the change. Every zone and locale NixOS accepts keeps working (for
+  example `CET` or `ca_ES.UTF-8@valencia`). Password hashes must use the
+  characters a real hash has, so a hash with a space or a line break inside is
+  refused. A value refused after the update is shown in Settings, where you
+  can correct it.
 - Security: the controller and the computers write editor, browser, bookmark
   and screen-layout defaults into the administrator's and teacher's homes as
   those users, not as root. Before, a teacher could leave a link in their own
