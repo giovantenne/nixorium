@@ -19,6 +19,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Discarding changes, committing selected files and carrying an Assistant
+  proposal to a new chat now treat file names literally: a file named with
+  `*`, `[` or `:(` no longer affects other files.
 - Nixorium services now stop promptly when asked to, even if a program
   connected to their local socket is not responding, instead of waiting until
   the system forces them to stop.

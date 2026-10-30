@@ -47,3 +47,34 @@ func TestDiscardKeepsABackupAndRestoresTheSavedVersion(t *testing.T) {
 		t.Fatal("an untracked file was removed")
 	}
 }
+
+func TestDiscardTreatsPathsLiterally(t *testing.T) {
+	repository := workspaceRepository(t)
+	writeGitReviewFile(t, repository, "a*", "star\n")
+	writeGitReviewFile(t, repository, "ab", "plain\n")
+	workspaceTestGit(t, repository, "add", "--", "a*", "ab")
+	workspaceTestGit(t, repository, "commit", "-qm", "saved")
+	writeGitReviewFile(t, repository, "a*", "star edited\n")
+	writeGitReviewFile(t, repository, "ab", "plain edited\n")
+	local := Local{}
+	revision, err := local.GitRevision(t.Context(), repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := local.GitCommitProposal(t.Context(), repository, []string{"a*"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(proposal.Diff.Content, "plain edited") {
+		t.Fatalf("a glob selected another file: %q", proposal.Diff.Content)
+	}
+	if _, err := local.DiscardGitPaths(t.Context(), repository, []string{"a*"}, revision, proposal.TreeID); err != nil {
+		t.Fatal(err)
+	}
+	if content, _ := os.ReadFile(filepath.Join(repository, "a*")); string(content) != "star\n" {
+		t.Fatalf("selected file = %q", content)
+	}
+	if content, _ := os.ReadFile(filepath.Join(repository, "ab")); string(content) != "plain edited\n" {
+		t.Fatalf("a path that was not selected was restored: %q", content)
+	}
+}
