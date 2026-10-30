@@ -171,7 +171,11 @@ func TestStagedTreeWriterStagesElsewhereAndCreatesTheDestination(t *testing.T) {
 		if during, _ := os.ReadDir(destination); len(during) != len(before) {
 			t.Fatal("something appeared in the destination before the end")
 		}
-		for index, data := range map[int]string{1: "hi", 2: "x"} {
+		// Files arrive in the order of the sending.
+		for index, data := range []string{1: "hi", 2: "x"} {
+			if index == 0 {
+				continue
+			}
 			if err := writer.Write(index, []byte(data)); err != nil {
 				t.Fatal(err)
 			}
