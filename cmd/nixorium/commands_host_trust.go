@@ -56,9 +56,9 @@ func runHostTrustCommand(ctx context.Context, repository string, options options
 		}
 		return 0
 	}
-	plan, matched := manager.Reviewed(plan, options.expect)
-	if !matched {
-		fmt.Fprintln(stderr, "Host-key review changed; create a fresh plan.")
+	plan, match := manager.Reviewed(plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "Host-key review changed; create a fresh plan.")
 		return 1
 	}
 	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Host-key apply requires interactive confirmation or --yes."}, func(output io.Writer) (bool, error) {

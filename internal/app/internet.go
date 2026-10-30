@@ -11,6 +11,9 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// internetReviewLifetime is how long an Internet review stays valid at least.
+const internetReviewLifetime = 10 * time.Minute
+
 type InternetSource interface {
 	LabMeta(context.Context, string) (domain.LabMeta, error)
 	ServiceState(context.Context, string) domain.ServiceState
@@ -32,26 +35,6 @@ func (m *InternetManager) conflict(ctx context.Context) bool {
 	return state.Mode == "active" || state.Mode == "degraded" || state.Mode == "recovery-required"
 }
 func (m *InternetManager) Plan(ctx context.Context, repository, requested string, action domain.InternetAction) domain.InternetPlan {
-	return m.planAt(ctx, repository, requested, action, m.now())
-}
-
-// Replan recomputes a reviewed plan in a later process (the command line's
-// apply). The expiry is part of the review token and moves in 5-minute
-// blocks, so a review made just before a block boundary is recomputed for the
-// block it was made in too. Apply still refuses it once it has expired.
-func (m *InternetManager) Replan(ctx context.Context, repository, requested string, action domain.InternetAction, token string) domain.InternetPlan {
-	now := m.now()
-	p := m.planAt(ctx, repository, requested, action, now)
-	if p.HasErrors() || p.ReviewToken == token {
-		return p
-	}
-	if earlier := m.planAt(ctx, repository, requested, action, now.Add(-5*time.Minute)); earlier.ReviewToken == token {
-		return earlier
-	}
-	return p
-}
-
-func (m *InternetManager) planAt(ctx context.Context, repository, requested string, action domain.InternetAction, at time.Time) domain.InternetPlan {
 	p := domain.InternetPlan{SchemaVersion: domain.SchemaVersion, Operation: "internet-plan", State: "blocked", Action: action, Requested: requested, Targets: []domain.InternetTarget{}, Issues: []domain.ValidationIssue{}}
 	fail := func(message string) domain.InternetPlan {
 		p.Message = message
@@ -115,9 +98,8 @@ func (m *InternetManager) planAt(ctx context.Context, repository, requested stri
 		return fail("No selected client supports authenticated Internet control. Update or reconnect the clients and review again.")
 	}
 	p.State = "ready"
-	// Between 5 and 10 minutes: a review made at the end of a block must not
-	// expire seconds later.
-	p.ExpiresAt = at.UTC().Truncate(5 * time.Minute).Add(10 * time.Minute)
+	// The expiry sits on the shared review grid so Reviewed can rebuild it.
+	p.ExpiresAt = reviewExpiry(m.now(), internetReviewLifetime)
 	p.Message = fmt.Sprintf("%d of %d clients available. Internet is restored on reboot; offline clients are never queued. Lab access remains available.", eligible, len(p.Targets))
 	if len(updating) > 0 {
 		p.Message += " Left unchanged while they are being updated: " + strings.Join(updating, ", ") + "."
@@ -200,4 +182,19 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 	}
 	r.Message = fmt.Sprintf("Verified on %d of %d selected clients. No action is queued for offline computers.", confirmed, len(p.Targets))
 	return r
+}
+
+// Reviewed tells whether token confirms a review of the plan fresh, a plan
+// built now. A match returns fresh carrying that review's expiry and token, so
+// an apply in a later process, or in a later grid step, still matches until
+// the review expires.
+func (m *InternetManager) Reviewed(fresh domain.InternetPlan, token string) (domain.InternetPlan, ReviewMatch) {
+	if fresh.HasErrors() {
+		return fresh, ReviewChanged
+	}
+	return matchReview(m.now(), internetReviewLifetime, fresh, token, func(p domain.InternetPlan, expiry time.Time) domain.InternetPlan {
+		p.ExpiresAt = expiry
+		p.ReviewToken = domain.InternetReviewToken(p)
+		return p
+	}, func(p domain.InternetPlan) string { return p.ReviewToken })
 }

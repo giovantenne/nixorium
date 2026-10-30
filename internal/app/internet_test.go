@@ -161,14 +161,14 @@ func TestInternetReviewAtABlockBoundaryStillApplies(t *testing.T) {
 	reviewed := time.Date(2026, 10, 23, 16, 59, 59, 0, time.UTC)
 	m.now = func() time.Time { return reviewed }
 	p := m.Plan(context.Background(), ".", "pc01", domain.InternetBlock)
-	if !p.ExpiresAt.After(reviewed.Add(5 * time.Minute)) {
+	if p.ExpiresAt.Sub(reviewed) < internetReviewLifetime {
 		t.Fatalf("a review at the end of a block expires at once: %v", p.ExpiresAt)
 	}
 	// The command line's apply runs in a new process, one second later and
 	// in the next block.
 	m.now = func() time.Time { return reviewed.Add(time.Second) }
-	again := m.Replan(context.Background(), ".", "pc01", domain.InternetBlock, p.ReviewToken)
-	if again.ReviewToken != p.ReviewToken {
+	again, match := m.Reviewed(m.Plan(context.Background(), ".", "pc01", domain.InternetBlock), p.ReviewToken)
+	if match != ReviewMatched || again.ReviewToken != p.ReviewToken {
 		t.Fatalf("replan across the boundary changed the review: %v -> %v", p.ExpiresAt, again.ExpiresAt)
 	}
 	if r := m.Apply(context.Background(), again, p.ReviewToken); r.State != "completed" || len(s.changed) != 1 {

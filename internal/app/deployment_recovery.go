@@ -10,7 +10,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-const deploymentRecoveryWindow = 10 * time.Minute
+// deploymentRecoveryLifetime is how long a recovery review stays valid at least.
+const deploymentRecoveryLifetime = 10 * time.Minute
 const deploymentActivityTimeout = 8 * time.Second
 
 // DeploymentRecoverySource observes an interrupted client update and archives
@@ -147,7 +148,7 @@ func (m *DeploymentRecoveryManager) Plan(ctx context.Context, repository string,
 	}
 	plan.State = "ready"
 	plan.Automatic = known && plan.Unreachable == 0
-	plan.ExpiresAt = m.now().UTC().Truncate(deploymentRecoveryWindow).Add(deploymentRecoveryWindow)
+	plan.ExpiresAt = reviewExpiry(m.now(), deploymentRecoveryLifetime)
 	plan.ReviewToken = domain.DeploymentRecoveryToken(plan)
 	plan.Message = "Every reachable computer has finished. Confirming archives the record and unblocks operations; the interrupted update is not declared successful."
 	if plan.Automatic {
@@ -272,4 +273,19 @@ func samePendingDeployment(left, right domain.PendingDeployment) bool {
 	a, errA := json.Marshal(left)
 	b, errB := json.Marshal(right)
 	return errA == nil && errB == nil && string(a) == string(b)
+}
+
+// Reviewed tells whether token confirms a review of the plan fresh, a plan
+// built now. A match returns fresh carrying that review's expiry and token, so
+// an apply in a later process, or in a later grid step, still matches until
+// the review expires.
+func (m *DeploymentRecoveryManager) Reviewed(fresh domain.DeploymentRecoveryPlan, token string) (domain.DeploymentRecoveryPlan, ReviewMatch) {
+	if fresh.State != "ready" {
+		return fresh, ReviewChanged
+	}
+	return matchReview(m.now(), deploymentRecoveryLifetime, fresh, token, func(p domain.DeploymentRecoveryPlan, expiry time.Time) domain.DeploymentRecoveryPlan {
+		p.ExpiresAt = expiry
+		p.ReviewToken = domain.DeploymentRecoveryToken(p)
+		return p
+	}, func(p domain.DeploymentRecoveryPlan) string { return p.ReviewToken })
 }

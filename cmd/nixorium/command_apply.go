@@ -25,6 +25,11 @@ func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, reposit
 		}
 		return 1
 	}
+	plan, match := manager.Reviewed(plan, expectedToken)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "The computers changed after review; create a fresh plan.")
+		return 1
+	}
 	if code, proceed := confirmReviewedApply(assumeYes, stderr, confirmationStream(stdout, stderr, jsonOutput), applyConfirmation{noTerminal: fmt.Sprintf("Error: %s apply requires an interactive terminal or explicit --yes", optionsPowerCommand(action)), readFailure: "Error: read confirmation:", cancelled: "Power action cancelled; no request was sent."}, func(output io.Writer) (bool, error) {
 		return presentation.ConfirmShutdown(os.Stdin, output, plan)
 	}); !proceed {
@@ -446,4 +451,15 @@ func runSetupApply(ctx context.Context, repository string, stdout, stderr io.Wri
 		return 1
 	}
 	return 0
+}
+
+// reviewMismatch tells the operator why a confirmed review no longer applies:
+// it ran out, or the computers or settings it covered changed. changed is the
+// message for the second case.
+func reviewMismatch(stderr io.Writer, match app.ReviewMatch, changed string) {
+	if match == app.ReviewExpired {
+		fmt.Fprintln(stderr, "The review expired; review again.")
+		return
+	}
+	fmt.Fprintln(stderr, changed)
 }
