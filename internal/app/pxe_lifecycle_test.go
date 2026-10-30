@@ -247,7 +247,9 @@ func TestPXEStopAndRecoverDoNotClaimARestoreTheyCouldNotVerify(t *testing.T) {
 		source := readyPXESource()
 		source.metaErr = errors.New("nix evaluation failed")
 		report := run(NewPXELifecycle(source))
-		if !report.HasErrors() || !strings.Contains(report.Message, restoredAddressUnverified) || !strings.Contains(report.Message, "nix evaluation failed") {
+		// The services are stopped: the result is complete, and says the
+		// address was not checked (an emergency recovery may have no repository).
+		if report.HasErrors() || report.State != "completed" || !strings.Contains(report.Message, restoredAddressUnverified) || !strings.Contains(report.Message, "nix evaluation failed") {
 			t.Fatalf("%s report = %+v", name, report)
 		}
 		if report.Mode != "stopped" {

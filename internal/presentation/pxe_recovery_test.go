@@ -136,8 +136,8 @@ func TestPXELifecycleTextStartsWithThePlainOutcome(t *testing.T) {
 }
 
 func TestPXELifecycleOutcomeSaysWhenTheRestoredAddressWasNotChecked(t *testing.T) {
-	report := domain.PXELifecycleReport{Operation: "pxe-stop", State: "failed", Mode: "stopped",
-		Message: "the restored controller address could not be verified: evaluate lab metadata: nix evaluation failed"}
+	report := domain.PXELifecycleReport{Operation: "pxe-stop", State: "completed", Mode: "stopped",
+		Message: "PXE installation mode stopped; the restored controller address could not be verified (lab metadata: nix evaluation failed)"}
 	headline, next := pxeLifecycleOutcome(report, false)
 	if !strings.Contains(headline, "could not be checked") || strings.Contains(headline, "was not stopped") ||
 		!strings.Contains(next, "Check the laboratory again") || !strings.Contains(next, "Apply to controller") {

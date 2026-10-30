@@ -122,7 +122,7 @@ func (m PXELifecycle) Stop(ctx context.Context, repository string) domain.PXELif
 	if pxeUnitsActive(report) {
 		errors = append(errors, "PXE listener or network unit is still active")
 	}
-	m.verifyRestoredAddress(ctx, repository, &report, &errors)
+	unverified := m.verifyRestoredAddress(ctx, repository, &report, &errors)
 	if len(errors) > 0 {
 		return failPXEReport(report, strings.Join(errors, "; "))
 	}
@@ -130,6 +130,9 @@ func (m PXELifecycle) Stop(ctx context.Context, repository string) domain.PXELif
 	report.State = "completed"
 	report.Mode = "stopped"
 	report.Message = "PXE installation mode stopped and normal addressing restored"
+	if unverified != "" {
+		report.Message = "PXE installation mode stopped; " + unverified
+	}
 	return report
 }
 
@@ -143,7 +146,7 @@ func (m PXELifecycle) Recover(ctx context.Context, repository string) domain.PXE
 	if pxeUnitsActive(report) {
 		errors = append(errors, "PXE listener or network unit is still active after recovery")
 	}
-	m.verifyRestoredAddress(ctx, repository, &report, &errors)
+	unverified := m.verifyRestoredAddress(ctx, repository, &report, &errors)
 	if len(errors) > 0 {
 		return failPXEReport(report, strings.Join(errors, "; "))
 	}
@@ -151,6 +154,9 @@ func (m PXELifecycle) Recover(ctx context.Context, repository string) domain.PXE
 	report.State = "completed"
 	report.Mode = "stopped"
 	report.Message = "PXE recovery completed; installation mode is stopped"
+	if unverified != "" {
+		report.Message += "; " + unverified
+	}
 	return report
 }
 
@@ -268,18 +274,19 @@ func (m PXELifecycle) failStartedPXE(ctx context.Context, report domain.PXELifec
 	return failPXEReport(m.observeReport(report, ctx), message)
 }
 
-func (m PXELifecycle) verifyRestoredAddress(ctx context.Context, repository string, report *domain.PXELifecycleReport, errors *[]string) {
+// verifyRestoredAddress checks the controller's normal address. Without the
+// laboratory metadata (an emergency recovery may run without a usable
+// repository) the expected address is unknown: it returns a note saying so,
+// for the result to carry instead of claiming a restore nobody looked at.
+func (m PXELifecycle) verifyRestoredAddress(ctx context.Context, repository string, report *domain.PXELifecycleReport, errors *[]string) string {
 	meta, err := m.source.LabMeta(ctx, repository)
 	if err != nil {
-		// Without the metadata the expected address is unknown: say so
-		// instead of reporting a restore that nobody looked at.
-		*errors = append(*errors, restoredAddressUnverified+": evaluate lab metadata: "+err.Error())
-		return
+		return restoredAddressUnverified + " (lab metadata: " + err.Error() + "); if the laboratory network does not answer, apply the controller configuration"
 	}
 	addresses, err := m.source.InterfaceAddresses(meta.Network.Interface)
 	if err != nil {
 		*errors = append(*errors, "verify restored interface: "+err.Error())
-		return
+		return ""
 	}
 	if !containsIP(addresses, meta.Controller.StaticIP) {
 		*errors = append(*errors, fmt.Sprintf("normal controller address %s is still missing on %s; apply the current controller configuration (Maintenance > Rebuild controller), then run Diagnostics", meta.Controller.StaticIP, meta.Network.Interface))
@@ -291,6 +298,7 @@ func (m PXELifecycle) verifyRestoredAddress(ctx context.Context, repository stri
 		report.DHCPAddress = meta.Controller.DHCPIP
 	}
 	report.StaticCIDR = fmt.Sprintf("%s/%d", meta.Controller.StaticIP, meta.Network.PrefixLength)
+	return ""
 }
 
 // restoredAddressUnverified starts the message of a stop or recovery that
