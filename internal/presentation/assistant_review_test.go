@@ -547,3 +547,74 @@ func TestAssistantReviewWarnsAboutAnUnfinishedProposal(t *testing.T) {
 		t.Fatal(view)
 	}
 }
+
+func TestAssistantReviewWithInvalidConfigurationStartsOnAnEnabledChoice(t *testing.T) {
+	m := assistantReviewFixture(t)
+	m.width, m.height = 80, 24
+	plan := m.assistant.review.plan
+	plan.Evaluation = domain.AssistantEvaluation{OK: false, Error: "attribute 'foo' missing"}
+	updated, _ := m.Update(assistantSavePlanMsg{plan: plan})
+	m = updated.(dashboardModel)
+	if m.assistant.review.cursor != 2 {
+		t.Fatalf("the cursor starts on %d, a disabled choice", m.assistant.review.cursor)
+	}
+	view := ansi.Strip(m.View().Content)
+	for _, want := range []string{"✗ The configuration is not valid", "Saving is not available", "ask the assistant to fix it", "Technical details"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("the main view misses %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "attribute 'foo' missing") {
+		t.Fatalf("the raw error is in the main view:\n%s", view)
+	}
+	// A valid proposal still starts on the first choice.
+	valid := plan
+	valid.Evaluation.OK = true
+	updated, _ = m.Update(assistantSavePlanMsg{plan: valid})
+	if updated.(dashboardModel).assistant.review.cursor != 0 {
+		t.Fatal("a valid proposal does not start on Save and update the controller")
+	}
+}
+
+func TestAssistantReviewEnterOnADisabledChoiceSaysWhy(t *testing.T) {
+	m := assistantReviewFixture(t)
+	m.assistant.review.plan.Evaluation = domain.AssistantEvaluation{OK: false, Error: "broken"}
+	for _, cursor := range []int{0, 1} {
+		m.assistant.review.cursor = cursor
+		m.message = ""
+		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		next := updated.(dashboardModel)
+		if command != nil || next.assistant.review.saving {
+			t.Fatalf("choice %d started a save", cursor)
+		}
+		if next.message != assistantEvaluationFailed {
+			t.Fatalf("choice %d answers %q", cursor, next.message)
+		}
+	}
+}
+
+func TestCtrlCClosesNixoriumFromTheAssistantChatAndReview(t *testing.T) {
+	quits := func(m dashboardModel) bool {
+		_, command := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		if command == nil {
+			return false
+		}
+		_, quit := command().(tea.QuitMsg)
+		return quit
+	}
+	review := assistantReviewFixture(t)
+	if !quits(review) {
+		t.Fatal("Ctrl+C is swallowed in the Assistant review")
+	}
+	chat := assistantReviewFixture(t)
+	chat.screen = dashboardAssistant
+	chat.assistant.state = "chat"
+	if !quits(chat) {
+		t.Fatal("Ctrl+C is swallowed in the Assistant chat")
+	}
+	// A running request is stopped first; Nixorium stays open.
+	chat.assistant.state = "running"
+	if quits(chat) {
+		t.Fatal("Ctrl+C closed Nixorium instead of stopping the running request")
+	}
+}

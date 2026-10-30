@@ -25,6 +25,20 @@ type assistantReviewModel struct {
 	// the reviewed change alters; nil when the review could not say.
 	changedClients map[string]bool
 }
+
+// canSave reports whether the reviewed proposal may be saved.
+func (r assistantReviewModel) canSave() bool {
+	return r.plan.State == "ready" && r.plan.Evaluation.OK
+}
+
+// saveUnavailable explains, in plain words, why saving is disabled.
+func (r assistantReviewModel) saveUnavailable() string {
+	if !r.plan.Evaluation.OK {
+		return assistantEvaluationFailed
+	}
+	return "Saving is not available: the proposal could not be prepared. Return to the chat and ask the assistant to try again."
+}
+
 type assistantSavePlanMsg struct{ plan domain.AssistantSavePlan }
 type assistantSaveResultMsg struct{ result domain.TemplateResetResult }
 
@@ -127,9 +141,10 @@ func (model dashboardModel) updateAssistantReviewKey(key tea.KeyPressMsg) (tea.M
 		case "enter":
 			switch r.cursor {
 			case 0, 1:
-				if r.plan.State == "ready" && r.plan.Evaluation.OK {
+				if r.canSave() {
 					return model.startAssistantSave(r.cursor == 1)
 				}
+				model.message = r.saveUnavailable()
 			case 2:
 				r.details, r.scroll = true, 0
 			case 3:
@@ -337,7 +352,7 @@ func (model dashboardModel) assistantReviewView() string {
 		}
 		switch {
 		case !r.plan.Evaluation.OK:
-			fixed += "✗ The configuration is not valid"
+			fixed += "✗ The configuration is not valid\n" + assistantEvaluationFailed + " Technical details show the error."
 		case r.plan.EvaluationReused && !r.plan.EvaluationVerifiedAt.IsZero():
 			fixed += "✓ Checked by Nixorium: the configuration is valid (verified " + assistantVerifiedAge(time.Since(r.plan.EvaluationVerifiedAt)) + " ago)"
 		default:
@@ -346,7 +361,7 @@ func (model dashboardModel) assistantReviewView() string {
 		fixed += "\nSaving creates a local commit and a backup. Enter on the first choice also updates this controller; you then choose the computers.\n"
 		for i, label := range []string{"Save and update the controller", "Save only — update computers later", "Technical details", "Back"} {
 			row := tuiSelection(label, r.cursor == i, model.isDark)
-			if i < 2 && !r.plan.Evaluation.OK {
+			if i < 2 && !r.canSave() {
 				row = tuiMuted(row, model.isDark)
 			}
 			fixed += row + "\n"
