@@ -284,7 +284,7 @@ require_client_interface() {
   CONFIGURED_INTERFACE=$(jq -er --arg name "$SELECTED_HOST" --arg fallback "$LAB_IFACE_NAME" '
     [.[] | select(.name == $name)]
     | if length == 1 then (.[0].ifaceName // $fallback) else empty end
-    | select(type == "string" and test("^[A-Za-z0-9_.:-]{1,64}$"))
+    | select(type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}$"))
   ' <<< "$LAB_CLIENT_HOSTS_JSON") || {
     ui_error "Installer metadata has no valid network interface for ${SELECTED_HOST}."
     return 1

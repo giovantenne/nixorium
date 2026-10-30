@@ -24,7 +24,13 @@ let
   isUserName = value:
     builtins.match "[a-z_][a-z0-9_-]{0,30}" value != null;
   isPasswordHash = value:
-    builtins.match "\\$6\\$[^$]+\\$[^$]+" value != null;
+    builtins.match "\\$6\\$(rounds=[0-9]+\\$)?[./0-9A-Za-z]+\\$[./0-9A-Za-z]+" value != null;
+  # Shape checks only, as in internal/domain/settings.go: a typo would
+  # otherwise fail at the controller build.
+  isTimeZone = value:
+    builtins.match "UTC|[A-Za-z_]+(/[A-Za-z0-9_+-]+){1,2}" value != null;
+  isLocale = value:
+    builtins.match "([a-z]{2,3}_[A-Z]{2}(@[a-z]+)?|C)\\.UTF-8" value != null;
   isIfaceName = value:
     builtins.match "[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}" value != null;
   isNonEmpty = value:
@@ -293,6 +299,10 @@ assert isGitName config.studentGitName && isGitName config.adminGitName
   || throw "Git names must be at most 256 bytes without control characters";
 assert isGitEmail config.studentGitEmail && isGitEmail config.adminGitEmail
   || throw "Git emails must look like name@domain, without spaces or control characters, at most 256 bytes";
+assert isTimeZone config.timeZone
+  || throw "timeZone must be UTC or a zone such as Europe/Rome or America/New_York";
+assert isLocale config.defaultLocale && isLocale config.extraLocale
+  || throw "defaultLocale and extraLocale must be UTF-8 locales such as en_US.UTF-8";
 assert isKeyboardLayout config.keyboardLayout
   || throw "keyboardLayout must be an XKB layout name: letters, digits and _ - + , ( ) only, at most 128 bytes";
 assert isUserName config.teacherUser

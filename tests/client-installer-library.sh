@@ -86,6 +86,14 @@ test_identity_record_and_class_system_name() (
   nixorium_write_identity_record pc120 "$fixture"
   test "$(cat "$fixture/var/lib/nixorium/identity.json")" = '{"schemaVersion":1,"number":120}'
   ! nixorium_write_identity_record pc00 "$fixture" >/dev/null 2>&1
+  nixorium_write_identity_record pc254 "$fixture"
+  test "$(cat "$fixture/var/lib/nixorium/identity.json")" = '{"schemaVersion":1,"number":254}'
+  # Only the names a laboratory can produce: pc01 to pc254, two digits at least.
+  for name in pc0 pc1 pc001 pc255 pc1000; do
+    ! nixorium_write_identity_record "$name" "$fixture" >/dev/null 2>&1
+    ! nixorium_expected_system_name "$name" >/dev/null 2>&1
+  done
+  test "$(nixorium_expected_system_name pc100 pc100)" = pc100
 )
 
 test_ed25519_key_identity_ignores_only_the_comment() {

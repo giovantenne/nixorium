@@ -156,7 +156,7 @@ LAB_META="$(as_admin nix eval "$FLAKE_URL#labMeta" --json --no-write-lock-file)"
   || fail "could not evaluate controller network metadata"
 CONTROLLER_NAME="$(jq -er '.controller.name' <<<"$LAB_META")" \
   || fail "evaluated controller name is missing"
-[[ "$CONTROLLER_NAME" =~ ^pc[0-9]+$ ]] \
+[[ "$CONTROLLER_NAME" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ ]] \
   || fail "evaluated controller name is invalid"
 DEPLOYMENT_MODE="$(jq -er '.deploymentMode // "laboratory"' <<<"$LAB_META")" \
   || fail "evaluated deployment mode is missing"

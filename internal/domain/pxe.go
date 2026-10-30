@@ -16,7 +16,6 @@ const PXEPreparationSchemaVersion = 1
 
 var (
 	gitRevisionPattern  = regexp.MustCompile(`^[0-9a-f]{40}$`)
-	clientNamePattern   = regexp.MustCompile(`^pc[0-9]+$`)
 	storePathPattern    = regexp.MustCompile(`^/nix/store/[0-9a-z]{32}-[^/\n\r\t ]+$`)
 	artifactNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]*$`)
 )
@@ -112,7 +111,7 @@ func DecodePXEPreparation(data []byte) (PXEPreparationRecord, error) {
 	}
 	seen := map[string]bool{}
 	for _, client := range record.Clients {
-		if !clientNamePattern.MatchString(client.Name) || !validStorePath(client.StorePath) || seen[client.Name] {
+		if !ValidHostName(client.Name) || !validStorePath(client.StorePath) || seen[client.Name] {
 			return record, errors.New("PXE preparation contains an invalid or duplicate client closure")
 		}
 		seen[client.Name] = true

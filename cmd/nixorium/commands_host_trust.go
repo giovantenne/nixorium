@@ -30,8 +30,8 @@ func parseHostTrustArguments(arguments []string) (options, error) {
 	if err := flags.Parse(arguments[1:]); err != nil {
 		return result, err
 	}
-	if flags.NArg() != 0 || !domain.ValidRemoteHostName(result.host) {
-		return result, errors.New("host-key requires exactly one --host pcNN")
+	if flags.NArg() != 0 || !domain.ValidHostName(result.host) {
+		return result, errors.New("host-key requires exactly one --host with a computer name such as pc07")
 	}
 	if result.subcommand == "plan" && (result.expect != "" || result.yes) {
 		return result, errors.New("--expect and --yes are only valid with host-key apply")

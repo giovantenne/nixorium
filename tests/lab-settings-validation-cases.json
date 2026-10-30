@@ -161,6 +161,120 @@
     {
       "name": "keyboard layout with a newline",
       "overrides": {"keyboardLayout": "us\n"}
+    },
+    {
+      "name": "time zone typo without an area",
+      "overrides": {"timeZone": "Rome"}
+    },
+    {
+      "name": "time zone with a space",
+      "overrides": {"timeZone": "Europe/ Rome"}
+    },
+    {
+      "name": "time zone with a newline",
+      "overrides": {"timeZone": "Europe/Rome\n"}
+    },
+    {
+      "name": "time zone with a trailing slash",
+      "overrides": {"timeZone": "Europe/"}
+    },
+    {
+      "name": "time zone with a parent path",
+      "overrides": {"timeZone": "../etc/passwd"}
+    },
+    {
+      "name": "default locale without the UTF-8 suffix",
+      "overrides": {"defaultLocale": "en_US"}
+    },
+    {
+      "name": "default locale with a lower-case country",
+      "overrides": {"defaultLocale": "en_us.UTF-8"}
+    },
+    {
+      "name": "default locale with a newline",
+      "overrides": {"defaultLocale": "en_US.UTF-8\n"}
+    },
+    {
+      "name": "extra locale with a typo",
+      "overrides": {"extraLocale": "italian"}
+    },
+    {
+      "name": "extra locale with a space",
+      "overrides": {"extraLocale": "it_IT.UTF-8 "}
+    },
+    {
+      "name": "password hash with a newline in the salt",
+      "overrides": {"adminPassword": "$6$sa\nlt$hash"}
+    },
+    {
+      "name": "password hash with a space in the hash",
+      "overrides": {"studentPassword": "$6$salt$ha sh"}
+    },
+    {
+      "name": "password hash with an empty salt",
+      "overrides": {"teacherPassword": "$6$$hash"}
+    },
+    {
+      "name": "password hash with a trailing newline",
+      "overrides": {"adminPassword": "$6$salt$hash\n"}
+    },
+    {
+      "name": "password hash with a rounds field but no salt",
+      "overrides": {"adminPassword": "$6$rounds=5000$hash"}
+    },
+    {
+      "name": "password hash for another algorithm",
+      "overrides": {"adminPassword": "$5$salt$hash"}
+    }
+  ],
+  "valid": [
+    {
+      "name": "UTC time zone",
+      "overrides": {"timeZone": "UTC"}
+    },
+    {
+      "name": "Area/Location time zone",
+      "overrides": {"timeZone": "Europe/Rome"}
+    },
+    {
+      "name": "time zone with an underscore",
+      "overrides": {"timeZone": "America/New_York"}
+    },
+    {
+      "name": "time zone with three parts",
+      "overrides": {"timeZone": "America/Argentina/Buenos_Aires"}
+    },
+    {
+      "name": "time zone with a hyphen",
+      "overrides": {"timeZone": "America/Port-au-Prince"}
+    },
+    {
+      "name": "Etc/GMT time zone with a sign",
+      "overrides": {"timeZone": "Etc/GMT+1"}
+    },
+    {
+      "name": "other UTF-8 locales",
+      "overrides": {"defaultLocale": "it_IT.UTF-8", "extraLocale": "de_DE.UTF-8"}
+    },
+    {
+      "name": "three-letter language locale",
+      "overrides": {"defaultLocale": "fil_PH.UTF-8"}
+    },
+    {
+      "name": "locale with a modifier",
+      "overrides": {"extraLocale": "sr_RS@latin.UTF-8"}
+    },
+    {
+      "name": "C.UTF-8 locale",
+      "overrides": {"defaultLocale": "C.UTF-8"}
+    },
+    {
+      "name": "password hash with a rounds field",
+      "overrides": {"adminPassword": "$6$rounds=656000$abcdefgh$AbC./0123456789.xyz"}
+    },
+    {
+      "name": "password hash from mkpasswd",
+      "overrides": {"teacherPassword": "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0"}
     }
   ]
 }

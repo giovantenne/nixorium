@@ -214,7 +214,7 @@ func ValidateSoftwareScope(scope SoftwareScope) error {
 		}
 		seen := map[string]bool{}
 		for _, name := range scope.Clients {
-			if !clientNamePattern.MatchString(name) || seen[name] {
+			if !ValidHostName(name) || seen[name] {
 				return errors.New("client scope contains an invalid or duplicate identity")
 			}
 			seen[name] = true

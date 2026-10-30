@@ -40,3 +40,51 @@ func TestDeploymentConfigurationsCountsOneSystemPerSharedClass(t *testing.T) {
 		}
 	}
 }
+
+func TestValidHostNameIsExactlyWhatSettingsCanProduce(t *testing.T) {
+	for _, name := range []string{"pc01", "pc09", "pc10", "pc99", "pc100", "pc199", "pc200", "pc254"} {
+		if !ValidHostName(name) {
+			t.Fatalf("ValidHostName(%q) refused", name)
+		}
+	}
+	for _, name := range []string{"", "pc", "pc0", "pc1", "pc00", "pc000", "pc001", "pc0100", "pc255", "pc300", "pc999", "pc1000", "PC01", "pc01\n", " pc01", "pc 01", "pc1a", "host01", "pc-1", "pc+10"} {
+		if ValidHostName(name) {
+			t.Fatalf("ValidHostName(%q) accepted", name)
+		}
+	}
+	// Every number a laboratory can use gives a name the rule accepts, and
+	// nothing else does.
+	accepted := 0
+	for number := 0; number <= 1200; number++ {
+		want := number >= 1 && number <= MaxHostNumber
+		if ValidHostName(HostName(number)) != want {
+			t.Fatalf("ValidHostName(%q) != %v", HostName(number), want)
+		}
+		if want {
+			accepted++
+		}
+	}
+	if accepted != MaxHostNumber {
+		t.Fatalf("accepted %d names, want %d", accepted, MaxHostNumber)
+	}
+}
+
+func TestRemoteInstallAcceptsThreeDigitHostsAndKernelInterfaceNames(t *testing.T) {
+	plan := validRemoteInstallPlan()
+	plan.Host.Name = "pc120"
+	plan.SystemPath = "/nix/store/00000000000000000000000000000000-nixos-system-pc120-test"
+	plan.Host.Interface = "enp12345678901" // 14 characters
+	if err := ValidateRemoteInstallPlan(plan); err != nil {
+		t.Fatalf("three-digit host refused: %v", err)
+	}
+	plan.Host.Interface = "enp123456789012x" // 16 characters, over the kernel limit
+	if err := ValidateRemoteInstallPlan(plan); err == nil {
+		t.Fatal("an interface name longer than 15 characters was accepted")
+	}
+	plan.Host.Interface = "enp0s2"
+	plan.Host.Name = "pc255"
+	plan.SystemPath = "/nix/store/00000000000000000000000000000000-nixos-system-pc255-test"
+	if err := ValidateRemoteInstallPlan(plan); err == nil {
+		t.Fatal("pc255 was accepted")
+	}
+}
