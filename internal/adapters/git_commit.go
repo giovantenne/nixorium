@@ -236,9 +236,9 @@ func (local Local) CommitGitPaths(ctx context.Context, repository string, paths 
 }
 
 func runBoundedGitInput(ctx context.Context, repository string, input []byte, limit int, arguments ...string) (string, bool, error) {
-	command := exec.CommandContext(ctx, "git", append([]string{"-C", repository}, arguments...)...)
+	command := exec.CommandContext(ctx, "git", append(append([]string{"-C", repository}, gitHardeningArguments()...), arguments...)...)
 	configureCommandCancellation(command)
-	command.Env = internalCommitEnvironment()
+	command.Env = gitHardenedEnvironment(internalCommitEnvironment())
 	command.Stdin = bytes.NewReader(input)
 	stdout := &boundedCommandBuffer{limit: limit}
 	stderr := &boundedCommandBuffer{limit: 16 * 1024}

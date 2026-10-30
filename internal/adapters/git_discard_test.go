@@ -78,3 +78,31 @@ func TestDiscardTreatsPathsLiterally(t *testing.T) {
 		t.Fatalf("a path that was not selected was restored: %q", content)
 	}
 }
+
+func TestDiscardDoesNotRunRepositoryHooks(t *testing.T) {
+	repository := workspaceRepository(t)
+	writeGitReviewFile(t, repository, "notes.txt", "saved\n")
+	workspaceTestGit(t, repository, "add", "notes.txt")
+	workspaceTestGit(t, repository, "commit", "-qm", "saved")
+	marker := filepath.Join(t.TempDir(), "hook-ran")
+	hook := "#!/bin/sh\ntouch " + marker + "\n"
+	if err := os.WriteFile(filepath.Join(repository, ".git", "hooks", "post-checkout"), []byte(hook), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeGitReviewFile(t, repository, "notes.txt", "edited\n")
+	local := Local{}
+	revision, err := local.GitRevision(t.Context(), repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := local.GitCommitProposal(t.Context(), repository, []string{"notes.txt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := local.DiscardGitPaths(t.Context(), repository, []string{"notes.txt"}, revision, proposal.TreeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("discarding ran a repository hook")
+	}
+}
