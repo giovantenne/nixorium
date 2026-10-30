@@ -10,7 +10,7 @@ import (
 )
 
 func TestAppendInputTextKeepsPrintableCharactersWithinTheLimit(t *testing.T) {
-	if got := appendInputText("ab", "c\nd\te​f", 10); got != "abcdef" {
+	if got := appendInputText("ab", "c\nd\te\u200bf", 10); got != "abcdef" {
 		t.Fatalf("control and invisible characters kept: %q", got)
 	}
 	if got := appendInputText("abc", "defgh", 5); got != "abcde" {
@@ -75,7 +75,7 @@ func TestPasteGoesIntoTheSoftwareSearchAndSearchesOnce(t *testing.T) {
 	if model.software.query != "inkscape" || command == nil {
 		t.Fatalf("query %q, search scheduled %v", model.software.query, command != nil)
 	}
-	updated, command = model.Update(tea.PasteMsg{Content: strings.Repeat("x", 200)})
+	updated, _ = model.Update(tea.PasteMsg{Content: strings.Repeat("x", 200)})
 	model = updated.(dashboardModel)
 	if len(model.software.query) != softwareQueryMax {
 		t.Fatalf("query length %d", len(model.software.query))
