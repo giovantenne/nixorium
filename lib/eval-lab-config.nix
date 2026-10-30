@@ -40,9 +40,9 @@ let
   # Lengths are in bytes, as in the Go validation.
   isGitName = value:
     builtins.stringLength value <= 256 && builtins.match "[^[:cntrl:]]*" value != null;
-  isGitEmail = value:
-    builtins.stringLength value <= 256
-    && builtins.match "[^[:space:][:cntrl:]@]+@[^[:space:][:cntrl:]@]+" value != null;
+  # Emails are not checked for shape: a laboratory may already use any text
+  # Git accepts. Quoting keeps them safe; only control characters are refused.
+  isGitEmail = isGitName;
   isKeyboardLayout = value:
     builtins.stringLength value <= 128 && builtins.match "[A-Za-z0-9_,()+-]+" value != null;
   isAbsoluteHttpUrl = value:
@@ -298,7 +298,7 @@ assert emptyRequiredFields == []
 assert isGitName config.studentGitName && isGitName config.adminGitName
   || throw "Git names must be at most 256 bytes without control characters";
 assert isGitEmail config.studentGitEmail && isGitEmail config.adminGitEmail
-  || throw "Git emails must look like name@domain, without spaces or control characters, at most 256 bytes";
+  || throw "Git emails must be at most 256 bytes without control characters";
 assert isTimeZone config.timeZone
   || throw "timeZone must be UTC or a zone such as Europe/Rome or America/New_York";
 assert isLocale config.defaultLocale && isLocale config.extraLocale

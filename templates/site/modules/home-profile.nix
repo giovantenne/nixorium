@@ -11,9 +11,9 @@ let
   ];
   # Activation runs as root, but every file in a staff home is written as its
   # owner: a symbolic link left in the home then cannot point the write at a
-  # system file.
+  # system file. The time limit, kept by root, ends a step the user stalls.
   asUser = user: command: ''
-    ${pkgs.util-linux}/bin/setpriv --reuid=${lib.escapeShellArg user} --regid=users --init-groups -- ${command} \
+    ${pkgs.coreutils}/bin/timeout -k 5 60 ${pkgs.util-linux}/bin/setpriv --reuid=${lib.escapeShellArg user} --regid=users --init-groups -- ${command} \
       || echo "Nixorium: could not update a file in the home of ${user}" >&2'';
   installForStaff = path: source: builtins.concatStringsSep "\n" (map (profile:
     asUser profile.user ''${pkgs.coreutils}/bin/install -D -m 0644 ${source} "${profile.home}/${path}"''
