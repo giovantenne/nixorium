@@ -308,7 +308,7 @@ func handle(connection net.Conn, agent agentContext) {
 	}
 	// Files of an unfinished sending are removed when the connection ends,
 	// and a showing of the teacher's screen through it ends too.
-	var incoming *receiver
+	var incoming *classroomview.TreeWriter
 	// A collection of the desktop through this connection ends with it.
 	var outgoing *collector
 	showing := false
@@ -320,7 +320,7 @@ func handle(connection net.Conn, agent agentContext) {
 			_ = capture.ClipboardEnd()
 		}
 		if incoming != nil {
-			incoming.abort()
+			incoming.Abort()
 		}
 		if outgoing != nil {
 			outgoing.close()
@@ -423,11 +423,24 @@ func handle(connection net.Conn, agent agentContext) {
 	}
 }
 
+// newIncoming starts receiving files for this session's desktop. They are
+// written into a private folder of the home first and move to the desktop
+// only when everything arrived, so the student never sees half a sending.
+// The agent runs as the student: the files belong to the student, folders
+// are 0755 and files 0644, never executable.
+func newIncoming(home string, entries []classroomview.FileEntry) (*classroomview.TreeWriter, error) {
+	desktop, err := classroomview.DesktopDirectory(home)
+	if err != nil {
+		return nil, err
+	}
+	return classroomview.NewStagedTreeWriter(desktop, filepath.Join(home, ".local", "share", "nixorium-classroom"), entries)
+}
+
 // filesReply advances a sending to the desktop; any refusal ends it.
-func filesReply(incoming **receiver, home string, message classroomview.Message) classroomview.Message {
+func filesReply(incoming **classroomview.TreeWriter, home string, message classroomview.Message) classroomview.Message {
 	refuse := func(err error) classroomview.Message {
 		if *incoming != nil {
-			(*incoming).abort()
+			(*incoming).Abort()
 			*incoming = nil
 		}
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeFilesRefused, Detail: err.Error()}
@@ -435,9 +448,9 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 	switch message.Type {
 	case classroomview.TypeFilesBegin:
 		if *incoming != nil {
-			(*incoming).abort()
+			(*incoming).Abort()
 		}
-		started, err := newReceiver(home, message.Entries)
+		started, err := newIncoming(home, message.Entries)
 		if err != nil {
 			*incoming = nil
 			return refuse(err)
@@ -448,7 +461,7 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 		if *incoming == nil {
 			return refuse(errors.New("no sending is open"))
 		}
-		if err := (*incoming).chunk(message.Index, message.Data); err != nil {
+		if err := (*incoming).Write(message.Index, message.Data); err != nil {
 			return refuse(err)
 		}
 		return classroomview.Message{Type: classroomview.TypeFilesAck, Index: message.Index}
@@ -456,7 +469,7 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 		if *incoming == nil {
 			return refuse(errors.New("no sending is open"))
 		}
-		placed, err := (*incoming).finish()
+		placed, err := (*incoming).Finish()
 		*incoming = nil
 		if err != nil {
 			return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeFilesRefused, Detail: err.Error()}

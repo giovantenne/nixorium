@@ -156,3 +156,47 @@ func TestEnsureFolderCreatesMissingFolders(t *testing.T) {
 		t.Fatal("a folder inside a file was accepted")
 	}
 }
+
+func TestStagedTreeWriterStagesElsewhereAndCreatesTheDestination(t *testing.T) {
+	root := t.TempDir()
+	destination := filepath.Join(root, "home", "Desktop")
+	staging := filepath.Join(root, "home", ".local", "share", "staging")
+	send := func() []string {
+		t.Helper()
+		before, _ := os.ReadDir(destination)
+		writer, err := NewStagedTreeWriter(destination, staging, []FileEntry{{Path: "Lesson", Dir: true}, {Path: "Lesson/a.txt", Size: 2}, {Path: "b.txt", Size: 1}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if during, _ := os.ReadDir(destination); len(during) != len(before) {
+			t.Fatal("something appeared in the destination before the end")
+		}
+		for index, data := range map[int]string{1: "hi", 2: "x"} {
+			if err := writer.Write(index, []byte(data)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		placed, err := writer.Finish()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if left, _ := os.ReadDir(staging); len(left) != 0 {
+			t.Fatalf("staging left behind: %v", left)
+		}
+		return placed
+	}
+	if placed := send(); strings.Join(placed, ",") != "Lesson,b.txt" {
+		t.Fatalf("placed = %v", placed)
+	}
+	// The folder is non-empty now: the next sending gets a new name and
+	// nothing is replaced.
+	if placed := send(); strings.Join(placed, ",") != "Lesson (2),b (2).txt" {
+		t.Fatalf("second placed = %v", placed)
+	}
+	if content, err := os.ReadFile(filepath.Join(destination, "Lesson", "a.txt")); err != nil || string(content) != "hi" {
+		t.Fatalf("first folder changed: %q, %v", content, err)
+	}
+	if _, err := NewStagedTreeWriter(destination, staging, []FileEntry{{Path: "../escape", Size: 1}}); err == nil {
+		t.Fatal("a path outside the sending was accepted")
+	}
+}
