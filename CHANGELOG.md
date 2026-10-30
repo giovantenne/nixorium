@@ -23,6 +23,10 @@ older, first follow the notes of those releases.
 
 ### Fixed
 
+- Remote control in the classroom view types characters that need AltGr and
+  Shift together, such as `{` and `}` on an Italian keyboard (AltGr+Shift+è).
+  Before, the student's computer received the teacher's AltGr and Shift on top
+  of the character and typed something else.
 - Send files no longer refuses with "other files are being prepared" for half
   an hour after three reviews that were not confirmed (or three uses of
   `nixorium send` from the command line): a new sending takes the place of the

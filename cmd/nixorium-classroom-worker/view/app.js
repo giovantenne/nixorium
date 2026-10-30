@@ -298,6 +298,7 @@ async function runAction(action, computers, transfer, extra) {
   // The dialog takes the keyboard: let go of every key on the student's side.
   if (controlling) {
     pressedCodes.clear();
+    heldModifiers.clear();
     send([], true);
   }
   actionID = '';
@@ -716,6 +717,13 @@ function showScreen(name) {
 let controlling = false;
 let queue = [];
 const pressedCodes = new Map();
+// Shift and AltGr held on the computer because of this view. A character is
+// sent as the character itself, and the computer's layout presses whatever
+// it needs to type it: the teacher's Shift or AltGr still held would change
+// the level (AltGr+Shift+è for { on an Italian keyboard typed something else),
+// so they are let go first.
+const levelModifiers = [0xffe1, 0xfe03];
+const heldModifiers = new Set();
 
 const specialKeys = {
   Enter: 0xff0d, Backspace: 0xff08, Tab: 0xff09, Escape: 0xff1b, Delete: 0xffff,
@@ -876,6 +884,12 @@ window.addEventListener('keydown', (event) => {
   if (!symbol) return;
   event.preventDefault();
   pressedCodes.set(event.code, symbol);
+  if (levelModifiers.includes(symbol)) heldModifiers.add(symbol);
+  const character = Array.from(event.key).length === 1 && !(event.key in specialKeys);
+  if (character && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    for (const modifier of heldModifiers) queueEvent({ kind: 'key', keysym: modifier, pressed: false });
+    heldModifiers.clear();
+  }
   queueEvent({ kind: 'key', keysym: symbol, pressed: true });
   const key = event.key.toLowerCase();
   if (clipboardReady && (key === 'c' || key === 'x') && event.ctrlKey && !event.altKey && !event.repeat) {
@@ -888,6 +902,8 @@ window.addEventListener('keyup', (event) => {
   pressedCodes.delete(event.code);
   if (!symbol) return;
   event.preventDefault();
+  // A modifier let go before a character is already up on the computer.
+  if (levelModifiers.includes(symbol) && !heldModifiers.delete(symbol)) return;
   queueEvent({ kind: 'key', keysym: symbol, pressed: false });
 });
 
@@ -909,6 +925,7 @@ function setControl(on) {
   } else {
     queue = [];
     pressedCodes.clear();
+    heldModifiers.clear();
     send([], true);
     if (selected) {
       fetch('/api/control', {
@@ -955,7 +972,8 @@ document.addEventListener('fullscreenchange', () => {
 document.getElementById('viewer-close').addEventListener('click', () => window.close());
 // Closing the window gives control back and lets go of every key.
 window.addEventListener('pagehide', () => setControl(false));
-window.addEventListener('blur', () => { if (controlling) { pressedCodes.clear(); send([], true); } });
+window.addEventListener('blur', () => { if (controlling) { pressedCodes.clear();
+    heldModifiers.clear(); send([], true); } });
 
 // A computer's window has no grid: its bar shows the notice instead.
 function notice(text) {
