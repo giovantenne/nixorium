@@ -219,3 +219,18 @@ func TestAccountSettingsDemoFollowsTheAccountsSubmenu(t *testing.T) {
 		}
 	}
 }
+
+func TestManagedJobsDemoShowsTheInterruptedJob(t *testing.T) {
+	bundle := RenderDemoBundle(strings.Repeat("a", 40), "2026-01-01")
+	for _, scenario := range bundle.Scenarios {
+		if scenario.ID != "managed-jobs" {
+			continue
+		}
+		frame := demoFrameWithLabel(scenario.Frames, "Interrupted job with journal identity")
+		if !strings.Contains(frame.Text, "interrupted") || strings.Contains(frame.Text, "— running") {
+			t.Fatalf("the interrupted job frame does not show the interrupted job:\n%s", frame.Text)
+		}
+		return
+	}
+	t.Fatal("no managed-jobs scenario")
+}

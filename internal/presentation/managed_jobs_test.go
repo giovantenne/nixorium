@@ -147,3 +147,61 @@ func TestManagedJobsStartupDoesNotResumeSetupOrExposeClassroomAdmin(t *testing.T
 		t.Fatal("classroom has administrative jobs")
 	}
 }
+
+func TestManagedJobPollingContinuesAfterReturningToOverview(t *testing.T) {
+	model := newTestModel(t, withActions(DashboardActions{
+		LoadManagedJobs: func(context.Context) ([]domain.ManagedJob, error) { return nil, nil },
+		LoadInitial: func(context.Context) (domain.StatusReport, domain.SetupReport, error) {
+			return testDashboardReport("ready"), testSetupReport(true, true, true, true), nil
+		},
+	}))
+	model.jobs.id = 1
+	updated, command := model.Update(managedJobsMsg{id: 1})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("polling did not start")
+	}
+	model.screen = dashboardAdministration
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHome {
+		t.Fatalf("screen %d", model.screen)
+	}
+	// Returning to the Overview started a new observation identity: the tick
+	// that was already waiting belongs to the old one and is dropped.
+	updated, command = model.Update(managedJobsTickMsg{id: 1})
+	model = updated.(dashboardModel)
+	if command != nil {
+		t.Fatal("the tick of the replaced polling chain was followed")
+	}
+	updated, command = model.Update(overviewQuietRefreshMsg{jobsID: model.jobs.id, read: model.overviewReads, report: testDashboardReport("ready"), setup: testSetupReport(true, true, true, true)})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("polling never restarted after the Overview refresh")
+	}
+	// A refresh that was overtaken still restarts the chain of its own
+	// identity, but one that belongs to an older identity does not.
+	model.overviewReads++
+	if _, command = model.Update(overviewQuietRefreshMsg{jobsID: model.jobs.id, read: model.overviewReads - 1}); command == nil {
+		t.Fatal("an overtaken refresh left polling stopped")
+	}
+	if _, command = model.Update(overviewQuietRefreshMsg{jobsID: model.jobs.id - 1, read: model.overviewReads}); command != nil {
+		t.Fatal("a refresh of an older identity started a second chain")
+	}
+}
+
+func TestBackgroundWorkListMovesUpAndDown(t *testing.T) {
+	model := newTestModel(t, withReadyLab())
+	model.screen = dashboardManagedJobs
+	model.jobs.items = []domain.ManagedJob{{Operation: "controller-apply"}, {Operation: "pxe-prepare"}, {Operation: "other"}}
+	for _, step := range []struct {
+		key  tea.KeyPressMsg
+		want int
+	}{{tea.KeyPressMsg{Code: tea.KeyDown}, 1}, {tea.KeyPressMsg{Code: tea.KeyDown}, 2}, {tea.KeyPressMsg{Code: tea.KeyUp}, 1}, {tea.KeyPressMsg{Code: tea.KeyUp}, 0}, {tea.KeyPressMsg{Code: tea.KeyUp}, 2}, {tea.KeyPressMsg{Code: tea.KeyTab}, 0}} {
+		updated, _ := model.Update(step.key)
+		model = updated.(dashboardModel)
+		if model.jobs.cursor != step.want {
+			t.Fatalf("after %s the cursor is %d, want %d", step.key.String(), model.jobs.cursor, step.want)
+		}
+	}
+}
