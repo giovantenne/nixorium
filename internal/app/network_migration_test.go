@@ -423,3 +423,23 @@ func TestNetworkMigrationUndoIsAlwaysPossibleBeforeFinish(t *testing.T) {
 		t.Fatal("undo without a change in progress")
 	}
 }
+
+func TestNetworkMigrationFinishChecksTheComputersAgainBeforeSaving(t *testing.T) {
+	lab := startedLab(t)
+	finish := NetworkMigrationRequest{Action: domain.NetworkMigrationFinish}
+	manager := lab.manager()
+	plan := manager.Plan(context.Background(), "/lab", finish)
+	if plan.HasErrors() || plan.ReviewToken == "" {
+		t.Fatalf("plan = %+v", plan.Issues)
+	}
+	// pc02 restarted into its previous address after the review.
+	lab.answers["pc02"] = domain.HostNetworkPrevious
+	result := manager.Apply(context.Background(), plan, plan.ReviewToken)
+	if !result.HasErrors() || lab.settings.Lab.NetworkTransition == nil || !strings.Contains(result.Message, "pc02") {
+		t.Fatalf("result = %+v, transition = %+v", result, lab.settings.Lab.NetworkTransition)
+	}
+	lab.answers["pc02"] = domain.HostNetworkCurrent
+	if result := manager.Apply(context.Background(), plan, plan.ReviewToken); result.HasErrors() || lab.settings.Lab.NetworkTransition != nil {
+		t.Fatalf("result = %+v", result)
+	}
+}

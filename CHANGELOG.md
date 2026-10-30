@@ -19,6 +19,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Changing the laboratory network: confirming a step now checks the
+  computers again before saving. Before, a computer restarted into its
+  previous address after the review of "finish" could be left without the
+  controller; now the step stops and asks for a new review.
 - Stopping Update computers, or reaching its time limit, no longer marks the
   computers still waiting for their turn as "activation result unknown". They
   keep their current system and are listed as not updated, so the update does
