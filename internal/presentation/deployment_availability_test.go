@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -133,5 +134,24 @@ func TestSuccessfulDeploymentDoesNotRepeatItsHeadline(t *testing.T) {
 	view := demoANSI.ReplaceAllString(model.View().Content, "")
 	if !strings.Contains(view, "pc01 — Updated") || strings.Contains(view, "updated, checked, and recorded") {
 		t.Fatalf("success result repeats its headline:\n%s", view)
+	}
+}
+
+func TestDeploymentReviewNamesComputersNotTheSelector(t *testing.T) {
+	plan := mixedDeploymentPlan()
+	plan.ColmenaSelector = "@lab"
+	model := newTestModel(t, withReadyLab())
+	model.width, model.height = 120, 30
+	model.screen = dashboardDeployReview
+	model.deployment.plan = plan
+	view := ansi.Strip(model.View().Content)
+	if !strings.Contains(view, "Affects  pc01, pc02 · 2 computers") || strings.Contains(view, "@lab") {
+		t.Fatalf("review:\n%s", view)
+	}
+	if got := deploymentAffectedLabel(make([]domain.DeploymentTarget, 12), 12); got != "all 12 computers" {
+		t.Fatalf("full long selection: %q", got)
+	}
+	if got := deploymentAffectedLabel(make([]domain.DeploymentTarget, 12), 30); strings.HasPrefix(got, "all") {
+		t.Fatalf("partial selection described as all: %q", got)
 	}
 }

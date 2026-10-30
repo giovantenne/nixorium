@@ -40,3 +40,17 @@ func TestPowerReviewSeparatesSessionsInUseFromUnusedLogins(t *testing.T) {
 		t.Fatalf("CLI review:\n%s", output.String())
 	}
 }
+
+func TestPowerReviewNamesTheChosenActionForSessionsInUse(t *testing.T) {
+	for action, want := range map[domain.ClientPowerAction]string{domain.ClientPowerOff: "pc02 · In use · will shut down", domain.ClientRestart: "pc02 · In use · will restart"} {
+		model := shutdownModel{plan: domain.ShutdownPlanReport{State: "ready", Action: action, Eligible: 1, Targets: []domain.ShutdownTargetPlan{{Name: "pc02", Eligible: true, Session: domain.ShutdownSessionActive}}}}
+		body, _ := model.reviewView(shutdownViewContext{height: 30})
+		text := strings.Join(body, "\n")
+		if !strings.Contains(text, want) {
+			t.Fatalf("%s review misses %q:\n%s", action, want, text)
+		}
+		if action == domain.ClientRestart && strings.Contains(text, "will shut down") {
+			t.Fatalf("restart review talks about shutting down:\n%s", text)
+		}
+	}
+}
