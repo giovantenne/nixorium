@@ -862,3 +862,42 @@ func TestRemoteWorkerRecoveryReleasesAReservationWithoutASessionRecord(t *testin
 		t.Fatalf("discarded=%v released=%v worker=%+v", bootstrap.discarded, reservations.reservation.released, worker)
 	}
 }
+
+func TestRemoteWorkerStatusLoadsTheSessionUnderTheWorkerMutex(t *testing.T) {
+	// A status request that arrives while apply holds the mutex must refresh
+	// the session apply leaves behind, not a copy read before apply started.
+	id := "0123456789abcdef0123456789abcdef"
+	session := domain.RemoteInstallSession{OperationID: id, State: "applying", TokenConsumed: true,
+		Preparation: &domain.RemoteInstallPreparation{BundlePath: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bundle"}}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: session}}
+	worker := &remoteWorker{state: state, operationID: id, liveSession: &adapters.VerifiedLiveSession{}}
+	worker.statusConnection = func(adapters.VerifiedLiveSession) (remoteStatusConnection, error) {
+		return fakeStatusConnection{receipt: domain.RemoteInstallReceipt{OperationID: id, State: "applying"}}, nil
+	}
+	worker.mutex.Lock()
+	done := make(chan domain.RemoteInstallResponse, 1)
+	go func() {
+		done <- worker.handleStatus(context.Background(), domain.RemoteInstallRequest{OperationID: id})
+	}()
+	time.Sleep(100 * time.Millisecond)
+	current := state.sessions[id]
+	current.Events = append(current.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseReconciliationRequired, Detail: "written by apply"})
+	state.sessions[id] = current
+	worker.mutex.Unlock()
+	response := <-done
+	if len(state.sessions[id].Events) != 1 || response.Session == nil || len(response.Session.Events) != 1 {
+		t.Fatalf("status saved a stale session: %+v", state.sessions[id])
+	}
+}
+
+type fakeStatusConnection struct {
+	receipt domain.RemoteInstallReceipt
+}
+
+func (connection fakeStatusConnection) Status(context.Context, string, string) (domain.RemoteInstallReceipt, error) {
+	return connection.receipt, nil
+}
+
+func (connection fakeStatusConnection) OperationLog(context.Context, string, string) ([]byte, error) {
+	return nil, errors.New("no log")
+}
