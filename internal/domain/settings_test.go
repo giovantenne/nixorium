@@ -355,6 +355,9 @@ func TestGitIdentityAndKeyboardLayoutValidation(t *testing.T) {
 	accepted := []struct{ name, field, value string }{
 		{"name with accents quotes and spaces", "name", "José O'Brien \"Jo\" Núñez"},
 		{"plain email", "email", "ada.lovelace+lab@example.org"},
+		// Labs may already have emails of any shape Git accepts.
+		{"email without at", "email", "admin"},
+		{"email with name", "email", "Mario Rossi <m@x.it>"},
 		{"simple layout", "layout", "us"},
 		{"layout with variant", "layout", "us(intl)"},
 		{"layout list", "layout", "us,it"},
@@ -365,10 +368,6 @@ func TestGitIdentityAndKeyboardLayoutValidation(t *testing.T) {
 		{"name with tab", "name", "Ada\tLovelace"},
 		{"name with DEL", "name", "Ada\x7f"},
 		{"name too long", "name", strings.Repeat("a", 257)},
-		{"email with space", "email", "ada lovelace@example.org"},
-		{"email without at", "email", "ada.example.org"},
-		{"email without domain", "email", "ada@"},
-		{"email with two ats", "email", "a@b@c"},
 		{"email with newline", "email", "ada@example.org\n[core]"},
 		{"email too long", "email", "a@" + strings.Repeat("b", 255)},
 		{"layout with quote", "layout", "us')]; touch /tmp/x #"},

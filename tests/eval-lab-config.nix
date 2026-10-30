@@ -36,6 +36,8 @@ assert builtins.all (case: !(evaluates (valid // case.overrides))) sharedCases.i
 # Git identities and the keyboard layout reach shell scripts: strict shapes,
 # while ordinary names (accents, quotes, spaces) and XKB layouts stay valid.
 assert evaluates (valid // { adminGitName = "José O'Brien \"Jo\" Núñez"; studentGitEmail = "jose.o+lab@example.org"; });
+# Emails already saved in a laboratory keep evaluating whatever their shape.
+assert evaluates (valid // { adminGitEmail = "admin"; studentGitEmail = "Mario Rossi <m@x.it>"; });
 assert evaluates (valid // { keyboardLayout = "us"; });
 assert evaluates (valid // { keyboardLayout = "us(intl)"; });
 assert evaluates (valid // { keyboardLayout = "us,it"; });

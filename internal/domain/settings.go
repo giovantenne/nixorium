@@ -25,7 +25,6 @@ var (
 	passwordHashPattern  = regexp.MustCompile(`^\$6\$[^$]+\$[^$]+$`)
 	// Git identities and the keyboard layout reach shell scripts and
 	// configuration files. lib/eval-lab-config.nix holds the same rules.
-	gitEmailPattern       = regexp.MustCompile(`^[^\x00-\x20\x7f@]+@[^\x00-\x20\x7f@]+$`)
 	keyboardLayoutPattern = regexp.MustCompile(`^[A-Za-z0-9_,()+-]+$`)
 )
 
@@ -340,8 +339,10 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 		{"lab.studentGitEmail", lab.StudentGitEmail},
 		{"lab.adminGitEmail", lab.AdminGitEmail},
 	} {
-		if strings.TrimSpace(email.value) != "" && (len(email.value) > maxGitTextBytes || !gitEmailPattern.MatchString(email.value)) {
-			add(email.field, "must look like name@domain, without spaces or control characters, and be at most 256 bytes")
+		// Not checked for shape: a laboratory may already use any text Git
+		// accepts; quoting keeps it safe.
+		if strings.TrimSpace(email.value) != "" && !validGitText(email.value) {
+			add(email.field, "must be at most 256 bytes without control characters")
 		}
 	}
 	if strings.TrimSpace(lab.KeyboardLayout) != "" && (len(lab.KeyboardLayout) > maxKeyboardLayoutBytes || !keyboardLayoutPattern.MatchString(lab.KeyboardLayout)) {

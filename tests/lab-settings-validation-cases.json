@@ -131,20 +131,8 @@
       "overrides": {"adminGitName": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
     },
     {
-      "name": "Git email with a space",
-      "overrides": {"adminGitEmail": "ada lovelace@example.org"}
-    },
-    {
-      "name": "Git email without an at sign",
-      "overrides": {"studentGitEmail": "ada.example.org"}
-    },
-    {
       "name": "Git email with a newline",
       "overrides": {"adminGitEmail": "ada@example.org\n[core]"}
-    },
-    {
-      "name": "Git email without a domain",
-      "overrides": {"studentGitEmail": "ada@"}
     },
     {
       "name": "Git email longer than 256 bytes",

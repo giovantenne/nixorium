@@ -549,7 +549,7 @@ that release's notes, so a release is not finished until the site follows it.
 - The core documents what the controller does and enforces; the service's instructions, recipes and routing are private (see "Service logic stays private").
 - Adoption telemetry is controller-only and off without explicit administrator
   consent. The first administrator launch acknowledges the operational disclaimer before
-  offering telemetry. only e accepts (Enter is "Not now"), n declines, Esc skips to the menu and q
+  offering telemetry. Only e accepts (Enter is "Not now"), n declines, Esc skips to the menu and q
   exits. Skipping saves no decision and reoffers at the next launch; a saved
   refusal is remembered;
   preview and privacy views never save a choice. Keep its allowlisted payload and monthly identity separate from support

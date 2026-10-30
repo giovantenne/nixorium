@@ -48,6 +48,8 @@ in
       ${asUser labSettings.teacherUser ''${pkgs.bash}/bin/sh -c ${lib.escapeShellArg ''
         file="$1/.config/gtk-3.0/bookmarks"
         mkdir -p "$1/.config/gtk-3.0"
+        # Only a regular file is read or extended; anything else is left alone.
+        if [ -L "$file" ] || { [ -e "$file" ] && [ ! -f "$file" ]; }; then exit 0; fi
         grep -q home-snapshots "$file" 2>/dev/null || echo "file:///var/lib/home-snapshots Snapshots" >> "$file"
       ''} sh "/home/${labSettings.teacherUser}"''}
     '';

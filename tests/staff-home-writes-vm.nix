@@ -53,7 +53,8 @@ pkgs.testers.runNixOSTest {
     machine.wait_for_unit("multi-user.target")
     machine.succeed("echo 'root:secret' > /etc/victim && chmod 0600 /etc/victim")
     machine.succeed("install -d -m 0750 /var/lib/victim && echo keep > /var/lib/victim/settings.json && echo keep > /var/lib/victim/argv.json")
-    machine.succeed("su - admin -c 'mkdir -p ~/.config && echo \"<monitors/>\" > ~/.config/monitors.xml'")
+    # The admin's layout is private: the teacher's copy must not need to read it.
+    machine.succeed("su - admin -c 'mkdir -p ~/.config && echo \"<monitors/>\" > ~/.config/monitors.xml && chmod 0600 ~/.config/monitors.xml'")
 
     with subtest("without links the files land in the homes, owned by their users"):
         machine.succeed("${runSteps}")
@@ -88,5 +89,9 @@ pkgs.testers.runNixOSTest {
         # The teacher's own link was replaced by a regular file, written as the teacher.
         machine.succeed("test ! -L /home/teacher/.config/monitors.xml")
         machine.succeed("test \"$(stat -c %U /home/teacher/.config/monitors.xml)\" = teacher")
+
+    with subtest("a FIFO left by the teacher does not stall the steps"):
+        machine.succeed("cd /home/teacher/.config/gtk-3.0 && rm -f bookmarks && mkfifo bookmarks && chown -h teacher:users bookmarks")
+        machine.succeed("timeout 120 ${runSteps}")
   '';
 }
