@@ -19,6 +19,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Nixorium services now stop promptly when asked to, even if a program
+  connected to their local socket is not responding, instead of waiting until
+  the system forces them to stop.
 - Stopping Update computers, or reaching its time limit, no longer marks the
   computers still waiting for their turn as "activation result unknown". They
   keep their current system and are listed as not updated, so the update does
