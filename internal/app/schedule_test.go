@@ -626,3 +626,50 @@ func TestScheduleNextFindsTheOccurrenceToTry(t *testing.T) {
 		}
 	}
 }
+
+func TestScheduleRunOnTheDaylightSavingNights(t *testing.T) {
+	rome, err := time.LoadLocation("Europe/Rome")
+	if err != nil {
+		t.Skipf("no time zone database: %v", err)
+	}
+	at := func(month time.Month, day, hour, minute int) time.Time {
+		return time.Date(2026, month, day, hour, minute, 0, 0, rome)
+	}
+	// Spring: 02:30 does not exist on 29 March 2026. The switch-on runs in
+	// the first minute after the jump, once, and is recorded like any run.
+	lab := scheduleFixture(domain.Schedule{On: "02:30", Days: []string{"sun"}})
+	lab.now = at(time.March, 29, 1, 59)
+	if report := lab.runner.Run(scheduleContext, "/lab"); report.State != "idle" {
+		t.Fatalf("before the jump: %+v", report)
+	}
+	for _, minute := range []int{0, 1, 2} {
+		lab.now = at(time.March, 29, 3, minute)
+		report := lab.runner.Run(scheduleContext, "/lab")
+		if minute == 0 {
+			if report.State != "completed" || report.Action != domain.ScheduleActionOn || report.Scheduled != "2026-03-29T03:00" {
+				t.Fatalf("after the jump: %+v", report)
+			}
+		} else if report.State != "idle" {
+			t.Fatalf("03:%02d: %+v", minute, report)
+		}
+	}
+	if len(lab.wake.sent) != 1 || len(lab.records.records) != 1 || lab.records.records[0].State != "completed" {
+		t.Fatalf("%d packets, history %+v", len(lab.wake.sent), lab.records.records)
+	}
+
+	// Autumn: 02:30 happens twice on 25 October 2026 and runs once.
+	lab = scheduleFixture(domain.Schedule{On: "02:30", Days: []string{"sun"}})
+	// Go does not say which of the two 02:30 a wall-clock date means: name
+	// them by their instants.
+	first := time.Date(2026, time.October, 25, 0, 30, 0, 0, time.UTC).In(rome)
+	for _, now := range []time.Time{first, first.Add(time.Hour), first.Add(90 * time.Minute)} {
+		lab.now = now
+		report := lab.runner.Run(scheduleContext, "/lab")
+		if now.Equal(first) != (report.State == "completed") || (!now.Equal(first) && report.State != "idle") {
+			t.Fatalf("%s: %+v", now, report)
+		}
+	}
+	if len(lab.wake.sent) != 1 || len(lab.records.records) != 1 {
+		t.Fatalf("%d packets, %d records", len(lab.wake.sent), len(lab.records.records))
+	}
+}

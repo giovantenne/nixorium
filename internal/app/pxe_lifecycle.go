@@ -271,6 +271,9 @@ func (m PXELifecycle) failStartedPXE(ctx context.Context, report domain.PXELifec
 func (m PXELifecycle) verifyRestoredAddress(ctx context.Context, repository string, report *domain.PXELifecycleReport, errors *[]string) {
 	meta, err := m.source.LabMeta(ctx, repository)
 	if err != nil {
+		// Without the metadata the expected address is unknown: say so
+		// instead of reporting a restore that nobody looked at.
+		*errors = append(*errors, restoredAddressUnverified+": evaluate lab metadata: "+err.Error())
 		return
 	}
 	addresses, err := m.source.InterfaceAddresses(meta.Network.Interface)
@@ -289,6 +292,10 @@ func (m PXELifecycle) verifyRestoredAddress(ctx context.Context, repository stri
 	}
 	report.StaticCIDR = fmt.Sprintf("%s/%d", meta.Controller.StaticIP, meta.Network.PrefixLength)
 }
+
+// restoredAddressUnverified starts the message of a stop or recovery that
+// could not tell which address the controller should have again.
+const restoredAddressUnverified = "the restored controller address could not be verified"
 
 func missingControllerAddressMessage(meta domain.LabMeta) string {
 	return fmt.Sprintf("normal controller address %s is not assigned to %s; apply the current controller configuration (Maintenance > Rebuild controller), then run Diagnostics. Recovery is only for an interrupted PXE transition", meta.Controller.StaticIP, meta.Network.Interface)

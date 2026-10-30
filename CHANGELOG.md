@@ -23,6 +23,15 @@ The project follows [Semantic Versioning](https://semver.org/).
   computers again before saving. Before, a computer restarted into its
   previous address after the review of "finish" could be left without the
   controller; now the step stops and asks for a new review.
+- A schedule set for a time that does not exist on the night the clocks go
+  forward (for example 02:30) now runs in the first minute after the jump and
+  appears in the history, instead of being skipped for that day. On the night
+  the clocks go back, a time in the repeated hour still runs once.
+- Stopping or recovering the network installation no longer says the normal
+  controller address is restored when the laboratory settings could not be
+  read to check it. It now says the address could not be verified and asks
+  you to check the laboratory again and run Apply to controller if the
+  address is missing.
 - Stopping Update computers, or reaching its time limit, no longer marks the
   computers still waiting for their turn as "activation result unknown". They
   keep their current system and are listed as not updated, so the update does

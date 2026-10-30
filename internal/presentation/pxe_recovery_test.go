@@ -134,3 +134,18 @@ func TestPXELifecycleTextStartsWithThePlainOutcome(t *testing.T) {
 		t.Fatalf("start reported a recovery:\n%s", output.String())
 	}
 }
+
+func TestPXELifecycleOutcomeSaysWhenTheRestoredAddressWasNotChecked(t *testing.T) {
+	report := domain.PXELifecycleReport{Operation: "pxe-stop", State: "failed", Mode: "stopped",
+		Message: "the restored controller address could not be verified: evaluate lab metadata: nix evaluation failed"}
+	headline, next := pxeLifecycleOutcome(report, false)
+	if !strings.Contains(headline, "could not be checked") || strings.Contains(headline, "was not stopped") ||
+		!strings.Contains(next, "Check the laboratory again") || !strings.Contains(next, "Apply to controller") {
+		t.Fatalf("outcome = %q / %q", headline, next)
+	}
+	var output bytes.Buffer
+	PXELifecycleText(&output, report)
+	if first, _, _ := strings.Cut(output.String(), "\n"); !strings.Contains(first, "could not be checked") || !strings.Contains(first, "nixorium doctor") {
+		t.Fatalf("first line %q", first)
+	}
+}
