@@ -157,3 +157,29 @@ func TestCheckingComputersAgainReplacesTheLastReviewsAvailability(t *testing.T) 
 		t.Fatalf("the earlier review's availability is still shown: %+v", updated.deployment.plan.Availability)
 	}
 }
+
+func TestCancelledComputerCheckDoesNotRedirectTheNextInventory(t *testing.T) {
+	model := newTestModel(t, withReadyLab(), withActions(DashboardActions{
+		LoadHosts: func(context.Context) (domain.HostsReport, error) {
+			return domain.HostsReport{GeneratedAt: time.Now()}, nil
+		},
+	}))
+	model.screen = dashboardDeploy
+	model.deployment.chosen = map[string]bool{}
+	updated, _ := model.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	model = updated.(dashboardModel)
+	if model.read.cancel == nil || model.computers.refreshReturn != dashboardDeploy {
+		t.Fatalf("no check started from the selection (cancel set %v, return %d)", model.read.cancel != nil, model.computers.refreshReturn)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if model.computers.refreshReturn != 0 {
+		t.Fatalf("cancelling kept the return screen %d", model.computers.refreshReturn)
+	}
+	model.screen = dashboardComputersArea
+	opened, command := model.openComputerTask("h")
+	updated, _ = opened.Update(command())
+	if screen := updated.(dashboardModel).screen; screen != dashboardHosts {
+		t.Fatalf("Computer inventory opened screen %d, want %d", screen, dashboardHosts)
+	}
+}

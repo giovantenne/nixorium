@@ -48,6 +48,11 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			}
 			return model, nil
 		}
+		if paste, pasted := message.(tea.PasteMsg); pasted && !model.navigation.helpOpen {
+			if next, command, handled := model.pasteIntoInput(paste); handled {
+				return next, command
+			}
+		}
 		if model.screen == dashboardHome {
 			model.ensureHomeMenu()
 			model.homeMenu, _ = model.homeMenu.update(message)
@@ -110,10 +115,12 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	if next, command, handled := model.updateInterfaceReloadKey(key); handled {
 		return next, command
 	}
-	if model.screen == dashboardAssistant {
+	// Ctrl+C closes Nixorium here as on every other screen, except where the
+	// Assistant uses it to stop its own running request or step.
+	if model.screen == dashboardAssistant && (key.String() != "ctrl+c" || model.assistantUsesCtrlC()) {
 		return model.updateAssistantKey(key)
 	}
-	if model.screen == dashboardAssistantReview && model.read.cancel == nil {
+	if model.screen == dashboardAssistantReview && model.read.cancel == nil && key.String() != "ctrl+c" {
 		return model.updateAssistantReviewKey(key)
 	}
 	if model.read.cancel == nil && model.screen == dashboardWorkspace && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
@@ -173,14 +180,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		case "enter":
 			model.computers.hostSearching = false
 		case "backspace":
-			value := []rune(model.computers.hostQuery)
-			if len(value) > 0 {
-				model.computers.hostQuery = string(value[:len(value)-1])
-			}
+			model.computers.hostQuery = dropLastRune(model.computers.hostQuery)
 		default:
-			if key.Text != "" && len(model.computers.hostQuery) < 128 {
-				model.computers.hostQuery += key.Text
-			}
+			model.computers.hostQuery = appendInputText(model.computers.hostQuery, key.Text, hostSearchLimit)
 		}
 		model.computers.hostCursor = 0
 		return model, nil
@@ -262,8 +264,11 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		switch key.String() {
 		case "esc", "left":
 			model.screen = dashboardHome
-		case "tab", "down", "up":
+		case "tab", "down":
 			model.jobs.cursor = (model.jobs.cursor + 1) % max(1, len(model.jobs.items))
+		case "up":
+			count := max(1, len(model.jobs.items))
+			model.jobs.cursor = (model.jobs.cursor + count - 1) % count
 		}
 		return model, nil
 	}

@@ -101,6 +101,12 @@ func (model dashboardModel) handleNetworkChangeMessage(message tea.Msg) (dashboa
 	return model, nil, false
 }
 
+// networkChangeEditing reports whether the address field accepts typing.
+func (model dashboardModel) networkChangeEditing() bool {
+	change := model.networkChange
+	return model.busy == "" && change.result.Operation == "" && !change.reviewing && !change.status.InProgress()
+}
+
 func (model dashboardModel) updateNetworkChange(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	change := &model.networkChange
 	if model.busy != "" {
@@ -148,9 +154,7 @@ func (model dashboardModel) updateNetworkChange(key tea.KeyPressMsg) (tea.Model,
 		}
 		change.input += "r"
 	case "backspace":
-		if value := []rune(change.input); len(value) > 0 {
-			change.input = string(value[:len(value)-1])
-		}
+		change.input = dropLastRune(change.input)
 	case "enter":
 		if !change.loaded || status.HasErrors() {
 			return model, nil
@@ -158,8 +162,8 @@ func (model dashboardModel) updateNetworkChange(key tea.KeyPressMsg) (tea.Model,
 		change.acknowledge = false
 		return model.planNetworkChange(domain.NetworkMigrationStart)
 	default:
-		if text := key.Text; len(text) == 1 && strings.ContainsAny(text, "0123456789./") && len(change.input) < 18 {
-			change.input += text
+		if text := key.Text; len(text) == 1 && strings.ContainsAny(text, "0123456789./") {
+			change.input = appendInputText(change.input, text, networkInputMax)
 		}
 	}
 	return model, nil

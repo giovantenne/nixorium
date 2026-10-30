@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 	"time"
-	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -269,10 +268,7 @@ func (model dashboardModel) updateSetupKeysKey(key tea.KeyPressMsg) (tea.Model, 
 			model.keys.path = ""
 			model.message = "Import cancelled; no key was changed."
 		case "backspace":
-			value := []rune(model.keys.path)
-			if len(value) > 0 {
-				model.keys.path = string(value[:len(value)-1])
-			}
+			model.keys.path = dropLastRune(model.keys.path)
 		case "enter":
 			if strings.TrimSpace(model.keys.path) == "" {
 				model.message = "Enter the path to an existing private key."
@@ -293,13 +289,7 @@ func (model dashboardModel) updateSetupKeysKey(key tea.KeyPressMsg) (tea.Model, 
 				return dashboardSetupKeyImportMsg{report: report, err: err, keys: model.actions.LoadSetupKeys(ctx)}
 			}
 		default:
-			if key.Text != "" && len(model.keys.path) < 4096 {
-				for _, character := range key.Text {
-					if unicode.IsPrint(character) && !unicode.In(character, unicode.Cf) {
-						model.keys.path += string(character)
-					}
-				}
-			}
+			model.keys.path = appendInputText(model.keys.path, key.Text, setupKeyPathMax)
 		}
 		return model, nil
 	}

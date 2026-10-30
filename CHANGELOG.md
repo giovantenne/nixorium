@@ -66,6 +66,27 @@ The project follows [Semantic Versioning](https://semver.org/).
   lists Windows on another disk in its first boot menu. Before, the boot
   loader was set up without the disk information os-prober needs, and Windows
   appeared only after the first update.
+- In the administrator interface, the file path in **Send files** now accepts
+  the letters `q` and `?` instead of closing Nixorium or opening help, and
+  pasting text works in that field, in the computer and software searches, in
+  the key import path and in the network address.
+- Background work from the Overview keeps being checked every two seconds after
+  you leave and return to it, so a finished job no longer shows as running and
+  no longer blocks Apply to controller. In Background work, the Up key moves up.
+- Cancelling a computer check no longer sends the next Computer inventory back
+  to the screen you left. Ctrl+C now closes Nixorium in the Assistant chat and
+  review, as on the other screens (while a request runs it still stops that
+  request first).
+- The Assistant review of a proposal that does not evaluate opens on "Technical
+  details" instead of a disabled save, explains on the main screen that saving
+  is not available and what to do next, and Enter on a disabled choice says why.
+- Reviews say what they change: Update computers lists the computers it affects
+  (or "all N computers") instead of the internal selector `@lab`; the restart
+  review says "will restart" for computers in use; Update system and packages
+  labels the line "NixOS base", uses an arrow and says "unchanged" when the
+  channel does not change. The help for the update review no longer mentions a
+  DEPLOY confirmation: Enter confirms. The demonstration of an interrupted
+  background job now shows it as interrupted.
 
 ## [3.11.0] - 2026-10-28
 

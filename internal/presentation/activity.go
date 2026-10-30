@@ -98,6 +98,9 @@ func (model dashboardModel) finishRead(message activityResultMsg) (tea.Model, te
 
 func (model dashboardModel) cancelActivity() dashboardModel {
 	model.controller.fromSave, model.controller.autoApply = false, false
+	// A computer check that was cancelled must not send the next, unrelated
+	// check back to the selection list that asked for this one.
+	model.computers.refreshReturn = 0
 	model.screen = model.read.returnScreen
 	model.read.cancelRead()
 	model.inventory.cancelRead()

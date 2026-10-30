@@ -511,6 +511,8 @@ Computers affected
 pc01–pc02
 
 ✗ The configuration is not valid
+Saving is not available: the proposal does not evaluate. Return to the chat and ask the assistant to fix it.
+Technical details show the error.
 Saving creates a local commit and a backup. Enter on the first choice also updates this controller; you then
 choose the computers.
   Save and update the controller
@@ -1301,7 +1303,7 @@ Nixorium  /  Maintenance  /  Update system and packages  /  Review
 
 Review update
 Builds passed; programs are checked when they run on a computer.
-Nixorium: nixos-26.05 -> nixos-26.05
+NixOS base: nixos-26.05 (unchanged)
 Applications whose version changes:
   Extension example.extension: 1.0 -> 2.0
   Package nodejs: not selected -> 24.0
@@ -1580,11 +1582,10 @@ Nixorium  /  Overview  /  Background work
 Managed background work
 Read-only attachment. Leaving this view does not stop the job.
 
-Controller configuration — running
-Managed work is still running; viewing it does not start another operation.
+Controller configuration — interrupted
+Progress was left running, but no managed unit is running. Inspect the journal before a fresh review.
 
-● Building system · Running
-1/4 steps complete
+Last recorded phase: build
 Building the reviewed controller system
 
 Journal unit: nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service

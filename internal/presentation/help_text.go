@@ -92,7 +92,7 @@ var screenHelp = map[dashboardScreen]helpText{
 		"Space select clients; a select all; Tab choose block or unblock; Enter review.", "r checks Internet access on all clients (read-only); n selects those the chosen action would change.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.",
 	}},
 	dashboardDeployReview: helpText{head: []string{
-		"The availability shown is a brief SSH-port check, not authenticated identity or proof of power state.", "A failed or interrupted update may require recovery before another operation.", "F3, when some computers did not answer, chooses whether they update automatically when switched on (Computers → Queued updates) or are skipped.", "F2, when offered, creates a new review for only the reachable computers with an open SSH port.", "The new review requires a fresh DEPLOY confirmation; it never starts automatically.", "Esc during replanning keeps the original review and clears its confirmation.",
+		"The availability shown is a brief SSH-port check, not authenticated identity or proof of power state.", "A failed or interrupted update may require recovery before another operation.", "F3, when some computers did not answer, chooses whether they update automatically when switched on (Computers → Queued updates) or are skipped.", "F2, when offered, creates a new review for only the reachable computers with an open SSH port.", "The new review needs its own Enter to confirm; it never starts automatically.", "Esc during replanning keeps the original review and clears its confirmation.",
 	}},
 	dashboardShutdown:       shutdownHelp,
 	dashboardShutdownReview: shutdownHelp,
