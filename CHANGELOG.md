@@ -23,6 +23,10 @@ older, first follow the notes of those releases.
 
 ### Fixed
 
+- Send files no longer refuses with "other files are being prepared" for half
+  an hour after three reviews that were not confirmed (or three uses of
+  `nixorium send` from the command line): a new sending takes the place of the
+  files unused the longest.
 - Changing the laboratory network: confirming a step now checks the
   computers again before saving. Before, a computer restarted into its
   previous address after the review of "finish" could be left without the

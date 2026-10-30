@@ -70,7 +70,17 @@ func TestShareStoreLimitsAndExpiry(t *testing.T) {
 		ids = append(ids, id)
 	}
 	if _, err := store.Begin(entries); err == nil {
-		t.Fatal("more transfers than allowed")
+		t.Fatal("more transfers than allowed while all are being written")
+	}
+	// Two minutes later nobody confirmed them: a new sending frees the place
+	// of the oldest, the others stay.
+	started := time.Now()
+	store.now = func() time.Time { return started.Add(2 * time.Minute) }
+	if _, err := store.Begin(entries); err != nil {
+		t.Fatalf("an unconfirmed transfer blocked a new sending: %v", err)
+	}
+	if len(store.transfers) != shareTransfers {
+		t.Fatalf("transfers = %d", len(store.transfers))
 	}
 	store.now = func() time.Time { return time.Now().Add(shareIdle + time.Minute) }
 	if _, err := store.Begin(entries); err != nil {

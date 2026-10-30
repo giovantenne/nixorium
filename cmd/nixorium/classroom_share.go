@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -99,7 +100,7 @@ func uploadFile(ctx context.Context, transfer string, index int, name string, si
 func planShare(ctx context.Context, requested, item string) domain.SharePlan {
 	transfer, err := prepareShare(ctx, item)
 	if err != nil {
-		return shareFailure(err.Error() + ".")
+		return shareFailure(strings.TrimSuffix(err.Error(), ".") + ".")
 	}
 	response, err := classroomCall(ctx, domain.ClassroomSharePlanOperation, func(request *domain.ClassroomRequest) {
 		request.Requested, request.ShareTransfer = requested, transfer
