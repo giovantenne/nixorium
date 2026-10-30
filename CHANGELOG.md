@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.12.0] - 2026-10-30
+
 From 3.11.0, Update Nixorium, then Apply to controller and Update computers as
 usual; the deployment migrations below run during the update. From 3.10.0 or
 older, first follow the notes of those releases.
