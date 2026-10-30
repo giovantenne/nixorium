@@ -19,6 +19,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Stopping Update computers, or reaching its time limit, no longer marks the
+  computers still waiting for their turn as "activation result unknown". They
+  keep their current system and are listed as not updated, so the update does
+  not need a reviewed recovery for computers it never touched.
 - Security: the controller and the computers write editor, browser, bookmark
   and screen-layout defaults into the administrator's and teacher's homes as
   those users, not as root. Before, a teacher could leave a link in their own

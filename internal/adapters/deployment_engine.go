@@ -326,7 +326,12 @@ func applyClientSystem(ctx context.Context, target domain.DeploymentTarget, addr
 		return outcome
 	}
 
-	copySlots <- struct{}{}
+	select {
+	case copySlots <- struct{}{}:
+	case <-ctx.Done():
+		outcome.detail = "cancelled before the copy"
+		return outcome
+	}
 	say("copying the system to %s", address)
 	err := copyClientClosure(ctx, address, system, &prefixedWriter{prefix: "[" + target.Name + "] ", writer: log})
 	<-copySlots
@@ -354,8 +359,21 @@ func applyClientSystem(ctx context.Context, target domain.DeploymentTarget, addr
 		}
 	}
 
-	activationSlots <- struct{}{}
+	// A cancelled or timed-out update starts no further activation: the
+	// computers still waiting for a slot keep their system, recorded as planned.
+	select {
+	case activationSlots <- struct{}{}:
+	case <-ctx.Done():
+		say("the update was stopped before this computer's activation; it keeps its current system")
+		outcome.detail = "stopped before activation"
+		return outcome
+	}
 	defer func() { <-activationSlots }()
+	if ctx.Err() != nil {
+		say("the update was stopped before this computer's activation; it keeps its current system")
+		outcome.detail = "stopped before activation"
+		return outcome
+	}
 	// From here the computer's system profile may change: say so durably
 	// before asking it to activate.
 	if err := record.update(target.Name, func(activation *domain.PendingActivation) {
@@ -382,6 +400,9 @@ func applyClientSystem(ctx context.Context, target domain.DeploymentTarget, addr
 		// systemd-run failed and the computer shows neither a unit nor a
 		// result for this activation: nothing was started.
 		return notStarted(fmt.Sprintf("the activation could not start: %v", startErr), "activation could not start")
+	case errors.Is(startErr, errClientCommandNotStarted):
+		// ssh itself never ran (the update was stopped at that moment).
+		return notStarted(fmt.Sprintf("the start request was never sent (%v); nothing was started", startErr), "activation not started")
 	case status == 255 && sshNeverConnected(startErr):
 		// The connection failed before authentication: nothing ran.
 		return notStarted(fmt.Sprintf("the computer did not accept the connection (%v); nothing was started", startErr), "computer not reachable")
@@ -448,6 +469,10 @@ func copyClientClosure(ctx context.Context, address, system string, log io.Write
 	return nil
 }
 
+// errClientCommandNotStarted marks an SSH command that never ran on the
+// computer: ssh could not start, or the update was stopped before it did.
+var errClientCommandNotStarted = errors.New("the command was not started")
+
 // runClientCommand runs one fixed command on the computer and returns the
 // remote exit status (255 when SSH itself failed, -1 when nothing ran).
 func runClientCommand(ctx context.Context, address, remote string) (int, error) {
@@ -478,6 +503,9 @@ func runClientSSH(ctx context.Context, address, remote string) (string, int, err
 				message = err.Error()
 			}
 			return stdout.buffer.String(), exit.ExitCode(), errors.New(message)
+		}
+		if command.Process == nil {
+			return "", -1, fmt.Errorf("%w: %v", errClientCommandNotStarted, err)
 		}
 		return stdout.buffer.String(), -1, err
 	}
