@@ -19,6 +19,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A schedule set for a time that does not exist on the night the clocks go
+  forward (for example 02:30) now runs in the first minute after the jump and
+  appears in the history, instead of being skipped for that day. On the night
+  the clocks go back, a time in the repeated hour still runs once.
 - Stopping or recovering the network installation no longer says the normal
   controller address is restored when the laboratory settings could not be
   read to check it. It now says the address could not be verified and asks
