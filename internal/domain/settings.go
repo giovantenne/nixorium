@@ -22,7 +22,16 @@ const (
 var (
 	interfaceNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}$`)
 	userNamePattern      = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,30}$`)
-	passwordHashPattern  = regexp.MustCompile(`^\$6\$[^$]+\$[^$]+$`)
+	// SHA-512 crypt as mkpasswd -m sha-512 prints it: $6$salt$hash, with an
+	// optional rounds=N field before the salt. Salt and hash use the crypt
+	// alphabet only, so a space or a newline can never hide in a stored hash.
+	passwordHashPattern = regexp.MustCompile(`^\$6\$(rounds=[0-9]+\$)?[./0-9A-Za-z]+\$[./0-9A-Za-z]+$`)
+	// The shape of a time zone and of a locale. A typo reaches the controller
+	// build only at apply time, so the shape is checked here and in
+	// lib/eval-lab-config.nix. Both stay shape checks: neither side carries
+	// a list of zones or locales.
+	timeZonePattern = regexp.MustCompile(`^(UTC|[A-Za-z_]+(/[A-Za-z0-9_+-]+){1,2})$`)
+	localePattern   = regexp.MustCompile(`^([a-z]{2,3}_[A-Z]{2}(@[a-z]+)?|C)\.UTF-8$`)
 	// Git identities and the keyboard layout reach shell scripts and
 	// configuration files. lib/eval-lab-config.nix holds the same rules.
 	gitEmailPattern       = regexp.MustCompile(`^[^\x00-\x20\x7f@]+@[^\x00-\x20\x7f@]+$`)
@@ -344,12 +353,26 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 			add(email.field, "must look like name@domain, without spaces or control characters, and be at most 256 bytes")
 		}
 	}
+	if strings.TrimSpace(lab.TimeZone) != "" && !timeZonePattern.MatchString(lab.TimeZone) {
+		add("lab.timeZone", "must be UTC or a zone such as Europe/Rome or America/New_York")
+	}
+	for _, locale := range []struct {
+		field string
+		value string
+	}{
+		{"lab.defaultLocale", lab.DefaultLocale},
+		{"lab.extraLocale", lab.ExtraLocale},
+	} {
+		if strings.TrimSpace(locale.value) != "" && !localePattern.MatchString(locale.value) {
+			add(locale.field, "must be a UTF-8 locale such as en_US.UTF-8 or it_IT.UTF-8")
+		}
+	}
 	if strings.TrimSpace(lab.KeyboardLayout) != "" && (len(lab.KeyboardLayout) > maxKeyboardLayoutBytes || !keyboardLayoutPattern.MatchString(lab.KeyboardLayout)) {
 		add("lab.keyboardLayout", "must be an XKB layout name: letters, digits and _ - + , ( ) only, at most 128 bytes")
 	}
-	validHosts := map[string]bool{fmt.Sprintf("pc%02d", lab.MasterHostNumber): true}
+	validHosts := map[string]bool{HostName(lab.MasterHostNumber): true}
 	for number := 1; number <= lab.PCCount; number++ {
-		validHosts[fmt.Sprintf("pc%02d", number)] = true
+		validHosts[HostName(number)] = true
 	}
 	for host, interfaceName := range lab.HostInterfaceNames {
 		if !validHosts[host] {

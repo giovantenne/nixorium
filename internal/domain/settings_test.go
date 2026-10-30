@@ -128,6 +128,7 @@ func TestSharedLabSettingsValidationCases(t *testing.T) {
 	}
 	type validationCases struct {
 		Invalid []validationCase `json:"invalid"`
+		Valid   []validationCase `json:"valid"`
 	}
 
 	data, err := os.ReadFile("../../tests/lab-settings-validation-cases.json")
@@ -142,29 +143,45 @@ func TestSharedLabSettingsValidationCases(t *testing.T) {
 		t.Fatal("shared validation corpus has no invalid cases")
 	}
 
+	if len(cases.Valid) == 0 {
+		t.Fatal("shared validation corpus has no valid cases")
+	}
+
+	decode := func(t *testing.T, overrides map[string]any) []ValidationIssue {
+		t.Helper()
+		base, err := json.Marshal(validSettings())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var candidate map[string]any
+		if err := json.Unmarshal(base, &candidate); err != nil {
+			t.Fatal(err)
+		}
+		lab, ok := candidate["lab"].(map[string]any)
+		if !ok {
+			t.Fatal("valid settings did not encode a lab object")
+		}
+		for field, value := range overrides {
+			lab[field] = value
+		}
+		candidateData, err := json.Marshal(candidate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, issues := DecodeLabSettings(candidateData)
+		return issues
+	}
 	for _, testCase := range cases.Invalid {
-		t.Run(testCase.Name, func(t *testing.T) {
-			base, err := json.Marshal(validSettings())
-			if err != nil {
-				t.Fatal(err)
+		t.Run("invalid/"+testCase.Name, func(t *testing.T) {
+			if issues := decode(t, testCase.Overrides); len(issues) == 0 {
+				t.Fatalf("shared invalid case was accepted: %v", testCase.Overrides)
 			}
-			var candidate map[string]any
-			if err := json.Unmarshal(base, &candidate); err != nil {
-				t.Fatal(err)
-			}
-			lab, ok := candidate["lab"].(map[string]any)
-			if !ok {
-				t.Fatal("valid settings did not encode a lab object")
-			}
-			for field, value := range testCase.Overrides {
-				lab[field] = value
-			}
-			candidateData, err := json.Marshal(candidate)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, issues := DecodeLabSettings(candidateData); len(issues) == 0 {
-				t.Fatalf("shared invalid case was accepted: %s", candidateData)
+		})
+	}
+	for _, testCase := range cases.Valid {
+		t.Run("valid/"+testCase.Name, func(t *testing.T) {
+			if issues := decode(t, testCase.Overrides); len(issues) != 0 {
+				t.Fatalf("shared valid case was refused: %v: %+v", testCase.Overrides, issues)
 			}
 		})
 	}

@@ -19,6 +19,18 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Computers numbered 100 and above (pc100 to pc254) are now accepted
+  everywhere a computer name is checked. Before, a laboratory with more than
+  99 computers could not review a changed SSH host key (one three-digit name
+  made every review refuse), start a USB installation for them, or run the
+  installer scripts for them. One rule now decides which names are valid
+  (pc01 to pc254), and the network interface name is limited to the 15
+  characters Linux allows in the USB installation too.
+- The time zone and the two locales in lab-settings.json are now checked when
+  you plan or save: a typo such as `Rome` or `italian` is refused with a
+  message, instead of failing hours later when the controller applies the
+  change. Password hashes must use the characters a real hash has, so a hash
+  with a space or a line break inside is refused.
 - Security: the controller and the computers write editor, browser, bookmark
   and screen-layout defaults into the administrator's and teacher's homes as
   those users, not as root. Before, a teacher could leave a link in their own
