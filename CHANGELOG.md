@@ -46,6 +46,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   collected, or a busy refusal no longer turns off the shared clipboard and
   the "controlled" notice on the student's screen. Only the end of the control
   does.
+- A student computer whose screen manager is slow to answer is no longer
+  shown to the teacher as "agent stopped" when the teacher opens the
+  classroom view: the computer answers the first greeting in time and is
+  reported as unlocked until the screen manager replies.
 
 ## [3.11.0] - 2026-10-28
 

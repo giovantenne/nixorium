@@ -254,6 +254,27 @@ func currentUserName() string {
 }
 
 // handle answers one connection until the peer closes it or misbehaves.
+// helloLockedWait is how long the hello reply waits for the extension to say
+// whether the computer is locked. The relay gives the whole hello helloTimeout
+// (3 s), and the extension may take lockTimeout (3 s) to answer, so the hello
+// must stop waiting sooner or a slow gnome-shell would make a healthy agent
+// look stopped. An extension that has not answered counts as not locked, as
+// it does when it is absent.
+var helloLockedWait = time.Second
+
+func lockedForHello(lock locker) bool {
+	answer := make(chan bool, 1)
+	go func() { answer <- lock.Locked() }()
+	timer := time.NewTimer(helloLockedWait)
+	defer timer.Stop()
+	select {
+	case locked := <-answer:
+		return locked
+	case <-timer.C:
+		return false
+	}
+}
+
 // replyWriteTimeout bounds one reply to a peer that stopped reading.
 var replyWriteTimeout = 30 * time.Second
 
@@ -305,7 +326,7 @@ func handle(connection net.Conn, agent agentContext) {
 				_ = send(classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported, Detail: fmt.Sprintf("protocol version %d is not supported", message.Version)})
 				return
 			}
-			if err := send(classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName, Locked: lock.Locked()}); err != nil {
+			if err := send(classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName, Locked: lockedForHello(lock)}); err != nil {
 				return
 			}
 		case classroomview.TypeThumbnailRequest:

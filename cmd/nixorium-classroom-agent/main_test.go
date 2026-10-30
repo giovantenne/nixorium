@@ -803,3 +803,38 @@ func TestBusCallsGiveUpOnAStalledCompositor(t *testing.T) {
 		t.Fatal("a stalled call was not bounded")
 	}
 }
+
+// slowLocker answers Locked only after release is closed.
+type slowLocker struct {
+	fakeLocker
+	release chan struct{}
+}
+
+func (locker *slowLocker) Locked() bool {
+	<-locker.release
+	return true
+}
+
+func TestHelloDoesNotWaitLongerThanTheRelayAllows(t *testing.T) {
+	previous := helloLockedWait
+	helloLockedWait = 50 * time.Millisecond
+	defer func() { helloLockedWait = previous }()
+	slow := &slowLocker{release: make(chan struct{})}
+	started := time.Now()
+	if lockedForHello(slow) {
+		t.Fatal("an extension that did not answer counted as locked")
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("the hello waited for a slow extension")
+	}
+	close(slow.release)
+	if !lockedForHello(&fakeLocker{locked: true}) {
+		t.Fatal("a prompt answer was ignored")
+	}
+}
+
+func TestHelloWaitIsShorterThanTheRelaysHelloTimeout(t *testing.T) {
+	if helloLockedWait >= helloTimeout {
+		t.Fatalf("hello waits %v for the lock state but the relay allows %v", helloLockedWait, helloTimeout)
+	}
+}
