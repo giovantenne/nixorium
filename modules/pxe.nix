@@ -228,7 +228,7 @@ let
           || fail "managed PXE preparation contains no client closures"
         for row in "''${client_rows[@]}"; do
           IFS=$'\t' read -r name store_path <<<"$row"
-          [[ "$name" =~ ^pc[0-9]+$ && "$store_path" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ && -d "$store_path" ]] \
+          [[ "$name" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ && "$store_path" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ && -d "$store_path" ]] \
             || fail "managed PXE preparation contains an invalid client closure"
         done
         PREPARATION_REVISION="$revision"

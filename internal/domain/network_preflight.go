@@ -103,7 +103,7 @@ func WirelessInterfaceName(name string) bool {
 // ControllerInterfaceFor resolves the controller's laboratory device in the
 // same order as mkLab: per-computer override, controller name, fallback.
 func ControllerInterfaceFor(lab LabSettings) string {
-	if name := lab.HostInterfaceNames[fmt.Sprintf("pc%02d", lab.MasterHostNumber)]; name != "" {
+	if name := lab.HostInterfaceNames[HostName(lab.MasterHostNumber)]; name != "" {
 		return name
 	}
 	return lab.ControllerInterface()
@@ -134,7 +134,7 @@ func NetworkPreflightNeeds(base, candidate LabSettingsFile) (controller bool, cl
 		return controller, nil
 	}
 	for number := 1; number <= min(base.Lab.PCCount, candidate.Lab.PCCount); number++ {
-		name := fmt.Sprintf("pc%02d", number)
+		name := HostName(number)
 		after, explicit := ClientInterfaceFor(candidate.Lab, name)
 		before, wasExplicit := ClientInterfaceFor(base.Lab, name)
 		if !explicit || (wasExplicit && before == after) {

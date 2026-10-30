@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -56,8 +55,6 @@ var (
 	clientActivationStartGrace = 30 * time.Second
 )
 
-var clientHostName = regexp.MustCompile(`^pc[0-9]{1,4}$`)
-
 // clientBuildSource prepares the reviewed source of a build; tests replace it.
 var clientBuildSource = func(ctx context.Context, repository, revision string) (string, error) {
 	return (Local{}).EvaluationSource(ctx, repository, revision)
@@ -87,7 +84,7 @@ func buildClientSystems(ctx context.Context, plan domain.DeploymentPlanReport, o
 	builds := []*build{}
 	byKey := map[string]*build{}
 	for _, target := range plan.Targets {
-		if !clientHostName.MatchString(target.Name) {
+		if !domain.ValidHostName(target.Name) {
 			return fmt.Errorf("invalid computer name %q", target.Name)
 		}
 		if !domain.ValidClientClass(target.Name, target.Class) {

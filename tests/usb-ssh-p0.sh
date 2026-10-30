@@ -56,7 +56,7 @@ case "${1:-}" in
     expected_system=$5
     require_regular_file "$key"
     require_regular_file "$known_hosts"
-    [[ "$port" =~ ^[0-9]+$ && "$expected_system" =~ ^/nix/store/[0-9a-z]{32}-nixos-system-pc[0-9]{2}- ]] || {
+    [[ "$port" =~ ^[0-9]+$ && "$expected_system" =~ ^/nix/store/[0-9a-z]{32}-nixos-system-pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])- ]] || {
       echo "invalid postboot argument" >&2
       exit 2
     }
@@ -70,7 +70,7 @@ case "${1:-}" in
       -o ControlMaster=no root@127.0.0.1 \
       'printf "%s\n" "$(hostname)" "$(readlink -f /run/current-system)" "$(nixos-version --configuration-revision)"')
     mapfile -t lines <<<"$output"
-    [[ ${lines[0]} =~ ^pc[0-9]{2}$ ]]
+    [[ ${lines[0]} =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ ]]
     [[ ${lines[1]} == "$expected_system" ]]
     [[ ${lines[2]} == "$EXPECTED_REVISION" ]]
     echo "strict post-boot identity verified"

@@ -73,7 +73,7 @@ build_pxe_outputs() {
   BATCH_SIZE=$((10#$BATCH_SIZE))
   ((${#CLIENT_NAMES[@]} > 0)) || fail "labMeta contains no client hosts"
   for NAME in "${CLIENT_NAMES[@]}"; do
-    [[ "$NAME" =~ ^pc[0-9]+$ ]] || fail "labMeta contains invalid client name"
+    [[ "$NAME" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ ]] || fail "labMeta contains invalid client name"
   done
   DECLARED_NAMES="$(printf '%s\n' "${CLIENT_NAMES[@]}" | jq -Rn '[inputs]')"
   # Computers of a class share one system (ADR 0033): the caller may set

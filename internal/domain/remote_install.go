@@ -327,8 +327,6 @@ func RemoteInstallDiskCompleted(session RemoteInstallSession) bool {
 var (
 	remoteOperationIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 	remoteBootIDPattern      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	remoteHostPattern        = regexp.MustCompile(`^pc[0-9]{2}$`)
-	remoteInterfacePattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$`)
 	remoteDevicePattern      = regexp.MustCompile(`^/dev/[A-Za-z0-9_.+-]+$`)
 	remoteKNamePattern       = regexp.MustCompile(`^[A-Za-z0-9_.+-]+$`)
 	remoteMajorMinorPattern  = regexp.MustCompile(`^[0-9]+:[0-9]+$`)
@@ -488,7 +486,7 @@ func ValidateRemoteInstallArtifacts(artifacts RemoteInstallArtifacts) error {
 	if artifacts.BundleClosureBytes == 0 || artifacts.SystemClosureBytes == 0 || artifacts.PreparedAt.IsZero() {
 		return errors.New("remote installation artifact measurements are incomplete")
 	}
-	if !remoteHostPattern.MatchString(artifacts.HostName) || !remoteInterfacePattern.MatchString(artifacts.HostInterface) || validateRemoteIPv4(artifacts.HostStaticIP) != nil {
+	if !ValidHostName(artifacts.HostName) || !interfaceNamePattern.MatchString(artifacts.HostInterface) || validateRemoteIPv4(artifacts.HostStaticIP) != nil {
 		return errors.New("remote installation artifact host is invalid")
 	}
 	if !remoteCacheKeyPattern.MatchString(artifacts.CachePublicKey) || !remotePublicKeyPattern.MatchString(artifacts.AdminPublicKey) {
@@ -515,7 +513,7 @@ func ValidateRemoteMachineFacts(facts RemoteMachineFacts) error {
 	}
 	interfaceNames := map[string]bool{}
 	for _, networkInterface := range facts.Interfaces {
-		if !remoteInterfacePattern.MatchString(networkInterface.Name) || interfaceNames[networkInterface.Name] || len(networkInterface.Addresses) > 64 {
+		if !interfaceNamePattern.MatchString(networkInterface.Name) || interfaceNames[networkInterface.Name] || len(networkInterface.Addresses) > 64 {
 			return errors.New("remote machine interface inventory is invalid")
 		}
 		interfaceNames[networkInterface.Name] = true
@@ -697,7 +695,7 @@ func consumeRemoteJSONValue(decoder *json.Decoder) error {
 }
 
 func validateRemoteHost(host RemoteInstallHost) error {
-	if !remoteHostPattern.MatchString(host.Name) || !remoteInterfacePattern.MatchString(host.Interface) || !ValidClientClass(host.Name, host.Class) {
+	if !ValidHostName(host.Name) || !interfaceNamePattern.MatchString(host.Interface) || !ValidClientClass(host.Name, host.Class) {
 		return errors.New("remote installation host identity is invalid")
 	}
 	if err := validateRemoteIPv4(host.LiveIP); err != nil {
@@ -789,8 +787,4 @@ func validateRemoteDiskIdentity(disk RemoteDisk) error {
 
 func ValidRemoteFingerprint(value string) bool {
 	return remoteFingerprintPattern.MatchString(value)
-}
-
-func ValidRemoteHostName(value string) bool {
-	return remoteHostPattern.MatchString(value)
 }

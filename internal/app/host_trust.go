@@ -149,14 +149,14 @@ func (m HostTrustManager) Reviewed(fresh domain.HostTrustPlan, token string) (do
 // A changed key is never evidence of inventory identity. Reject ambiguous
 // inventories before connecting, including an address shared with the controller.
 func hostTrustClient(meta domain.LabMeta, name string) (domain.HostMeta, bool) {
-	if !domain.ValidRemoteHostName(meta.Controller.Name) || !domain.ValidRemoteHostName(name) || name == meta.Controller.Name {
+	if !domain.ValidHostName(meta.Controller.Name) || !domain.ValidHostName(name) || name == meta.Controller.Name {
 		return domain.HostMeta{}, false
 	}
 	names, addresses := map[string]bool{}, map[string]bool{}
 	var selected domain.HostMeta
 	for _, host := range meta.Clients.Hosts {
 		address, err := netip.ParseAddr(host.IP)
-		if !domain.ValidRemoteHostName(host.Name) || host.Name == meta.Controller.Name ||
+		if !domain.ValidHostName(host.Name) || host.Name == meta.Controller.Name ||
 			err != nil || !address.Is4() || address.IsUnspecified() || address.IsMulticast() || address.IsLoopback() || address.IsLinkLocalUnicast() ||
 			address.String() != host.IP || host.IP == meta.Controller.StaticIP || host.IP == meta.Controller.DHCPIP ||
 			names[host.Name] || addresses[host.IP] {
