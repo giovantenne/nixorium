@@ -235,12 +235,12 @@ func TestHostTrustReviewSurvivesExpiryGridUntilItExpires(t *testing.T) {
 			now := created
 			m.now = func() time.Time { return now }
 			p := m.Plan(context.Background(), "/deployment", "pc01")
-			if p.HasErrors() || p.ExpiresAt.Sub(created) < 4*time.Minute {
+			if p.HasErrors() || p.ExpiresAt.Sub(created) < 5*time.Minute {
 				t.Fatalf("review too short: %+v", p)
 			}
 			now = created.Add(delay)
-			rebuilt, matched := m.Reviewed(m.Plan(context.Background(), "/deployment", "pc01"), p.ReviewToken)
-			if !matched || rebuilt.ReviewToken != p.ReviewToken || !rebuilt.ExpiresAt.Equal(p.ExpiresAt) {
+			rebuilt, match := m.Reviewed(m.Plan(context.Background(), "/deployment", "pc01"), p.ReviewToken)
+			if match != ReviewMatched || rebuilt.ReviewToken != p.ReviewToken || !rebuilt.ExpiresAt.Equal(p.ExpiresAt) {
 				t.Fatalf("CLI could not rebuild a valid review after %s: %+v", delay, rebuilt)
 			}
 			if r := m.Apply(context.Background(), rebuilt, p.ReviewToken); r.HasErrors() || f.writes != 1 {
@@ -259,8 +259,8 @@ func TestHostTrustReviewSurvivesExpiryGridUntilItExpires(t *testing.T) {
 		m.now = func() time.Time { return now }
 		p := m.Plan(context.Background(), "/deployment", "pc01")
 		now = p.ExpiresAt
-		if _, matched := m.Reviewed(m.Plan(context.Background(), "/deployment", "pc01"), p.ReviewToken); matched {
-			t.Fatal("expired review matched a rebuilt one")
+		if _, match := m.Reviewed(m.Plan(context.Background(), "/deployment", "pc01"), p.ReviewToken); match != ReviewExpired {
+			t.Fatalf("expired review reported as %v", match)
 		}
 		p.ExpiresAt = now.Add(time.Hour)
 		if r := m.Apply(context.Background(), p, p.ReviewToken); !r.HasErrors() || f.writes != 0 {

@@ -11,6 +11,9 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// collectReviewLifetime is how long a confirmed collect review stays valid at least.
+const collectReviewLifetime = 10 * time.Minute
+
 // CollectContent keeps collected files on the controller until whoever
 // asked copies them into a folder of their own.
 type CollectContent interface {
@@ -91,9 +94,8 @@ func (m *CollectManager) Plan(ctx context.Context, repository, requested, destin
 		return fail("No selected computer has someone signed in with the classroom view. Check that the computers are on and updated.")
 	}
 	p.State = "ready"
-	// Between 5 and 10 minutes: a review made at the end of a block must not
-	// expire seconds later.
-	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(10 * time.Minute)
+	// The expiry sits on the shared review grid so Reviewed can rebuild it.
+	p.ExpiresAt = reviewExpiry(m.now(), collectReviewLifetime)
 	p.Message = fmt.Sprintf("The desktop files of %d of %d computers are copied to %s, one folder per computer. Hidden files and links are left out; nothing changes on the students' computers.", eligible, len(p.Targets), destination)
 	p.ReviewToken = domain.CollectReviewToken(p)
 	return p
@@ -312,4 +314,19 @@ func collectDescription(files int, bytes int64, skipped int) string {
 		text += fmt.Sprintf(" %d items with unusual names are left out.", skipped)
 	}
 	return text
+}
+
+// ReviewedCollect tells whether token confirms a review of the plan fresh, a
+// plan built at now. A match returns fresh carrying that review's expiry and
+// token, so an apply in a later process, or in a later grid step, still
+// matches until the review expires.
+func ReviewedCollect(now time.Time, fresh domain.CollectPlan, token string) (domain.CollectPlan, ReviewMatch) {
+	if fresh.HasErrors() {
+		return fresh, ReviewChanged
+	}
+	return matchReview(now, collectReviewLifetime, fresh, token, func(p domain.CollectPlan, expiry time.Time) domain.CollectPlan {
+		p.ExpiresAt = expiry
+		p.ReviewToken = domain.CollectReviewToken(p)
+		return p
+	}, func(p domain.CollectPlan) string { return p.ReviewToken })
 }

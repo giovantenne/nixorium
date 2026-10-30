@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
@@ -16,9 +15,6 @@ import (
 func runInternetCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
 	manager := app.NewInternetManager(adapters.Local{})
 	plan := manager.Plan(ctx, repository, options.on, options.internetAction)
-	if options.subcommand == "apply" {
-		plan = manager.Replan(ctx, repository, options.on, options.internetAction, options.expect)
-	}
 	if options.subcommand == "plan" || plan.HasErrors() {
 		if options.json {
 			_ = presentation.JSON(stdout, plan)
@@ -30,8 +26,9 @@ func runInternetCommand(ctx context.Context, repository string, options options,
 		}
 		return 0
 	}
-	if options.expect != plan.ReviewToken {
-		fmt.Fprintln(stderr, "Internet state or review changed; create a fresh plan.")
+	plan, match := manager.Reviewed(plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "Internet state or review changed; create a fresh plan.")
 		return 1
 	}
 	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Internet apply requires an interactive terminal or --yes."}, func(output io.Writer) (bool, error) {

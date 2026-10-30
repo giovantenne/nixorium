@@ -19,6 +19,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A confirmation could expire seconds after it was shown: a review made just
+  before a clock boundary (every 5 or 10 minutes) was valid for only a few
+  seconds, so Enter was answered with "review expired", and a command-line
+  plan followed by an apply on either side of the boundary said the computers
+  had changed. Every review for update recovery, cleanup, shutdown and restart,
+  Internet and lock control, file sending and collecting, and host-key changes
+  now stays valid for at least its full time (5 or 10 minutes, as before), the
+  command-line apply accepts the earlier review until it expires, and an
+  expired review is reported as expired.
 - Security: the controller and the computers write editor, browser, bookmark
   and screen-layout defaults into the administrator's and teacher's homes as
   those users, not as root. Before, a teacher could leave a link in their own

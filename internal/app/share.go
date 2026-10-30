@@ -14,6 +14,9 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// shareReviewLifetime is how long a confirmed share review stays valid at least.
+const shareReviewLifetime = 10 * time.Minute
+
 // ShareContent holds files prepared on the controller for sending.
 type ShareContent interface {
 	// Files lists a complete prepared transfer with each file's SHA-256.
@@ -95,9 +98,8 @@ func (m *ShareManager) Plan(ctx context.Context, repository, requested, transfer
 		return fail("No selected computer has someone signed in with the classroom view. Check that the computers are on and updated.")
 	}
 	p.State = "ready"
-	// Between 5 and 10 minutes: a review made at the end of a block must not
-	// expire seconds later.
-	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(10 * time.Minute)
+	// The expiry sits on the shared review grid so Reviewed can rebuild it.
+	p.ExpiresAt = reviewExpiry(m.now(), shareReviewLifetime)
 	p.Message = fmt.Sprintf("%s (%s) go to the desktop of %d of %d computers. A restart empties the student's home.", shareCount(files), shareSize(p.Bytes), eligible, len(p.Targets))
 	p.ReviewToken = domain.ShareReviewToken(p)
 	return p
