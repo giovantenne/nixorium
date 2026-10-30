@@ -32,6 +32,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   read to check it. It now says the address could not be verified and asks
   you to check the laboratory again and run Apply to controller if the
   address is missing.
+- Discarding changes, committing selected files and carrying an Assistant
+  proposal to a new chat now treat file names literally: a file named with
+  `*`, `[` or `:(` no longer affects other files.
+- Nixorium services now stop promptly when asked to, even if a program
+  connected to their local socket is not responding, instead of waiting until
+  the system forces them to stop.
 - Stopping Update computers, or reaching its time limit, no longer marks the
   computers still waiting for their turn as "activation result unknown". They
   keep their current system and are listed as not updated, so the update does

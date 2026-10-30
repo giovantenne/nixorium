@@ -24,9 +24,37 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// assistantNixQuote writes value as a Nix string literal. Nix reads only \n,
+// \r and \t after a backslash and treats every other escape as the plain
+// character, so JSON escapes such as \u0026 must not be used.
 func assistantNixQuote(value string) string {
-	data, _ := json.Marshal(value)
-	return strings.ReplaceAll(string(data), "${", `\${`)
+	var quoted strings.Builder
+	quoted.Grow(len(value) + 2)
+	quoted.WriteByte('"')
+	for index := 0; index < len(value); index++ {
+		switch character := value[index]; character {
+		case '\\':
+			quoted.WriteString(`\\`)
+		case '"':
+			quoted.WriteString(`\"`)
+		case '\n':
+			quoted.WriteString(`\n`)
+		case '\r':
+			quoted.WriteString(`\r`)
+		case '\t':
+			quoted.WriteString(`\t`)
+		case '$':
+			if strings.HasPrefix(value[index:], "${") {
+				quoted.WriteString(`\$`)
+			} else {
+				quoted.WriteByte('$')
+			}
+		default:
+			quoted.WriteByte(character)
+		}
+	}
+	quoted.WriteByte('"')
+	return quoted.String()
 }
 
 func assistantNpmResolve(ctx context.Context, registry *npmartifact.Registry, node, name, version string) ([]byte, error) {

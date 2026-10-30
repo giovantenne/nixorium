@@ -68,7 +68,7 @@ func (server *RemoteInstallIPCServer) serveConnection(ctx context.Context, conne
 		return
 	}
 	content = append(content, '\n')
-	_ = writeRemoteIPCFrame(connection, content)
+	_ = writeIPCResponse(connection, content)
 }
 
 func RemoteInstallIPCRequest(ctx context.Context, socketPath string, request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {

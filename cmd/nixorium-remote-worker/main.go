@@ -671,6 +671,10 @@ func (worker *remoteWorker) handleApply(ctx context.Context, request domain.Remo
 
 func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
 	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "unavailable"}
+	// Load under the mutex: an apply or reconcile in progress saves events
+	// that a copy read earlier would overwrite when the refresh is saved.
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
 	session, err := worker.state.Load(request.OperationID)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -680,8 +684,6 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 		}
 		return response
 	}
-	worker.mutex.Lock()
-	defer worker.mutex.Unlock()
 	message := domain.RemoteStatusLoaded
 	if worker.operationID == request.OperationID && session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
 		if cleanupErr := worker.releaseResolvedFailureLocked(&session); cleanupErr != nil {
