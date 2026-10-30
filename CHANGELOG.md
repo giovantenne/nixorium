@@ -23,6 +23,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   computers still waiting for their turn as "activation result unknown". They
   keep their current system and are listed as not updated, so the update does
   not need a reviewed recovery for computers it never touched.
+- A USB installation over SSH that lost the live computer right after its
+  temporary key was added no longer blocks the controller: Apply to controller
+  and network installation refused until a file was deleted by hand, and the
+  installation service failed at every start. The reservation is now released
+  (the controller has already deleted the key's private half); restart the
+  live USB computer before trying again.
 - Security: the controller and the computers write editor, browser, bookmark
   and screen-layout defaults into the administrator's and teacher's homes as
   those users, not as root. Before, a teacher could leave a link in their own
