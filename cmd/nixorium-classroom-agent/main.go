@@ -201,11 +201,20 @@ type agentContext struct {
 func serveConnections(listener net.Listener, agent agentContext) error {
 	slots := make(chan struct{}, maxConnections)
 	var open atomic.Int32
+	var backoff time.Duration
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
-			return err
+			// Running out of descriptors or an aborted connection is passing:
+			// the agent keeps serving, as net/http does.
+			if !temporaryAcceptError(err) {
+				return err
+			}
+			backoff = min(max(2*backoff, 5*time.Millisecond), time.Second)
+			time.Sleep(backoff)
+			continue
 		}
+		backoff = 0
 		select {
 		case slots <- struct{}{}:
 			open.Add(1)
@@ -228,6 +237,15 @@ func serveConnections(listener net.Listener, agent agentContext) error {
 			_ = connection.Close()
 		}
 	}
+}
+
+// temporaryAcceptError tells an Accept failure that may pass from one that
+// ends the listener.
+func temporaryAcceptError(err error) bool {
+	if errors.Is(err, net.ErrClosed) {
+		return false
+	}
+	return errors.Is(err, syscall.EMFILE) || errors.Is(err, syscall.ENFILE) || errors.Is(err, syscall.ECONNABORTED) || errors.Is(err, syscall.ENOBUFS) || errors.Is(err, syscall.ENOMEM)
 }
 
 // removeStaleSocket removes a previous socket of this user, never anything else.
