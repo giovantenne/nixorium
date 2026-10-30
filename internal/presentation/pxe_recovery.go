@@ -103,6 +103,14 @@ func pxeLifecycleOutcome(report domain.PXELifecycleReport, cli bool) (string, st
 	}
 	message := strings.ToLower(report.Message)
 	switch {
+	case strings.Contains(message, "address could not be verified"):
+		// The services are stopped; only the check of the address failed.
+		headline = "Network installation is off, but the controller network could not be checked."
+		next := "Check the laboratory again (Maintenance → Diagnostics); if the controller address is missing, run Apply to controller (Maintenance → Apply to controller)."
+		if cli {
+			next = "Run nixorium doctor; if the controller address is missing, run nixorium controller plan and apply it."
+		}
+		return headline, next
 	case strings.Contains(message, "normal controller address") && strings.Contains(message, "missing"):
 		next := "The normal controller address did not come back. Apply the saved configuration to the controller (Maintenance → Apply to controller), then open Maintenance → Diagnostics."
 		if cli {

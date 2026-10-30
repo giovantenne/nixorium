@@ -22,6 +22,7 @@ type fakePXELifecycleSource struct {
 	controlErr  map[string]error
 	controls    []string
 	skipRestore bool
+	metaErr     error
 }
 
 func readyPXESource() *fakePXELifecycleSource {
@@ -46,6 +47,9 @@ func readyPXESource() *fakePXELifecycleSource {
 }
 
 func (f *fakePXELifecycleSource) LabMeta(context.Context, string) (domain.LabMeta, error) {
+	if f.metaErr != nil {
+		return domain.LabMeta{}, f.metaErr
+	}
 	return f.meta, nil
 }
 
@@ -232,5 +236,22 @@ func TestPXERecoverDoesNotClaimItCanCreateMissingControllerAddress(t *testing.T)
 	report := NewPXELifecycle(source).Recover(context.Background(), "/deployment")
 	if !report.HasErrors() || !strings.Contains(report.Message, "apply the current controller configuration") {
 		t.Fatalf("report = %+v", report)
+	}
+}
+
+func TestPXEStopAndRecoverDoNotClaimARestoreTheyCouldNotVerify(t *testing.T) {
+	for name, run := range map[string]func(PXELifecycle) domain.PXELifecycleReport{
+		"stop":    func(m PXELifecycle) domain.PXELifecycleReport { return m.Stop(context.Background(), "/deployment") },
+		"recover": func(m PXELifecycle) domain.PXELifecycleReport { return m.Recover(context.Background(), "/deployment") },
+	} {
+		source := readyPXESource()
+		source.metaErr = errors.New("nix evaluation failed")
+		report := run(NewPXELifecycle(source))
+		if !report.HasErrors() || !strings.Contains(report.Message, restoredAddressUnverified) || !strings.Contains(report.Message, "nix evaluation failed") {
+			t.Fatalf("%s report = %+v", name, report)
+		}
+		if report.Mode != "stopped" {
+			t.Fatalf("%s mode = %q; the services are stopped", name, report.Mode)
+		}
 	}
 }

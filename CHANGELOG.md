@@ -19,6 +19,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Stopping or recovering the network installation no longer says the normal
+  controller address is restored when the laboratory settings could not be
+  read to check it. It now says the address could not be verified and asks
+  you to check the laboratory again and run Apply to controller if the
+  address is missing.
 - Stopping Update computers, or reaching its time limit, no longer marks the
   computers still waiting for their turn as "activation result unknown". They
   keep their current system and are listed as not updated, so the update does
