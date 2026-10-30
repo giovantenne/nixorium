@@ -35,13 +35,7 @@ func (locker *extensionLocker) HideMessage() error {
 // messageCall maps any failure, including an extension that predates
 // messages, to errMessageUnavailable.
 func (locker *extensionLocker) messageCall(method string, arguments ...any) error {
-	object, err := locker.object()
-	if err != nil {
-		return errMessageUnavailable
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
-	defer cancel()
-	if err := object.CallWithContext(ctx, lockBusName+"."+method, 0, arguments...).Err; err != nil {
+	if locker.call(method, arguments...) != nil {
 		return errMessageUnavailable
 	}
 	return nil
