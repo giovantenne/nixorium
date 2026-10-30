@@ -28,14 +28,14 @@ func wakeScreen(connection *dbus.Conn) bool {
 	}
 	saver := connection.Object(screenSaverName, "/org/gnome/ScreenSaver")
 	var active bool
-	if saver.Call(screenSaverName+".GetActive", 0).Store(&active) != nil || !active {
+	if callBus(saver, screenSaverName+".GetActive").Store(&active) != nil || !active {
 		return false
 	}
-	if saver.Call(screenSaverName+".SetActive", 0, false).Err != nil {
+	if callBus(saver, screenSaverName+".SetActive", false).Err != nil {
 		return false
 	}
 	for deadline := time.Now().Add(wakeWait); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
-		if saver.Call(screenSaverName+".GetActive", 0).Store(&active) == nil && !active {
+		if callBus(saver, screenSaverName+".GetActive").Store(&active) == nil && !active {
 			return true
 		}
 	}
@@ -57,11 +57,11 @@ func blankIfUntouched(wokeAt time.Time) {
 	}
 	defer connection.Close()
 	var idle uint64
-	if connection.Object(idleMonitorName, "/org/gnome/Mutter/IdleMonitor/Core").Call(idleMonitorName+".GetIdletime", 0).Store(&idle) != nil {
+	if callBus(connection.Object(idleMonitorName, "/org/gnome/Mutter/IdleMonitor/Core"), idleMonitorName+".GetIdletime").Store(&idle) != nil {
 		return
 	}
 	if untouchedSince(time.Duration(idle)*time.Millisecond, wokeAt, time.Now()) {
-		_ = connection.Object(screenSaverName, "/org/gnome/ScreenSaver").Call(screenSaverName+".SetActive", 0, true).Err
+		_ = callBus(connection.Object(screenSaverName, "/org/gnome/ScreenSaver"), screenSaverName+".SetActive", true).Err
 	}
 }
 
@@ -74,7 +74,7 @@ func sessionLocked() bool {
 		return true
 	}
 	defer system.Close()
-	display, err := system.Object(login1Name, "/org/freedesktop/login1/user/self").GetProperty(login1Name + ".User.Display")
+	display, err := busProperty(system.Object(login1Name, "/org/freedesktop/login1/user/self"), login1Name+".User", "Display")
 	if err != nil {
 		return true
 	}
@@ -82,7 +82,7 @@ func sessionLocked() bool {
 	if !ok {
 		return true
 	}
-	hint, err := system.Object(login1Name, session).GetProperty(login1Name + ".Session.LockedHint")
+	hint, err := busProperty(system.Object(login1Name, session), login1Name+".Session", "LockedHint")
 	if err != nil {
 		return true
 	}

@@ -87,6 +87,18 @@ The project follows [Semantic Versioning](https://semver.org/).
   channel does not change. The help for the update review no longer mentions a
   DEPLOY confirmation: Enter confirms. The demonstration of an interrupted
   background job now shows it as interrupted.
+- While you control a student's computer, a message, a lock, a file sent or
+  collected, or a busy refusal no longer turns off the shared clipboard and
+  the "controlled" notice on the student's screen. Only the end of the control
+  does.
+- A student computer whose screen manager is slow to answer is no longer
+  shown to the teacher as "agent stopped" when the teacher opens the
+  classroom view: the computer answers the first greeting in time and is
+  reported as unlocked until the screen manager replies.
+- A student screen that produces a very large picture (a big, detailed screen
+  at the enlarged view) no longer makes the classroom view lose that computer:
+  the picture is made smaller to fit, or skipped, instead of closing the
+  connection.
 
 ## [3.11.0] - 2026-10-28
 

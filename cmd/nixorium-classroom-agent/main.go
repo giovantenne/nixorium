@@ -201,11 +201,20 @@ type agentContext struct {
 func serveConnections(listener net.Listener, agent agentContext) error {
 	slots := make(chan struct{}, maxConnections)
 	var open atomic.Int32
+	var backoff time.Duration
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
-			return err
+			// Running out of descriptors or an aborted connection is passing:
+			// the agent keeps serving, as net/http does.
+			if !temporaryAcceptError(err) {
+				return err
+			}
+			backoff = min(max(2*backoff, 5*time.Millisecond), time.Second)
+			time.Sleep(backoff)
+			continue
 		}
+		backoff = 0
 		select {
 		case slots <- struct{}{}:
 			open.Add(1)
@@ -228,6 +237,15 @@ func serveConnections(listener net.Listener, agent agentContext) error {
 			_ = connection.Close()
 		}
 	}
+}
+
+// temporaryAcceptError tells an Accept failure that may pass from one that
+// ends the listener.
+func temporaryAcceptError(err error) bool {
+	if errors.Is(err, net.ErrClosed) {
+		return false
+	}
+	return errors.Is(err, syscall.EMFILE) || errors.Is(err, syscall.ENFILE) || errors.Is(err, syscall.ECONNABORTED) || errors.Is(err, syscall.ENOBUFS) || errors.Is(err, syscall.ENOMEM)
 }
 
 // removeStaleSocket removes a previous socket of this user, never anything else.
@@ -254,20 +272,55 @@ func currentUserName() string {
 }
 
 // handle answers one connection until the peer closes it or misbehaves.
+// helloLockedWait is how long the hello reply waits for the extension to say
+// whether the computer is locked. The relay gives the whole hello helloTimeout
+// (3 s), and the extension may take lockTimeout (3 s) to answer, so the hello
+// must stop waiting sooner or a slow gnome-shell would make a healthy agent
+// look stopped. An extension that has not answered counts as not locked, as
+// it does when it is absent.
+var helloLockedWait = time.Second
+
+func lockedForHello(lock locker) bool {
+	answer := make(chan bool, 1)
+	go func() { answer <- lock.Locked() }()
+	timer := time.NewTimer(helloLockedWait)
+	defer timer.Stop()
+	select {
+	case locked := <-answer:
+		return locked
+	case <-timer.C:
+		return false
+	}
+}
+
+// replyWriteTimeout bounds one reply to a peer that stopped reading.
+var replyWriteTimeout = 30 * time.Second
+
 func handle(connection net.Conn, agent agentContext) {
 	defer connection.Close()
 	userName, capture, lock := agent.userName, agent.capture, agent.lock
+	// A peer that stops reading must not pin this handler and its slot: a
+	// reply that cannot be written in time ends the connection (callers
+	// return on a write error).
+	send := func(message classroomview.Message) error {
+		_ = connection.SetWriteDeadline(time.Now().Add(replyWriteTimeout))
+		return classroomview.Write(connection, message)
+	}
 	// Files of an unfinished sending are removed when the connection ends,
 	// and a showing of the teacher's screen through it ends too.
-	var incoming *receiver
+	var incoming *classroomview.TreeWriter
 	// A collection of the desktop through this connection ends with it.
 	var outgoing *collector
 	showing := false
+	// The shared clipboard lives only as long as the control that began it:
+	// another channel closing (a lock, a message, a sending) must not end it.
+	clipboardBegun := false
 	defer func() {
-		// The shared clipboard lives only as long as a control does.
-		_ = capture.ClipboardEnd()
+		if clipboardBegun {
+			_ = capture.ClipboardEnd()
+		}
 		if incoming != nil {
-			incoming.abort()
+			incoming.Abort()
 		}
 		if outgoing != nil {
 			outgoing.close()
@@ -281,17 +334,17 @@ func handle(connection net.Conn, agent agentContext) {
 		message, err := classroomview.Read(connection)
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBadRequest})
+				_ = send(classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBadRequest})
 			}
 			return
 		}
 		switch message.Type {
 		case classroomview.TypeHello:
 			if message.Version != classroomview.ProtocolVersion {
-				_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported, Detail: fmt.Sprintf("protocol version %d is not supported", message.Version)})
+				_ = send(classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported, Detail: fmt.Sprintf("protocol version %d is not supported", message.Version)})
 				return
 			}
-			if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName, Locked: lock.Locked()}); err != nil {
+			if err := send(classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName, Locked: lockedForHello(lock)}); err != nil {
 				return
 			}
 		case classroomview.TypeThumbnailRequest:
@@ -299,19 +352,19 @@ func handle(connection net.Conn, agent agentContext) {
 			if reply.Type == classroomview.TypeThumbnail {
 				reply.Locked = lock.Locked()
 			}
-			if err := classroomview.Write(connection, reply); err != nil {
+			if err := send(reply); err != nil {
 				return
 			}
 		case classroomview.TypeLock:
-			if err := classroomview.Write(connection, lockReply(lock, message.Locked)); err != nil {
+			if err := send(lockReply(lock, message.Locked)); err != nil {
 				return
 			}
 		case classroomview.TypeMessageShow, classroomview.TypeMessageHide:
-			if err := classroomview.Write(connection, messageReply(agent.notice, message)); err != nil {
+			if err := send(messageReply(agent.notice, message)); err != nil {
 				return
 			}
 		case classroomview.TypeNotice:
-			if err := classroomview.Write(connection, noticeReply(agent.notice, message)); err != nil {
+			if err := send(noticeReply(agent.notice, message)); err != nil {
 				return
 			}
 		case classroomview.TypeBroadcastFrame, classroomview.TypeBroadcastStop:
@@ -331,12 +384,12 @@ func handle(connection net.Conn, agent agentContext) {
 					showing = true
 				}
 			}
-			if err := classroomview.Write(connection, reply); err != nil {
+			if err := send(reply); err != nil {
 				return
 			}
 		case classroomview.TypeFilesBegin, classroomview.TypeFilesChunk, classroomview.TypeFilesEnd:
 			reply := filesReply(&incoming, agent.home, message)
-			if err := classroomview.Write(connection, reply); err != nil {
+			if err := send(reply); err != nil {
 				return
 			}
 		case classroomview.TypeCollectList, classroomview.TypeCollectChunk, classroomview.TypeCollectEnd:
@@ -344,30 +397,50 @@ func handle(connection net.Conn, agent agentContext) {
 			// once a collection succeeded: a review also lists and ends,
 			// and a desktop of folders or empty files hands no bytes over.
 			reply := collectReply(&outgoing, agent.home, message)
-			if err := classroomview.Write(connection, reply); err != nil {
+			if err := send(reply); err != nil {
 				return
 			}
 		case classroomview.TypeInput:
-			if err := classroomview.Write(connection, inputReply(capture, message)); err != nil {
+			if err := send(inputReply(capture, message)); err != nil {
 				return
 			}
 		case classroomview.TypeClipboardBegin, classroomview.TypeClipboardSet, classroomview.TypeClipboardGet, classroomview.TypeClipboardEnd:
-			if err := classroomview.Write(connection, clipboardReply(capture, message)); err != nil {
+			reply := clipboardReply(capture, message)
+			switch {
+			case message.Type == classroomview.TypeClipboardBegin && reply.Type == classroomview.TypeClipboardDone:
+				clipboardBegun = true
+			case message.Type == classroomview.TypeClipboardEnd:
+				clipboardBegun = false
+			}
+			if err := send(reply); err != nil {
 				return
 			}
 		default:
-			if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported}); err != nil {
+			if err := send(classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported}); err != nil {
 				return
 			}
 		}
 	}
 }
 
+// newIncoming starts receiving files for this session's desktop. They are
+// written into a private folder of the home first and move to the desktop
+// only when everything arrived, so the student never sees half a sending.
+// The agent runs as the student: the files belong to the student, folders
+// are 0755 and files 0644, never executable.
+func newIncoming(home string, entries []classroomview.FileEntry) (*classroomview.TreeWriter, error) {
+	desktop, err := classroomview.DesktopDirectory(home)
+	if err != nil {
+		return nil, err
+	}
+	return classroomview.NewStagedTreeWriter(desktop, filepath.Join(home, ".local", "share", "nixorium-classroom"), entries)
+}
+
 // filesReply advances a sending to the desktop; any refusal ends it.
-func filesReply(incoming **receiver, home string, message classroomview.Message) classroomview.Message {
+func filesReply(incoming **classroomview.TreeWriter, home string, message classroomview.Message) classroomview.Message {
 	refuse := func(err error) classroomview.Message {
 		if *incoming != nil {
-			(*incoming).abort()
+			(*incoming).Abort()
 			*incoming = nil
 		}
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeFilesRefused, Detail: err.Error()}
@@ -375,9 +448,9 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 	switch message.Type {
 	case classroomview.TypeFilesBegin:
 		if *incoming != nil {
-			(*incoming).abort()
+			(*incoming).Abort()
 		}
-		started, err := newReceiver(home, message.Entries)
+		started, err := newIncoming(home, message.Entries)
 		if err != nil {
 			*incoming = nil
 			return refuse(err)
@@ -388,7 +461,7 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 		if *incoming == nil {
 			return refuse(errors.New("no sending is open"))
 		}
-		if err := (*incoming).chunk(message.Index, message.Data); err != nil {
+		if err := (*incoming).Write(message.Index, message.Data); err != nil {
 			return refuse(err)
 		}
 		return classroomview.Message{Type: classroomview.TypeFilesAck, Index: message.Index}
@@ -396,7 +469,7 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 		if *incoming == nil {
 			return refuse(errors.New("no sending is open"))
 		}
-		placed, err := (*incoming).finish()
+		placed, err := (*incoming).Finish()
 		*incoming = nil
 		if err != nil {
 			return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeFilesRefused, Detail: err.Error()}
@@ -439,6 +512,10 @@ func thumbnailReply(capture capturer, width int, since int64) classroomview.Mess
 	}
 	if err != nil {
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: err.Error()}
+	}
+	if len(image) > classroomview.MaxImageBytes {
+		// Sending it would fail and close the channel.
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: "the screen picture is too large"}
 	}
 	return classroomview.Message{Type: classroomview.TypeThumbnail, Width: width, Height: height, Image: image, CapturedAt: capturedAt.UnixMilli(), Frame: frame}
 }
