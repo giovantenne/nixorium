@@ -95,7 +95,7 @@ func TestEveryStableReleaseMigratesToThisTemplate(t *testing.T) {
 // migrations of that file.
 func TestTheTemplateOfThisReleaseNeedsNoMigration(t *testing.T) {
 	template := filepath.Join("..", "..", "templates", "site")
-	if _, err := os.Stat(template); err != nil {
+	if _, err := os.Stat(filepath.Join(template, "modules", "workstation.nix")); err != nil {
 		t.Skip("the template is not in this source tree (the package build)")
 	}
 	root := t.TempDir()
