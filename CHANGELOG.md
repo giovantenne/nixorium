@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+From 3.11.0, Update Nixorium, then Apply to controller and Update computers as
+usual; the deployment migrations below run during the update. From 3.10.0 or
+older, first follow the notes of those releases.
+
 ### Added
 
 - Every user has a **Caffeine** toggle in GNOME's quick settings (top right):
@@ -19,9 +23,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Security: the controller and the computers write editor, browser, bookmark
-  and screen-layout defaults into the administrator's and teacher's homes as
-  those users, not as root. Before, a teacher could leave a link in their own
+- Security: the controller and the computers write editor, browser and
+  bookmark defaults (and, on the controller, the screen layout) into the
+  administrator's and teacher's homes as those users, not as root. Before, a teacher could leave a link in their own
   home that made the controller or a computer overwrite a system file at the
   next start or update. The deployment migration
   `2026-10-staff-home-writes-as-owner` updates `modules/home-profile.nix`. If

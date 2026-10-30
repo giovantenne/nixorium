@@ -49,24 +49,25 @@ in
       GDM_MONITORS="$GDM_CONFIG_DIR/monitors.xml"
       TEACHER_MONITORS="/home/${labSettings.teacherUser}/.config/monitors.xml"
 
-      if [ ! -f "$ADMIN_MONITORS" ]; then
+      if [ ! -f "$ADMIN_MONITORS" ] || [ -L "$ADMIN_MONITORS" ]; then
         exit 0
       fi
 
+      # Reads are bounded: a FIFO swapped in must not hold the login screen.
       install -d -m 0700 "$GDM_CONFIG_DIR"
       rm -f "$GDM_MONITORS"
-      cp "$ADMIN_MONITORS" "$GDM_MONITORS"
+      timeout 30 cp "$ADMIN_MONITORS" "$GDM_MONITORS"
       chmod 0600 "$GDM_MONITORS"
       chown -h "$(stat -c '%u:%g' "$GDM_CONFIG_DIR")" "$GDM_MONITORS"
 
       # The teacher's copy is written by the teacher from what root reads:
-      # cat reads the open descriptor, so the admin's file may stay private.
-      ${asUser labSettings.teacherUser ''${pkgs.bash}/bin/sh -c ${lib.escapeShellArg ''
+      # the teacher's cat reads the pipe, so the admin's file may stay private.
+      timeout 30 cat "$ADMIN_MONITORS" | ${asUser labSettings.teacherUser ''${pkgs.bash}/bin/sh -c ${lib.escapeShellArg ''
         umask 077
         mkdir -p "''${1%/*}"
         rm -f "$1"
         cat > "$1"
-      ''} sh "$TEACHER_MONITORS" < "$ADMIN_MONITORS"''}
+      ''} sh "$TEACHER_MONITORS"''}
     '';
     path = [ pkgs.coreutils ];
   };

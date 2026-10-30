@@ -14,9 +14,12 @@ let
         ${asUser user ''${pkgs.coreutils}/bin/chmod u+rwx "$PATH_NAME"''}
       fi
     done
+    # Only trees whose parent is a real folder of this home, and only what
+    # root created there: a link at ~/.config cannot lead the repair into
+    # another home.
     for PATH_NAME in "$HOME_DIR/.config/Code" "$HOME_DIR/.vscode/extensions" "$HOME_DIR/.local/npm"; do
-      if [ -d "$PATH_NAME" ] && [ ! -L "$PATH_NAME" ]; then
-        chown -hR ${user}:users "$PATH_NAME"
+      if [ -d "$PATH_NAME" ] && [ ! -L "$PATH_NAME" ] && [ ! -L "''${PATH_NAME%/*}" ]; then
+        chown -hR --from=root ${user}:users "$PATH_NAME"
         ${asUser user ''${pkgs.coreutils}/bin/chmod -R u+rwX "$PATH_NAME"''}
       fi
     done
