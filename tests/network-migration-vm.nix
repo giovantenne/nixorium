@@ -323,7 +323,7 @@ in
         "set -eu; cd ~/nixorium-deployment; cp /etc/nixorium-test/flake.nix flake.nix; cp /etc/nixorium-test/.gitignore .gitignore; "
         + "jq '.lab.masterDhcpIp = \"192.0.2.10\" | .lab.ifaceName = \"eth1\" | .lab.pcCount = 1 | .lab.credentialsVersion = 1' /etc/nixorium-test/lab-settings.json > lab-settings.json; "
         + "printf '{\"schemaVersion\":1,\"packages\":[]}\\n' > lab-software.json; "
-        + "jq -n --arg hash '$6$vm$not-the-public-default' '{version:1, admin:$hash, teacher:$hash, student:$hash}' > lab-credentials.json; chmod 0600 lab-credentials.json; "
+        + "jq -n --arg hash '$6$vm$notthepublicdefault' '{version:1, admin:$hash, teacher:$hash, student:$hash}' > lab-credentials.json; chmod 0600 lab-credentials.json; "
         + "git init -q; git config user.name Test; git config user.email test@example.invalid; "
         + "git add flake.nix lab-settings.json lab-software.json .gitignore; git commit -qm initial"))
       apply_controller()
