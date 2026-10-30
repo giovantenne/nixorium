@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"slices"
 	"strings"
 )
@@ -34,9 +35,17 @@ type WholeFile struct {
 // later, manual (nothing touched) when any file was changed by hand or is
 // missing.
 func ReplaceWholeFiles(tree Tree, replacements []WholeFile) Outcome {
-	var edited, pending []string
+	// What is found is kept: a failed write restores it, and each file keeps
+	// the mode it had.
+	type original struct {
+		file    WholeFile
+		content []byte
+		mode    fs.FileMode
+	}
+	var edited []string
+	var pending []original
 	for _, file := range replacements {
-		content, _, found, err := tree.Read(file.Path)
+		content, mode, found, err := tree.Read(file.Path)
 		if err != nil || !found {
 			edited = append(edited, file.Path)
 			continue
@@ -53,7 +62,7 @@ func ReplaceWholeFiles(tree Tree, replacements []WholeFile) Outcome {
 			edited = append(edited, file.Path)
 			continue
 		}
-		pending = append(pending, file.Path)
+		pending = append(pending, original{file: file, content: content, mode: mode})
 	}
 	if len(edited) > 0 {
 		return Outcome{State: Manual, Detail: fmt.Sprintf("%s changed by hand or missing. Copy the new versions of %s from templates/site in this Nixorium release.", strings.Join(edited, ", "), wholeFileNames(replacements))}
@@ -61,16 +70,24 @@ func ReplaceWholeFiles(tree Tree, replacements []WholeFile) Outcome {
 	if len(pending) == 0 {
 		return Outcome{State: Done}
 	}
-	for _, file := range replacements {
-		if !slices.Contains(pending, file.Path) {
-			continue
-		}
-		_, mode, _, _ := tree.Read(file.Path)
-		if err := tree.Write(file.Path, file.Content, mode); err != nil {
-			return Outcome{State: Manual, Detail: file.Path + " cannot be written"}
+	paths := make([]string, 0, len(pending))
+	for index, item := range pending {
+		paths = append(paths, item.file.Path)
+		if err := tree.Write(item.file.Path, item.file.Content, item.mode); err != nil {
+			// The failed file may be half written: restore it too.
+			var stuck []string
+			for _, written := range pending[:index+1] {
+				if tree.Write(written.file.Path, written.content, written.mode) != nil {
+					stuck = append(stuck, written.file.Path)
+				}
+			}
+			if len(stuck) > 0 {
+				return Outcome{State: Manual, Detail: fmt.Sprintf("%s cannot be written and %s could not be restored. Restore %s from Git.", item.file.Path, strings.Join(stuck, ", "), strings.Join(stuck, ", "))}
+			}
+			return Outcome{State: Manual, Detail: item.file.Path + " cannot be written. Nothing was changed."}
 		}
 	}
-	return Outcome{State: Applied, Files: pending}
+	return Outcome{State: Applied, Files: paths}
 }
 
 func wholeFileNames(replacements []WholeFile) string {

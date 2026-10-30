@@ -1,6 +1,7 @@
 package deploymigrate
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -208,5 +209,47 @@ func TestTheStaffHomeMigrationWritesAsTheOwnerAndRespectsEdits(t *testing.T) {
 	report, err = Run(treeWith(t, map[string]string{"modules/home-profile.nix": edited}), "3.11.0", migration)
 	if err != nil || report.Migrations[0].State != Manual {
 		t.Fatalf("an edited home profile was not left alone: %+v, %v", report, err)
+	}
+}
+
+// failWriteOf makes the first write of the named file fail, as a full disk
+// would, and leaves every other write alone.
+func failWriteOf(t *testing.T, name string) {
+	t.Helper()
+	failed := false
+	original := writeFile
+	t.Cleanup(func() { writeFile = original })
+	writeFile = func(path string, content []byte, mode os.FileMode) error {
+		if !failed && strings.HasSuffix(path, "/"+name) {
+			failed = true
+			return errors.New("disk full")
+		}
+		return original(path, content, mode)
+	}
+}
+
+func TestAFailedWriteRestoresTheFilesAlreadyReplaced(t *testing.T) {
+	files := releasedScreensaver(t)
+	root := treeWith(t, files)
+	if err := os.Chmod(filepath.Join(root, "modules/screensaver.nix"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	failWriteOf(t, "scripts/cmd-screensaver.sh")
+	report, err := Run(root, "3.10.0", ttfxOnly)
+	if err != nil || len(report.Migrations) != 1 || report.Migrations[0].State != Manual ||
+		!strings.Contains(report.Migrations[0].Detail, "scripts/cmd-screensaver.sh cannot be written") ||
+		!strings.Contains(report.Migrations[0].Detail, "Nothing was changed") {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	for path, want := range files {
+		if got := read(t, root, path); got != want {
+			t.Errorf("%s was left changed", path)
+		}
+	}
+	if info, err := os.Stat(filepath.Join(root, "modules/screensaver.nix")); err != nil || info.Mode().Perm() != 0o755 {
+		t.Fatalf("mode = %v, %v", info, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, RecordFile)); !os.IsNotExist(err) {
+		t.Fatalf("a manual migration was recorded: %v", err)
 	}
 }

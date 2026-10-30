@@ -33,9 +33,12 @@ fixed rules, shows it in the review and saves it with the update.
   holds `Registry`, a list of `Migration{ID, Description, Apply}`. `ID` starts
   with the year and month (`2026-10-short-slug`), `Description` is one sentence
   for the administrator, and `Apply` receives a `Tree` (the deployment copy)
-  and returns an outcome. A migration can change, create or remove files
-  through `Tree.Read`, `Tree.Write` and `Tree.Remove`. The helper
-  `ReplaceExact` covers the common case of one exact text. The first
+  and returns an outcome. A migration can read, change or create regular files
+  through `Tree.Read` and `Tree.Write`. Removing a file is not implemented
+  yet: it needs a `Tree` method and a migration that uses it. The helper
+  `ReplaceExact` covers the common case of one exact text (replacing it with
+  nothing deletes it), and `ReplaceWholeFiles` the case of template files
+  replaced as a whole. The first
   migration, `2026-10-workstation-is-controller`, replaces the `hostName`
   comparison in `modules/workstation.nix` with `args.isController or false`.
 - **The release being installed runs them.** The installed release does not
@@ -58,7 +61,7 @@ fixed rules, shows it in the review and saves it with the update.
   example an invalid record). Anything else, or a timeout, refuses the update.
   The report is JSON:
   `{"contractVersion":1,"targetVersion":"…","migrations":[{"id","description","state","detail","files"}]}`
-  with `state` one of `applied`, `done`, `manual`, `skipped`. A new contract
+  with `state` one of `applied`, `done`, `manual`. (The installed release also ignores an entry whose state is `skipped`, so a future migrator can use it; this one never does.) A new contract
   version is added next to the old one, and the old one stays for a year of
   releases.
 - **The difference is the truth.** The report only labels it. The installed
@@ -73,7 +76,7 @@ fixed rules, shows it in the review and saves it with the update.
   is saved.
 - **Outcomes.** `applied` changed the listed files. `done` means the deployment
   already has the change. `manual` means the files were changed by hand and
-  nothing was touched; the review shows the migrator's detail (for
+  nothing was touched (a failed write restores what was already written); the review shows the migrator's detail (for
   `ReplaceExact`: the file, the text to replace and the text to put instead).
   A manual migration does not block the update by itself: the update is
   refused only when the candidate, built without that change, does not
@@ -134,6 +137,17 @@ fixed rules, shows it in the review and saves it with the update.
   a template file that differs needs its own entry; a file the administrator
   changed in that place becomes a "Manual change", which the administrator, or
   Assistant as a normal reviewed proposal, makes by hand.
+- A migration that replaces whole files (`ReplaceWholeFiles`) recognises only
+  the hashes it lists. A form of the file that is in neither `Released` nor
+  `Later` (for example from a beta or an unreleased commit between two edits)
+  reads as "Manual change" at every update, because a manual migration is
+  never recorded. Every time a migrated file changes in `templates/site`, add
+  the new form's hash to `Later` of each earlier whole-file migration of that
+  path. `TestTheTemplateOfThisReleaseNeedsNoMigration` runs the registry on the
+  current template and fails when any migration is not `done` there;
+  `TestEveryStableReleaseMigratesToThisTemplate` does the same for the stable
+  and beta tags. Forms of commits that were never tagged cannot be found by a
+  test.
 - Developers must add an entry in the same change as the template change
   (`AGENTS.md`, section "Deployment migrations"), and must test it.
 - A corrupt `nixorium-migrations.json` makes the migrator refuse the
