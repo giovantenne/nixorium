@@ -538,6 +538,9 @@ func (model dashboardModel) textEntry() bool {
 		return true
 	case dashboardHosts:
 		return model.computers.hostSearching
+	case dashboardShare:
+		// The path is typed text: q and ? belong to it, not to the shell.
+		return model.share.stage == shareStagePath && model.busy == ""
 	case dashboardSoftware:
 		return model.software.acceptsText()
 	case dashboardWorkspace:

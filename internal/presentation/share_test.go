@@ -79,3 +79,30 @@ func TestSendFilesReviewCancelAndApply(t *testing.T) {
 		t.Fatal("Send files opened without its actions")
 	}
 }
+
+func TestSendFilesPathTreatsQAndHelpKeyAsText(t *testing.T) {
+	model := newTestModel(t, withReadyLab(), withActions(DashboardActions{
+		PlanShare:  func(context.Context, string, string) domain.SharePlan { return domain.SharePlan{} },
+		ApplyShare: func(domain.SharePlan) domain.ShareReport { return domain.ShareReport{} },
+	}))
+	opened, _ := model.openComputerTask("s")
+	model = opened.(dashboardModel)
+	model.share.path = "/home/teacher/"
+	for _, character := range "q?" {
+		updated, command := model.Update(tea.KeyPressMsg{Code: character, Text: string(character)})
+		model = updated.(dashboardModel)
+		if command != nil {
+			if _, quit := command().(tea.QuitMsg); quit {
+				t.Fatalf("typing %q in the Send files path quits Nixorium", character)
+			}
+		}
+	}
+	if model.share.path != "/home/teacher/q?" || model.navigation.helpOpen {
+		t.Fatalf("path %q, help open %v", model.share.path, model.navigation.helpOpen)
+	}
+	// Once the computers are being chosen the path is no longer typed.
+	model.share.stage = shareStageComputers
+	if model.textEntry() {
+		t.Fatal("the computer list still counts as text entry")
+	}
+}
