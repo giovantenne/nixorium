@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"net/textproto"
 	"os/exec"
@@ -385,6 +387,11 @@ func (capture *mutterCapture) startLocked(width int) error {
 	}
 	go func() {
 		err := readFrames(output, func(frame []byte) {
+			// A picture too large for one message is made smaller or left
+			// out: it must never close the controller's channel.
+			if frame = fitFrame(frame, classroomview.MaxImageBytes); frame == nil {
+				return
+			}
 			capture.mutex.Lock()
 			capture.frame, capture.frameAt = frame, time.Now()
 			capture.frameNumber++
@@ -474,6 +481,24 @@ func scaledHeight(width, screenWidth, screenHeight int) int {
 		height++
 	}
 	return max(2, height)
+}
+
+// fitFrame returns a JPEG of at most limit bytes: the frame itself when it
+// fits, else the same picture encoded again at a lower quality; nil when
+// even that is too large (or the frame cannot be decoded).
+func fitFrame(frame []byte, limit int) []byte {
+	if len(frame) <= limit {
+		return frame
+	}
+	picture, err := jpeg.Decode(bytes.NewReader(frame))
+	if err != nil {
+		return nil
+	}
+	var smaller bytes.Buffer
+	if err := jpeg.Encode(&smaller, picture, &jpeg.Options{Quality: 40}); err != nil || smaller.Len() > limit {
+		return nil
+	}
+	return smaller.Bytes()
 }
 
 // readFrames splits GStreamer's multipart output into JPEG frames.

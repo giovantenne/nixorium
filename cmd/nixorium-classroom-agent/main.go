@@ -482,6 +482,10 @@ func thumbnailReply(capture capturer, width int, since int64) classroomview.Mess
 	if err != nil {
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: err.Error()}
 	}
+	if len(image) > classroomview.MaxImageBytes {
+		// Sending it would fail and close the channel.
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: "the screen picture is too large"}
+	}
 	return classroomview.Message{Type: classroomview.TypeThumbnail, Width: width, Height: height, Image: image, CapturedAt: capturedAt.UnixMilli(), Frame: frame}
 }
 

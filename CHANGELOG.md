@@ -50,6 +50,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   shown to the teacher as "agent stopped" when the teacher opens the
   classroom view: the computer answers the first greeting in time and is
   reported as unlocked until the screen manager replies.
+- A student screen that produces a very large picture (a big, detailed screen
+  at the enlarged view) no longer makes the classroom view lose that computer:
+  the picture is made smaller to fit, or skipped, instead of closing the
+  connection.
 
 ## [3.11.0] - 2026-10-28
 

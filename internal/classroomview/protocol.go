@@ -19,6 +19,11 @@ const ProtocolVersion = 1
 // MaxMessageBytes bounds one encoded message, including future image payloads.
 const MaxMessageBytes = 4 << 20
 
+// MaxImageBytes is the largest picture (a JPEG) a message can carry: pictures
+// travel as base64, four bytes for every three, and the rest of the message
+// needs a few kilobytes at most.
+const MaxImageBytes = (MaxMessageBytes - 4096) / 4 * 3
+
 // Message types.
 const (
 	TypeHello            = "hello"
