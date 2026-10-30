@@ -83,9 +83,9 @@ older, first follow the notes of those releases.
   can correct it.
 - Security: the controller and the computers write editor, browser and
   bookmark defaults (and, on the controller, the screen layout) into the
-  administrator's and teacher's homes as those users, not as root. Before, a teacher could leave a link in their own
-  home that made the controller or a computer overwrite a system file at the
-  next start or update. The deployment migration
+  administrator's and teacher's homes as those users, not as root. Before, a
+  teacher could leave a link in their own home that made the controller or a
+  computer overwrite a system file at the next start or update. The deployment migration
   `2026-10-staff-home-writes-as-owner` updates `modules/home-profile.nix`. If
   you edited that file, the review shows a manual change and the old,
   vulnerable version stays until you copy the new one from `templates/site`.
