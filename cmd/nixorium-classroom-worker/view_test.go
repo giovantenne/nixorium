@@ -304,3 +304,24 @@ func TestHiddenPageEndsTheControlAndResumesIt(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteTypingLetsGoOfShiftAndAltGrBeforeACharacter(t *testing.T) {
+	script, err := viewAssets.ReadFile("view/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A character is typed by the computer's own layout: Shift and AltGr
+	// still held from the teacher's keyboard would change its level (AltGr+
+	// Shift+è for { on an Italian keyboard), so they are let go first, and
+	// their own release is not sent twice.
+	for _, words := range []string{
+		"const levelModifiers = [0xffe1, 0xfe03];",
+		"if (character && !event.ctrlKey && !event.altKey && !event.metaKey) {",
+		"for (const modifier of heldModifiers) queueEvent({ kind: 'key', keysym: modifier, pressed: false });",
+		"if (levelModifiers.includes(symbol) && !heldModifiers.delete(symbol)) return;",
+	} {
+		if !strings.Contains(string(script), words) {
+			t.Fatalf("app.js lacks %s", words)
+		}
+	}
+}

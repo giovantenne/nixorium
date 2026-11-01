@@ -109,7 +109,7 @@ func updateReviewLines(report domain.UpdatePlanReport, full bool) []string {
 		workspaceUpdateText(&content, report.Workspace)
 	} else if report.Workspace != nil {
 		if report.CurrentRef != "" || report.Target != "" {
-			fmt.Fprintln(&content, "Nixorium: "+safeWorkspaceText(updateRefChange(report)))
+			fmt.Fprintln(&content, updateRefLabel(report)+": "+safeWorkspaceText(updateRefChange(report)))
 		}
 		if changes := workspaceVersionChanges(report.Workspace); len(changes) > 0 {
 			fmt.Fprintln(&content, "Applications whose version changes:")
@@ -141,13 +141,26 @@ func updateReviewLines(report domain.UpdatePlanReport, full bool) []string {
 	return strings.Split(strings.TrimSuffix(content.String(), "\n"), "\n")
 }
 
-// updateRefChange names the Nixorium change. A moving target such as master
-// keeps its name, so the revisions say what changes.
-func updateRefChange(report domain.UpdatePlanReport) string {
-	if report.CurrentRef == report.Target && report.CurrentRev != "" && report.TargetRev != "" {
-		return fmt.Sprintf("%s %s -> %s", report.Target, shortRevision(report.CurrentRev), shortRevision(report.TargetRev))
+// updateRefLabel says what the reference in the review is: the NixOS channel
+// for a system and package update, the Nixorium release otherwise.
+func updateRefLabel(report domain.UpdatePlanReport) string {
+	if report.Kind == "package-base" {
+		return "NixOS base"
 	}
-	return report.CurrentRef + " -> " + report.Target
+	return "Nixorium"
+}
+
+// updateRefChange names the change of the reference. A moving target such as
+// master keeps its name, so the revisions say what changes; when nothing
+// changes it says so instead of printing the same name twice.
+func updateRefChange(report domain.UpdatePlanReport) string {
+	if report.CurrentRef == report.Target {
+		if report.CurrentRev != "" && report.TargetRev != "" && report.CurrentRev != report.TargetRev {
+			return fmt.Sprintf("%s %s → %s", report.Target, shortRevision(report.CurrentRev), shortRevision(report.TargetRev))
+		}
+		return report.Target + " (unchanged)"
+	}
+	return report.CurrentRef + " → " + report.Target
 }
 
 // hangingWrap wraps a "Label:   text" line, or an indented one, so its

@@ -429,6 +429,30 @@ func (m *NetworkMigrationManager) Apply(ctx context.Context, plan domain.Network
 	if check.Revision != plan.Revision {
 		return refuse("the configuration changed after the review; review the change again")
 	}
+	// The review observed the computers, and finishing is safe only while
+	// each one still runs the saved configuration on its new address: one
+	// restarted into its previous address since then would lose the
+	// controller. Observe them again; any change asks for a new review.
+	meta, err := m.source.LabMeta(ctx, plan.Repository)
+	if err != nil {
+		return refuse("the computers could not be checked again (" + err.Error() + ")")
+	}
+	fresh := plan
+	fresh.Issues, fresh.Acknowledged = []domain.ValidationIssue{}, []string{}
+	fresh.Computers = make([]domain.NetworkMigrationComputer, len(plan.Computers))
+	for index, computer := range plan.Computers {
+		fresh.Computers[index] = domain.NetworkMigrationComputer{Name: computer.Name, From: computer.From, To: computer.To}
+	}
+	m.observeComputers(ctx, &fresh, meta, NetworkMigrationRequest{Action: plan.Action, AcknowledgeOff: len(plan.Acknowledged) > 0})
+	if ctx.Err() != nil {
+		return refuse("the computer check was cancelled or timed out")
+	}
+	if len(fresh.Issues) > 0 {
+		return refuse("the computers changed since the review: " + strings.TrimSuffix(fresh.Issues[0].Message, "."))
+	}
+	if networkMigrationToken(fresh, plan.Settings) != plan.ReviewToken {
+		return refuse("the computers changed since the review; review the change of laboratory network again")
+	}
 	if plan.Action == domain.NetworkMigrationStart && m.trust != nil {
 		moves := make([]domain.KnownHostMove, 0, len(plan.Computers))
 		for _, computer := range plan.Computers {

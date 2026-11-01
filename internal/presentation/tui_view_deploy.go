@@ -55,7 +55,7 @@ func (model dashboardModel) deployView() string {
 		lines := []string{
 			tuiTitle("Update these computers?", model.isDark),
 			"",
-			fmt.Sprintf("Affects  %s · %s", strings.ReplaceAll(model.deployment.plan.ColmenaSelector, ",", ", "), countNoun(len(model.deployment.plan.Targets), "computer")),
+			"Affects  " + deploymentAffectedLabel(model.deployment.plan.Targets, len(model.report.Meta.Clients.Hosts)),
 			fmt.Sprintf("Builds   %s", deploymentConfigurationsLabel(model.deployment.plan.Targets)),
 			"",
 			tuiMuted("Reviewed revision  "+model.deployment.plan.Revision, model.isDark),
@@ -330,4 +330,19 @@ func deploymentPlanIssues(report domain.DeploymentPlanReport) string {
 		issues = append(issues, issue.Field+": "+issue.Message)
 	}
 	return strings.Join(issues, "; ")
+}
+
+// deploymentAffectedLabel names the computers a review changes: their names,
+// or "all N computers" when it covers a long list of every configured
+// computer, which the lines below list one by one. The
+// deployment selector (such as @lab) is an engine detail and is never shown.
+func deploymentAffectedLabel(targets []domain.DeploymentTarget, configured int) string {
+	if len(targets) > 6 && len(targets) == configured {
+		return "all " + countNoun(len(targets), "computer")
+	}
+	names := make([]string, len(targets))
+	for index, target := range targets {
+		names[index] = target.Name
+	}
+	return strings.Join(names, ", ") + " · " + countNoun(len(targets), "computer")
 }

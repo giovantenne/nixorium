@@ -129,7 +129,7 @@ func (preparer *RemoteInstallPreparer) PrepareArtifacts(ctx context.Context, ope
 	if !remoteStateID(operationID) {
 		return result, errors.New("remote artifact preparation operation ID is invalid")
 	}
-	if !domain.ValidRemoteHostName(hostName) {
+	if !domain.ValidHostName(hostName) {
 		return result, errors.New("remote artifact preparation host is invalid")
 	}
 	if err := preparer.validateRepository(ctx); err != nil {

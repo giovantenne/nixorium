@@ -111,7 +111,7 @@ func (m HostTrustManager) Plan(ctx context.Context, repository, name string) dom
 	p.Message = "Trust this changed key only after deliberately reinstalling this exact computer and comparing the offered fingerprint with its physical console. Other entries are preserved."
 	// Apply rebuilds this review. The expiry sits on the shared review grid so
 	// the rebuilt review can match the confirmed token, which keeps it valid
-	// for four to five minutes without letting an old token renew.
+	// for at least five minutes without letting an old token renew.
 	p.ExpiresAt = reviewExpiry(m.now(), hostTrustReviewLifetime)
 	p.ReviewToken = hostTrustToken(p)
 	return p
@@ -127,36 +127,32 @@ func hostTrustToken(p domain.HostTrustPlan) string {
 	return fmt.Sprintf("sha256:%x", sha256.Sum256(data))
 }
 
-// Reviewed reports whether token confirms a still-valid review of the same
-// repository revision, computer, recorded trust and offered key as fresh, and
-// returns fresh carrying that review's expiry and token. A review created in
-// an earlier grid step therefore still matches a rebuilt one until it expires.
-func (m HostTrustManager) Reviewed(fresh domain.HostTrustPlan, token string) (domain.HostTrustPlan, bool) {
-	if fresh.HasErrors() || token == "" {
-		return fresh, false
+// Reviewed tells whether token confirms a review of the same repository
+// revision, computer, recorded trust and offered key as fresh, and returns
+// fresh carrying that review's expiry and token. A review created in an
+// earlier grid step therefore still matches a rebuilt one until it expires.
+func (m HostTrustManager) Reviewed(fresh domain.HostTrustPlan, token string) (domain.HostTrustPlan, ReviewMatch) {
+	if fresh.HasErrors() {
+		return fresh, ReviewChanged
 	}
-	for _, expiry := range reviewExpiries(m.now(), hostTrustReviewLifetime) {
-		candidate := fresh
-		candidate.ExpiresAt = expiry
-		if hostTrustToken(candidate) == token {
-			candidate.ReviewToken = token
-			return candidate, true
-		}
-	}
-	return fresh, false
+	return matchReview(m.now(), hostTrustReviewLifetime, fresh, token, func(p domain.HostTrustPlan, expiry time.Time) domain.HostTrustPlan {
+		p.ExpiresAt = expiry
+		p.ReviewToken = hostTrustToken(p)
+		return p
+	}, func(p domain.HostTrustPlan) string { return p.ReviewToken })
 }
 
 // A changed key is never evidence of inventory identity. Reject ambiguous
 // inventories before connecting, including an address shared with the controller.
 func hostTrustClient(meta domain.LabMeta, name string) (domain.HostMeta, bool) {
-	if !domain.ValidRemoteHostName(meta.Controller.Name) || !domain.ValidRemoteHostName(name) || name == meta.Controller.Name {
+	if !domain.ValidHostName(meta.Controller.Name) || !domain.ValidHostName(name) || name == meta.Controller.Name {
 		return domain.HostMeta{}, false
 	}
 	names, addresses := map[string]bool{}, map[string]bool{}
 	var selected domain.HostMeta
 	for _, host := range meta.Clients.Hosts {
 		address, err := netip.ParseAddr(host.IP)
-		if !domain.ValidRemoteHostName(host.Name) || host.Name == meta.Controller.Name ||
+		if !domain.ValidHostName(host.Name) || host.Name == meta.Controller.Name ||
 			err != nil || !address.Is4() || address.IsUnspecified() || address.IsMulticast() || address.IsLoopback() || address.IsLinkLocalUnicast() ||
 			address.String() != host.IP || host.IP == meta.Controller.StaticIP || host.IP == meta.Controller.DHCPIP ||
 			names[host.Name] || addresses[host.IP] {
@@ -182,8 +178,8 @@ func (m HostTrustManager) Apply(ctx context.Context, plan domain.HostTrustPlan, 
 		return r
 	}
 	defer gate.Close()
-	fresh, matched := m.Reviewed(m.Plan(ctx, plan.Repository, plan.Host.Name), token)
-	if !matched {
+	fresh, match := m.Reviewed(m.Plan(ctx, plan.Repository, plan.Host.Name), token)
+	if match != ReviewMatched {
 		r.Message = "Computer identity, recorded key or offered key changed; create a fresh plan."
 		return r
 	}

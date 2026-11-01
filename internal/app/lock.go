@@ -11,6 +11,9 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// lockReviewLifetime is how long a confirmed lock review stays valid at least.
+const lockReviewLifetime = 10 * time.Minute
+
 // LockSource reads the laboratory identities and reaches each computer's
 // classroom agent over the controller's SSH access.
 type LockSource interface {
@@ -87,9 +90,8 @@ func (m *LockManager) Plan(ctx context.Context, repository, requested string, ac
 	p.State = "ready"
 	// A fixed five-minute window, as for Internet control, so that a fresh
 	// plan of the same computers keeps the reviewed token.
-	// Between 5 and 10 minutes: a review made at the end of a block must not
-	// expire seconds later.
-	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(10 * time.Minute)
+	// The expiry sits on the shared review grid so Reviewed can rebuild it.
+	p.ExpiresAt = reviewExpiry(m.now(), lockReviewLifetime)
 	p.Message = fmt.Sprintf("%d of %d computers available. Logging out or restarting always unlocks a computer.", eligible, len(p.Targets))
 	p.ReviewToken = domain.LockReviewToken(p)
 	return p
@@ -184,4 +186,19 @@ func lockUnavailable(err error) string {
 		}
 	}
 	return ClassroomOffDetail
+}
+
+// Reviewed tells whether token confirms a review of the plan fresh, a plan
+// built now. A match returns fresh carrying that review's expiry and token, so
+// an apply in a later process, or in a later grid step, still matches until
+// the review expires.
+func (m *LockManager) Reviewed(fresh domain.LockPlan, token string) (domain.LockPlan, ReviewMatch) {
+	if fresh.HasErrors() {
+		return fresh, ReviewChanged
+	}
+	return matchReview(m.now(), lockReviewLifetime, fresh, token, func(p domain.LockPlan, expiry time.Time) domain.LockPlan {
+		p.ExpiresAt = expiry
+		p.ReviewToken = domain.LockReviewToken(p)
+		return p
+	}, func(p domain.LockPlan) string { return p.ReviewToken })
 }

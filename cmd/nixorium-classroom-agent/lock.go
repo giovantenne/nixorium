@@ -43,14 +43,19 @@ func (locker *extensionLocker) object() (dbus.BusObject, error) {
 	return locker.connection.Object(lockBusName, lockPath), nil
 }
 
-func (locker *extensionLocker) SetLocked(locked bool) error {
+// call calls a method of the classroom extension within lockTimeout.
+func (locker *extensionLocker) call(method string, arguments ...any) error {
 	object, err := locker.object()
 	if err != nil {
-		return errLockUnavailable
+		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
 	defer cancel()
-	if err := object.CallWithContext(ctx, lockBusName+".SetLocked", 0, locked).Err; err != nil {
+	return object.CallWithContext(ctx, lockBusName+"."+method, 0, arguments...).Err
+}
+
+func (locker *extensionLocker) SetLocked(locked bool) error {
+	if locker.call("SetLocked", locked) != nil {
 		return errLockUnavailable
 	}
 	return nil

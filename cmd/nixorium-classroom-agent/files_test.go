@@ -30,9 +30,13 @@ var lessonEntries = []classroomview.FileEntry{
 	{Path: "run.sh", Size: 4},
 }
 
+func stagingParent(home string) string {
+	return filepath.Join(home, ".local", "share", "nixorium-classroom")
+}
+
 func sendLesson(t *testing.T, home string) []string {
 	t.Helper()
-	incoming, err := newReceiver(home, lessonEntries)
+	incoming, err := newIncoming(home, lessonEntries)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,21 +44,21 @@ func sendLesson(t *testing.T, home string) []string {
 		index int
 		data  string
 	}{{1, "hello "}, {1, "world"}, {3, "ls\n\n"}} {
-		if err := incoming.chunk(piece.index, []byte(piece.data)); err != nil {
+		if err := incoming.Write(piece.index, []byte(piece.data)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	placed, err := incoming.finish()
+	placed, err := incoming.Finish()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(incoming.staging); !os.IsNotExist(err) {
-		t.Fatal("the staging folder was left behind")
+	if entries, _ := os.ReadDir(stagingParent(home)); len(entries) != 0 {
+		t.Fatalf("the staging folder was left behind: %v", entries)
 	}
 	return placed
 }
 
-func TestReceiverPlacesFilesOnTheDesktop(t *testing.T) {
+func TestIncomingPlacesFilesOnTheDesktop(t *testing.T) {
 	home, desktop := studentHome(t)
 	if placed := sendLesson(t, home); strings.Join(placed, ",") != "Lesson,run.sh" {
 		t.Fatalf("placed = %v", placed)
@@ -78,33 +82,33 @@ func TestReceiverPlacesFilesOnTheDesktop(t *testing.T) {
 	}
 }
 
-func TestReceiverRefusesBrokenSendings(t *testing.T) {
+func TestIncomingRefusesBrokenSendings(t *testing.T) {
 	home, desktop := studentHome(t)
-	for name, step := range map[string]func(*receiver) error{
-		"out of order": func(incoming *receiver) error { return incoming.chunk(3, []byte("ls")) },
-		"too large":    func(incoming *receiver) error { return incoming.chunk(1, []byte("hello world!")) },
-		"a folder":     func(incoming *receiver) error { return incoming.chunk(0, []byte("x")) },
-		"incomplete": func(incoming *receiver) error {
-			if err := incoming.chunk(1, []byte("hello")); err != nil {
+	for name, step := range map[string]func(*classroomview.TreeWriter) error{
+		"out of order": func(incoming *classroomview.TreeWriter) error { return incoming.Write(3, []byte("ls")) },
+		"too large":    func(incoming *classroomview.TreeWriter) error { return incoming.Write(1, []byte("hello world!")) },
+		"a folder":     func(incoming *classroomview.TreeWriter) error { return incoming.Write(0, []byte("x")) },
+		"incomplete": func(incoming *classroomview.TreeWriter) error {
+			if err := incoming.Write(1, []byte("hello")); err != nil {
 				return nil
 			}
-			_, err := incoming.finish()
+			_, err := incoming.Finish()
 			return err
 		},
 	} {
-		incoming, err := newReceiver(home, lessonEntries)
+		incoming, err := newIncoming(home, lessonEntries)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := step(incoming); err == nil {
 			t.Fatalf("%s was accepted", name)
 		}
-		incoming.abort()
-		if _, err := os.Stat(incoming.staging); !os.IsNotExist(err) {
+		incoming.Abort()
+		if entries, _ := os.ReadDir(stagingParent(home)); len(entries) != 0 {
 			t.Fatalf("%s left the staging folder", name)
 		}
 	}
-	if _, err := newReceiver(home, []classroomview.FileEntry{{Path: "../escape", Size: 1}}); err == nil {
+	if _, err := newIncoming(home, []classroomview.FileEntry{{Path: "../escape", Size: 1}}); err == nil {
 		t.Fatal("a path outside the sending was accepted")
 	}
 	if entries, _ := os.ReadDir(desktop); len(entries) != 0 {
@@ -161,7 +165,7 @@ func TestAgentReceivesFilesOverTheProtocol(t *testing.T) {
 		t.Fatalf("second begin = %+v", reply)
 	}
 	_ = client.Close()
-	staging := filepath.Join(home, ".local", "share", "nixorium-classroom")
+	staging := stagingParent(home)
 	for attempt := 0; attempt < 100; attempt++ {
 		if entries, _ := os.ReadDir(staging); len(entries) == 0 {
 			return

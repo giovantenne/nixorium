@@ -217,9 +217,17 @@ migration in the same change:
   run it again, and those where it was a "Manual change" did not record it, so
   the next update applies it.
 - `TestEveryStableReleaseMigratesToThisTemplate` runs every migration on the
-  template of each stable release from 3.0.0 and expects the current template,
-  apart from the files listed in `releasedDrift`. A template change without a
-  migration, or a migration that misses an old form, fails it.
+  template of each stable release from 3.0.0 and of each later beta, and
+  expects the current template, apart from the files listed in `releasedDrift`.
+  A template change without a migration, or a migration that misses an old
+  form, fails it. `TestTheTemplateOfThisReleaseNeedsNoMigration` runs the
+  registry on the current template and expects every migration `done`: when a
+  migrated whole file changes again, add the new form's hash to `Later` of
+  each earlier `ReplaceWholeFiles` migration of that path, or it reads as a
+  "Manual change" at every update. Forms of commits that were never tagged
+  (a beta or master template between two edits) are not covered by any test:
+  keep their hashes in `Later` too when a laboratory may have been created
+  from them.
 - `ID` starts with the year and month: `2026-10-short-slug`. `Description` is
   one sentence an administrator understands.
 - For a text replacement use `ReplaceExact`. Its `from` is the exact text of
@@ -228,13 +236,15 @@ migration in the same change:
   of the text that differs needs its own entry; a form with no entry becomes a
   "Manual change" in the review, so say so in the changelog. Prefer whole-line
   replacements that end with a newline, and keep each text short. A migration
-  may also create, change or remove files through `Tree.Write` and
-  `Tree.Remove`.
+  may also create or change regular files through `Tree.Read` and
+  `Tree.Write`; there is no `Tree.Remove` yet (replacing a text with the empty
+  string deletes it).
 - To replace whole template files the administrator never changed, use
   `ReplaceWholeFiles`: freeze the new content under
   `internal/deploymigrate/files/<migration id>/` and list the SHA-256 of every
   released form it replaces (from `git show <tag>:templates/site/<file>`). The
-  files are replaced together or, when one was edited, not at all (manual).
+  files are replaced together or, when one was edited or a write fails (the
+  files already written are restored), not at all (manual).
 - To give existing laboratories a package the template now declares for
   every computer, use `AddSharedPackage`: it adds the package to
   `lab-software.json` for the controller and all clients, and leaves it
@@ -549,7 +559,7 @@ that release's notes, so a release is not finished until the site follows it.
 - The core documents what the controller does and enforces; the service's instructions, recipes and routing are private (see "Service logic stays private").
 - Adoption telemetry is controller-only and off without explicit administrator
   consent. The first administrator launch acknowledges the operational disclaimer before
-  offering telemetry. Enter/e accepts, n declines, Esc skips to the menu and q
+  offering telemetry. Only e accepts (Enter is "Not now"), n declines, Esc skips to the menu and q
   exits. Skipping saves no decision and reoffers at the next launch; a saved
   refusal is remembered;
   preview and privacy views never save a choice. Keep its allowlisted payload and monthly identity separate from support

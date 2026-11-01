@@ -45,6 +45,8 @@ type TreeWriter struct {
 	entries     []FileEntry
 	destination string
 	staging     string
+	// createDestination makes Finish create a missing destination.
+	createDestination bool
 	// next is the entry whose content is expected; written counts its bytes.
 	next    int
 	written int64
@@ -68,7 +70,32 @@ func NewTreeWriter(destination string, entries []FileEntry) (*TreeWriter, error)
 	if err != nil {
 		return nil, err
 	}
-	writer := &TreeWriter{entries: entries, destination: destination, staging: staging}
+	return startTreeWriter(&TreeWriter{entries: entries, destination: destination, staging: staging})
+}
+
+// NewStagedTreeWriter prepares writing entries into destination like
+// NewTreeWriter, with two differences: the pieces go to a private folder
+// under stagingParent (created when missing) so nothing appears in the
+// destination before the end, and Finish creates the destination when it
+// does not exist. The entries are validated as a sending to a computer,
+// not as a save of many computers.
+func NewStagedTreeWriter(destination, stagingParent string, entries []FileEntry) (*TreeWriter, error) {
+	if err := ValidateFileEntries(entries); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(stagingParent, 0o700); err != nil {
+		return nil, err
+	}
+	staging, err := os.MkdirTemp(stagingParent, "incoming-")
+	if err != nil {
+		return nil, err
+	}
+	return startTreeWriter(&TreeWriter{entries: entries, destination: destination, staging: staging, createDestination: true})
+}
+
+// startTreeWriter creates the folders of the tree in the staging folder.
+func startTreeWriter(writer *TreeWriter) (*TreeWriter, error) {
+	staging, entries := writer.staging, writer.entries
 	for _, entry := range entries {
 		if entry.Dir {
 			folder := filepath.Join(staging, filepath.FromSlash(entry.Path))
@@ -167,6 +194,11 @@ func (writer *TreeWriter) Finish() ([]string, error) {
 	defer writer.Abort()
 	if err := writer.skipDone(); err != nil || writer.next != len(writer.entries) {
 		return nil, errors.New("some files did not arrive completely")
+	}
+	if writer.createDestination {
+		if err := EnsureFolder(writer.destination); err != nil {
+			return nil, err
+		}
 	}
 	placed := []string{}
 	for _, entry := range writer.entries {

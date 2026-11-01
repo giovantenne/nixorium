@@ -12,7 +12,7 @@ import (
 
 const shutdownObservationTimeout = 3 * time.Second
 const shutdownDispatchTimeout = 8 * time.Second
-const shutdownReviewWindow = 5 * time.Minute
+const shutdownReviewLifetime = 5 * time.Minute
 
 type ShutdownSource interface {
 	LabMeta(context.Context, string) (domain.LabMeta, error)
@@ -104,7 +104,7 @@ func (m *ShutdownManager) PlanAction(ctx context.Context, repository, requested 
 		return shutdownPlanIssue(report, "targets", "power on a selected computer, restore management access, or review unknown-session risk")
 	}
 	report.State = "ready"
-	report.ExpiresAt = m.now().UTC().Truncate(shutdownReviewWindow).Add(shutdownReviewWindow)
+	report.ExpiresAt = reviewExpiry(m.now(), shutdownReviewLifetime)
 	report.ReviewToken = domain.ShutdownReviewToken(report)
 	if report.InterruptsSessions() {
 		report.Confirmation = action.Confirmation()
@@ -355,4 +355,19 @@ func shutdownApplyFromPlan(plan domain.ShutdownPlanReport) domain.ShutdownApplyR
 		report.Operation = "restart-apply"
 	}
 	return report
+}
+
+// Reviewed tells whether token confirms a review of the plan fresh, a plan
+// built now. A match returns fresh carrying that review's expiry and token, so
+// an apply in a later process, or in a later grid step, still matches until
+// the review expires.
+func (m *ShutdownManager) Reviewed(fresh domain.ShutdownPlanReport, token string) (domain.ShutdownPlanReport, ReviewMatch) {
+	if fresh.HasErrors() || fresh.State != "ready" {
+		return fresh, ReviewChanged
+	}
+	return matchReview(m.now(), shutdownReviewLifetime, fresh, token, func(p domain.ShutdownPlanReport, expiry time.Time) domain.ShutdownPlanReport {
+		p.ExpiresAt = expiry
+		p.ReviewToken = domain.ShutdownReviewToken(p)
+		return p
+	}, func(p domain.ShutdownPlanReport) string { return p.ReviewToken })
 }

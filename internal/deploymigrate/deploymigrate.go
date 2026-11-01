@@ -193,6 +193,9 @@ func (tree Tree) Read(name string) (content []byte, mode fs.FileMode, found bool
 	return content, info.Mode().Perm(), err == nil, err
 }
 
+// writeFile is os.WriteFile; tests replace it to make a write fail.
+var writeFile = os.WriteFile
+
 // Write creates or replaces a regular file.
 func (tree Tree) Write(name string, content []byte, mode fs.FileMode) error {
 	path, err := tree.path(name)
@@ -205,15 +208,15 @@ func (tree Tree) Write(name string, content []byte, mode fs.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, content, mode); err != nil {
+	if err := writeFile(path, content, mode); err != nil {
 		return err
 	}
 	return os.Chmod(path, mode)
 }
 
 // ReplaceExact replaces one exact, known text of file: applied when it is
-// there exactly once, done when the new text is already there, manual
-// otherwise (the file was changed by hand).
+// there exactly once, done when the new text is already there (for a
+// deletion: when the old text is gone), manual otherwise (the file was changed by hand).
 func ReplaceExact(tree Tree, file, from, to string) Outcome {
 	content, mode, found, err := tree.Read(file)
 	if err != nil || !found {
@@ -226,7 +229,8 @@ func ReplaceExact(tree Tree, file, from, to string) Outcome {
 			return Outcome{State: Manual, Detail: file + " cannot be written"}
 		}
 		return Outcome{State: Applied, Files: []string{file}}
-	case count == 0 && to != "" && strings.Contains(text, to):
+	case count == 0 && (to == "" || strings.Contains(text, to)):
+		// A deletion (to == "") is done when the removed text is gone.
 		return Outcome{State: Done}
 	default:
 		return Outcome{State: Manual, Detail: manualReplacement(file, from, to)}

@@ -264,7 +264,7 @@ nixorium_require_unique_target_labels() {
 # name when the computer shares one system with its class (ADR 0033).
 nixorium_expected_system_name() {
   local host_name=$1 class=${2:-}
-  [[ "$host_name" =~ ^pc[0-9]{2,4}$ ]] || { echo "invalid computer name" >&2; return 1; }
+  [[ "$host_name" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ ]] || { echo "invalid computer name" >&2; return 1; }
   if [[ -z "$class" || "$class" == "$host_name" ]]; then
     printf '%s\n' "$host_name"
   elif [[ "$class" =~ ^shared-[0-9]{1,4}$ ]]; then
@@ -280,8 +280,8 @@ nixorium_expected_system_name() {
 # record itself. Written before the first boot and read back.
 nixorium_write_identity_record() {
   local host_name=$1 install_root=${2:-/mnt} number expected record
-  [[ "$host_name" =~ ^pc0*([1-9][0-9]{0,3})$ ]] || { echo "invalid computer name" >&2; return 1; }
-  number=${BASH_REMATCH[1]}
+  [[ "$host_name" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ ]] || { echo "invalid computer name" >&2; return 1; }
+  number=$((10#${host_name#pc}))
   expected="{\"schemaVersion\":1,\"number\":${number}}"
   record="$install_root/var/lib/nixorium/identity.json"
   local -a privileged=()

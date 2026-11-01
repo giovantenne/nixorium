@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"os/signal"
@@ -128,6 +129,20 @@ func (worker *remoteWorker) recover() error {
 		return nil
 	}
 	session, err := worker.state.Load(operationID)
+	if errors.Is(err, fs.ErrNotExist) {
+		// Reserved, but the worker stopped before the first session record:
+		// nothing can have been authorized or applied without one. Drop the
+		// local key of that live session and release the reservation instead
+		// of failing at every start.
+		if err := worker.bootstrap.DiscardLocalSession(adapters.VerifiedLiveSession{OperationID: operationID}); err != nil {
+			return fmt.Errorf("discard the live session of an unrecorded reservation: %w", err)
+		}
+		if err := reservation.ReleaseResolved(); err != nil {
+			return fmt.Errorf("release an unrecorded reservation: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "released USB installation reservation %s: it had no session record; restart the live USB computer before trying again\n", operationID)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("recover reserved operation state: %w", err)
 	}
@@ -656,6 +671,10 @@ func (worker *remoteWorker) handleApply(ctx context.Context, request domain.Remo
 
 func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
 	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "unavailable"}
+	// Load under the mutex: an apply or reconcile in progress saves events
+	// that a copy read earlier would overwrite when the refresh is saved.
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
 	session, err := worker.state.Load(request.OperationID)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -665,8 +684,6 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 		}
 		return response
 	}
-	worker.mutex.Lock()
-	defer worker.mutex.Unlock()
 	message := domain.RemoteStatusLoaded
 	if worker.operationID == request.OperationID && session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
 		if cleanupErr := worker.releaseResolvedFailureLocked(&session); cleanupErr != nil {
@@ -998,6 +1015,15 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 	}()
 	liveSession, err := worker.bootstrap.Establish(ctx, operationID, request.Address, request.Fingerprint, secret)
 	if err != nil {
+		if adapters.BootstrapCleanupUnconfirmed(err) && !reusingArtifacts {
+			// Establish already deleted the private half of the temporary key,
+			// so the entry left on the live computer cannot be used, and nothing
+			// was prepared or authorized: keeping the reservation without a
+			// session record only blocked the controller (and a restarted worker
+			// could not recover it).
+			response.Message = err.Error() + "; the controller deleted its private key, so the entry cannot be used: restart the live USB computer before trying again"
+			return response
+		}
 		if adapters.BootstrapCleanupUnconfirmed(err) {
 			keepReservation = true
 			worker.operationID = operationID

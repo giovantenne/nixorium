@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 
 func (capture fakeCapture) ClipboardBegin() error { return capture.err }
 func (capture fakeCapture) ClipboardEnd() error   { return nil }
+func (capture fakeCapture) ClipboardRelease()     {}
 func (capture fakeCapture) ClipboardSet(text string) error {
 	if _, err := classroomview.ValidateClipboardText(text); err != nil {
 		return err
@@ -80,5 +82,78 @@ func TestTextFormatsOnly(t *testing.T) {
 	}
 	if pickTextMime([]string{"image/png", "text/html"}) != "" || isTextMime("image/png") {
 		t.Fatal("a non-text format was accepted")
+	}
+}
+
+type endCountingCapture struct {
+	fakeCapture
+	ended chan struct{}
+}
+
+func (capture endCountingCapture) ClipboardEnd() error {
+	capture.ended <- struct{}{}
+	return nil
+}
+
+func (capture endCountingCapture) ClipboardRelease() { capture.ended <- struct{}{} }
+
+func TestOnlyTheConnectionThatBeganTheClipboardEndsIt(t *testing.T) {
+	capture := endCountingCapture{ended: make(chan struct{}, 4)}
+	agent := agentContext{userName: "student", capture: capture, lock: &fakeLocker{}}
+	open := func() (net.Conn, <-chan struct{}) {
+		server, client := net.Pipe()
+		finished := make(chan struct{})
+		go func() {
+			handle(server, agent)
+			close(finished)
+		}()
+		return client, finished
+	}
+	exchange := func(client net.Conn, message classroomview.Message) classroomview.Message {
+		t.Helper()
+		_ = client.SetDeadline(time.Now().Add(2 * time.Second))
+		if err := classroomview.Write(client, message); err != nil {
+			t.Fatal(err)
+		}
+		reply, err := classroomview.Read(client)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+	control, controlDone := open()
+	if reply := exchange(control, classroomview.Message{Type: classroomview.TypeClipboardBegin}); reply.Type != classroomview.TypeClipboardDone {
+		t.Fatalf("begin = %+v", reply)
+	}
+	// Another channel does its work and closes: the control goes on.
+	other, otherDone := open()
+	if reply := exchange(other, classroomview.Message{Type: classroomview.TypeLock, Locked: true}); reply.Type != classroomview.TypeLockState {
+		t.Fatalf("lock = %+v", reply)
+	}
+	other.Close()
+	<-otherDone
+	select {
+	case <-capture.ended:
+		t.Fatal("another channel closing ended the shared clipboard")
+	case <-time.After(100 * time.Millisecond):
+	}
+	// The control's own channel closing ends it.
+	control.Close()
+	<-controlDone
+	select {
+	case <-capture.ended:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the control closing left the shared clipboard on")
+	}
+}
+
+func TestASecondControlKeepsTheClipboardWhenTheFirstCloses(t *testing.T) {
+	capture := &mutterCapture{running: true}
+	capture.clipboard = clipboardState{on: true, holders: 1}
+	// A reconnect begins the clipboard again while the old channel drains.
+	capture.clipboard.holders++
+	capture.ClipboardRelease()
+	if !capture.clipboard.on || capture.clipboard.holders != 1 {
+		t.Fatalf("the old channel closing ended the clipboard: %+v", capture.clipboard)
 	}
 }

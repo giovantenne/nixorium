@@ -13,7 +13,7 @@
   checks-workspace-runtime = [ "workspace-runtime" ];
   checks-workspace-template = [ "workspace-template" ];
   checks-workspace-systems = [ "workspace-offline" "workspace-systems" "home-files-adoption" ];
-  checks-home-reset = [ "home-reset-filesystem-vm" "workspace-reset-service-vm" ];
+  checks-home-reset = [ "home-reset-filesystem-vm" "workspace-reset-service-vm" "staff-home-writes-vm" ];
   checks-editor = [ "workspace-editor-vm" "programming-profile-vm" "mysql-workbench-vm" ];
   checks-management = [ "management-vm" "network-migration-vm" "assistant-vm" "host-diagnostics-vm" "telemetry-vm" "onboarding-vm" ];
   checks-session = [ "console-keyboard-vm" "session-state-vm" "stay-active-vm" "clean-generations-vm" "classroom-view-vm" ];

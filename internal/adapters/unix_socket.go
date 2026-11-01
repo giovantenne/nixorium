@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // serveUnixSocket listens on a private Unix socket until ctx ends and runs
@@ -41,6 +42,20 @@ func serveUnixSocket(ctx context.Context, socketPath, name string, mode os.FileM
 		_ = listener.Close()
 	}()
 	var clients sync.WaitGroup
+	var live sync.Mutex
+	open := map[*net.UnixConn]struct{}{}
+	closing := false
+	// Handlers may run for hours, so shutdown closes their connections instead
+	// of waiting for peers that never read or write.
+	go func() {
+		<-ctx.Done()
+		live.Lock()
+		closing = true
+		for connection := range open {
+			_ = connection.Close()
+		}
+		live.Unlock()
+	}()
 	defer clients.Wait()
 	for {
 		connection, err := listener.AcceptUnix()
@@ -50,13 +65,37 @@ func serveUnixSocket(ctx context.Context, socketPath, name string, mode os.FileM
 			}
 			return fmt.Errorf("accept %s IPC client: %w", name, err)
 		}
+		live.Lock()
+		if closing {
+			live.Unlock()
+			_ = connection.Close()
+			continue
+		}
+		open[connection] = struct{}{}
+		live.Unlock()
 		clients.Add(1)
 		go func() {
 			defer clients.Done()
-			defer connection.Close()
+			defer func() {
+				live.Lock()
+				delete(open, connection)
+				live.Unlock()
+				_ = connection.Close()
+			}()
 			handle(ctx, connection)
 		}()
 	}
+}
+
+// ipcResponseWriteTimeout bounds how long a client may take to accept a
+// response; the handler itself is not bounded.
+var ipcResponseWriteTimeout = 30 * time.Second
+
+// writeIPCResponse sends a response frame with a fresh write deadline, so a
+// client that never reads cannot pin the worker goroutine.
+func writeIPCResponse(connection *net.UnixConn, content []byte) error {
+	_ = connection.SetWriteDeadline(time.Now().Add(ipcResponseWriteTimeout))
+	return writeRemoteIPCFrame(connection, content)
 }
 
 // peerCredentials reads the kernel's record of the connecting process.

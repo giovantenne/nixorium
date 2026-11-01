@@ -76,3 +76,40 @@ func TestAssistantCarryOverProposal(t *testing.T) {
 		target.Close()
 	}
 }
+
+func TestAssistantCarryOverComparesPathsLiterally(t *testing.T) {
+	repo := workspaceRepository(t)
+	writeGitReviewFile(t, repo, "flake.nix", "{ outputs = _: {}; }\n")
+	writeGitReviewFile(t, repo, "a*", "star\n")
+	writeGitReviewFile(t, repo, "ab", "plain\n")
+	workspaceTestGit(t, repo, "add", "--all")
+	workspaceTestGit(t, repo, "commit", "-qm", "synthetic base")
+	state := t.TempDir()
+	if err := os.Chmod(state, 0700); err != nil {
+		t.Fatal(err)
+	}
+	store := AssistantWorkspaceStore{Directory: state}
+	old, err := store.CreateConversation(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace, err := store.Open(old.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = workspace.Write("a*", "star edited\n", false); err != nil {
+		t.Fatal(err)
+	}
+	workspace.Close()
+	// Only a different file changes upstream: a glob would see a conflict.
+	writeGitReviewFile(t, repo, "ab", "plain updated\n")
+	workspaceTestGit(t, repo, "add", "--all")
+	workspaceTestGit(t, repo, "commit", "-qm", "synthetic update")
+	next, err := store.CreateConversation(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if carried, err := store.CarryOverProposal(old.ID, next.ID); err != nil || carried != 1 {
+		t.Fatal("unrelated upstream change blocked the carry-over", carried, err)
+	}
+}

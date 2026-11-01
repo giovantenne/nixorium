@@ -80,4 +80,17 @@ var Registry = []Migration{
 				"# An application or the Caffeine toggle that keeps the screen on (a session\n# idle inhibitor) keeps the screensaver away too.\nidle_inhibited() {\n  gdbus call --session \\\n    --dest org.gnome.SessionManager \\\n    --object-path /org/gnome/SessionManager \\\n    --method org.gnome.SessionManager.IsInhibited 8 2>/dev/null |\n  grep -q true\n}\n\nwhile true; do\n  IDLE_MS=$(get_idle_ms)\n  if idle_inhibited; then\n    IDLE_MS=0\n  fi\n\n  if [[ \"$IDLE_MS\" -ge \"$IDLE_BLANK_MS\" ]]; then\n")
 		},
 	},
+	{
+		ID:          "2026-10-staff-home-writes-as-owner",
+		Description: "Editor and browser defaults in the administrator's and teacher's homes are written as those users, so a link left in a home cannot redirect a write to a system file.",
+		Apply: func(tree Tree) Outcome {
+			// Released form: 3.0.0 up to 3.11.0.
+			const id = "2026-10-staff-home-writes-as-owner"
+			return ReplaceWholeFiles(tree, []WholeFile{
+				{Path: "modules/home-profile.nix", Content: frozen(id, "home-profile.nix"), Released: []string{
+					"e93dd4f571ba6e88ce940d0ee31c7ede1e1f3fd1dfa59784d3a3e0258f4325ea",
+				}},
+			})
+		},
+	},
 }

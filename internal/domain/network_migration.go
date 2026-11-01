@@ -210,7 +210,7 @@ func LabNetworkText(base string, prefix int) string {
 
 // ClientName is the inventory name of client number n (pc01, pc02, …).
 func ClientName(number int) string {
-	return fmt.Sprintf("pc%02d", number)
+	return HostName(number)
 }
 
 // MigrationAddresses lists, for the saved settings and a target network, the

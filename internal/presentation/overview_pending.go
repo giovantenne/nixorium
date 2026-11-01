@@ -150,8 +150,16 @@ func (model dashboardModel) withQuietOverviewRefresh(command tea.Cmd) (dashboard
 }
 
 func (model dashboardModel) finishQuietOverviewRefresh(message overviewQuietRefreshMsg) (tea.Model, tea.Cmd) {
+	// Starting the refresh took a new identity for the job observations and
+	// dropped the pending tick of the previous polling chain. This is the only
+	// place that can start the new chain, whatever happens to the rest of the
+	// result: without it a finished job would stay "running" forever.
+	var poll tea.Cmd
+	if message.jobsID == model.jobs.id {
+		poll = model.scheduleManagedJobsTick()
+	}
 	if message.err != nil || model.busy != "" || message.read != model.overviewReads {
-		return model, nil
+		return model, poll
 	}
 	if message.jobsID == model.jobs.id {
 		model.jobs.items, model.jobs.err = message.jobs, message.jobsErr
@@ -165,7 +173,7 @@ func (model dashboardModel) finishQuietOverviewRefresh(message overviewQuietRefr
 	if model.screen == dashboardHome {
 		model.syncHomeTasks()
 	}
-	return model, nil
+	return model, poll
 }
 
 func (model *dashboardModel) syncHomeTasks() {

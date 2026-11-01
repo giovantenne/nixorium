@@ -121,14 +121,7 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 			return model, nil
 		}
 		if model.telemetry.firstOffer {
-			model.screen = dashboardHome
-			model.telemetry.firstOffer = false
-			model.message = "Adoption statistics remain off. Choose later in Maintenance."
-			if model.telemetry.loadingOffer {
-				model.message = "No statistics choice was saved. Manage it in Maintenance."
-			}
-			model.telemetry.loadingOffer = false
-			return model, nil
+			return model.skipTelemetryOffer(), nil
 		}
 		model.screen = dashboardAdministration
 		model.telemetry.firstOffer = false
@@ -148,11 +141,14 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 		}
 		model.navigation.pageScroll = 0
 		model.message = ""
-	case "e", "enter", "n", "d":
-		// Enter invokes the displayed primary action only on the overview.
-		if key.String() == "enter" && model.telemetry.detail != "" {
-			return model, nil
+	case "enter":
+		// Enter never saves a choice: on the first invitation it means
+		// "Not now" (the same as Esc); elsewhere it does nothing.
+		if model.telemetry.firstOffer && model.telemetry.detail == "" {
+			return model.skipTelemetryOffer(), nil
 		}
+		return model, nil
+	case "e", "n", "d":
 		if model.actions.Telemetry == nil || (key.String() != "d" && key.String() != "n" && model.telemetry.report.Consent == "") {
 			return model, nil
 		}
@@ -176,6 +172,19 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 		model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 	}
 	return model, nil
+}
+
+// skipTelemetryOffer leaves the first invitation without saving a decision.
+// Consent stays undecided, so the invitation returns at the next launch.
+func (model dashboardModel) skipTelemetryOffer() dashboardModel {
+	model.screen = dashboardHome
+	model.telemetry.firstOffer = false
+	model.message = "Adoption statistics remain off. You will be asked again the next time Nixorium starts, or you can choose now in Maintenance."
+	if model.telemetry.loadingOffer {
+		model.message = "No statistics choice was saved. You will be asked again the next time Nixorium starts, or you can choose now in Maintenance."
+	}
+	model.telemetry.loadingOffer = false
+	return model
 }
 func (model dashboardModel) telemetryView() string {
 	if model.telemetry.loadingOffer {
@@ -230,12 +239,11 @@ func (model dashboardModel) telemetryView() string {
 	if r.Consent == "enabled" {
 		decline = "Disable sharing"
 	}
-	acceptKey := "e/Enter"
-	if model.telemetry.detail != "" {
-		acceptKey = "e"
+	actions := []tuiAction{{key: "e", label: "Share statistics"}, {key: "n", label: decline}}
+	if model.telemetry.firstOffer && model.telemetry.detail == "" {
+		actions = append(actions, tuiAction{key: "Enter", label: "Not now"})
 	}
-	actions := []tuiAction{{key: acceptKey, label: "Share statistics"}, {key: "n", label: decline},
-		{key: "p", label: "Exact report"}, {key: "i", label: "Privacy & retention"}, {key: "↑/↓", label: "Scroll"}}
+	actions = append(actions, tuiAction{key: "p", label: "Exact report"}, tuiAction{key: "i", label: "Privacy & retention"}, tuiAction{key: "↑/↓", label: "Scroll"})
 	back := "Back"
 	if model.telemetry.firstOffer && model.telemetry.detail == "" {
 		back = "Menu"

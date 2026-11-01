@@ -37,6 +37,8 @@ type shareTransfer struct {
 const (
 	shareTransfers = 3
 	shareIdle      = 30 * time.Minute
+	// shareBusy keeps prepared files that are still being written.
+	shareBusy = time.Minute
 )
 
 var errShareMissing = errors.New("the prepared files are not available")
@@ -53,7 +55,7 @@ func (store *shareStore) Begin(entries []classroomview.FileEntry) (string, error
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
 	store.pruneLocked()
-	if len(store.transfers) >= shareTransfers {
+	if len(store.transfers) >= shareTransfers && !store.evictIdleLocked() {
 		return "", errors.New("other files are being prepared; try again in a few minutes")
 	}
 	id, err := randomToken()
@@ -161,6 +163,25 @@ func (store *shareStore) Remove(id string) {
 		_ = os.RemoveAll(transfer.directory)
 		delete(store.transfers, id)
 	}
+}
+
+// evictIdleLocked frees the place of the prepared files unused the longest,
+// so files nobody confirmed (a review left open, or the plan step of the
+// command line, which prepares them again to apply) do not block the next
+// sending for half an hour. Files written in the last minute stay.
+func (store *shareStore) evictIdleLocked() bool {
+	oldest := ""
+	for id, transfer := range store.transfers {
+		if oldest == "" || transfer.used.Before(store.transfers[oldest].used) {
+			oldest = id
+		}
+	}
+	if oldest == "" || store.now().Sub(store.transfers[oldest].used) < shareBusy {
+		return false
+	}
+	_ = os.RemoveAll(store.transfers[oldest].directory)
+	delete(store.transfers, oldest)
+	return true
 }
 
 func (store *shareStore) pruneLocked() {

@@ -46,7 +46,7 @@ func (local Local) GitCommitProposal(ctx context.Context, repository string, pat
 	if _, _, err := runBoundedGitEnvironment(ctx, repository, environment, 16*1024, "read-tree", "HEAD"); err != nil {
 		return domain.GitCommitProposal{}, fmt.Errorf("initialize proposed commit from HEAD: %w", err)
 	}
-	addArguments := append([]string{"add", "--"}, paths...)
+	addArguments := append([]string{"--literal-pathspecs", "add", "--"}, paths...)
 	if _, _, err := runBoundedGitEnvironment(ctx, repository, environment, 16*1024, addArguments...); err != nil {
 		return domain.GitCommitProposal{}, fmt.Errorf("stage selected paths in isolated proposal: %w", err)
 	}
@@ -57,7 +57,7 @@ func (local Local) GitCommitProposal(ctx context.Context, repository string, pat
 	if truncated || !fullGitObjectIDPattern.MatchString(strings.TrimSpace(tree)) {
 		return domain.GitCommitProposal{}, errors.New("proposed Git tree ID is invalid")
 	}
-	rawArguments := append([]string{"diff", "--cached", "--raw", "-z", "--no-abbrev", "--no-renames", "--no-ext-diff", "--no-textconv", "HEAD", "--"}, paths...)
+	rawArguments := append([]string{"--literal-pathspecs", "diff", "--cached", "--raw", "-z", "--no-abbrev", "--no-renames", "--no-ext-diff", "--no-textconv", "HEAD", "--"}, paths...)
 	raw, rawTruncated, err := runBoundedGitEnvironment(ctx, repository, environment, maximumGitStatusBytes, rawArguments...)
 	if err != nil || rawTruncated {
 		return domain.GitCommitProposal{}, errors.New("cannot inspect proposed commit metadata")
@@ -81,7 +81,7 @@ func (local Local) GitCommitProposal(ctx context.Context, repository string, pat
 	if len(changed) == 0 {
 		return domain.GitCommitProposal{}, errors.New("selected paths do not differ from HEAD")
 	}
-	diffArguments := []string{"diff", "--cached", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=3", "HEAD", "--"}
+	diffArguments := []string{"--literal-pathspecs", "diff", "--cached", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=3", "HEAD", "--"}
 	nativeHomeFiles := true
 	opaqueSummary := ""
 	for _, path := range paths {
@@ -126,7 +126,7 @@ func (local Local) GitCommitProposal(ctx context.Context, repository string, pat
 	}
 	diff := ""
 	diffTruncated := false
-	if len(diffArguments) > 8 {
+	if len(diffArguments) > 9 {
 		diff, diffTruncated, err = runBoundedGitEnvironment(ctx, repository, environment, limit, diffArguments...)
 	}
 	if err != nil {
@@ -220,7 +220,7 @@ func (local Local) CommitGitPaths(ctx context.Context, repository string, paths 
 	if _, _, err := runBoundedGit(ctx, repository, 16*1024, "update-ref", "-m", "nixorium reviewed commit", "HEAD", commit, expectedRevision); err != nil {
 		return "", fmt.Errorf("advance HEAD to reviewed Git commit: %w", err)
 	}
-	resetArguments := []string{"reset", "--mixed", "--quiet", "HEAD", "--"}
+	resetArguments := []string{"--literal-pathspecs", "reset", "--mixed", "--quiet", "HEAD", "--"}
 	resetArguments = append(resetArguments, paths...)
 	if _, _, err := runBoundedGit(ctx, repository, 16*1024, resetArguments...); err != nil {
 		return "", fmt.Errorf("commit created but selected index paths could not be reconciled: %w", err)
@@ -236,9 +236,9 @@ func (local Local) CommitGitPaths(ctx context.Context, repository string, paths 
 }
 
 func runBoundedGitInput(ctx context.Context, repository string, input []byte, limit int, arguments ...string) (string, bool, error) {
-	command := exec.CommandContext(ctx, "git", append([]string{"-C", repository}, arguments...)...)
+	command := exec.CommandContext(ctx, "git", append(append([]string{"-C", repository}, gitHardeningArguments()...), arguments...)...)
 	configureCommandCancellation(command)
-	command.Env = internalCommitEnvironment()
+	command.Env = gitHardenedEnvironment(internalCommitEnvironment())
 	command.Stdin = bytes.NewReader(input)
 	stdout := &boundedCommandBuffer{limit: limit}
 	stderr := &boundedCommandBuffer{limit: 16 * 1024}
@@ -364,11 +364,11 @@ func (local Local) DiscardGitPaths(ctx context.Context, repository string, paths
 	if _, _, err := runBoundedGit(ctx, repository, 16*1024, "update-ref", backup, commit, strings.Repeat("0", 40)); err != nil {
 		return "", fmt.Errorf("record the discard backup: %w", err)
 	}
-	checkout := append([]string{"checkout", expectedRevision, "--"}, paths...)
+	checkout := append([]string{"--literal-pathspecs", "checkout", expectedRevision, "--"}, paths...)
 	if _, _, err := runBoundedGit(ctx, repository, 16*1024, checkout...); err != nil {
 		return backup, fmt.Errorf("restore the selected paths: %w", err)
 	}
-	verify := append([]string{"diff", "--quiet", "--no-ext-diff", "--no-textconv", expectedRevision, "--"}, paths...)
+	verify := append([]string{"--literal-pathspecs", "diff", "--quiet", "--no-ext-diff", "--no-textconv", expectedRevision, "--"}, paths...)
 	if _, _, err := runBoundedGit(ctx, repository, 16*1024, verify...); err != nil {
 		return backup, errors.New("the selected paths still differ from the last saved version")
 	}

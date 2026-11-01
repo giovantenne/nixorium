@@ -42,8 +42,9 @@ func runLockCommand(ctx context.Context, repository string, options options, std
 		return 0
 	}
 	// The plan above is fresh, so compare what it covers with the review.
-	if options.expect != plan.ReviewToken {
-		fmt.Fprintln(stderr, "The computers changed since the review; create a fresh plan.")
+	plan, match := manager.Reviewed(plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "The computers changed since the review; create a fresh plan.")
 		return 1
 	}
 	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Lock apply requires an interactive terminal or --yes."}, func(output io.Writer) (bool, error) {

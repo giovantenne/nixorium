@@ -73,7 +73,7 @@ func TestUpdateReviewShowsOnlyChangesUntilDetails(t *testing.T) {
 	plan.Workspace.Current.Packages = append(plan.Workspace.Current.Packages, domain.WorkspacePackage{Package: "gcc", Version: "15.2.0"})
 	plan.Workspace.Proposed.Packages = append(plan.Workspace.Proposed.Packages, domain.WorkspacePackage{Package: "gcc", Version: "15.2.0"})
 	summary := strings.Join(updateReviewLines(plan, false), "\n")
-	for _, want := range []string{"Nixorium: nixos-26.05 -> nixos-26.05", "Applications whose version changes:", "Package vscode: 1.0 -> 2.0", "Package nodejs: not selected -> 24.0", "F4 shows every version and the changes to the deployment files."} {
+	for _, want := range []string{"NixOS base: nixos-26.05 (unchanged)", "Applications whose version changes:", "Package vscode: 1.0 -> 2.0", "Package nodejs: not selected -> 24.0", "F4 shows every version and the changes to the deployment files."} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary misses %q:\n%s", want, summary)
 		}
@@ -101,17 +101,34 @@ func TestUpdateReviewNamesMasterRevisionsAndIndentsMigrations(t *testing.T) {
 	m.width, m.height = 100, 40
 	m.screen = dashboardUpdateReview
 	m.updates.plan = demoWorkspaceUpdatePlan()
+	m.updates.plan.Kind = ""
 	m.updates.plan.CurrentRef, m.updates.plan.Target = "master", "master"
 	m.updates.plan.CurrentRev, m.updates.plan.TargetRev = strings.Repeat("3", 40), strings.Repeat("a", 40)
 	m.updates.plan.Migrations = []domain.DeploymentMigrationResult{{State: domain.MigrationApplied, Files: []string{"scripts/cmd-screensaver.sh"},
 		Description: "The lab screensaver draws 60 frames per second instead of 30: its effects advance once per frame, so at 30 they ran at half speed."}}
 	content := strings.Join(m.updateReviewContent(), "\n")
-	if !strings.Contains(content, "Nixorium: master 333333333333 -> aaaaaaaaaaaa") {
+	if !strings.Contains(content, "Nixorium: master 333333333333 → aaaaaaaaaaaa") {
 		t.Fatalf("revisions missing:\n%s", content)
 	}
 	for _, line := range strings.Split(content, "\n") {
 		if strings.Contains(line, "half speed") && !strings.HasPrefix(line, strings.Repeat(" ", 18)) {
 			t.Fatalf("migration continuation not indented: %q\n%s", line, content)
 		}
+	}
+}
+
+func TestUpdateReviewLabelsTheReferenceAndSaysWhenNothingChanges(t *testing.T) {
+	plan := demoWorkspaceUpdatePlan()
+	summary := strings.Join(updateReviewLines(plan, false), "\n")
+	if !strings.Contains(summary, "NixOS base: nixos-26.05 (unchanged)") || strings.Contains(summary, "Nixorium:") || strings.Contains(summary, "nixos-26.05 -> nixos-26.05") {
+		t.Fatalf("system and package update review:\n%s", summary)
+	}
+	plan.Target = "nixos-26.11"
+	if summary = strings.Join(updateReviewLines(plan, false), "\n"); !strings.Contains(summary, "NixOS base: nixos-26.05 → nixos-26.11") {
+		t.Fatalf("channel change:\n%s", summary)
+	}
+	plan.Kind, plan.CurrentRef, plan.Target = "", "v3.10.0", "v3.11.0"
+	if summary = strings.Join(updateReviewLines(plan, false), "\n"); !strings.Contains(summary, "Nixorium: v3.10.0 → v3.11.0") {
+		t.Fatalf("release change:\n%s", summary)
 	}
 }

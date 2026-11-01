@@ -101,14 +101,14 @@ validate_plan() {
     (.operationId | type == "string" and test("^[0-9a-f]{32}$")) and
     (.bootId | type == "string" and test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")) and
     (.deploymentRevision | type == "string" and test("^[0-9a-f]{40,64}$")) and
-    (.systemPath | type == "string" and test("^/nix/store/[0-9a-z]{32}-nixos-system-(pc[0-9]{2}|nixorium-client-shared-[0-9]{1,4})-[^/[:space:]]+$")) and
+    (.systemPath | type == "string" and test("^/nix/store/[0-9a-z]{32}-nixos-system-(pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])|nixorium-client-shared-[0-9]{1,4})-[^/[:space:]]+$")) and
     (.adminPublicKey | type == "string" and length <= 1024 and test("^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$")) and
     (.hostKeyPublic | type == "string" and length <= 1024 and test("^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$")) and
     (.hostKeyRotation | type == "boolean") and
     (.host | type == "object" and (keys | sort) == (["class","interface","liveIp","name","staticIp"] | sort)) and
-    (.host.name | type == "string" and test("^pc[0-9]{2}$")) and
-    (.host.class | type == "string" and test("^(|pc[0-9]{2}|shared-[0-9]{1,4})$")) and
-    (.host.interface | type == "string" and test("^[A-Za-z0-9_.:-]{1,64}$")) and
+    (.host.name | type == "string" and test("^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$")) and
+    (.host.class | type == "string" and test("^(|pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])|shared-[0-9]{1,4})$")) and
+    (.host.interface | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}$")) and
     (.host.liveIp | type == "string" and test("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")) and
     (.host.staticIp | type == "string" and test("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")) and
     (.cache | type == "object" and (keys | sort) == (["publicKey","url"] | sort)) and

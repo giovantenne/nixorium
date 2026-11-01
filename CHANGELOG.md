@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.12.0] - 2026-10-30
+
+From 3.11.0, Update Nixorium, then Apply to controller and Update computers as
+usual; the deployment migrations below run during the update. From 3.10.0 or
+older, first follow the notes of those releases.
+
 ### Added
 
 - Every user has a **Caffeine** toggle in GNOME's quick settings (top right):
@@ -19,10 +25,128 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Remote control in the classroom view types characters that need AltGr and
+  Shift together, such as `{` and `}` on an Italian keyboard (AltGr+Shift+è).
+  Before, the student's computer received the teacher's AltGr and Shift on top
+  of the character and typed something else.
+- Send files no longer refuses with "other files are being prepared" for half
+  an hour after three reviews that were not confirmed (or three uses of
+  `nixorium send` from the command line): a new sending takes the place of the
+  files unused the longest.
+- Changing the laboratory network: confirming a step now checks the
+  computers again before saving. Before, a computer restarted into its
+  previous address after the review of "finish" could be left without the
+  controller; now the step stops and asks for a new review.
+- A schedule set for a time that does not exist on the night the clocks go
+  forward (for example 02:30) now runs in the first minute after the jump and
+  appears in the history, instead of being skipped for that day. On the night
+  the clocks go back, a time in the repeated hour still runs once.
+- Stopping or recovering the network installation no longer says the normal
+  controller address is restored when the laboratory settings could not be
+  read to check it. It now says the address could not be verified and asks
+  you to check the laboratory again and run Apply to controller if the
+  address is missing.
+- Discarding changes, committing selected files and carrying an Assistant
+  proposal to a new chat now treat file names literally: a file named with
+  `*`, `[` or `:(` no longer affects other files.
+- Nixorium services now stop promptly when asked to, even if a program
+  connected to their local socket is not responding, instead of waiting until
+  the system forces them to stop.
+- Stopping Update computers, or reaching its time limit, no longer marks the
+  computers still waiting for their turn as "activation result unknown". They
+  keep their current system and are listed as not updated, so the update does
+  not need a reviewed recovery for computers it never touched.
+- A USB installation over SSH that lost the live computer right after its
+  temporary key was added no longer blocks the controller: Apply to controller
+  and network installation refused until a file was deleted by hand, and the
+  installation service failed at every start. The reservation is now released
+  (the controller has already deleted the key's private half); restart the
+  live USB computer before trying again.
+- Deployment migrations that replace several files (such as the screensaver
+  one) now put every file back as it was if writing one of them fails, instead
+  of leaving the deployment half migrated. The review also no longer reports
+  a migration that only deletes text as a manual change when the text is
+  already gone.
+- A confirmation could expire seconds after it was shown: a review made just
+  before a clock boundary (every 5 or 10 minutes) was valid for only a few
+  seconds, so Enter was answered with "review expired", and a command-line
+  plan followed by an apply on either side of the boundary said the computers
+  had changed. Every review for update recovery, cleanup, shutdown and restart,
+  Internet and lock control, file sending and collecting, and host-key changes
+  now stays valid for at least its full time (5 or 10 minutes, as before), the
+  command-line apply accepts the earlier review until it expires, and an
+  expired review is reported as expired.
+- Computers numbered 100 and above (pc100 to pc254) are now accepted
+  everywhere a computer name is checked. Before, a laboratory with more than
+  99 computers could not review a changed SSH host key (one three-digit name
+  made every review refuse), start a USB installation for them, or run the
+  installer scripts for them. One rule now decides which names are valid
+  (pc01 to pc254), and the network interface name is limited to the 15
+  characters Linux allows in the USB installation too.
+- The time zone and the two locales in lab-settings.json are now checked when
+  you plan or save: a malformed value such as `Europe/ Rome` or `italian` is
+  refused with a message, instead of failing hours later when the controller
+  applies the change. Every zone and locale NixOS accepts keeps working (for
+  example `CET` or `ca_ES.UTF-8@valencia`). Password hashes must use the
+  characters a real hash has, so a hash with a space or a line break inside is
+  refused. A value refused after the update is shown in Settings, where you
+  can correct it.
+- Security: the controller and the computers write editor, browser and
+  bookmark defaults (and, on the controller, the screen layout) into the
+  administrator's and teacher's homes as those users, not as root. Before, a
+  teacher could leave a link in their own home that made the controller or a
+  computer overwrite a system file at the next start or update. The deployment migration
+  `2026-10-staff-home-writes-as-owner` updates `modules/home-profile.nix`. If
+  you edited that file, the review shows a manual change and the old,
+  vulnerable version stays until you copy the new one from `templates/site`.
+- Git names and emails and the keyboard layout from lab-settings.json are now
+  checked (one line, no control characters, at most 256 bytes; layouts made of
+  letters, digits and `_-+,()`) and are quoted wherever they reach a script
+  that runs as root, so a crafted value (for example one proposed to the
+  Assistant) can no longer run commands on the computers.
+- The first adoption statistics invitation no longer turns sharing on when you
+  press Enter. Only `e` accepts; Enter now means "Not now" and leaves the choice
+  undecided, so the invitation returns at the next launch, and the screen says
+  so. In Maintenance, Enter no longer enables sharing either. The privacy
+  notice now names the operator as HardyPress SRL, which maintains Nixorium,
+  instead of a person.
 - A new installation (controller, or computer from USB or the network) now
   lists Windows on another disk in its first boot menu. Before, the boot
   loader was set up without the disk information os-prober needs, and Windows
   appeared only after the first update.
+- In the administrator interface, the file path in **Send files** now accepts
+  the letters `q` and `?` instead of closing Nixorium or opening help, and
+  pasting text works in that field, in the computer and software searches, in
+  the key import path and in the network address.
+- Background work from the Overview keeps being checked every two seconds after
+  you leave and return to it, so a finished job no longer shows as running and
+  no longer blocks Apply to controller. In Background work, the Up key moves up.
+- Cancelling a computer check no longer sends the next Computer inventory back
+  to the screen you left. Ctrl+C now closes Nixorium in the Assistant chat and
+  review, as on the other screens (while a request runs it still stops that
+  request first).
+- The Assistant review of a proposal that does not evaluate opens on "Technical
+  details" instead of a disabled save, explains on the main screen that saving
+  is not available and what to do next, and Enter on a disabled choice says why.
+- Reviews say what they change: Update computers lists the computers it affects
+  (or "all N computers") instead of the internal selector `@lab`; the restart
+  review says "will restart" for computers in use; Update system and packages
+  labels the line "NixOS base", uses an arrow and says "unchanged" when the
+  channel does not change. The help for the update review no longer mentions a
+  DEPLOY confirmation: Enter confirms. The demonstration of an interrupted
+  background job now shows it as interrupted.
+- While you control a student's computer, a message, a lock, a file sent or
+  collected, or a busy refusal no longer turns off the shared clipboard and
+  the "controlled" notice on the student's screen. Only the end of the control
+  does.
+- A student computer whose screen manager is slow to answer is no longer
+  shown to the teacher as "agent stopped" when the teacher opens the
+  classroom view: the computer answers the first greeting in time and is
+  reported as unlocked until the screen manager replies.
+- A student screen that produces a very large picture (a big, detailed screen
+  at the enlarged view) no longer makes the classroom view lose that computer:
+  the picture is made smaller to fit, or skipped, instead of closing the
+  connection.
 
 ## [3.11.0] - 2026-10-28
 

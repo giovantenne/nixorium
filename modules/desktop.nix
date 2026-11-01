@@ -1,9 +1,13 @@
 { pkgs, lib, isController, labSettings, labAssets, ... }:
 let
+  # A GVariant string literal: backslash and single quote are escaped.
+  gvariantString = value:
+    "'" + lib.replaceStrings [ "\\" "'" ] [ "\\\\" "\\'" ] value + "'";
   backgroundFiles = builtins.listToAttrs (map (background: {
     name = "lab/backgrounds/${builtins.baseNameOf (builtins.unsafeDiscardStringContext (toString background))}";
     value.source = background;
   }) labAssets.backgrounds);
+  asUser = import ../lib/as-user.nix { inherit pkgs lib; };
 in
 {
   imports = [
@@ -43,22 +47,27 @@ in
       ADMIN_MONITORS="/home/admin/.config/monitors.xml"
       GDM_CONFIG_DIR="/var/lib/gdm/seat0/config"
       GDM_MONITORS="$GDM_CONFIG_DIR/monitors.xml"
-      TEACHER_CONFIG_DIR="/home/${labSettings.teacherUser}/.config"
-      TEACHER_MONITORS="$TEACHER_CONFIG_DIR/monitors.xml"
+      TEACHER_MONITORS="/home/${labSettings.teacherUser}/.config/monitors.xml"
 
-      if [ ! -f "$ADMIN_MONITORS" ]; then
+      if [ ! -f "$ADMIN_MONITORS" ] || [ -L "$ADMIN_MONITORS" ]; then
         exit 0
       fi
 
+      # Reads are bounded: a FIFO swapped in must not hold the login screen.
       install -d -m 0700 "$GDM_CONFIG_DIR"
-      cp "$ADMIN_MONITORS" "$GDM_MONITORS"
+      rm -f "$GDM_MONITORS"
+      timeout 30 cp "$ADMIN_MONITORS" "$GDM_MONITORS"
       chmod 0600 "$GDM_MONITORS"
-      chown "$(stat -c '%u:%g' "$GDM_CONFIG_DIR")" "$GDM_MONITORS"
+      chown -h "$(stat -c '%u:%g' "$GDM_CONFIG_DIR")" "$GDM_MONITORS"
 
-      install -d -o "${labSettings.teacherUser}" -g users -m 0700 "$TEACHER_CONFIG_DIR"
-      cp "$ADMIN_MONITORS" "$TEACHER_MONITORS"
-      chmod 0600 "$TEACHER_MONITORS"
-      chown "${labSettings.teacherUser}:users" "$TEACHER_MONITORS"
+      # The teacher's copy is written by the teacher from what root reads:
+      # the teacher's cat reads the pipe, so the admin's file may stay private.
+      timeout 30 cat "$ADMIN_MONITORS" | ${asUser labSettings.teacherUser ''${pkgs.bash}/bin/sh -c ${lib.escapeShellArg ''
+        umask 077
+        mkdir -p "''${1%/*}"
+        rm -f "$1"
+        cat > "$1"
+      ''} sh "$TEACHER_MONITORS"''}
     '';
     path = [ pkgs.coreutils ];
   };
@@ -91,7 +100,7 @@ in
     idle-dim=false
 
     [org.gnome.desktop.input-sources]
-    sources=[('xkb', '${labSettings.keyboardLayout}')]
+    sources=[('xkb', ${gvariantString labSettings.keyboardLayout})]
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [
     pkgs.gnome-settings-daemon

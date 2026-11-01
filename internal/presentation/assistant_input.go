@@ -445,3 +445,14 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 	model.assistant.input, command = model.assistant.input.Update(key)
 	return model, command
 }
+
+// assistantUsesCtrlC reports whether Ctrl+C belongs to the Assistant step on
+// screen: it stops a running request and leaves the billing and name steps.
+// In the chat and the other steps it closes Nixorium like anywhere else.
+func (model dashboardModel) assistantUsesCtrlC() bool {
+	switch model.assistant.state {
+	case "running", "billing-loading", "name", "name-saving":
+		return true
+	}
+	return false
+}

@@ -81,7 +81,7 @@ func (server *ClassroomIPCServer) serveConnection(ctx context.Context, connectio
 	if err != nil || len(content) > domain.ClassroomMessageMaxBytes {
 		return
 	}
-	_ = writeRemoteIPCFrame(connection, append(content, '\n'))
+	_ = writeIPCResponse(connection, append(content, '\n'))
 }
 
 func ClassroomIPCRequest(ctx context.Context, socketPath string, request domain.ClassroomRequest) (domain.ClassroomResponse, error) {

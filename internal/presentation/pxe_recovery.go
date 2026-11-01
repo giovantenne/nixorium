@@ -91,6 +91,14 @@ func (model dashboardModel) pxeRecoveryLines() []string {
 // network installation in plain words, and the next step when it failed.
 func pxeLifecycleOutcome(report domain.PXELifecycleReport, cli bool) (string, string) {
 	recover := report.Operation == "pxe-recover"
+	if !report.HasErrors() && strings.Contains(report.Message, "address could not be verified") {
+		// The services are stopped; only the check of the address was missing.
+		next := "Check the laboratory again (Maintenance → Diagnostics); if the controller address is missing, run Apply to controller (Maintenance → Apply to controller)."
+		if cli {
+			next = "Run nixorium doctor; if the controller address is missing, run nixorium controller plan and apply it."
+		}
+		return "Network installation is off, but the controller network could not be checked.", next
+	}
 	if !report.HasErrors() {
 		if recover {
 			return "The controller network is back to normal; network installation is off.", "Nothing changed on the student computers."

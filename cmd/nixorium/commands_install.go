@@ -452,8 +452,8 @@ func validateInstall(result *options) error {
 		if (result.subcommand == "usb-prepare" || result.subcommand == "usb-start") != (result.host != "") {
 			return errors.New("install usb prepare/start require --host; other USB operations do not accept it")
 		}
-		if result.host != "" && !domain.ValidRemoteHostName(result.host) {
-			return errors.New("--host must be a canonical pcNN inventory name")
+		if result.host != "" && !domain.ValidHostName(result.host) {
+			return errors.New("--host must be a computer name from pc01 to pc254, such as pc07")
 		}
 		needsID := result.subcommand != "usb-prepare" && result.subcommand != "usb-start"
 		// status without --id shows the unfinished operation, if any.

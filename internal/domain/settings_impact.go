@@ -174,9 +174,9 @@ func SettingsImpacts(base, candidate LabSettingsFile, changes []SettingChange) [
 
 func computerRange(first, last int) string {
 	if first == last {
-		return fmt.Sprintf("pc%02d", first)
+		return HostName(first)
 	}
-	return strings.Join([]string{fmt.Sprintf("pc%02d", first), fmt.Sprintf("pc%02d", last)}, "–")
+	return strings.Join([]string{HostName(first), HostName(last)}, "–")
 }
 
 // ClassroomViewImpact says in plain words what the classroom view setting

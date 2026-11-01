@@ -271,14 +271,13 @@ func (model softwareModel) updateSearchInput(key tea.KeyPressMsg, search func(co
 		model.searching = false
 		return model, softwareSearchInput{handled: true, delegate: true}
 	case "backspace":
-		value := []rune(model.query)
-		if len(value) > 0 {
-			model.query = string(value[:len(value)-1])
+		if query := dropLastRune(model.query); query != model.query {
+			model.query = query
 			changed = true
 		}
 	default:
-		if key.Text != "" && len(model.query) < 80 {
-			model.query += key.Text
+		if query := appendInputText(model.query, key.Text, softwareQueryMax); query != model.query {
+			model.query = query
 			changed = true
 		}
 	}

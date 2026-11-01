@@ -207,6 +207,12 @@ func (s Schedule) ActionAt(t time.Time) string {
 
 // Due tells which half of the schedule starts in the minute of now, read in
 // now's own time zone (the controller's, when now is time.Now()).
+//
+// A time that the clock skipped, because the zone jumped forward (02:00 to
+// 03:00 on the spring night), is due in the first minute after the jump, so
+// that day's run is late instead of lost. When the clock goes back, the
+// repeated minutes match twice; the record of the last run keeps the second
+// one from running again.
 func (s Schedule) Due(now time.Time) (on, off bool) {
 	day := ScheduleWeekdays[(int(now.Weekday())+6)%7]
 	listed := false
@@ -217,7 +223,30 @@ func (s Schedule) Due(now time.Time) (on, off bool) {
 		return false, false
 	}
 	clock := now.Format("15:04")
-	return s.On != "" && s.On == clock, s.Off != "" && s.Off == clock
+	skippedFrom, jumped := scheduleSkippedFrom(now)
+	due := func(set string) bool {
+		return set != "" && (set == clock || (jumped && set > skippedFrom && set < clock))
+	}
+	return due(s.On), due(s.Off)
+}
+
+// scheduleSkippedFrom tells whether the minute of now is the first one after
+// the clock jumped forward, and the last HH:MM before the jump. The clock
+// times after it and before now do not exist on that day. When the jump
+// crossed midnight the skipped times start at 00:00 of now's day.
+func scheduleSkippedFrom(now time.Time) (string, bool) {
+	start := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, now.Location())
+	before := start.Add(-time.Minute)
+	_, offsetNow := start.Zone()
+	_, offsetBefore := before.Zone()
+	if offsetNow <= offsetBefore {
+		return "", false
+	}
+	if before.Day() != start.Day() {
+		// "" sorts before every HH:MM, including 00:00.
+		return "", true
+	}
+	return before.Format("15:04"), true
 }
 
 // FormatScheduleDays says "every day", "Monday to Friday" for three or more

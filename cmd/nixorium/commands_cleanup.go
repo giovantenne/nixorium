@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
@@ -26,8 +25,9 @@ func runCleanupCommand(ctx context.Context, repository string, options options, 
 		}
 		return 0
 	}
-	if options.expect != plan.ReviewToken {
-		fmt.Fprintln(stderr, "The computers changed after review; create a fresh cleanup plan.")
+	plan, match := manager.Reviewed(plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "The computers changed after review; create a fresh cleanup plan.")
 		return 1
 	}
 	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "cleanup apply requires an interactive terminal or --yes.", cancelled: "Confirmation did not match; nothing was removed.", cancelCode: 1}, func(output io.Writer) (bool, error) {

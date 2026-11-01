@@ -32,8 +32,8 @@ navigable dashboard demonstrates the same proposal on two of its four PCs.
 ## Workflow guide
 
 The first administrator launch shows the operational disclaimer (Enter accepts,
-q exits), then the optional telemetry invitation (Enter accepts, n declines,
-Esc skips to the menu, q exits). Skipping saves no consent and repeats the
+q exits), then the optional telemetry invitation (e accepts, n declines,
+Enter or Esc skips to the menu, q exits). Skipping saves no consent and repeats the
 invitation next launch. A saved refusal is remembered.
 
 The overview opens Computers, Installation, Software and Maintenance. Startup
@@ -163,8 +163,8 @@ Disable anytime in Maintenance. See Privacy & retention for details.
 
 Status: Off — no adoption reports are being sent.
 
-e/Enter Share statistics  ·  n No thanks  ·  p Exact report  ·  i Privacy & retention  ·  ↑/↓ Scroll  ·  Esc Menu
-q Exit  ·  F1 Help
+e Share statistics  ·  n No thanks  ·  ⏎ Enter Not now  ·  p Exact report  ·  i Privacy & retention  ·  ↑/↓ Scroll
+Esc Menu  ·  q Exit  ·  F1 Help
 ```
 
 ## Unconfigured clients
@@ -511,6 +511,8 @@ Computers affected
 pc01–pc02
 
 ✗ The configuration is not valid
+Saving is not available: the proposal does not evaluate. Return to the chat and ask the assistant to fix it.
+Technical details show the error.
 Saving creates a local commit and a backup. Enter on the first choice also updates this controller; you then
 choose the computers.
   Save and update the controller
@@ -1301,7 +1303,7 @@ Nixorium  /  Maintenance  /  Update system and packages  /  Review
 
 Review update
 Builds passed; programs are checked when they run on a computer.
-Nixorium: nixos-26.05 -> nixos-26.05
+NixOS base: nixos-26.05 (unchanged)
 Applications whose version changes:
   Extension example.extension: 1.0 -> 2.0
   Package nodejs: not selected -> 24.0
@@ -1580,11 +1582,10 @@ Nixorium  /  Overview  /  Background work
 Managed background work
 Read-only attachment. Leaving this view does not stop the job.
 
-Controller configuration — running
-Managed work is still running; viewing it does not start another operation.
+Controller configuration — interrupted
+Progress was left running, but no managed unit is running. Inspect the journal before a fresh review.
 
-● Building system · Running
-1/4 steps complete
+Last recorded phase: build
 Building the reviewed controller system
 
 Journal unit: nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service

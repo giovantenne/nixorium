@@ -17,6 +17,7 @@ import (
 // update (app.DeploymentRecoveryManager).
 type deploymentRecoverer interface {
 	Plan(context.Context, string, bool) domain.DeploymentRecoveryPlan
+	Reviewed(domain.DeploymentRecoveryPlan, string) (domain.DeploymentRecoveryPlan, app.ReviewMatch)
 	Apply(context.Context, domain.DeploymentRecoveryPlan, string) domain.DeploymentRecoveryResult
 }
 
@@ -38,8 +39,9 @@ func deploymentRecoveryCommand(ctx context.Context, manager deploymentRecoverer,
 		}
 		return 0
 	}
-	if options.expect != plan.ReviewToken {
-		fmt.Fprintln(stderr, "The computers or the interrupted update record changed after review; create a fresh plan.")
+	plan, match := manager.Reviewed(plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "The computers or the interrupted update record changed after review; create a fresh plan.")
 		return 1
 	}
 	if !options.yes {

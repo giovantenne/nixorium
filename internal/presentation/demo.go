@@ -129,7 +129,7 @@ func renderManagedJobsDemo(revision string, width, height int) DemoScenario {
 	jobs = append([]domain.ManagedJob(nil), jobs...)
 	jobs[0].State = "interrupted"
 	jobs[0].Detail = "Progress was left running, but no managed unit is running. Inspect the journal before a fresh review."
-	r.message(managedJobsMsg{jobs: jobs})
+	r.message(managedJobsMsg{id: r.model.jobs.id, jobs: jobs})
 	r.capture("Interrupted job with journal identity", 2500)
 	r.key(demoCode(tea.KeyTab))
 	r.capture("Inspect the other managed job", 1500)

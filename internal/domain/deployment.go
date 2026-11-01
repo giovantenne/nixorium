@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -68,6 +69,33 @@ func ValidClientClass(host, class string) bool {
 		}
 	}
 	return true
+}
+
+// MaxHostNumber is the highest computer number a laboratory can use.
+const MaxHostNumber = 254
+
+// HostName is the name of computer number n: pc01 to pc99, then pc100 and up.
+// lib/mk-lab.nix and setup.sh build the same name.
+func HostName(number int) string {
+	return fmt.Sprintf("pc%02d", number)
+}
+
+// ValidHostName reports whether value is a name a laboratory can produce: the
+// name of a computer number from 1 to MaxHostNumber. It is the one rule for
+// every computer name the controller reads, stores or passes to a script.
+func ValidHostName(value string) bool {
+	digits, found := strings.CutPrefix(value, "pc")
+	if !found || len(digits) < 2 || len(digits) > 3 {
+		return false
+	}
+	number := 0
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+		number = number*10 + int(digit-'0')
+	}
+	return number >= 1 && number <= MaxHostNumber && HostName(number) == value
 }
 
 // ClientNumber is the number in a client name such as pc07.

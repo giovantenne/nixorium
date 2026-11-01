@@ -10,7 +10,7 @@ import (
 )
 
 const TelemetryEndpoint = "https://telemetry.nixorium.org/v1/heartbeat"
-const TelemetryNotice = `Operator: Claudio Benvenuti, Nixorium maintainer.
+const TelemetryNotice = `Operator: HardyPress SRL, which maintains Nixorium.
 Privacy contact: hello@nixorium.org
 
 Purpose: understand adoption and lab sizes, and prioritize development.

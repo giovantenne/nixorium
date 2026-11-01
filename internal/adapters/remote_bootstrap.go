@@ -161,6 +161,12 @@ func BootstrapCleanupUnconfirmed(err error) bool {
 	return errors.As(err, &failure) && failure.cleanupUnconfirmed
 }
 
+// BootstrapCleanupUnconfirmedError marks err as a failure after which the
+// temporary live key could not be confirmed removed (tests and fakes).
+func BootstrapCleanupUnconfirmedError(err error) error {
+	return &liveBootstrapError{err: err, cleanupUnconfirmed: true}
+}
+
 func NewLiveBootstrap() LiveBootstrap {
 	return LiveBootstrap{runtimeRoot: "/run/nixorium/remote-install", port: 22, timeout: remoteBootstrapTimeout}
 }

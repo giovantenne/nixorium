@@ -36,6 +36,10 @@ var errClipboardOff = errors.New("the shared clipboard is not on")
 // clipboardState is guarded by the capture's mutex.
 type clipboardState struct {
 	on bool
+	// holders counts the connections that began the clipboard and are still
+	// open: a second control (a reconnect while the old channel drains) keeps
+	// it on when the first one closes.
+	holders int
 	// text is what the teacher pasted and the session may fetch.
 	text string
 	// ownerSeq counts the copies made by the session's user; readSeq the
@@ -52,12 +56,13 @@ func (capture *mutterCapture) ClipboardBegin() error {
 	}
 	capture.lastRequest = time.Now()
 	if capture.clipboard.on {
+		capture.clipboard.holders++
 		return nil
 	}
-	if err := capture.remote.Call(remoteDesktopName+".Session.EnableClipboard", 0, map[string]dbus.Variant{}).Err; err != nil {
+	if err := callBus(capture.remote, remoteDesktopName+".Session.EnableClipboard", map[string]dbus.Variant{}).Err; err != nil {
 		return err
 	}
-	capture.clipboard = clipboardState{on: true}
+	capture.clipboard = clipboardState{on: true, holders: 1}
 	return nil
 }
 
@@ -68,12 +73,24 @@ func (capture *mutterCapture) ClipboardEnd() error {
 	return nil
 }
 
+// ClipboardRelease is called when a connection that began the clipboard
+// closes: the clipboard ends with the last such connection.
+func (capture *mutterCapture) ClipboardRelease() {
+	capture.mutex.Lock()
+	defer capture.mutex.Unlock()
+	if capture.clipboard.holders > 1 {
+		capture.clipboard.holders--
+		return
+	}
+	capture.clipboardOffLocked()
+}
+
 // clipboardOffLocked turns the clipboard off and forgets any text.
 func (capture *mutterCapture) clipboardOffLocked() {
 	// The control ends with its clipboard.
 	capture.banner.Set(false)
 	if capture.clipboard.on && capture.remote != nil {
-		_ = capture.remote.Call(remoteDesktopName+".Session.DisableClipboard", 0).Err
+		_ = callBus(capture.remote, remoteDesktopName+".Session.DisableClipboard").Err
 	}
 	capture.clipboard = clipboardState{}
 	capture.changed.Broadcast()
@@ -97,7 +114,7 @@ func (capture *mutterCapture) ClipboardSet(text string) error {
 	capture.lastRequest = time.Now()
 	capture.clipboard.text = text
 	options := map[string]dbus.Variant{"mime-types": dbus.MakeVariant(textMimes)}
-	return capture.remote.Call(remoteDesktopName+".Session.SetSelection", 0, options).Err
+	return callBus(capture.remote, remoteDesktopName+".Session.SetSelection", options).Err
 }
 
 // ClipboardGet returns the text the session's user copied since the last
@@ -132,7 +149,7 @@ func (capture *mutterCapture) ClipboardGet() (string, error) {
 		return "", nil
 	}
 	var descriptor dbus.UnixFD
-	if err := remote.Call(remoteDesktopName+".Session.SelectionRead", 0, mime).Store(&descriptor); err != nil {
+	if err := callBus(remote, remoteDesktopName+".Session.SelectionRead", mime).Store(&descriptor); err != nil {
 		return "", err
 	}
 	data, err := readSelection(fileFromDescriptor(int(descriptor)), classroomview.MaxClipboardBytes, clipboardTransferTimeout)
@@ -183,14 +200,14 @@ func (capture *mutterCapture) selectionSignal(generation int, remote dbus.BusObj
 // answerTransfer writes the teacher's text into the pipe Mutter hands out.
 func answerTransfer(remote dbus.BusObject, serial uint32, text string, allowed bool) {
 	done := func(ok bool) {
-		_ = remote.Call(remoteDesktopName+".Session.SelectionWriteDone", 0, serial, ok).Err
+		_ = callBus(remote, remoteDesktopName+".Session.SelectionWriteDone", serial, ok).Err
 	}
 	if !allowed {
 		done(false)
 		return
 	}
 	var descriptor dbus.UnixFD
-	if err := remote.Call(remoteDesktopName+".Session.SelectionWrite", 0, serial).Store(&descriptor); err != nil {
+	if err := callBus(remote, remoteDesktopName+".Session.SelectionWrite", serial).Store(&descriptor); err != nil {
 		done(false)
 		return
 	}

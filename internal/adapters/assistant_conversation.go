@@ -362,7 +362,7 @@ func (store AssistantWorkspaceStore) CarryOverProposal(from, to string) (int, er
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	changed, err := resetGit(ctx, old.Repository, nil, 1024*1024, append([]string{"diff", "--name-only", old.Base, target.Conversation.Base, "--"}, paths...)...)
+	changed, err := resetGit(ctx, old.Repository, nil, 1024*1024, append([]string{"--literal-pathspecs", "diff", "--name-only", old.Base, target.Conversation.Base, "--"}, paths...)...)
 	if err != nil || strings.TrimSpace(changed) != "" {
 		return 0, ErrAssistantProposalConflict
 	}

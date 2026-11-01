@@ -83,9 +83,7 @@ func (model dashboardModel) updateShare(key tea.KeyPressMsg) (tea.Model, tea.Cmd
 	case shareStagePath:
 		switch key.String() {
 		case "backspace":
-			if value := []rune(m.path); len(value) > 0 {
-				m.path = string(value[:len(value)-1])
-			}
+			m.path = dropLastRune(m.path)
 		case "enter":
 			if strings.TrimSpace(m.path) == "" {
 				model.message = "Type the path of a file or folder."
@@ -93,7 +91,7 @@ func (model dashboardModel) updateShare(key tea.KeyPressMsg) (tea.Model, tea.Cmd
 			}
 			m.stage = shareStageComputers
 		default:
-			m.path += key.Text
+			m.path = appendInputText(m.path, key.Text, sharePathLimit)
 		}
 		return model, nil
 	case shareStageResult:

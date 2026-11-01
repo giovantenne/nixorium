@@ -246,7 +246,7 @@ func (local Local) RecordHomeFilesCandidate(ctx context.Context, repository, exp
 	}
 	slices.Sort(paths)
 	paths = slices.Compact(paths)
-	arguments := append([]string{"diff", "--cached", "--name-only", "-z", "--no-ext-diff", "--no-textconv", "HEAD", "--"}, paths...)
+	arguments := append([]string{"--literal-pathspecs", "diff", "--cached", "--name-only", "-z", "--no-ext-diff", "--no-textconv", "HEAD", "--"}, paths...)
 	staged, truncated, err := runBoundedGit(ctx, repository, 1024*1024, arguments...)
 	if err != nil || truncated || staged != "" {
 		return "", domain.ErrHomeFilesConflict

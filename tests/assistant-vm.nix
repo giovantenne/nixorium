@@ -245,7 +245,7 @@
     controller.succeed("install -d -m 0700 -o admin -g users /home/admin/deployment")
     controller.succeed("cp /etc/assistant-test/flake.nix /home/admin/deployment/flake.nix; mkdir /home/admin/deployment/modules; printf '{ course = 1; }\\n' > /home/admin/deployment/modules/course.nix; printf '{}\\n' > /home/admin/deployment/modules/controller.nix")
     settings = json.loads(controller.succeed("cat /etc/assistant-test/settings.json"))
-    settings["lab"].update(masterDhcpIp="192.0.2.10", pcCount=1, ifaceName="eth0", adminPassword="$6$vm$not-the-public-default", teacherPassword="$6$vm$not-the-public-default", studentPassword="$6$vm$not-the-public-default")
+    settings["lab"].update(masterDhcpIp="192.0.2.10", pcCount=1, ifaceName="eth0", adminPassword="$6$vm$notthepublicdefault", teacherPassword="$6$vm$notthepublicdefault", studentPassword="$6$vm$notthepublicdefault")
     controller.succeed("printf %s " + __import__("shlex").quote(json.dumps(settings)) + " > /home/admin/deployment/lab-settings.json; chown -R admin:users /home/admin/deployment")
     controller.succeed("su - admin -c 'cd deployment; git init -q; git add .; git -c user.name=Test -c user.email=test@example.invalid commit -qm initial'")
     original = controller.succeed("su - admin -c 'git -C deployment rev-parse HEAD'").strip()

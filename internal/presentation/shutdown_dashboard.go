@@ -355,7 +355,7 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 	lines = append(lines, "")
 	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-ctaRows(context.height)-20))
 	for _, target := range plan.Targets[start:end] {
-		lines = append(lines, shutdownTargetStatus(target, context.dark))
+		lines = append(lines, shutdownTargetStatus(target, plan.Action, context.dark))
 	}
 	if end < len(plan.Targets) {
 		lines = append(lines, tuiMuted(fmt.Sprintf("Showing %d of %d reviewed targets", end, len(plan.Targets)), context.dark))
@@ -444,12 +444,16 @@ func shutdownHasTechnicalDetail(report domain.ShutdownApplyReport) bool {
 	return false
 }
 
-func shutdownTargetStatus(target domain.ShutdownTargetPlan, dark bool) string {
+func shutdownTargetStatus(target domain.ShutdownTargetPlan, action domain.ClientPowerAction, dark bool) string {
+	verb := "will shut down"
+	if action == domain.ClientRestart {
+		verb = "will restart"
+	}
 	switch {
 	case target.Eligible && target.Session == domain.ShutdownSessionIdle:
 		return tuiStatus(target.Name+" · Ready", tuiStatusSuccess, dark)
 	case target.Eligible && target.Session == domain.ShutdownSessionActive:
-		return tuiStatus(target.Name+" · In use · will shut down", tuiStatusAttention, dark)
+		return tuiStatus(target.Name+" · In use · "+verb, tuiStatusAttention, dark)
 	case target.Eligible && target.Session == domain.ShutdownSessionUnused:
 		return tuiStatus(target.Name+" · Logged in, not in use · Ready", tuiStatusSuccess, dark)
 	case target.Eligible:

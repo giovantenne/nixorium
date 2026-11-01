@@ -244,3 +244,42 @@ func strictLiveSSHFixture(t *testing.T) *StrictLiveSSH {
 	}
 	return connection
 }
+
+func TestStrictLiveSSHRefusesStorePathsThatCouldInjectShellSyntax(t *testing.T) {
+	connection := strictLiveSSHFixture(t)
+	marker := filepath.Join(t.TempDir(), "ssh-ran")
+	executable := filepath.Join(t.TempDir(), "ssh")
+	if err := os.WriteFile(executable, []byte("#!/bin/sh\ntouch "+marker+"\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	connection.sshExecutable = executable
+	cache := domain.RemoteInstallCache{URL: "http://192.0.2.1:5000", PublicKey: "cache-1:" + strings.Repeat("A", 43) + "="}
+	operation := strings.Repeat("a", 32)
+	for _, path := range []string{
+		"/nix/store/00000000000000000000000000000000-bundle;touch-x",
+		"/nix/store/00000000000000000000000000000000-bundle$(id)",
+		"/nix/store/00000000000000000000000000000000-bundle'x",
+		"/nix/store/00000000000000000000000000000000-bundle?",
+		"/nix/store/00000000000000000000000000000000-bundle\nid",
+	} {
+		ctx := t.Context()
+		failures := []error{
+			connection.PullBundle(ctx, cache, path),
+			connection.VerifySignedClosure(ctx, cache, path),
+			func() error { _, err := connection.Probe(ctx, path); return err }(),
+			connection.ValidatePlan(ctx, path, []byte("{}")),
+			func() error { _, err := connection.Status(ctx, path, operation); return err }(),
+			func() error { _, err := connection.Reboot(ctx, path, operation); return err }(),
+			func() error { _, err := connection.OperationLog(ctx, path, operation); return err }(),
+			func() error { _, err := connection.Dispatch(ctx, path, domain.RemoteInstallPlan{}); return err }(),
+		}
+		for index, err := range failures {
+			if err == nil {
+				t.Fatalf("method %d accepted %q", index, path)
+			}
+		}
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("an unsafe store path reached the live computer's shell")
+	}
+}

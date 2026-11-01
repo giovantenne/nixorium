@@ -57,7 +57,7 @@ func (connection *StrictLiveSSH) PullBundle(ctx context.Context, cache domain.Re
 	if err := domain.ValidateRemoteInstallCache(cache); err != nil {
 		return err
 	}
-	if !domain.ValidStorePath(bundlePath) {
+	if !validRemoteStorePath(bundlePath) {
 		return errors.New("remote installer bundle path is invalid")
 	}
 	command := strings.Join([]string{
@@ -95,7 +95,7 @@ func (connection *StrictLiveSSH) VerifySignedClosure(ctx context.Context, cache 
 	if err := domain.ValidateRemoteInstallCache(cache); err != nil {
 		return err
 	}
-	if !domain.ValidStorePath(storePath) {
+	if !validRemoteStorePath(storePath) {
 		return errors.New("closure store path is invalid")
 	}
 	command := strings.Join([]string{
@@ -111,7 +111,7 @@ func (connection *StrictLiveSSH) VerifySignedClosure(ctx context.Context, cache 
 }
 
 func (connection *StrictLiveSSH) Probe(ctx context.Context, bundlePath string) (domain.RemoteMachineFacts, error) {
-	if !domain.ValidStorePath(bundlePath) {
+	if !validRemoteStorePath(bundlePath) {
 		return domain.RemoteMachineFacts{}, errors.New("remote installer bundle path is invalid")
 	}
 	command := bundlePath + "/bin/nixorium-remote-client-installer probe"
@@ -123,7 +123,7 @@ func (connection *StrictLiveSSH) Probe(ctx context.Context, bundlePath string) (
 }
 
 func (connection *StrictLiveSSH) ValidatePlan(ctx context.Context, bundlePath string, plan []byte) error {
-	if !domain.ValidStorePath(bundlePath) || len(plan) == 0 || len(plan) > domain.RemoteInstallPlanMaxBytes {
+	if !validRemoteStorePath(bundlePath) || len(plan) == 0 || len(plan) > domain.RemoteInstallPlanMaxBytes {
 		return errors.New("remote installation plan transfer is invalid")
 	}
 	if _, err := domain.DecodeRemoteInstallPlan(plan); err != nil {
@@ -141,7 +141,7 @@ func (connection *StrictLiveSSH) ValidatePlan(ctx context.Context, bundlePath st
 }
 
 func (connection *StrictLiveSSH) Status(ctx context.Context, bundlePath, operationID string) (domain.RemoteInstallReceipt, error) {
-	if !domain.ValidStorePath(bundlePath) || !remoteStateID(operationID) {
+	if !validRemoteStorePath(bundlePath) || !remoteStateID(operationID) {
 		return domain.RemoteInstallReceipt{}, errors.New("remote installation status selector is invalid")
 	}
 	command := bundlePath + "/bin/nixorium-remote-client-installer status " + operationID
@@ -153,7 +153,7 @@ func (connection *StrictLiveSSH) Status(ctx context.Context, bundlePath, operati
 }
 
 func (connection *StrictLiveSSH) Reboot(ctx context.Context, bundlePath, operationID string) (domain.RemoteInstallReceipt, error) {
-	if !domain.ValidStorePath(bundlePath) || !remoteStateID(operationID) {
+	if !validRemoteStorePath(bundlePath) || !remoteStateID(operationID) {
 		return domain.RemoteInstallReceipt{}, errors.New("remote installation reboot selector is invalid")
 	}
 	command := bundlePath + "/bin/nixorium-remote-client-installer reboot " + operationID
@@ -165,7 +165,7 @@ func (connection *StrictLiveSSH) Reboot(ctx context.Context, bundlePath, operati
 }
 
 func (connection *StrictLiveSSH) OperationLog(ctx context.Context, bundlePath, operationID string) ([]byte, error) {
-	if !domain.ValidStorePath(bundlePath) || !remoteStateID(operationID) {
+	if !validRemoteStorePath(bundlePath) || !remoteStateID(operationID) {
 		return nil, errors.New("remote installation log selector is invalid")
 	}
 	command := bundlePath + "/bin/nixorium-remote-client-installer log " + operationID
@@ -222,7 +222,7 @@ func (connection *StrictLiveSSH) Revalidate(ctx context.Context, preparation dom
 }
 
 func (connection *StrictLiveSSH) Dispatch(ctx context.Context, bundlePath string, plan domain.RemoteInstallPlan) (domain.RemoteInstallReceipt, error) {
-	if !domain.ValidStorePath(bundlePath) {
+	if !validRemoteStorePath(bundlePath) {
 		return domain.RemoteInstallReceipt{}, errors.New("remote installer bundle path is invalid")
 	}
 	content, err := json.Marshal(plan)
@@ -321,4 +321,11 @@ func canonicalRemoteIPv4(value string) string {
 
 func filepathIsAbsoluteClean(value string) bool {
 	return filepath.IsAbs(value) && filepath.Clean(value) == value
+}
+
+// validRemoteStorePath accepts only a store path that is safe as an unquoted
+// word of the root shell command it is placed in: the strict store-name
+// characters, without the shell glob character "?" that Nix names allow.
+func validRemoteStorePath(path string) bool {
+	return validSystemPath(path) && !strings.Contains(path, "?")
 }

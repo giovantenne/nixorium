@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/classroomview"
 	"github.com/giovantenne/nixorium/internal/domain"
 	"github.com/giovantenne/nixorium/internal/presentation"
@@ -89,8 +90,9 @@ func runCollectCommand(ctx context.Context, options options, stdout, stderr io.W
 		}
 		return 0
 	}
-	if options.expect != plan.ReviewToken {
-		fmt.Fprintln(stderr, "The computers or the folder changed since the review; create a fresh plan.")
+	plan, match := app.ReviewedCollect(time.Now(), plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "The computers or the folder changed since the review; create a fresh plan.")
 		return 1
 	}
 	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Collect apply requires an interactive terminal or --yes."}, func(output io.Writer) (bool, error) {

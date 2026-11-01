@@ -29,6 +29,11 @@ func (model dashboardModel) handleAssistantMessage(message tea.Msg) (tea.Model, 
 	case assistantSavePlanMsg:
 		model.busy = ""
 		model.assistant.review.plan = message.plan
+		// Start on a choice that works: a disabled save is never the first one.
+		model.assistant.review.cursor = 0
+		if !model.assistant.review.canSave() {
+			model.assistant.review.cursor = 2
+		}
 		return model, nil
 	case assistantSaveResultMsg:
 		return model.finishAssistantSave(message)

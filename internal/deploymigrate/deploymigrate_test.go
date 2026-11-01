@@ -178,3 +178,19 @@ func registryWith(part string) []Migration {
 	}
 	return found
 }
+
+func TestADeletionIsDoneWhenTheTextIsGone(t *testing.T) {
+	tree := Tree{Root: treeWith(t, map[string]string{"a.txt": "keep\nremove me\nkeep\n", "b.txt": "keep\nkeep\n", "c.txt": "x\nx\n"})}
+	if outcome := ReplaceExact(tree, "a.txt", "remove me\n", ""); outcome.State != Applied || read(t, tree.Root, "a.txt") != "keep\nkeep\n" {
+		t.Fatalf("applied = %+v", outcome)
+	}
+	if outcome := ReplaceExact(tree, "b.txt", "remove me\n", ""); outcome.State != Done {
+		t.Fatalf("already deleted = %+v", outcome)
+	}
+	if outcome := ReplaceExact(tree, "c.txt", "x\n", ""); outcome.State != Manual {
+		t.Fatalf("ambiguous = %+v", outcome)
+	}
+	if outcome := ReplaceExact(tree, "missing.txt", "remove me\n", ""); outcome.State != Manual {
+		t.Fatalf("missing file = %+v", outcome)
+	}
+}
