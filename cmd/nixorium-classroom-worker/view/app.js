@@ -107,7 +107,6 @@ function updateSelection() {
   // A menu with data-always keeps opening without a selection: it holds an
   // entry about the whole classroom (Power: Schedule…).
   for (const menu of document.querySelectorAll('.toolbar .actions-menu')) menu.classList.toggle('disabled', chosen.size === 0 && !menu.hasAttribute('data-always'));
-  classroomTools.updateExamButton();
 }
 
 selectAll.addEventListener('change', () => {
@@ -164,24 +163,15 @@ function screenAge(computer) {
   return seconds < 60 ? '' : 'No change for ' + Math.round(seconds / 60) + ' min';
 }
 
-// Refresh asks for a clean redraw: cards of computers no longer listed go,
-// and every card's labels are drawn again.
-let redraw = false;
-
 function render(computers) {
   let viewing = 0;
-  classroomTools.read(computers);
-  if (redraw) {
-    redraw = false;
-    const listed = new Set(computers.map((computer) => computer.name));
-    for (const [name, entry] of cards) {
-      if (listed.has(name)) {
-        entry.badgeText = null;
-      } else {
-        entry.item.remove();
-        cards.delete(name);
-        chosen.delete(name);
-      }
+  // Cards of computers no longer listed go.
+  const listed = new Set(computers.map((computer) => computer.name));
+  for (const [name, entry] of cards) {
+    if (!listed.has(name)) {
+      entry.item.remove();
+      cards.delete(name);
+      chosen.delete(name);
     }
   }
   for (const computer of computers) {
@@ -208,7 +198,6 @@ function render(computers) {
     if (computer.showing) labels.push('Sharing your screen');
     // The teacher's lock is known only while the screen answers.
     if (computer.locked && (computer.state === 'viewing' || computer.state === 'locked')) labels.push('Locked');
-    if (classroomTools.inExam(computer.name)) labels.push('Exam mode');
     if (computer.internet === 'blocked') labels.push('Internet off');
     if (computer.power) labels.push(computer.power);
     if (labels.join('|') !== entry.badgeText) {
@@ -309,6 +298,7 @@ async function runAction(action, computers, transfer, extra) {
   // The dialog takes the keyboard: let go of every key on the student's side.
   if (controlling) {
     pressedCodes.clear();
+    heldModifiers.clear();
     send([], true);
   }
   actionID = '';
@@ -500,7 +490,7 @@ async function saveScreenshot(name) {
 }
 
 // A computer's window offers a screenshot only of a live screen, and
-// Collect from desktop only with someone signed in.
+// Collect from students' desktops only with someone signed in.
 function updateSaveButtons(computers) {
   if (!selected) return;
   const computer = computers.find((item) => item.name === selected);
@@ -518,8 +508,10 @@ screenshotButton.addEventListener('click', () => {
 
 // Share screen: GNOME asks what to share (the whole screen is offered
 // first; a window or a tab works too, but not this page itself); after the
-// review the page sends a picture whenever it changes, at most five a
-// second, and one every few seconds to keep the showing on.
+// review the page sends each new picture as soon as the previous one has
+// left, at most fifteen a second, and one every few seconds to keep the
+// showing on. Each computer gets the latest picture, so a slow one skips
+// pictures instead of falling behind.
 let pendingStream = null;
 let casting = null;
 
@@ -527,7 +519,7 @@ async function showMyScreen(computers) {
   let stream;
   try {
     stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: 'monitor', frameRate: { ideal: 5, max: 5 } },
+      video: { displaySurface: 'monitor', frameRate: { ideal: 15, max: 15 } },
       audio: false,
       monitorTypeSurfaces: 'include',
       selfBrowserSurface: 'exclude',
@@ -551,36 +543,57 @@ async function startCasting(id) {
   const canvas = document.createElement('canvas');
   let lastDigest = '';
   let lastSent = 0;
+  let busy = false;
+  let again = false;
   casting = { id, stream, timer: 0 };
   stream.getVideoTracks()[0].addEventListener('ended', () => stopCasting());
   updateCasting();
-  const tick = async () => {
-    if (!casting || casting.id !== id) return;
-    if (video.videoWidth > 0) {
-      // Sharp enough to read text on the students' screens.
-      const width = Math.min(1920, video.videoWidth);
-      canvas.width = width;
-      canvas.height = Math.round(video.videoHeight * width / video.videoWidth);
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-      if (blob) {
-        const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))).join(',');
-        if (digest !== lastDigest || Date.now() - lastSent > 4000) {
-          const response = await fetch('/api/broadcast/frame?id=' + encodeURIComponent(id), {
-            method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob,
-          }).catch(() => null);
-          if (response && response.status === 410) {
-            stopCasting();
-            return;
-          }
-          lastDigest = digest;
-          lastSent = Date.now();
-        }
-      }
+  const send = async () => {
+    if (!casting || casting.id !== id || video.videoWidth === 0) return;
+    // Sharp enough to read text on the students' screens.
+    const width = Math.min(1920, video.videoWidth);
+    canvas.width = width;
+    canvas.height = Math.round(video.videoHeight * width / video.videoWidth);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    if (!blob) return;
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))).join(',');
+    if (digest === lastDigest && Date.now() - lastSent < 4000) return;
+    const response = await fetch('/api/broadcast/frame?id=' + encodeURIComponent(id), {
+      method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob,
+    }).catch(() => null);
+    if (response && response.status === 410) {
+      stopCasting();
+      return;
     }
-    if (casting && casting.id === id) casting.timer = setTimeout(tick, 200);
+    lastDigest = digest;
+    lastSent = Date.now();
   };
-  tick();
+  // One picture at a time; a picture that arrives meanwhile is sent next.
+  const tick = async () => {
+    if (busy) {
+      again = true;
+      return;
+    }
+    busy = true;
+    do {
+      again = false;
+      await send();
+    } while (again && casting && casting.id === id);
+    busy = false;
+  };
+  const onFrame = () => {
+    if (!casting || casting.id !== id) return;
+    tick();
+    video.requestVideoFrameCallback(onFrame);
+  };
+  if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(onFrame);
+  const keepAlive = () => {
+    if (!casting || casting.id !== id) return;
+    if (!('requestVideoFrameCallback' in video) || Date.now() - lastSent > 2000) tick();
+    casting.timer = setTimeout(keepAlive, 'requestVideoFrameCallback' in video ? 1000 : 100);
+  };
+  keepAlive();
 }
 
 function stopCasting() {
@@ -610,7 +623,6 @@ function startAction(action, computers) {
   else if (action === 'show-screen' && casting) stopCasting();
   else if (action === 'show-screen') showMyScreen(computers);
   else if (action === 'message') classroomTools.message(computers);
-  else if (action === 'exam') classroomTools.exam(computers);
   else runAction(action, computers);
 }
 
@@ -638,18 +650,31 @@ for (const button of document.querySelectorAll('.viewer-actions button[data-acti
   });
 }
 
-// Enlarged view: frames as fast as the computer sends them (only changes).
+// Enlarged view: frames as fast as the computer sends them (only changes);
+// the controller answers when the next frame arrives.
 let frameSince = 0;
 let frameURL = null;
 let frameLoopRunning = false;
+let frameRequest = null;
+let frameResume = null;
+
+// A minimized window or a background tab asks for nothing: the computers
+// stop being captured a few seconds later.
+const pageHidden = () => document.visibilityState === 'hidden';
 
 async function frameLoop() {
   if (frameLoopRunning) return;
   frameLoopRunning = true;
   while (selected) {
+    if (pageHidden()) {
+      await new Promise((resolve) => { frameResume = resolve; });
+      frameResume = null;
+      continue;
+    }
     const name = selected;
     try {
-      const response = await fetch('/api/frame?name=' + encodeURIComponent(name) + '&since=' + frameSince, { cache: 'no-store' });
+      frameRequest = new AbortController();
+      const response = await fetch('/api/frame?name=' + encodeURIComponent(name) + '&since=' + frameSince, { cache: 'no-store', signal: frameRequest.signal });
       if (name !== selected) continue;
       if (response.status === 200) {
         const blob = await response.blob();
@@ -657,12 +682,17 @@ async function frameLoop() {
         viewerImage.src = url;
         if (frameURL) URL.revokeObjectURL(frameURL);
         frameURL = url;
+        // A control that the hidden page ended resumes with the first frame:
+        // the hub starts a control only for a computer that is being viewed.
+        if (resumeControl) {
+          resumeControl = false;
+          setControl(true);
+        }
       }
       frameSince = Number(response.headers.get('X-Frame') || frameSince);
     } catch (error) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (!pageHidden()) await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    await new Promise((resolve) => setTimeout(resolve, 100));
   }
   frameLoopRunning = false;
 }
@@ -687,6 +717,13 @@ function showScreen(name) {
 let controlling = false;
 let queue = [];
 const pressedCodes = new Map();
+// Shift and AltGr held on the computer because of this view. A character is
+// sent as the character itself, and the computer's layout presses whatever
+// it needs to type it: the teacher's Shift or AltGr still held would change
+// the level (AltGr+Shift+è for { on an Italian keyboard typed something else),
+// so they are let go first.
+const levelModifiers = [0xffe1, 0xfe03];
+const heldModifiers = new Set();
 
 const specialKeys = {
   Enter: 0xff0d, Backspace: 0xff08, Tab: 0xff09, Escape: 0xff1b, Delete: 0xffff,
@@ -769,13 +806,95 @@ viewerImage.addEventListener('wheel', (event) => {
   queueEvent({ kind: 'scroll', steps: event.deltaY > 0 ? 1 : -1 });
 }, { passive: false });
 
+// Shared clipboard (text only, while controlling). Ctrl+V and Shift+Insert are
+// not sent as keys: the browser's paste event gives the text, which is put on
+// the student's clipboard before Ctrl+V is typed there. Ctrl+C and Ctrl+X go
+// to the student as usual, then the copied text is brought back.
+let clipboardReady = false;
+let clipboardTimer = 0;
+const clipboardNote = document.getElementById('viewer-clipboard');
+
+function clipboardNotice(text) {
+  clearTimeout(clipboardTimer);
+  clipboardNote.textContent = text;
+  clipboardNote.hidden = !text;
+  if (text) clipboardTimer = setTimeout(() => { clipboardNote.hidden = true; }, 4000);
+}
+
+async function clipboardCall(path, body) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error((await response.text()).trim() || 'The clipboard could not be shared.');
+  return response;
+}
+
+async function copyFromComputer() {
+  const name = selected;
+  if (!controlling || !clipboardReady || !name) return;
+  try {
+    const response = await clipboardCall('/api/clipboard/get', { computer: name });
+    const { text } = await response.json();
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    clipboardNotice('Copied from ' + name);
+  } catch (error) {
+    clipboardNotice(error.message || 'The clipboard could not be shared.');
+  }
+}
+
+async function pasteToComputer(text) {
+  const name = selected;
+  try {
+    await clipboardCall('/api/clipboard/set', { computer: name, text });
+  } catch (error) {
+    clipboardNotice(error.message || 'The clipboard could not be shared.');
+    return;
+  }
+  // Ctrl+V on the student's computer, with the teacher's own Control key
+  // left as it is.
+  const held = pressedCodes.has('ControlLeft') || pressedCodes.has('ControlRight');
+  if (!held) queueEvent({ kind: 'key', keysym: 0xffe3, pressed: true });
+  queueEvent({ kind: 'key', keysym: 0x76, pressed: true });
+  queueEvent({ kind: 'key', keysym: 0x76, pressed: false });
+  if (!held) queueEvent({ kind: 'key', keysym: 0xffe3, pressed: false });
+  clipboardNotice('Pasted into ' + name);
+}
+
+function isPasteKey(event) {
+  const key = event.key.toLowerCase();
+  return (key === 'v' && (event.ctrlKey || event.metaKey) && !event.altKey) || (event.key === 'Insert' && event.shiftKey && !event.ctrlKey);
+}
+
+document.addEventListener('paste', (event) => {
+  if (!controlling || actionDialog.open) return;
+  event.preventDefault();
+  const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+  if (!clipboardReady) clipboardNotice('Clipboard sharing is not available on this computer.');
+  else if (text) pasteToComputer(text);
+});
+
 window.addEventListener('keydown', (event) => {
   if (!controlling || event.target === controlButton || actionDialog.open) return;
+  // The paste event follows; the key itself is not sent twice.
+  if (clipboardReady && isPasteKey(event)) return;
   const symbol = keysym(event);
   if (!symbol) return;
   event.preventDefault();
   pressedCodes.set(event.code, symbol);
+  if (levelModifiers.includes(symbol)) heldModifiers.add(symbol);
+  const character = Array.from(event.key).length === 1 && !(event.key in specialKeys);
+  if (character && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    for (const modifier of heldModifiers) queueEvent({ kind: 'key', keysym: modifier, pressed: false });
+    heldModifiers.clear();
+  }
   queueEvent({ kind: 'key', keysym: symbol, pressed: true });
+  const key = event.key.toLowerCase();
+  if (clipboardReady && (key === 'c' || key === 'x') && event.ctrlKey && !event.altKey && !event.repeat) {
+    setTimeout(copyFromComputer, 250);
+  }
 });
 window.addEventListener('keyup', (event) => {
   if (!controlling || actionDialog.open) return;
@@ -783,6 +902,8 @@ window.addEventListener('keyup', (event) => {
   pressedCodes.delete(event.code);
   if (!symbol) return;
   event.preventDefault();
+  // A modifier let go before a character is already up on the computer.
+  if (levelModifiers.includes(symbol) && !heldModifiers.delete(symbol)) return;
   queueEvent({ kind: 'key', keysym: symbol, pressed: false });
 });
 
@@ -793,12 +914,27 @@ function setControl(on) {
   controlButton.classList.toggle('primary', !on);
   controllingNotice.hidden = !on;
   viewerImage.classList.toggle('control', on);
+  clipboardReady = false;
+  clipboardNotice('');
   if (on) {
     viewerImage.focus();
+    const name = selected;
+    clipboardCall('/api/control', { computer: name, on: true })
+      .then(() => { clipboardReady = controlling && selected === name; })
+      .catch(() => clipboardNotice('Clipboard sharing is not available on ' + name + '.'));
   } else {
     queue = [];
     pressedCodes.clear();
+    heldModifiers.clear();
     send([], true);
+    if (selected) {
+      fetch('/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ computer: selected, on: false }),
+        keepalive: true,
+      }).catch(() => {});
+    }
   }
 }
 
@@ -836,7 +972,8 @@ document.addEventListener('fullscreenchange', () => {
 document.getElementById('viewer-close').addEventListener('click', () => window.close());
 // Closing the window gives control back and lets go of every key.
 window.addEventListener('pagehide', () => setControl(false));
-window.addEventListener('blur', () => { if (controlling) { pressedCodes.clear(); send([], true); } });
+window.addEventListener('blur', () => { if (controlling) { pressedCodes.clear();
+    heldModifiers.clear(); send([], true); } });
 
 // A computer's window has no grid: its bar shows the notice instead.
 function notice(text) {
@@ -857,7 +994,7 @@ let failures = 0;
 
 async function refresh() {
   clearTimeout(refreshTimer);
-  // A forced refresh replaces a request still waiting.
+  // A new request replaces one still waiting.
   if (refreshing) refreshing.abort();
   const request = new AbortController();
   refreshing = request;
@@ -887,16 +1024,29 @@ async function refresh() {
   }
   if (request !== refreshing) return;
   refreshing = null;
-  refreshTimer = setTimeout(refresh, 2000);
+  if (!pageHidden()) refreshTimer = setTimeout(refresh, 2000);
 }
 
-// Refresh asks again at once and draws every card anew, without the
-// notice of the last action.
-document.getElementById('refresh').addEventListener('click', () => {
-  hideToast();
-  redraw = true;
-  summary.textContent = 'Refreshing…';
-  refresh();
+// Hidden page: stop asking for the computers and their pictures; ask again
+// as soon as the page is shown.
+// A control ends while the page is hidden (the computer's clipboard goes off
+// when its capture restarts) and comes back with the page.
+let resumeControl = false;
+document.addEventListener('visibilitychange', () => {
+  if (pageHidden()) {
+    if (controlling) {
+      send([], true);
+      setControl(false);
+      resumeControl = true;
+    }
+    clearTimeout(refreshTimer);
+    if (refreshing) refreshing.abort();
+    refreshing = null;
+    if (frameRequest) frameRequest.abort();
+  } else {
+    refresh();
+    if (frameResume) frameResume();
+  }
 });
 
 if (screenMode) showScreen(screenName);

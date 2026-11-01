@@ -13,10 +13,10 @@ Commands
   /billing   Manage your subscription and see payments (opens Stripe).
   /report   Tell us one answer was helpful or wrong. Sends this conversation
             to Nixorium once, so we can fix mistakes. Kept for 90 days.
-  /share    Turn automatic sharing on or off (off by default). When on, every
-            conversation of this lab is sent to Nixorium to improve Assistant.
-            Kept for 90 days.
-  /name     Set this laboratory's name, shown on invoices emails and in support
+  /share    Switch "Save conversations on the service" On or Off (On by
+            default). When on, every conversation of this lab is saved on the
+            Nixorium Assistant service for 90 days to find and fix mistakes.
+  /name     Set this laboratory's name, shown on invoices and emails
             (for example 'Lab 2 – Informatica').
   /code     Enter an activation code (for example after subscribing).
   /help     Show this help.
@@ -37,8 +37,8 @@ var assistantCommandDescriptions = map[string]string{
 	"/resume":  "Open a previous conversation. Opening it does not use a request.",
 	"/billing": "Manage your subscription and see payments (opens Stripe).",
 	"/report":  "Tell us one answer was helpful or wrong.",
-	"/share":   "Turn automatic sharing on or off (off by default).",
-	"/name":    "Set this laboratory's name, shown on invoices emails and in support (for example 'Lab 2 – Informatica').",
+	"/share":   "Switch saving conversations on the service On or Off (On by default).",
+	"/name":    "Set this laboratory's name, shown on invoices and emails (for example 'Lab 2 – Informatica').",
 	"/code":    "Enter an activation code (for example after subscribing).",
 	"/help":    "Show this help.",
 }

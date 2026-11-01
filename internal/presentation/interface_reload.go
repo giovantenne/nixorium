@@ -2,14 +2,9 @@ package presentation
 
 import (
 	"fmt"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 )
-
-// interfaceReloadSeconds is how long the result screen waits before it reopens
-// the interface on the freshly installed Nixorium.
-const interfaceReloadSeconds = 3
 
 // reopenSentence is the guidance shown when the administrator keeps the
 // running interface.
@@ -25,45 +20,53 @@ type interfaceReloadState int
 
 const (
 	interfaceReloadNone interfaceReloadState = iota
-	interfaceReloadCounting
+	interfaceReloadOffered
 	interfaceReloadCancelled
 	interfaceReloadRequested
 )
 
 type interfaceReloadModel struct {
-	state     interfaceReloadState
-	version   string
-	remaining int
-	id        uint64
-}
-
-type interfaceReloadTickMsg struct{ id uint64 }
-
-func scheduleInterfaceReloadTick(id uint64) tea.Cmd {
-	return tea.Tick(time.Second, func(time.Time) tea.Msg { return interfaceReloadTickMsg{id: id} })
+	state   interfaceReloadState
+	version string
+	id      uint64
 }
 
 // line is the result-screen sentence for a successful controller activation.
+// The result stays on screen until the administrator chooses: reopening on a
+// timer hid the result before it could be read.
 func (reload interfaceReloadModel) line() string {
-	if reload.state != interfaceReloadCounting && reload.state != interfaceReloadRequested {
+	if reload.state != interfaceReloadOffered && reload.state != interfaceReloadRequested {
 		return reopenSentence
 	}
 	subject := "The updated Nixorium"
 	if reload.version != "" {
 		subject = "Nixorium " + reload.version
 	}
-	return fmt.Sprintf("%s is active. The interface reopens in %d s with it (Esc keeps this one).", subject, reload.remaining)
+	return fmt.Sprintf("%s is active on this controller. Enter reopens the interface with it.", subject)
 }
 
-func (reload interfaceReloadModel) counting() bool { return reload.state == interfaceReloadCounting }
+func (reload interfaceReloadModel) offered() bool { return reload.state == interfaceReloadOffered }
 
-// reloadActions replaces the result actions while the countdown runs.
+// reloadActions replaces the result actions while the reopening is offered.
 func (model dashboardModel) reloadActions() []tuiAction {
-	return []tuiAction{{key: "Enter", label: "Reopen now"}, {key: "Esc", label: "Keep this interface"}, {key: "F1", label: "Help"}}
+	return []tuiAction{{key: "Enter", label: "Reopen with the update"}, {key: "Esc", label: "Keep this interface"}, {key: "F1", label: "Help"}}
 }
 
-// offerInterfaceReload starts the countdown after a successful controller
-// activation when the installed Nixorium differs from the running one.
+// ReopenNoticeEnvironment carries the outcome shown before the interface
+// reopened on the installed Nixorium, so the new interface shows it too.
+const ReopenNoticeEnvironment = "NIXORIUM_REOPEN_NOTICE"
+
+// reloadOutcome is the result to show after the interface reopens.
+func (model dashboardModel) reloadOutcome() string {
+	if model.screen == dashboardUpdate {
+		return "Nixorium and this controller are updated. Next: Computers → Update computers."
+	}
+	return "This controller runs the updated Nixorium."
+}
+
+// offerInterfaceReload offers to reopen the interface after a successful
+// controller activation when the installed Nixorium differs from the running
+// one.
 func (model dashboardModel) offerInterfaceReload() (dashboardModel, tea.Cmd) {
 	id := model.reload.id + 1
 	model.reload = interfaceReloadModel{id: id}
@@ -74,8 +77,13 @@ func (model dashboardModel) offerInterfaceReload() (dashboardModel, tea.Cmd) {
 	if !reload {
 		return model, nil
 	}
-	model.reload = interfaceReloadModel{state: interfaceReloadCounting, version: installed.Version, remaining: interfaceReloadSeconds, id: id}
-	return model, scheduleInterfaceReloadTick(id)
+	if installed.Version == model.actions.RunningVersion {
+		// A new revision of the same version (master): the number would
+		// read as no change.
+		installed.Version = ""
+	}
+	model.reload = interfaceReloadModel{state: interfaceReloadOffered, version: installed.Version, id: id}
+	return model, nil
 }
 
 // offerControllerInterfaceReload applies the offer to the Maintenance and
@@ -91,7 +99,7 @@ func (model dashboardModel) offerControllerInterfaceReload() (dashboardModel, te
 
 // reloadScreenVisible reports whether a controller result is still on screen.
 func (model dashboardModel) reloadScreenVisible() bool {
-	if model.helpOpen || model.busy != "" {
+	if model.navigation.helpOpen || model.busy != "" {
 		return false
 	}
 	switch model.screen {
@@ -103,9 +111,9 @@ func (model dashboardModel) reloadScreenVisible() bool {
 	return false
 }
 
-// updateInterfaceReloadKey handles Enter and Esc while the countdown runs.
+// updateInterfaceReloadKey handles Enter and Esc while the reopening is offered.
 func (model dashboardModel) updateInterfaceReloadKey(key tea.KeyPressMsg) (dashboardModel, tea.Cmd, bool) {
-	if !model.reload.counting() || !model.reloadScreenVisible() {
+	if !model.reload.offered() || !model.reloadScreenVisible() {
 		return model, nil, false
 	}
 	switch key.String() {
@@ -117,21 +125,4 @@ func (model dashboardModel) updateInterfaceReloadKey(key tea.KeyPressMsg) (dashb
 		return model, nil, true
 	}
 	return model, nil, false
-}
-
-func (model dashboardModel) updateInterfaceReloadTick(message interfaceReloadTickMsg) (tea.Model, tea.Cmd) {
-	if !model.reload.counting() || message.id != model.reload.id {
-		return model, nil
-	}
-	if !model.reloadScreenVisible() {
-		model.reload.state = interfaceReloadCancelled
-		return model, nil
-	}
-	model.reload.remaining--
-	if model.reload.remaining <= 0 {
-		model.reload.remaining = 0
-		model.reload.state = interfaceReloadRequested
-		return model, tea.Quit
-	}
-	return model, scheduleInterfaceReloadTick(message.id)
 }

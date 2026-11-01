@@ -62,6 +62,13 @@ func (session collectSession) ReadDesktopFile(index int, size int64, piece func(
 
 func (session collectSession) EndCollect() error { return nil }
 
+func (session collectSession) Notice(kind string) error {
+	session.lab.mutex.Lock()
+	defer session.lab.mutex.Unlock()
+	session.lab.notices[session.name] = append(session.lab.notices[session.name], kind)
+	return nil
+}
+
 // collectLab is a laboratory whose computers answer with desktops; an
 // outdated computer's session cannot collect.
 type collectLab struct {
@@ -71,6 +78,7 @@ type collectLab struct {
 	outdated map[string]bool
 	active   int
 	peak     int
+	notices  map[string][]string
 }
 
 func (lab *collectLab) Connect(ctx context.Context, host domain.HostMeta) (classroomview.Session, error) {
@@ -90,7 +98,7 @@ func newCollectLab(names ...string) *collectLab {
 	for index, name := range names {
 		source.meta.Clients.Hosts = append(source.meta.Clients.Hosts, domain.HostMeta{Name: name, IP: fmt.Sprintf("10.0.0.%d", index+1)})
 	}
-	return &collectLab{fakeLockSource: source, desktops: map[string]fakeDesktop{}, outdated: map[string]bool{}}
+	return &collectLab{fakeLockSource: source, desktops: map[string]fakeDesktop{}, outdated: map[string]bool{}, notices: map[string][]string{}}
 }
 
 // fakeCollectContent keeps stored files in memory, like the worker's
@@ -278,5 +286,27 @@ func TestCollectApplyRefusesStaleReviewsAndForgetsEmptyCollections(t *testing.T)
 	report := manager.Apply(context.Background(), plan, plan.ReviewToken)
 	if report.State != "completed" || report.Save != "" || !content.removed || report.Targets[0].State != domain.CollectEmpty {
 		t.Fatalf("empty desktops = %+v", report)
+	}
+}
+
+func TestCollectTellsTheStudentOnlyAfterACollection(t *testing.T) {
+	lab := newCollectLab("pc01", "pc02")
+	// A desktop with only a folder hands no bytes over and is still collected.
+	lab.desktops["pc01"] = fakeDesktop{entries: []classroomview.FileEntry{{Path: "New Folder", Dir: true}}}
+	lab.desktops["pc02"] = fakeDesktop{entries: []classroomview.FileEntry{}}
+	manager := NewCollectManager(lab, &fakeCollectContent{noSpace: map[string]bool{}})
+	plan := manager.Plan(context.Background(), "/srv/lab", "pc01,pc02", "/home/teacher/Homework")
+	if plan.HasErrors() {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if len(lab.notices) != 0 {
+		t.Fatalf("the review told the students: %v", lab.notices)
+	}
+	report := manager.Apply(context.Background(), plan, plan.ReviewToken)
+	if report.Targets[0].State != domain.CollectCollected || report.Targets[1].State != domain.CollectEmpty {
+		t.Fatalf("outcomes = %+v", report.Targets)
+	}
+	if got := lab.notices["pc01"]; len(got) != 1 || got[0] != classroomview.NoticeCollect || len(lab.notices["pc02"]) != 0 {
+		t.Fatalf("notices = %v", lab.notices)
 	}
 }

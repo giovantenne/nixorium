@@ -393,9 +393,12 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 		fixed = append(fixed, model.activitySpinner.View()+fmt.Sprintf(" Working… %ds · Esc to stop", seconds))
 	}
 	if model.assistant.changedFiles > 0 {
-		left := "Proposal ready · " + countNoun(model.assistant.changedFiles, "file") + " changed"
+		left, status := "Proposal ready · "+countNoun(model.assistant.changedFiles, "file")+" changed", tuiStatusSuccess
+		if model.assistant.unfinished {
+			left, status = assistantUnfinishedBanner+countNoun(model.assistant.changedFiles, "file")+" changed", tuiStatusAttention
+		}
 		right := "Ctrl+R to review"
-		fixed = append(fixed, model.assistantBox(left+strings.Repeat(" ", max(1, width-4-lipgloss.Width(left)-len(right)))+right, width, tuiStatusSuccess))
+		fixed = append(fixed, model.assistantBox(left+strings.Repeat(" ", max(1, width-4-lipgloss.Width(left)-len(right)))+right, width, status))
 	}
 	fixed = append(fixed, inputBox)
 	if model.assistant.state == "history" {
@@ -488,7 +491,7 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	body := lipgloss.NewStyle().Width(width).Render(assistantLinkify(strings.Join(lines, "\n")))
 	bodyLines = strings.Split(body, "\n")
 	fixedText = strings.Join(fixed, "\n")
-	capacity = max(1, model.height-2-1-2-lipgloss.Height(fixedText)-1)
+	capacity = max(1, model.height-ctaRows(model.height)-2-1-2-lipgloss.Height(fixedText)-1)
 	if model.height == 0 {
 		capacity = len(bodyLines)
 	}

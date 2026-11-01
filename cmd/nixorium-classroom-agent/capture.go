@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"net/textproto"
 	"os/exec"
@@ -28,11 +30,37 @@ const (
 	firstFrameMax = 3 * time.Second
 )
 
+// busTimeout bounds one call to the compositor or the classroom extension.
+// Most calls run while the capture's mutex is held, so a stalled gnome-shell
+// must not hold every handler for longer.
+var busTimeout = 5 * time.Second
+
+// callBus calls a D-Bus method with a bounded wait.
+func callBus(object dbus.BusObject, method string, arguments ...any) *dbus.Call {
+	ctx, cancel := context.WithTimeout(context.Background(), busTimeout)
+	defer cancel()
+	return object.CallWithContext(ctx, method, 0, arguments...)
+}
+
+// busProperty reads one property with a bounded wait.
+func busProperty(object dbus.BusObject, iface, name string) (dbus.Variant, error) {
+	var value dbus.Variant
+	err := callBus(object, "org.freedesktop.DBus.Properties.Get", iface, name).Store(&value)
+	return value, err
+}
+
 // capturer provides frames of the session's screen and injects input.
 type capturer interface {
 	// Thumbnail returns the latest frame; image is nil when frame equals since.
 	Thumbnail(width int, since int64) (image []byte, height int, capturedAt time.Time, frame int64, err error)
 	Input(events []classroomview.InputEvent, release bool) error
+	// The shared clipboard (clipboard.go), on only while the teacher controls
+	// the computer.
+	ClipboardBegin() error
+	ClipboardEnd() error
+	ClipboardRelease()
+	ClipboardSet(text string) error
+	ClipboardGet() (string, error)
 }
 
 // widthMemory keeps the largest width asked for recently, so the overview and
@@ -64,11 +92,26 @@ type mutterCapture struct {
 	keysDown    map[uint32]bool
 	buttonsDown map[string]bool
 	keyboardOn  bool
+	clipboard   clipboardState
+	// wokeAt is when this capture lifted a blank screen (blank.go).
+	wokeAt time.Time
+	// banner tells the student while the teacher controls the computer
+	// (control.go); nil shows nothing.
+	banner *extensionFlag
+	// sharing tells the extension that a capture session exists.
+	sharing *extensionFlag
 }
 
-func newMutterCapture() *mutterCapture {
+func newMutterCapture(notifier stateNotifier) *mutterCapture {
 	capture := &mutterCapture{widths: map[int]time.Time{}, keysDown: map[uint32]bool{}, buttonsDown: map[string]bool{}}
 	capture.changed = sync.NewCond(&capture.mutex)
+	if notifier != nil {
+		capture.banner = newExtensionFlag(notifier.SetControlled)
+		capture.sharing = newExtensionFlag(notifier.SetSharing)
+		// An agent that restarted mid-control left its flags on.
+		capture.banner.Set(false)
+		capture.sharing.Set(false)
+	}
 	go capture.stopWhenIdle()
 	return capture
 }
@@ -93,6 +136,9 @@ func (capture *mutterCapture) Thumbnail(requested int, since int64) ([]byte, int
 			return nil, 0, time.Time{}, 0, err
 		}
 	}
+	// An extension that was not ready when the capture started hears of it
+	// with the next request.
+	capture.sharing.Set(true)
 	deadline := time.Now().Add(firstFrameMax)
 	for capture.frame == nil && capture.running && time.Now().Before(deadline) {
 		timer := time.AfterFunc(100*time.Millisecond, capture.changed.Broadcast)
@@ -120,9 +166,13 @@ func (capture *mutterCapture) Input(events []classroomview.InputEvent, release b
 		return errNotReady
 	}
 	capture.lastRequest = time.Now()
+	if len(events) > 0 {
+		// The first input of a control tells the student.
+		capture.banner.Set(true)
+	}
 	session := remoteDesktopName + ".Session"
 	call := func(method string, arguments ...any) error {
-		return capture.remote.Call(session+"."+method, 0, arguments...).Err
+		return callBus(capture.remote, session+"."+method, arguments...).Err
 	}
 	for _, event := range events {
 		var err error
@@ -166,18 +216,19 @@ func (capture *mutterCapture) Input(events []classroomview.InputEvent, release b
 // releaseLocked lets go of everything still pressed, so a closed view never
 // leaves a stuck key or button on the student's computer.
 func (capture *mutterCapture) releaseLocked() {
+	capture.banner.Set(false)
 	if capture.remote == nil {
 		return
 	}
 	session := remoteDesktopName + ".Session"
 	for keysym, down := range capture.keysDown {
 		if down {
-			_ = capture.remote.Call(session+".NotifyKeyboardKeysym", 0, keysym, false).Err
+			_ = callBus(capture.remote, session+".NotifyKeyboardKeysym", keysym, false).Err
 		}
 	}
 	for button, down := range capture.buttonsDown {
 		if down {
-			_ = capture.remote.Call(session+".NotifyPointerButton", 0, buttonCodes[button], false).Err
+			_ = callBus(capture.remote, session+".NotifyPointerButton", buttonCodes[button], false).Err
 		}
 	}
 	capture.keysDown, capture.buttonsDown = map[uint32]bool{}, map[string]bool{}
@@ -190,22 +241,41 @@ var errLocked = errors.New("the screen is locked")
 func (capture *mutterCapture) stopWhenIdle() {
 	for range time.Tick(5 * time.Second) {
 		capture.mutex.Lock()
+		if capture.running {
+			capture.sharing.Refresh()
+			capture.banner.Refresh()
+		}
 		if capture.running && time.Since(capture.lastRequest) > captureIdle {
 			capture.stopLocked()
+			if !capture.wokeAt.IsZero() {
+				go blankIfUntouched(capture.wokeAt)
+				capture.wokeAt = time.Time{}
+			}
 		}
 		capture.mutex.Unlock()
+	}
+}
+
+// StopCapture ends the capture now (the last controller channel closed).
+func (capture *mutterCapture) StopCapture() {
+	capture.mutex.Lock()
+	defer capture.mutex.Unlock()
+	if capture.running {
+		capture.stopLocked()
 	}
 }
 
 func (capture *mutterCapture) stopLocked() {
 	if capture.running {
 		capture.releaseLocked()
+		capture.clipboardOffLocked()
 	}
 	if capture.stop != nil {
 		capture.stop()
 	}
 	capture.running, capture.stop, capture.frame, capture.failure = false, nil, nil, nil
 	capture.remote, capture.keyboardOn = nil, false
+	capture.sharing.Set(false)
 }
 
 // startLocked opens the Mutter sessions (no consent dialog: these are the
@@ -220,7 +290,18 @@ func (capture *mutterCapture) startLocked(width int) error {
 		return err
 	}
 	var remotePath, castPath, streamPath dbus.ObjectPath
-	if err := connection.Object(remoteDesktopName, "/org/gnome/Mutter/RemoteDesktop").Call(remoteDesktopName+".CreateSession", 0).Store(&remotePath); err != nil {
+	create := func() error {
+		return callBus(connection.Object(remoteDesktopName, "/org/gnome/Mutter/RemoteDesktop"), remoteDesktopName+".CreateSession").Store(&remotePath)
+	}
+	err = create()
+	// A blank (not locked) screen also inhibits capture: wake it and retry.
+	if err != nil && strings.Contains(err.Error(), "inhibited") && wakeScreen(connection) {
+		if capture.wokeAt.IsZero() {
+			capture.wokeAt = time.Now()
+		}
+		err = create()
+	}
+	if err != nil {
 		if strings.Contains(err.Error(), "inhibited") {
 			// GNOME refuses screen capture while the screen is locked.
 			return fail(errLocked)
@@ -228,16 +309,16 @@ func (capture *mutterCapture) startLocked(width int) error {
 		return fail(fmt.Errorf("remote desktop session: %w", err))
 	}
 	remote := connection.Object(remoteDesktopName, remotePath)
-	sessionID, err := remote.GetProperty(remoteDesktopName + ".Session.SessionId")
+	sessionID, err := busProperty(remote, remoteDesktopName+".Session", "SessionId")
 	if err != nil {
 		return fail(fmt.Errorf("remote desktop session id: %w", err))
 	}
 	options := map[string]dbus.Variant{"remote-desktop-session-id": sessionID}
-	if err := connection.Object(screenCastName, "/org/gnome/Mutter/ScreenCast").Call(screenCastName+".CreateSession", 0, options).Store(&castPath); err != nil {
+	if err := callBus(connection.Object(screenCastName, "/org/gnome/Mutter/ScreenCast"), screenCastName+".CreateSession", options).Store(&castPath); err != nil {
 		return fail(fmt.Errorf("screen cast session: %w", err))
 	}
 	record := map[string]dbus.Variant{"cursor-mode": dbus.MakeVariant(uint32(1))}
-	if err := connection.Object(screenCastName, castPath).Call(screenCastName+".Session.RecordMonitor", 0, "", record).Store(&streamPath); err != nil {
+	if err := callBus(connection.Object(screenCastName, castPath), screenCastName+".Session.RecordMonitor", "", record).Store(&streamPath); err != nil {
 		return fail(fmt.Errorf("record monitor: %w", err))
 	}
 	signals := make(chan *dbus.Signal, 16)
@@ -246,12 +327,14 @@ func (capture *mutterCapture) startLocked(width int) error {
 		{dbus.WithMatchObjectPath(streamPath), dbus.WithMatchInterface(screenCastName + ".Stream"), dbus.WithMatchMember("PipeWireStreamAdded")},
 		{dbus.WithMatchObjectPath(remotePath), dbus.WithMatchInterface(remoteDesktopName + ".Session"), dbus.WithMatchMember("Closed")},
 		{dbus.WithMatchInterface(displayConfigName), dbus.WithMatchMember("MonitorsChanged")},
+		{dbus.WithMatchObjectPath(remotePath), dbus.WithMatchInterface(remoteDesktopName + ".Session"), dbus.WithMatchMember("SelectionOwnerChanged")},
+		{dbus.WithMatchObjectPath(remotePath), dbus.WithMatchInterface(remoteDesktopName + ".Session"), dbus.WithMatchMember("SelectionTransfer")},
 	} {
 		if err := connection.AddMatchSignal(match...); err != nil {
 			return fail(err)
 		}
 	}
-	if err := remote.Call(remoteDesktopName+".Session.Start", 0).Err; err != nil {
+	if err := callBus(remote, remoteDesktopName+".Session.Start").Err; err != nil {
 		return fail(fmt.Errorf("start session: %w", err))
 	}
 	node, err := waitForNode(signals, streamPath)
@@ -263,15 +346,19 @@ func (capture *mutterCapture) startLocked(width int) error {
 	// the small thumbnails.
 	outputWidth := min(width, screenW)
 	height := scaledHeight(outputWidth, screenW, screenH)
-	quality := 60
+	// Mutter sends a picture only when the screen changes; the enlarged view
+	// takes up to fifteen a second, the thumbnails (one every 1.5 seconds)
+	// two. Mutter still sends the last change once the interval has passed.
+	quality, rate := 60, 2
 	if outputWidth > 640 {
-		quality = 85
+		quality, rate = 85, 15
 	}
 	// The pipeline lives as long as this capture: stopping the capture
 	// cancels the context, which kills it.
 	pipelineContext, stopPipeline := context.WithCancel(context.Background())
 	pipeline := exec.CommandContext(pipelineContext, "gst-launch-1.0", "-q",
 		"pipewiresrc", fmt.Sprintf("path=%d", node), "always-copy=true", "!",
+		fmt.Sprintf("video/x-raw,max-framerate=%d/1", rate), "!",
 		"videoconvert", "!", "videoscale", "!",
 		fmt.Sprintf("video/x-raw,width=%d,height=%d", outputWidth, height), "!",
 		"jpegenc", fmt.Sprintf("quality=%d", quality), "!",
@@ -288,18 +375,24 @@ func (capture *mutterCapture) startLocked(width int) error {
 	capture.generation++
 	generation := capture.generation
 	capture.running, capture.width, capture.height = true, width, height
+	capture.sharing.Set(true)
 	capture.remote, capture.streamPath = remote, streamPath
 	capture.screenW, capture.screenH = float64(screenW), float64(screenH)
 	var once sync.Once
 	capture.stop = func() {
 		once.Do(func() {
 			stopPipeline()
-			_ = remote.Call(remoteDesktopName+".Session.Stop", 0).Err
+			_ = callBus(remote, remoteDesktopName+".Session.Stop").Err
 			connection.Close()
 		})
 	}
 	go func() {
 		err := readFrames(output, func(frame []byte) {
+			// A picture too large for one message is made smaller or left
+			// out: it must never close the controller's channel.
+			if frame = fitFrame(frame, classroomview.MaxImageBytes); frame == nil {
+				return
+			}
 			capture.mutex.Lock()
 			capture.frame, capture.frameAt = frame, time.Now()
 			capture.frameNumber++
@@ -311,6 +404,10 @@ func (capture *mutterCapture) startLocked(width int) error {
 	}()
 	go func() {
 		for signal := range signals {
+			if signal.Path == remotePath && strings.HasPrefix(signal.Name, remoteDesktopName+".Session.Selection") {
+				capture.selectionSignal(generation, remote, signal)
+				continue
+			}
 			if signal.Path == remotePath && strings.HasSuffix(signal.Name, ".Closed") {
 				capture.ended(generation, errors.New("the screen cast was closed"))
 				return
@@ -337,6 +434,9 @@ func (capture *mutterCapture) ended(generation int, err error) {
 	capture.stop()
 	capture.running, capture.stop, capture.frame = false, nil, nil
 	capture.remote, capture.keyboardOn = nil, false
+	capture.clipboard = clipboardState{}
+	capture.banner.Set(false)
+	capture.sharing.Set(false)
 	if err != nil && !errors.Is(err, io.EOF) {
 		capture.failure = err
 	}
@@ -362,7 +462,7 @@ func waitForNode(signals <-chan *dbus.Signal, streamPath dbus.ObjectPath) (uint3
 // screenSize reads the monitor size of the stream, falling back to 1280×800.
 func screenSize(stream dbus.BusObject) (int, int) {
 	screenWidth, screenHeight := 1280, 800
-	if value, err := stream.GetProperty(screenCastName + ".Stream.Parameters"); err == nil {
+	if value, err := busProperty(stream, screenCastName+".Stream", "Parameters"); err == nil {
 		if parameters, ok := value.Value().(map[string]dbus.Variant); ok {
 			if size, ok := parameters["size"].Value().([]any); ok && len(size) == 2 {
 				if w, ok := size[0].(int32); ok && w > 0 {
@@ -382,6 +482,24 @@ func scaledHeight(width, screenWidth, screenHeight int) int {
 		height++
 	}
 	return max(2, height)
+}
+
+// fitFrame returns a JPEG of at most limit bytes: the frame itself when it
+// fits, else the same picture encoded again at a lower quality; nil when
+// even that is too large (or the frame cannot be decoded).
+func fitFrame(frame []byte, limit int) []byte {
+	if len(frame) <= limit {
+		return frame
+	}
+	picture, err := jpeg.Decode(bytes.NewReader(frame))
+	if err != nil {
+		return nil
+	}
+	var smaller bytes.Buffer
+	if err := jpeg.Encode(&smaller, picture, &jpeg.Options{Quality: 40}); err != nil || smaller.Len() > limit {
+		return nil
+	}
+	return smaller.Bytes()
 }
 
 // readFrames splits GStreamer's multipart output into JPEG frames.

@@ -57,7 +57,7 @@ for example:
 
 ```text
 ! The computers were not updated: a previous update of the student computers was interrupted.
-  Nixorium does not know how it ended on every computer, so the student computers wait until you review it.
+  Nixorium does not know how it ended on every computer, so maintenance waits until you review it; classroom controls leave only those computers alone.
   Next: Review the interrupted update (Enter)
 ```
 
@@ -83,12 +83,15 @@ and JSON issues carry a `next` object with the same code and texts; the JSON
 | `DISK-LOW` | The controller is low on disk space | Free disk space (Maintenance → Free disk space) |
 | `CONTROLLER-NOT-APPLIED` | The controller is not running its saved configuration | Apply the saved configuration to the controller ([Controller apply failed](#controller-apply-failed)) |
 | `UPDATES-QUEUED` | Some computers will update when they are switched on | Nothing to do (Computers → Queued updates shows them; review again those marked as changed) |
+| `UPDATES-NEED-REVIEW` | A queued update needs a new review | Review the queued updates (Computers → Queued updates; `nixorium deploy queue status`): the configuration changed after queueing, or the update kept failing |
 | `BACKUP-DUE` | A backup of this laboratory is due | Back up the lab ([Backups and restoration](#backups-and-restoration)) |
+| `BACKUP-NONE` | This laboratory has no backup yet | Back up the lab when its setup is done ([Backups and restoration](#backups-and-restoration)) |
 | `EVAL-FAILED` | The configuration has an error | Open Diagnostics and fix the first reported error (`nixorium doctor`; do not retry other operations) |
+| `PIN-OUTDATED` | The saved Nixorium version is recorded inconsistently | Repeat the update for the configured Nixorium version ([Updating the computers fails with a read-only flake.lock](#updating-the-computers-fails-with-a-read-only-flakelock)) |
 
 ## The controller DHCP lease changed
 
-Normal administration and Colmena deployment use the static laboratory address.
+Normal administration and computer updates use the static laboratory address.
 PXE preparation separately binds one live non-static controller address to the
 session so a routine DHCP lease change does not require a configuration commit.
 
@@ -149,9 +152,9 @@ output with the same sentence and keep their JSON report unchanged.
 
 `DISK-FREE` warns below 10 GiB available or when the filesystem probe failed;
 it is not an estimate of the space required by the next build. `COMMAND-NIX`,
-`COMMAND-GIT`, `COMMAND-SYSTEMCTL`, `COMMAND-SSH` and `COMMAND-COLMENA` report
+`COMMAND-GIT`, `COMMAND-SYSTEMCTL`, `COMMAND-SSH` and `COMMAND-NIX-COPY-CLOSURE` report
 missing executables in the command's environment. Neither condition starts
-a repair. Inspect `df -h /nix` and `command -v nix git systemctl ssh colmena`.
+a repair. Inspect `df -h /nix` and `command -v nix git systemctl ssh nix-copy-closure`.
 
 Run the packaged command from the deployment's supported controller environment.
 A missing tool may require a separately reviewed controller rebuild. For low
@@ -213,7 +216,7 @@ journalctl -u harmonia.service -b
 nixorium services restart cache
 ```
 
-The restart action requires exact confirmation and verifies both the unit and
+The restart action is confirmed with Enter on its review and verifies both the unit and
 HTTP endpoint. If the signing key is missing, run `nixorium setup keys`, review
 only the public-key change, then `nixorium setup install-secrets`. A public/
 private mismatch or a different installed secret fails closed; do not overwrite
@@ -223,8 +226,9 @@ either side until its provenance is understood.
 
 Use the official NixOS 26.05 ISO for `x86_64-linux`, either Minimal or
 Graphical (GNOME), booted in
-UEFI mode with Ethernet or Wi-Fi connectivity. Connect Wi-Fi with `nmtui` in
-the live environment first. Keep its physical console visible and recheck:
+UEFI mode, preferably on the laboratory cable (Wi-Fi, connected with `nmtui`
+in the live environment, serves only the installation itself). Keep its
+physical console visible and recheck:
 
 ```sh
 passwd
@@ -250,10 +254,10 @@ the TUI offers to save the observed card for that computer and prepares it
 again. USB/SSH does not
 need PXE, ProxyDHCP, or a controller address transition, but the controller must
 reach the live client's SSH server and the client must reach the signed Harmonia
-cache. Wi-Fi profiles and credentials are not copied into the installed system:
-arrange connectivity separately or reconnect locally as the administrator after
-boot before verifying the installed client. Keep secrets out of Git and the
-Nix store. Do not bridge an isolated trial onto an institutional
+cache. The installed client takes its laboratory address on its wired card
+only: connect the cable before the restart, or verification after boot finds
+nothing at the static address. Wi-Fi profiles and credentials are not copied
+into the installed system. Do not bridge an isolated trial onto an institutional
 LAN as a troubleshooting shortcut.
 
 ## USB installation refuses the disk or cache
@@ -343,14 +347,20 @@ verify the installed revision after disk boot. `close` releases a completed or
 deliberately abandoned record; it does not make an uncertain disk safe. If the
 live ISO is gone before any apply was dispatched, choose **Close this record**
 (Enter), or run `nixorium install usb close --id OPERATION_ID` and answer the
-yes/no question; closing an installed record before its restart keeps the
-typed `CLOSE`. Closing a never-dispatched record discards the operation's
+yes/no question. Closing a never-dispatched record discards the operation's
 local access credentials and releases its reservation without claiming remote
 key revocation. The old record is retained;
-a new installation must establish identity and review the disk again. Any
-consumed apply token, remote receipt, uncertain dispatch, or reboot evidence
-blocks this abandonment path. If apply was dispatched and completion cannot
-be proved, retain the reservation for reconciliation.
+a new installation must establish identity and review the disk again.
+
+When the disk may have been written, **Close this record** asks you to type
+`CLOSE`: before the restart of an installed computer, and also when the
+computer does not come back from the restart (a broken disk, a computer that
+starts from the USB stick again) or when the outcome cannot be proved. Closing
+frees the controller for other operations and keeps the record as closed
+without verification; the live key is revoked when the computer started from
+the USB stick still answers, and the controller's copy is always discarded.
+Nixorium does not check that computer: check it, or install it again with a
+new review. Prefer **Verify now** when the computer is back.
 
 For a reinstall, a different key at the configured static address is expected
 only after proving the old machine is the selected physical client. Approve
@@ -419,6 +429,10 @@ checked against the live process; it is never a reason to remove the lock.
 Without a confirmed holder the message says so; do not delete
 `/var/lib/nixorium/coordination/operation.lock`.
 
+Classroom controls (Internet access, shut down, restart and the schedule) do
+not wait for a running operation: they leave alone only the computers being
+updated, or named by an interrupted update.
+
 ## Codes shown to the teacher
 
 Classroom controls replace administrative detail with a short code. The
@@ -432,8 +446,8 @@ technical cause stays in `journalctl -u nixorium-classroom.service`.
 | `PXE-ACTIVE` | Network installation is still active | Finish installation or run `nixorium pxe recover` |
 | `CLASSROOM-LOAD` | The classroom service could not read the committed configuration | Read the service journal; fix and commit the configuration |
 | `CLASSROOM-SERVICE` | The classroom service is not running or not answering | `systemctl status nixorium-classroom.service`; apply the controller configuration if it is missing |
-| `CLASSROOM-VIEW-OFF` | The classroom view is turned off for this laboratory | Remove `"classroomView": false` from `lab-settings.json` (or set it to `true`), apply the controller and update the client computers |
-| `DISK-LOW` | Collect from desktop found too little free space on the controller to keep a computer's files (it keeps 1 GB free) | Free disk space (Maintenance → Free disk space) and collect again |
+| `CLASSROOM-VIEW-OFF` | The classroom view is turned off in this laboratory's settings. If the setting is on, the controller has not yet applied the configuration that writes `/etc/nixorium/classroom-view.json`, or `nixorium` runs from outside the applied system (for example `nix run`) | Turn it on in **Maintenance → Change settings → Classroom view**, save, apply the controller and update the client computers. If it is already on, use **Apply to controller** and run `nixorium` from the controller's own session |
+| `DISK-LOW` | Collect from students' desktops found too little free space on the controller to keep a computer's files (it keeps 1 GB free) | Free disk space (Maintenance → Free disk space) and collect again |
 
 Classroom controls read the last **committed** configuration, so uncommitted
 edits in the deployment repository do not affect them until they are saved.
@@ -472,7 +486,9 @@ nmcli connection up nixorium-lab    # bring the laboratory profile up
 systemctl list-jobs                 # is an activation or start-up job still running?
 ```
 
-Add `ifname DEVICE` to `nmcli connection up nixorium-lab` to choose the card
+The controller uses the same profile since 3.10: the same commands apply on
+its console when it lost its laboratory address. Add `ifname DEVICE` to
+`nmcli connection up nixorium-lab` to choose the card
 that has the cable. Without an interface name, the laboratory profile is active
 on the first wired card that comes up; for a computer with several wired cards,
 name the right one with a `hostIfaceNames` entry in the private deployment
@@ -499,6 +515,33 @@ with a known address stays off:
   card until the computer is started by hand;
 - check that it is on the same network segment as the controller: the packet
   is a broadcast and does not cross a router.
+
+## A student computer stops before the login screen
+
+The boot shows `Failed to start Restore the configured student workspace
+before login` and no login screen appears. The student home is restored at
+every boot; when that cannot finish, login stays closed so nobody works in a
+half-restored home. The computer still answers SSH from the controller.
+
+A computer that was switched off during the restore repairs itself at the next
+boot: before the snapshot of the old home exists, the restore starts again;
+after it, the restore completes and publishes that snapshot. Restart it once
+before investigating. Read the reason from the controller:
+
+```sh
+ssh root@<client-address> 'journalctl -b -u home-reset.service --no-pager | tail -5'
+ssh root@<client-address> 'ls -la /var/lib/home-snapshots/.workspace-reset'
+```
+
+- `managed account still has running processes (pid …, "…")`: a service ran as
+  the student during the restore. Nothing changed in the home and the next
+  boot tries again; report the named process if it repeats.
+- `automatic recovery of an interrupted reset already failed`, or any other
+  message with `administrator recovery is required`: the computer stays
+  closed. Keep every file in `.workspace-reset`, especially `previous`, which
+  can be the only copy of the student's files, and ask for support with the
+  journal output. Never delete the folder, rerun `nixorium-home-reset` or
+  disable the student profile to open the login.
 
 ## A client was deliberately reinstalled and its SSH key changed
 
@@ -529,9 +572,69 @@ system or certify its installed revision: refresh Computers before a fresh
 deployment plan. Unexpected key changes require investigation, not rotation.
 Never delete the whole trust file or disable host-key verification.
 
+## This computer has no Nixorium identity
+
+Computers of the same kind share one system, and each one keeps its name and
+laboratory address from a small identity record,
+`/var/lib/nixorium/identity.json`, which holds only its number. If that record
+is missing or not valid, the computer starts without its laboratory address,
+and `systemctl status nixorium-identity.service` shows a failed unit with the
+message "This computer has no Nixorium identity". In the inventory the computer
+is offline or unknown, and it cannot be reached from the controller.
+
+Typical causes are a disk restored or copied from another computer, or a
+record removed or edited by hand. Without its laboratory address the
+controller cannot update the computer, so the fix starts at the computer:
+
+1. If the computer was moved to the shared system by an update, restart it
+   and choose the previous generation in the boot menu. That system knows the
+   computer's number: it writes the record and starts with the laboratory
+   address. Then update the computer from the controller (Computers → Update
+   computers).
+2. Otherwise, as administrator at the computer, write its number in the
+   record and restart. For computer number 3 the file
+   `/var/lib/nixorium/identity.json` must contain exactly this line:
+
+   ```text
+   {"schemaVersion":1,"number":3}
+   ```
+
+3. If neither is possible, reinstall the computer from the controller
+   (network installation or USB). The installer writes the record before the
+   first start. A reinstall erases the disk.
+
+Do not copy the record from another computer. Two computers with the same
+number refuse each other's address and neither works reliably.
+
+## The update says "identity record names another computer"
+
+Before it switches a computer to a shared system, the update checks the
+identity record on that computer. If the record names a different computer
+number than the one the controller is updating, the update leaves the
+computer unchanged and reports "identity record names another computer". It
+never overwrites the record, because that could hide a swapped disk or two
+computers whose places were exchanged.
+
+1. Decide which computer is which: the label on the case, the inventory entry
+   (Computers) and the address the controller used.
+2. On the computer that holds the wrong record, correct it by hand as
+   administrator. For computer number 3, for example, the file must contain
+   exactly this line:
+
+   ```text
+   {"schemaVersion":1,"number":3}
+   ```
+
+   Save it as `/var/lib/nixorium/identity.json`.
+3. Run `nixorium hosts` to refresh the state, then update the computer again.
+
+If you are not sure which computer is which, leave the computer as it is and
+check the inventory first: a wrong correction gives the computer another
+computer's name and address.
+
 ## A deployment failed
 
-A Colmena failure can leave selected machines at different generations.
+A failed update can leave selected machines at different generations.
 Nixorium does not claim an automatic rollback across hosts. Unexpected terminal
 loss can interrupt the foreground deployment and uses this same recovery path.
 
@@ -551,26 +654,28 @@ update successful history. Historical success never overrides the live result.
 
 The distribution percentage counts phases, not bytes or updated computers.
 During build/apply, `l` shows a bounded, terminal-safe tail of the private
-Colmena log and the time since its last output. Silence alone is not failure.
+update log and the time since its last output. Silence alone is not failure.
 SSH connects with a 10-second limit and one attempt; unanswered server-alive
 checks use a 10-second interval and a count of three. Phase supervision has
 generous upper bounds of six hours for build and two hours for apply. These
 are safety ceilings, not progress estimates or proof that a remote job stopped.
 
 If waiting is no longer useful, `s` opens a separate **Stop waiting** review.
-Only typing `STOP WAITING` confirms termination of local Colmena/SSH processes.
+Enter on that review confirms termination of the local Nixorium update and SSH processes; Esc keeps waiting.
 Nixorium then attempts bounded authenticated client observations. This is not
 a remote cancellation or rollback; activation may still be running.
 
 Before dispatching apply, Nixorium durably creates the administrator-owned
 mode-0600 `/var/lib/nixorium/coordination/deployment-pending.json`, containing
 the repository, reviewed revision, selected names/addresses and start time.
-A normal successful Colmena return clears it. A failed/disconnected/timed-out
+A normal successful finish of the update clears it. A failed/disconnected/timed-out
 apply, terminal loss or process death retains it, even across controller reboot.
-New managed deployments, installation starts, network installation and fleet
-mutations, including classroom controls, are refused. Inventory and logs remain
-readable. Malformed or unsafe pending evidence also blocks operations rather
-than being silently removed.
+New managed deployments, installation starts, network installation and other
+maintenance operations are refused. Classroom controls (Internet access, shut
+down, restart and the schedule) keep working on the other computers and leave
+alone only the computers named in the record. Inventory and logs remain
+readable. Malformed or unsafe pending evidence also blocks operations, and
+classroom controls on every computer, rather than being silently removed.
 
 **Update Nixorium** and **Maintenance → Apply to controller** stay available,
 so a newer release can always reach the controller, even when the fix is in
@@ -629,15 +734,15 @@ Only when the guided review cannot run, recover by hand:
 
 1. Keep the private operation log and the pending record; do not delete or
    overwrite them, and review them before sharing.
-2. Confirm that the Nixorium process that started the update and its Colmena
-   and SSH children have exited (a stored PID is only a hint).
+2. Confirm that the Nixorium process that started the update and its SSH
+   child processes have exited (a stored PID is only a hint).
 3. Inspect every recorded computer, over SSH or at its console, for running
    activation and pending systemd jobs; resolve them first. A matching
    revision or a lost connection is not proof that activation finished.
 4. With no operation running, hold `operation.lock` exclusively and move the
    exact record to a new private file under `recovered/`; never delete or
-   recreate the lock files, and never bypass them with old binaries or raw
-   Colmena.
+   recreate the lock files, and never bypass them with old binaries or by
+   running a manual activation.
 5. Check the computers again and authorize a fresh reviewed update.
 
 ### Last resort: activate the controller with NixOS
@@ -767,6 +872,120 @@ Do not create or edit the receipt under `/var/lib/nixorium/controller/`.
 The privileged action invalidates stale evidence before retrying and recreates
 it only after complete activation.
 
+## Updating the computers fails with a read-only flake.lock
+
+**Symptom.** **Update computers** (or `nixorium deploy apply`) stops before
+any computer changes, with a log ending like:
+
+```text
+error: opening file "/nix/store/…-source/flake.lock": Read-only file system
+colmena build: exit status 1
+```
+
+Releases after 3.8.0 stop earlier with `PIN-OUTDATED` and the message
+`flake.lock does not match flake.nix (nixorium: flake.nix declares
+github:…/vB but flake.lock records github:…/vA)`. `nixorium doctor` reports
+the same finding.
+
+**Cause.** **Update Nixorium** in 3.8.0 and earlier saved the new release in
+`flake.nix` and locked the right commit in `flake.lock`, but recorded the
+release that was configured *before* the update as the lock's reference. Nix
+then wants to rewrite `flake.lock`. Applying the controller still works, but
+the computers are built from a read-only copy of the configuration, where the
+file cannot be rewritten. Every laboratory that updated Nixorium from the menu
+is affected; nothing on the computers changed.
+
+**Fix.** With a Nixorium release newer than 3.8.0 running on the controller:
+
+1. Open **Maintenance → Update Nixorium**. The list says the saved version is
+   recorded inconsistently; select the configured version (marked
+   "Current · select to repair") or a newer release.
+2. Review and confirm as for any update. The review shows only the
+   `flake.lock` reference changing for the configured version. Nixorium saves
+   the files and applies the controller.
+3. Run **Update computers** again.
+
+In a terminal the same repair is `nixorium update plan --target <configured
+version>`, then `nixorium update apply --target <configured version> --expect
+<review-token> --yes`, saving
+the two files in **Maintenance → Review Git changes** (`nixorium git review`)
+and applying the controller.
+
+Manual alternative (needs Internet access): in the deployment folder run
+`nix flake lock`, check with `git diff flake.lock` that only the `original`
+reference changed (the locked revision stays the same for a release tag), then
+save `flake.lock` in **Maintenance → Review Git changes** and apply the
+controller. The same command repairs a `nixpkgs` reference that disagrees with
+`flake.nix` after a manual edit.
+
+If the controller still runs 3.8.0, update Nixorium first: that update leaves
+the same inconsistency once more, and the newer release then repairs it as
+above.
+
+## The update review shows "Manual change"
+
+The review of **Update Nixorium** lists the changes the new release makes to
+your own files. "Manual change" means the release could not make one of them
+because the file is not as the release expects: you edited that place, or the
+file is missing. No file is touched for that change.
+
+1. Read the line under "Manual change" in the review. For a text replacement it
+   names the file and says what to do: `Replace "…" with "…".`
+2. Open the file named in the review and make that change yourself: replace
+   the first text with the second, keeping any other edit you made on purpose.
+   If the file already says what the second text says, nothing needs to change.
+3. Save it as a normal reviewed change (**Maintenance → Review Git changes**),
+   then run **Update Nixorium** again. Assistant can prepare this change as a
+   proposal for you to review.
+
+Do not edit `nixorium-migrations.json` to make the message go away: it records
+changes the update made and only the update writes it.
+
+If `nixorium-migrations.json` itself is not valid, the update stops with a
+message that names the file. Go back to an earlier saved version of the file in
+Git. A valid file has this form:
+
+```text
+{"schemaVersion":1,"applied":["2026-10-workstation-is-controller"]}
+```
+
+If there is no earlier version, remove the file in a reviewed change: the update
+then checks each change again, and records those your files already contain.
+
+## The update is refused because of the new release's changes to your files
+
+The new release brings its own program that changes your deployment's files. It
+runs on a copy, without network, and **Update Nixorium** accepts only the
+changes it can show you in the review. The update is refused, and nothing is
+saved, when:
+
+- the new release's migrations fail, do not finish in 2 minutes, or say they
+  cannot migrate this deployment (the message gives the reason, for example
+  that `nixorium-migrations.json` is not valid);
+- they change something they did not declare, or a file they must not touch
+  (`flake.nix`, `flake.lock`, keys, credentials, hidden files), or too much;
+- the sandbox that runs them cannot start on the controller (the message says
+  so).
+
+The current release keeps working. Do not try to work around it:
+
+1. Fix what the message names, if it is on your side (for example restore
+   `nixorium-migrations.json` from Git), and update again.
+2. Otherwise stay on the current release and collect a support report
+   (`nixorium support export`) to send with the message. This is a problem of
+   the new release, not of your laboratory.
+
+If the message says **update to an intermediate release first**, the new
+release migrates files in a newer way than the release you run knows. Update
+to the release that the message or the release notes name as intermediate, then
+update again.
+
+If you run a release from before deployment migrations existed, the update
+cannot run them. In the deployment folder run
+`nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment migrate --root .`,
+review the result with `git diff` (or **Maintenance → Review Git changes**),
+save it, and then run **Update Nixorium**.
+
 ## An upstream update failed
 
 - A failed `update check` changes nothing. It is optional; when the controller
@@ -860,7 +1079,7 @@ fetch the backup without first needing the keys inside it.
 
 Save configuration edits through **Maintenance → Review Git changes** first.
 Back up lab reviews the destination, branch and saved revision, then asks for a
-passphrase of at least 12 characters, its repetition and `PUSH`. Confirm on your
+passphrase of at least 12 characters and its repetition; Enter then pushes. Confirm on your
 provider that the destination is private: Git transport cannot establish repository
 visibility. Only `nixorium-recovery.age` is added by the backup operation. It uses
 age/scrypt and contains the original `secret-key`, `admin-ssh`,
@@ -917,10 +1136,11 @@ an existing deployment:
 nixorium backup clone
 ```
 
-Choose **Backup file** or **Private Git repository**. For a file, enter its path
-(for example on the mounted USB drive), a **new absolute directory** and the
-passphrase. For Git, enter the SSH repository URL, branch, a new absolute
-directory and the passphrase. Review and confirm. Both restore the deployment
+Choose **Backup file** or **Private Git repository**. For a file, Nixorium
+looks for `nixorium-backup-*.age` files on connected drives and proposes the
+newest; enter its passphrase. **Restore into** proposes a new folder next to
+the deployment (`nixorium-restored`); change it only if needed. For Git, enter
+the SSH repository URL, branch and the passphrase. Review and confirm. Both restore the deployment
 with its private keys and account passwords into the new directory and fill the
 controller's trusted computer keys in the same way. The equivalent
 noninteractive Git command is:
@@ -938,10 +1158,29 @@ mismatches leave no published target. A finalization failure explicitly reports 
 partial result and the retained directory; keep it and collect support evidence
 before activation instead of deleting it or blindly retrying.
 
-On a replacement controller, install NixOS with the same controller number and
-network, sign in as `admin`, restore to a new directory, then use the restored
-repository at the configured deployment path. Keep any newly created deployment
-aside until recovery is verified. Run these commands from the restored deployment:
+On a replacement controller, install the controller as usual, sign in as
+`admin`, open Nixorium and choose **Maintenance → Restore lab**. After the
+restore, the result
+offers **Use this lab on this controller**: the deployment created by the
+installer is kept as `nixorium-deployment-before-restore-DATE`, the restored lab
+takes its place and its keys are installed on the controller. Nothing is
+deleted or activated. Then **Review controller** applies it to the controller
+after the usual review. Computers reinstalled after the backup was made show
+"SSH key changed": compare the fingerprint on their screen before trusting
+them. Do it before **Install computers** on the new controller: the step
+refuses a controller that already has the keys of another lab, which the
+installation guide creates.
+
+If that happened (the refusal names `/home/admin/.ssh/id_ed25519`), the new
+controller's own keys must go before the restored ones can be installed. They
+belong to the lab created on this controller, never to the restored one. As
+root, remove `/home/admin/.ssh/id_ed25519`, `/home/admin/.ssh/id_ed25519.pub`
+and `/var/lib/nixorium/keys/harmonia-secret-key`, then open **Restore lab**
+again and choose **Use this lab on this controller**.
+
+Without the TUI, use the restored repository at the configured deployment
+path. Keep any newly created deployment aside until recovery is verified. Run
+these commands from the restored deployment:
 
 ```sh
 nixorium setup keys --verify-only
@@ -954,9 +1193,9 @@ again. Clients retain trust in the restored original keys and do not need
 reinstallation. The passphrase decrypts existing keys; it never generates
 replacement keys. Repository access and the passphrase are both needed.
 
-For an **Encrypted file**, the TUI proposes your home folder; for a USB drive,
-mount it first and enter its folder instead (any existing absolute folder outside
-the deployment). Enter and repeat a passphrase of at least
+For an **Encrypted file**, the TUI proposes a connected USB drive, or your home
+folder when none is connected (any existing absolute folder outside the
+deployment can be entered). Enter and repeat a passphrase of at least
 12 characters, review the destination, then choose **Create backup**. No Git
 remote is needed and nothing is pushed. A detached USB need not stay mounted
 for the recorded backup to count. The equivalent CLI and restoration commands are:

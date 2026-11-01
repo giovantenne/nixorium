@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,8 +15,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func workspaceFixture() dashboardModel {
-	m := experienceFixture(2)
+func workspaceFixture(t testing.TB) dashboardModel {
+	m := experienceFixture(t, 2)
 	m.screen = dashboardWorkspace
 	plan := demoWorkspacePlan()
 	m.workspace = workspaceModel{loaded: plan, candidate: *plan.Candidate}
@@ -72,7 +73,7 @@ func TestWorkspaceFieldsPreserveInheritanceAndReviewedObjects(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Fatal("editing mutated the reviewed candidate")
 	}
-	ext := workspaceGroupFields(2)[0]
+	ext := workspaceReviewOnlyFields[slices.IndexFunc(workspaceReviewOnlyFields, func(field workspaceField) bool { return field.kind == "extensions" })]
 	updated, err := workspaceSetValue(p, ext, []string{"z.last", "a.first"})
 	if err != nil || !reflect.DeepEqual(*updated.VSCode.Extensions, []string{"a.first", "z.last"}) {
 		t.Fatal("extension normalization was bypassed")
@@ -83,7 +84,7 @@ func TestWorkspaceFieldsPreserveInheritanceAndReviewedObjects(t *testing.T) {
 }
 
 func TestWorkspaceFieldSelectionOrderInheritanceAndNumericInput(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.workspace.startField()
 	if !m.workspace.inherit || len(m.workspace.selected) != 2 {
 		t.Fatal("baseline preview missing")
@@ -93,7 +94,7 @@ func TestWorkspaceFieldSelectionOrderInheritanceAndNumericInput(t *testing.T) {
 	m, _ = workspaceKey(m, demoCode(tea.KeyDown))
 	m, _ = workspaceKey(m, demoCode(tea.KeySpace))
 	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
-	if !reflect.DeepEqual(m.workspace.selected, []string{"code.desktop", "firefox.desktop"}) || m.pageScroll != 0 {
+	if !reflect.DeepEqual(m.workspace.selected, []string{"code.desktop", "firefox.desktop"}) || m.navigation.pageScroll != 0 {
 		t.Fatal("ordered favorites escaped their field")
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyEnter))
@@ -124,20 +125,15 @@ func TestWorkspaceFieldSelectionOrderInheritanceAndNumericInput(t *testing.T) {
 	if m.workspace.candidate.Desktop != nil {
 		t.Fatal("cancel changed the draft")
 	}
-	m.workspace.group, m.workspace.cursor = 3, 0
+	m.workspace.group, m.workspace.cursor = 2, 0
 	m.workspace.startField()
 	if !reflect.DeepEqual(m.workspace.choices, []string{"Inherit", "firefox.desktop"}) {
 		t.Fatal("non-browser offered as default")
 	}
-	m.workspace.group, m.workspace.cursor = 2, 0
-	m.workspace.startField()
-	if !reflect.DeepEqual(m.workspace.choices, []string{"ritwickdey.liveserver"}) {
-		t.Fatal("extension picker does not use the pinned catalog")
-	}
 }
 
 func TestWorkspaceSettingsRouteAndCancelledLateLoad(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.screen = dashboardSettings
 	m.settings.menu = newRoutineSettingsMenu(true, 80, 24)
 	var request context.Context
@@ -156,7 +152,7 @@ func TestWorkspaceSettingsRouteAndCancelledLateLoad(t *testing.T) {
 		t.Fatal("late load reopened the editor")
 	}
 	for _, classroom := range []bool{false, true} {
-		m := workspaceFixture()
+		m := workspaceFixture(t)
 		m.screen = dashboardSettings
 		m.actions.ClassroomMode = classroom
 		if !classroom {
@@ -170,7 +166,7 @@ func TestWorkspaceSettingsRouteAndCancelledLateLoad(t *testing.T) {
 }
 
 func TestWorkspaceReviewRejectsConcurrentBaseAndPreservesDraft(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.workspace.candidate, _ = workspaceSetValue(m.workspace.candidate, workspaceFields[1], "dark")
 	m.actions.PlanWorkspace = func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport {
 		p := demoWorkspacePlan()
@@ -185,7 +181,7 @@ func TestWorkspaceReviewRejectsConcurrentBaseAndPreservesDraft(t *testing.T) {
 }
 
 func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	saves := 0
 	m.actions.SaveWorkspace = func(plan domain.WorkspacePlanReport) domain.WorkspaceApplyReport {
 		saves++
@@ -200,18 +196,15 @@ func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) 
 	m.actions.ApplyGitCommit = nil
 	m, cmd := workspaceKey(m, demoText("v"))
 	m = workspaceComplete(t, m, cmd)
-	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
-	if cmd != nil || saves != 0 {
-		t.Fatal("save without typed confirmation")
+	if saves != 0 || !strings.Contains(m.View().Content, "Enter saves") {
+		t.Fatalf("the review does not say what Enter does:\n%s", m.View().Content)
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyF1))
-	m, _ = workspaceKey(m, demoText("SAVE"))
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
-	if !m.helpOpen || cmd != nil || saves != 0 {
+	if !m.navigation.helpOpen || cmd != nil || saves != 0 {
 		t.Fatal("help triggered a save")
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyEsc))
-	m, _ = workspaceKey(m, demoText("SAVE"))
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 	if cmd == nil || !m.workspace.saving {
 		t.Fatal("reviewed save did not start")
@@ -234,7 +227,7 @@ func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) 
 		t.Fatal("duplicate result replaced success")
 	}
 	for _, state := range []string{"unchanged", "invalid"} {
-		m.workspace.stage, m.workspace.plan.State, m.workspace.confirmation = workspaceReview, state, "SAVE"
+		m.workspace.stage, m.workspace.plan.State = workspaceReview, state
 		m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 		if cmd != nil || saves != 1 {
 			t.Fatalf("%s plan requested save", state)
@@ -243,7 +236,7 @@ func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) 
 }
 
 func TestWorkspaceResultRecoveryAndContextualGitReview(t *testing.T) {
-	m := workspaceFixture()
+	m := workspaceFixture(t)
 	m.workspace.stage = workspaceResult
 	m.workspace.result = domain.WorkspaceApplyReport{State: "partial", RecoveryRequired: true}
 	m, cmd := workspaceKey(m, demoText("r"))
@@ -267,20 +260,17 @@ func TestWorkspaceResultRecoveryAndContextualGitReview(t *testing.T) {
 func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		for _, dark := range []bool{false, true} {
-			for _, state := range []string{"overview", "fields", "favorites", "extensions", "empty", "numeric", "review", "loading", "failure", "saving", "saved", "partial"} {
+			for _, state := range []string{"overview", "fields", "favorites", "empty", "numeric", "review", "loading", "failure", "saving", "saved", "partial"} {
 				t.Run(fmt.Sprintf("%dx%d/dark%t/%s", size[0], size[1], dark, state), func(t *testing.T) {
-					m := workspaceFixture()
+					m := workspaceFixture(t)
 					m.width, m.height, m.isDark = size[0], size[1], dark
 					w := &m.workspace
 					want := []string{"Student workspace", "F1", "Help", "Esc"}
 					switch state {
 					case "fields":
-						w.group, w.cursor, w.stage = 2, 7, workspaceFieldList
-						want = append(want, "Auto save", "Review")
-					case "favorites", "extensions", "empty":
-						if state == "extensions" {
-							w.group = 2
-						}
+						w.group, w.cursor, w.stage = 1, 5, workspaceFieldList
+						want = append(want, "Show mounts", "Review")
+					case "favorites", "empty":
 						if state == "empty" {
 							w.loaded.Inspection.Resolution.Catalog.Applications = nil
 						}
@@ -302,7 +292,7 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					case "review":
 						w.plan = demoWorkspacePlan()
 						w.stage = workspaceReview
-						want = append(want, "Type SAVE:", "Save JSON", "no system apply or reset")
+						want = append(want, "Enter saves and records only the profile JSON", "Save JSON", "no system apply or reset")
 					case "loading":
 						m.busy = "Loading workspace metadata"
 						m.beginRead(dashboardReadTimeout)

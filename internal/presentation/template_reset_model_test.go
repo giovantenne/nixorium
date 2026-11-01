@@ -13,8 +13,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func templateResetUIFixture() dashboardModel {
-	m := experienceFixture(2)
+func templateResetUIFixture(t testing.TB) dashboardModel {
+	m := experienceFixture(t, 2)
 	m.screen = dashboardAdministration
 	p := demoTemplateResetPlan()
 	m.actions.LoadTemplateReset = func(context.Context) domain.TemplateResetCatalog {
@@ -28,7 +28,7 @@ func templateResetUIFixture() dashboardModel {
 }
 
 func TestTemplateResetUIRequiresExactConfirmationAndSavesOnce(t *testing.T) {
-	m := templateResetUIFixture()
+	m := templateResetUIFixture(t)
 	saves := 0
 	m.actions.ApplyTemplateReset = func(p domain.TemplateResetPlan) domain.TemplateResetResult {
 		saves++
@@ -76,7 +76,7 @@ func TestTemplateResetUIRequiresExactConfirmationAndSavesOnce(t *testing.T) {
 }
 
 func TestTemplateResetUICancellationAndLateMessages(t *testing.T) {
-	m := templateResetUIFixture()
+	m := templateResetUIFixture(t)
 	var request context.Context
 	m.actions.LoadTemplateReset = func(ctx context.Context) domain.TemplateResetCatalog {
 		request = ctx
@@ -93,7 +93,7 @@ func TestTemplateResetUICancellationAndLateMessages(t *testing.T) {
 	if m.screen != dashboardAdministration || m.busy != "" {
 		t.Fatal("late message restored cancelled screen")
 	}
-	m = templateResetUIFixture()
+	m = templateResetUIFixture(t)
 	m.actions.ClassroomMode = true
 	_, command = m.openTemplateReset()
 	if command != nil {
@@ -106,7 +106,7 @@ func TestTemplateResetUIRendering(t *testing.T) {
 		for _, dark := range []bool{true, false} {
 			for _, state := range []string{"select", "review", "end", "loading", "saving", "blocked", "saved", "recovery-required"} {
 				t.Run(fmt.Sprintf("%dx%d/%t/%s", size[0], size[1], dark, state), func(t *testing.T) {
-					m := templateResetUIFixture()
+					m := templateResetUIFixture(t)
 					m.width, m.height, m.isDark, m.screen = size[0], size[1], dark, dashboardTemplateReset
 					m.templateReset.stage, m.templateReset.plan = "review", demoTemplateResetPlan()
 					want := []string{"Reset deployment template", "F1", "Help", "Esc"}

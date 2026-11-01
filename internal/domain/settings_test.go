@@ -67,6 +67,22 @@ func TestLabSettingsValidation(t *testing.T) {
 	}
 }
 
+func TestLabSettingsRefuseWiFiCardNames(t *testing.T) {
+	for field, change := range map[string]func(*LabSettingsFile){
+		"lab.ifaceName":           func(s *LabSettingsFile) { s.Lab.InterfaceName = "wlp2s0" },
+		"lab.controllerIfaceName": func(s *LabSettingsFile) { s.Lab.ControllerInterfaceName = "wlan0" },
+		"lab.clientIfaceName":     func(s *LabSettingsFile) { s.Lab.ClientInterfaceName = "wlo1" },
+		"lab.hostIfaceNames.pc01": func(s *LabSettingsFile) { s.Lab.HostInterfaceNames = map[string]string{"pc01": "wlx001122334455"} },
+	} {
+		s := validSettings()
+		change(&s)
+		issues := s.Validate()
+		if len(issues) != 1 || issues[0].Field != field || !strings.Contains(issues[0].Message, "Wi-Fi card name") {
+			t.Fatalf("%s: %+v", field, issues)
+		}
+	}
+}
+
 func TestDHCPMustStayOutsideTheStaticLabPrefix(t *testing.T) {
 	for _, address := range []string{"10.0.0.0", "10.0.0.1", "10.0.0.255"} {
 		s := validSettings()
@@ -112,6 +128,7 @@ func TestSharedLabSettingsValidationCases(t *testing.T) {
 	}
 	type validationCases struct {
 		Invalid []validationCase `json:"invalid"`
+		Valid   []validationCase `json:"valid"`
 	}
 
 	data, err := os.ReadFile("../../tests/lab-settings-validation-cases.json")
@@ -126,29 +143,45 @@ func TestSharedLabSettingsValidationCases(t *testing.T) {
 		t.Fatal("shared validation corpus has no invalid cases")
 	}
 
+	if len(cases.Valid) == 0 {
+		t.Fatal("shared validation corpus has no valid cases")
+	}
+
+	decode := func(t *testing.T, overrides map[string]any) []ValidationIssue {
+		t.Helper()
+		base, err := json.Marshal(validSettings())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var candidate map[string]any
+		if err := json.Unmarshal(base, &candidate); err != nil {
+			t.Fatal(err)
+		}
+		lab, ok := candidate["lab"].(map[string]any)
+		if !ok {
+			t.Fatal("valid settings did not encode a lab object")
+		}
+		for field, value := range overrides {
+			lab[field] = value
+		}
+		candidateData, err := json.Marshal(candidate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, issues := DecodeLabSettings(candidateData)
+		return issues
+	}
 	for _, testCase := range cases.Invalid {
-		t.Run(testCase.Name, func(t *testing.T) {
-			base, err := json.Marshal(validSettings())
-			if err != nil {
-				t.Fatal(err)
+		t.Run("invalid/"+testCase.Name, func(t *testing.T) {
+			if issues := decode(t, testCase.Overrides); len(issues) == 0 {
+				t.Fatalf("shared invalid case was accepted: %v", testCase.Overrides)
 			}
-			var candidate map[string]any
-			if err := json.Unmarshal(base, &candidate); err != nil {
-				t.Fatal(err)
-			}
-			lab, ok := candidate["lab"].(map[string]any)
-			if !ok {
-				t.Fatal("valid settings did not encode a lab object")
-			}
-			for field, value := range testCase.Overrides {
-				lab[field] = value
-			}
-			candidateData, err := json.Marshal(candidate)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, issues := DecodeLabSettings(candidateData); len(issues) == 0 {
-				t.Fatalf("shared invalid case was accepted: %s", candidateData)
+		})
+	}
+	for _, testCase := range cases.Valid {
+		t.Run("valid/"+testCase.Name, func(t *testing.T) {
+			if issues := decode(t, testCase.Overrides); len(issues) != 0 {
+				t.Fatalf("shared valid case was refused: %v: %+v", testCase.Overrides, issues)
 			}
 		})
 	}
@@ -266,6 +299,33 @@ func TestClassroomViewIsOnUnlessTurnedOff(t *testing.T) {
 	}
 }
 
+func TestClassroomViewImpactNamesWhatStopsAndWhatStays(t *testing.T) {
+	base := validSettings()
+	off := false
+	candidate := base
+	candidate.Lab.ClassroomView = &off
+	found := ""
+	for _, impact := range SettingsImpacts(base, candidate, DiffLabSettings(base, candidate)) {
+		if impact.Kind == "classroom-view" {
+			found = impact.Detail
+		}
+	}
+	for _, want := range []string{"locking screens", "messages", "sending files", "collecting files", "dock icon", "Internet pause", "schedule", "Apply to controller", "Update computers"} {
+		if !strings.Contains(found, want) {
+			t.Fatalf("impact lacks %q: %q", want, found)
+		}
+	}
+	found = ""
+	for _, impact := range SettingsImpacts(candidate, base, DiffLabSettings(candidate, base)) {
+		if impact.Kind == "classroom-view" {
+			found = impact.Detail
+		}
+	}
+	if !strings.HasPrefix(found, "Classroom view on") {
+		t.Fatalf("turning it back on: %q", found)
+	}
+}
+
 func TestAssistantDefaultsOnAndSurvivesSettingsSave(t *testing.T) {
 	settings := validSettings()
 	data, err := MarshalLabSettings(settings)
@@ -305,5 +365,57 @@ func TestAssistantDefaultsOnAndSurvivesSettingsSave(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("disabling Assistant is not reviewed: %+v", changes)
+	}
+}
+
+func TestGitIdentityAndKeyboardLayoutValidation(t *testing.T) {
+	accepted := []struct{ name, field, value string }{
+		{"name with accents quotes and spaces", "name", "José O'Brien \"Jo\" Núñez"},
+		{"plain email", "email", "ada.lovelace+lab@example.org"},
+		// Labs may already have emails of any shape Git accepts.
+		{"email without at", "email", "admin"},
+		{"email with name", "email", "Mario Rossi <m@x.it>"},
+		{"simple layout", "layout", "us"},
+		{"layout with variant", "layout", "us(intl)"},
+		{"layout list", "layout", "us,it"},
+		{"layout with underscore", "layout", "de_CH-legacy+1"},
+	}
+	rejected := []struct{ name, field, value string }{
+		{"name with shell injection and newline", "name", "x\"; touch /tmp/x #\nname"},
+		{"name with tab", "name", "Ada\tLovelace"},
+		{"name with DEL", "name", "Ada\x7f"},
+		{"name too long", "name", strings.Repeat("a", 257)},
+		{"email with newline", "email", "ada@example.org\n[core]"},
+		{"email too long", "email", "a@" + strings.Repeat("b", 255)},
+		{"layout with quote", "layout", "us')]; touch /tmp/x #"},
+		{"layout with space", "layout", "us intl"},
+		{"layout with newline", "layout", "us\n"},
+		{"layout too long", "layout", strings.Repeat("u", 129)},
+	}
+	apply := func(field, value string) []ValidationIssue {
+		settings := validSettings()
+		switch field {
+		case "name":
+			settings.Lab.StudentGitName, settings.Lab.AdminGitName = value, value
+		case "email":
+			settings.Lab.StudentGitEmail, settings.Lab.AdminGitEmail = value, value
+		default:
+			settings.Lab.KeyboardLayout = value
+		}
+		return settings.Validate()
+	}
+	for _, c := range accepted {
+		t.Run("accepts "+c.name, func(t *testing.T) {
+			if issues := apply(c.field, c.value); len(issues) != 0 {
+				t.Fatalf("%q rejected: %v", c.value, issues)
+			}
+		})
+	}
+	for _, c := range rejected {
+		t.Run("rejects "+c.name, func(t *testing.T) {
+			if issues := apply(c.field, c.value); len(issues) == 0 {
+				t.Fatalf("%q accepted", c.value)
+			}
+		})
 	}
 }

@@ -93,6 +93,13 @@ func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, 
 		return domain.UpdateInputSnapshot{}, errors.New("flake.lock nixorium revision is missing")
 	}
 	snapshot.CurrentRev = node.Locked.Rev
+	if mismatches, err := flakeLockOriginalMismatches(flake, lock); err == nil {
+		for _, mismatch := range mismatches {
+			if strings.HasPrefix(mismatch, "nixorium:") {
+				snapshot.PinOutdated = mismatch
+			}
+		}
+	}
 	return snapshot, nil
 }
 
@@ -213,38 +220,109 @@ func (Local) PrepareUpdateWithProgress(ctx context.Context, repository, target s
 		return domain.UpdateProposal{}, err
 	}
 	targetURL := "github:" + snapshot.SourcePrefix + "/" + target
-	lockFile, err := os.CreateTemp("", "nixorium-update-lock-*.json")
+	// The framework update owns only nixorium. A package-base pin that already
+	// disagrees with flake.nix would be relocked here; refuse instead.
+	mismatches, err := flakeLockOriginalMismatches(snapshot.FlakeContent, snapshot.LockContent)
 	if err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("create candidate lock path: %w", err)
+		return domain.UpdateProposal{}, err
 	}
-	lockPath := lockFile.Name()
-	if err := lockFile.Close(); err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("close candidate lock path: %w", err)
+	for _, mismatch := range mismatches {
+		if strings.HasPrefix(mismatch, "nixpkgs:") {
+			return domain.UpdateProposal{}, fmt.Errorf("flake.lock does not match flake.nix (%s); in the deployment folder run `nix flake lock`, save flake.lock in Maintenance → Review Git changes, then update again", mismatch)
+		}
 	}
-	if err := os.Remove(lockPath); err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("initialize candidate lock path: %w", err)
-	}
-	defer os.Remove(lockPath)
-	flake, err := deploymentFlakeReference(ctx, repository)
+	current, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseLock, "Resolving the selected release and generating its candidate lock", 0, 0)
-	if _, err := runBoundedNix(ctx, 256*1024, "flake", "lock", flake, "--override-input", "nixorium", targetURL, "--output-lock-file", lockPath); err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("generate candidate flake.lock: %w", err)
-	}
-	proposedLock, _, err := readRegularFileNoFollowLimit(lockPath, 4*1024*1024)
+	proposedLock, err := lockUpdateCandidate(ctx, repository, proposedFlake, "nixorium", targetURL)
 	if err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("read candidate flake.lock: %w", err)
+		return domain.UpdateProposal{}, err
 	}
 	if err := preserveDeploymentInputNode(snapshot.LockContent, proposedLock, "nixpkgs"); err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("validate candidate package-base pin: %w", err)
 	}
-	common := []string{"--override-input", "nixorium", targetURL, "--reference-lock-file", lockPath, "--no-write-lock-file"}
-	return validateUpdateCandidate(ctx, flake, common, snapshot, proposedFlake, proposedLock, progress, false)
+	return validateUpdateCandidate(ctx, repository, current, snapshot, proposedFlake, proposedLock, progress, false)
 }
 
-func validateUpdateCandidate(ctx context.Context, flake string, common []string, snapshot domain.UpdateInputSnapshot, proposedFlake, proposedLock []byte, progress func(domain.UpdatePlanProgress), packageBase bool) (domain.UpdateProposal, error) {
+// lockUpdateCandidate locks the proposed flake.nix against the current
+// flake.lock. Only the named input is resolved again (the override fetches
+// targetURL even when the reference is a moving branch); Nix keeps every
+// other node. Because the proposed flake.nix already declares targetURL, the
+// recorded "original" matches the file that will be saved.
+func lockUpdateCandidate(ctx context.Context, repository string, proposedFlake []byte, input, targetURL string, extra ...string) ([]byte, error) {
+	source, err := candidateFlakeSource(ctx, repository, map[string][]byte{"flake.nix": proposedFlake})
+	if err != nil {
+		return nil, err
+	}
+	directory, err := os.MkdirTemp("", "nixorium-update-lock-*")
+	if err != nil {
+		return nil, fmt.Errorf("create candidate lock path: %w", err)
+	}
+	defer os.RemoveAll(directory)
+	lockPath := filepath.Join(directory, "flake.lock")
+	arguments := append([]string{"flake", "lock", source, "--override-input", input, targetURL}, extra...)
+	arguments = append(arguments, "--output-lock-file", lockPath)
+	if _, err := runBoundedNix(ctx, 256*1024, arguments...); err != nil {
+		return nil, fmt.Errorf("generate candidate flake.lock: %w", err)
+	}
+	lock, _, err := readRegularFileNoFollowLimit(lockPath, 4*1024*1024)
+	if err != nil {
+		return nil, fmt.Errorf("read candidate flake.lock: %w", err)
+	}
+	return lock, nil
+}
+
+// candidateLockMismatch is the refusal when a candidate flake.lock would
+// not be accepted by Nix as-is next to the proposed flake.nix.
+const candidateLockMismatch = "flake.lock does not match flake.nix in the candidate; the update was refused and nothing was changed"
+
+// validateUpdateCandidate evaluates and builds exactly the proposed pair of
+// files. The candidate is an immutable copy with the proposed flake.nix and
+// flake.lock, used with --no-update-lock-file and never with
+// --no-write-lock-file (which would let Nix silently relock in memory): a
+// pair that Nix would want to change is refused before anything else.
+func validateUpdateCandidate(ctx context.Context, repository, currentFlake string, snapshot domain.UpdateInputSnapshot, proposedFlake, proposedLock []byte, progress func(domain.UpdatePlanProgress), packageBase bool) (domain.UpdateProposal, error) {
+	if mismatches, err := flakeLockOriginalMismatches(proposedFlake, proposedLock); err != nil || len(mismatches) > 0 {
+		return domain.UpdateProposal{}, fmt.Errorf("%s: %s", candidateLockMismatch, strings.Join(mismatches, "; "))
+	}
+	replacements := map[string][]byte{"flake.nix": proposedFlake, "flake.lock": proposedLock}
+	flake, err := candidateFlakeSource(ctx, repository, replacements)
+	if err != nil {
+		return domain.UpdateProposal{}, err
+	}
+	// The target release's changes to the deployment's own files, made by
+	// its own migrator: the candidate is evaluated and built with them
+	// (ADR 0034). A package-base update keeps the Nixorium revision and has
+	// none.
+	// An unreadable revision on either side counts as a change: migrations
+	// run rather than being skipped silently.
+	proposedRevision, currentRevision := lockedNixoriumRevision(proposedLock), lockedNixoriumRevision(snapshot.LockContent)
+	revisionChanges := proposedRevision == "" || currentRevision == "" || proposedRevision != currentRevision
+	if revisionChanges {
+		emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Running the target release's changes to deployment files", 0, 0)
+	}
+	migrations, migratedFiles, migrationReport, migrator, err := planDeploymentMigrations(ctx, repository, flake, revisionChanges)
+	if err != nil {
+		return domain.UpdateProposal{}, err
+	}
+	if len(migratedFiles) > 0 {
+		for _, file := range migratedFiles {
+			replacements[file.Path] = file.After
+			if file.Delete {
+				replacements[file.Path] = nil
+			}
+		}
+		if flake, err = candidateFlakeSource(ctx, repository, replacements); err != nil {
+			return domain.UpdateProposal{}, err
+		}
+	}
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Checking that the candidate flake.lock matches flake.nix", 0, 0)
+	if _, err := runBoundedNix(ctx, 64*1024, "flake", "lock", "--no-update-lock-file", flake); err != nil {
+		return domain.UpdateProposal{}, fmt.Errorf("%s: %w", candidateLockMismatch, err)
+	}
+	common := []string{"--no-update-lock-file"}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Evaluating candidate laboratory metadata", 0, 0)
 	metaOutput, err := runBoundedNix(ctx, 1024*1024, append([]string{"eval", flake + "#labMeta", "--json"}, common...)...)
 	if err != nil {
@@ -268,7 +346,7 @@ func validateUpdateCandidate(ctx context.Context, flake string, common []string,
 		return domain.UpdateProposal{}, err
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Comparing pinned student workspace dependencies", 0, 0)
-	workspace, err := inspectWorkspaceUpdate(ctx, flake, common)
+	workspace, err := inspectWorkspaceUpdate(ctx, currentFlake, flake, common)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
@@ -294,14 +372,23 @@ func validateUpdateCandidate(ctx context.Context, flake string, common []string,
 				return domain.UpdateProposal{}, fmt.Errorf("unknown update target %q", host)
 			}
 			if !seen[host] {
-				builds = append(builds, updateCandidateBuild{"host-" + host, "nixosConfigurations." + host + ".config.system.build.toplevel"})
+				builds = append(builds, updateCandidateBuild{"host-" + host, "nixosConfigurations." + host + ".config.system.build.toplevel", false})
 				seen[host] = true
 			}
 		}
-		builds = append(builds, updateCandidateBuild{"offline-equivalence", "nixoriumOfflineCheck"})
+		builds = append(builds, updateCandidateBuild{"offline-equivalence", "nixoriumOfflineCheck", false})
 	}
 	// One Nix invocation groups the complete reviewed output set. Do not mark individual checks passed until all succeed.
+	evaluated := 0
+	for _, build := range builds {
+		if build.evaluateOnly {
+			evaluated++
+		}
+	}
 	detail := fmt.Sprintf("Building all %d required outputs together", len(builds))
+	if evaluated > 0 {
+		detail = fmt.Sprintf("Building %d systems and evaluating %d installation outputs", len(builds)-evaluated, evaluated)
+	}
 	current := 0
 	if len(builds) == 1 {
 		detail = "Building " + updateBuildLabel(builds[0].id)
@@ -309,27 +396,46 @@ func validateUpdateCandidate(ctx context.Context, flake string, common []string,
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseBuild, detail, current, len(builds))
 	arguments := []string{"build", "--no-link"}
+	evaluations := []string{"path-info", "--derivation"}
 	for _, build := range builds {
-		arguments = append(arguments, flake+"#"+build.attribute)
+		if build.evaluateOnly {
+			evaluations = append(evaluations, flake+"#"+build.attribute)
+		} else {
+			arguments = append(arguments, flake+"#"+build.attribute)
+		}
+	}
+	if len(evaluations) > 2 {
+		if _, err := runBoundedNix(ctx, 256*1024, append(evaluations, common...)...); err != nil {
+			return domain.UpdateProposal{}, fmt.Errorf("evaluate candidate installation outputs: %w", err)
+		}
 	}
 	arguments = append(arguments, common...)
 	if _, err := runBoundedNix(ctx, 256*1024, arguments...); err != nil {
-		return domain.UpdateProposal{}, fmt.Errorf("build candidate systems and installation outputs: %w", err)
+		return domain.UpdateProposal{}, fmt.Errorf("build candidate systems: %w", err)
 	}
 	for _, build := range builds {
-		checks = append(checks, domain.UpdateCheck{ID: build.id, State: "passed", Message: "candidate output built without a result link"})
+		message := "candidate output built without a result link"
+		if build.evaluateOnly {
+			message = "candidate output evaluated; it is built when network installation is prepared"
+		}
+		checks = append(checks, domain.UpdateCheck{ID: build.id, State: "passed", Message: message})
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseReview, "Preparing the bounded flake.nix and flake.lock review", 0, 0)
-	diff, err := updateProposalDiff(ctx, snapshot.FlakeContent, proposedFlake, snapshot.LockContent, proposedLock)
+	diff, err := updateProposalDiff(ctx, snapshot.FlakeContent, proposedFlake, snapshot.LockContent, proposedLock, migratedFiles...)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
 	return domain.UpdateProposal{
-		FlakeContent: proposedFlake,
-		LockContent:  proposedLock,
-		Diff:         domain.GitDiff{Scope: "nixorium-update", Content: diff},
-		Checks:       checks,
-		Workspace:    workspace,
+		FlakeContent:     proposedFlake,
+		LockContent:      proposedLock,
+		NixoriumRevision: proposedRevision,
+		Diff:             domain.GitDiff{Scope: "nixorium-update", Content: diff},
+		Checks:           checks,
+		Workspace:        workspace,
+		Migrations:       migrations,
+		MigratedFiles:    migratedFiles,
+		MigrationReport:  migrationReport,
+		Migrator:         migrator,
 	}, nil
 }
 
@@ -419,6 +525,10 @@ func directRootInputNode(content []byte, inputName string) ([]byte, bool, error)
 type updateCandidateBuild struct {
 	id        string
 	attribute string
+	// evaluateOnly outputs are evaluated and instantiated, not built: the
+	// network-installation outputs are built when PXE is prepared, and building
+	// the netboot image here doubled the review time.
+	evaluateOnly bool
 }
 
 func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) ([]updateCandidateBuild, []domain.UpdateCheck, error) {
@@ -441,7 +551,7 @@ func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) 
 			return nil, nil, fmt.Errorf("candidate controller is not ready: %s", detail)
 		}
 		return []updateCandidateBuild{
-				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel"},
+				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel", false},
 			}, []domain.UpdateCheck{
 				{ID: "lab-meta", State: "passed", Message: "candidate controller metadata evaluated"},
 				{ID: "deployment-status", State: "passed", Message: "candidate controller is ready"},
@@ -458,11 +568,11 @@ func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) 
 			return nil, nil, fmt.Errorf("candidate deployment is not ready: %s", detail)
 		}
 		return []updateCandidateBuild{
-				{"client", "nixosConfigurations." + meta.Clients.Hosts[0].Name + ".config.system.build.toplevel"},
-				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel"},
-				{"netboot", "nixosConfigurations.netboot.config.system.build.netbootRamdisk"},
-				{"pxe-firmware", "pxeFirmware"},
-				{"installer-bundle", "installerBundle"},
+				{"client", "nixosConfigurations." + meta.Clients.Hosts[0].Name + ".config.system.build.toplevel", false},
+				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel", false},
+				{"netboot", "nixosConfigurations.netboot.config.system.build.netbootRamdisk", true},
+				{"pxe-firmware", "pxeFirmware", true},
+				{"installer-bundle", "installerBundle", true},
 			}, []domain.UpdateCheck{
 				{ID: "lab-meta", State: "passed", Message: "candidate laboratory metadata evaluated"},
 				{ID: "deployment-status", State: "passed", Message: "candidate deployment is ready"},
@@ -473,7 +583,32 @@ func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) 
 }
 
 func runBoundedNix(ctx context.Context, limit int, arguments ...string) (string, error) {
-	command := exec.CommandContext(ctx, "nix", append([]string{"--extra-experimental-features", "nix-command flakes"}, arguments...)...)
+	return runBoundedNixCommand(ctx, limit, exec.CommandContext(ctx, "nix", append([]string{"--extra-experimental-features", "nix-command flakes"}, arguments...)...))
+}
+
+// runIsolatedNix runs nix as runBoundedNix does, but in a network namespace of
+// its own: an Assistant candidate is Nix code written by the model, and a
+// fetch with a fixed hash in it would otherwise make the controller send
+// requests while the change is only being reviewed. The file system, the
+// Nix daemon and its store stay the same, so the result is too.
+func runIsolatedNix(ctx context.Context, limit int, arguments ...string) (string, error) {
+	sandbox := os.Getenv("NIXORIUM_NPM_BWRAP")
+	if sandbox == "" {
+		var err error
+		if sandbox, err = exec.LookPath("bwrap"); err != nil {
+			return "", errors.New("bubblewrap is needed to evaluate Assistant proposals")
+		}
+	}
+	nix, err := exec.LookPath("nix")
+	if err != nil {
+		return "", err
+	}
+	return runBoundedNixCommand(ctx, limit, exec.CommandContext(ctx, sandbox, append([]string{
+		"--dev-bind", "/", "/", "--unshare-net", "--die-with-parent", "--new-session",
+		"--", nix, "--extra-experimental-features", "nix-command flakes"}, arguments...)...))
+}
+
+func runBoundedNixCommand(ctx context.Context, limit int, command *exec.Cmd) (string, error) {
 	configureCommandCancellation(command)
 	stdout := &boundedCommandBuffer{limit: limit}
 	stderr := &boundedCommandBuffer{limit: limit}
@@ -495,20 +630,25 @@ func runBoundedNix(ctx context.Context, limit int, arguments ...string) (string,
 	return stdout.buffer.String(), nil
 }
 
-func updateProposalDiff(ctx context.Context, oldFlake, newFlake, oldLock, newLock []byte) (string, error) {
+func updateProposalDiff(ctx context.Context, oldFlake, newFlake, oldLock, newLock []byte, migrated ...domain.MigratedFile) (string, error) {
 	temporary, err := os.MkdirTemp("", "nixorium-update-diff-*")
 	if err != nil {
 		return "", fmt.Errorf("create update diff directory: %w", err)
 	}
 	defer os.RemoveAll(temporary)
 	var combined bytes.Buffer
-	for _, file := range []struct {
+	type diffFile struct {
 		name       string
 		oldContent []byte
 		newContent []byte
-	}{{"flake.nix", oldFlake, newFlake}, {"flake.lock", oldLock, newLock}} {
-		oldPath := filepath.Join(temporary, "old-"+file.name)
-		newPath := filepath.Join(temporary, "new-"+file.name)
+	}
+	files := []diffFile{{"flake.nix", oldFlake, newFlake}, {"flake.lock", oldLock, newLock}}
+	for _, file := range migrated {
+		files = append(files, diffFile{file.Path, file.Before, file.After})
+	}
+	for index, file := range files {
+		oldPath := filepath.Join(temporary, fmt.Sprintf("old-%d", index))
+		newPath := filepath.Join(temporary, fmt.Sprintf("new-%d", index))
 		if err := os.WriteFile(oldPath, file.oldContent, 0600); err != nil {
 			return "", fmt.Errorf("write old %s diff input: %w", file.name, err)
 		}
@@ -572,6 +712,12 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 	if len(proposal.FlakeContent) == 0 || len(proposal.LockContent) == 0 {
 		return false, errors.New("validated update proposal is incomplete")
 	}
+	// The release's changes to the deployment's own files go first: they
+	// work with the current release too, and a failure leaves the update
+	// input untouched (ADR 0034).
+	if partial, err := applyMigratedFiles(repository, proposal.MigratedFiles); err != nil {
+		return partial, err
+	}
 	lockMode := os.FileMode(expected.LockMode)
 	if !expected.HasLock {
 		lockMode = 0644
@@ -589,19 +735,116 @@ func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expected
 	lockPath := filepath.Join(repository, "flake.lock")
 	flakePath := filepath.Join(repository, "flake.nix")
 	if err := os.Rename(lockTemp, lockPath); err != nil {
+		if restoreErr := restoreMigratedFiles(repository, proposal.MigratedFiles); restoreErr != nil {
+			return true, fmt.Errorf("replace flake.lock: %w; restoring migrated files also failed: %v", err, restoreErr)
+		}
 		return false, fmt.Errorf("replace flake.lock: %w", err)
 	}
 	if err := os.Rename(flakeTemp, flakePath); err != nil {
-		rollbackErr := restoreUpdateLock(repository, expected)
+		rollbackErr := errors.Join(restoreUpdateLock(repository, expected), restoreMigratedFiles(repository, proposal.MigratedFiles))
 		if rollbackErr != nil {
-			return true, fmt.Errorf("replace flake.nix: %w; restoring flake.lock also failed: %v", err, rollbackErr)
+			return true, fmt.Errorf("replace flake.nix: %w; restoring flake.lock and migrated files also failed: %v", err, rollbackErr)
 		}
-		return false, fmt.Errorf("replace flake.nix: %w; original flake.lock was restored", err)
+		return false, fmt.Errorf("replace flake.nix: %w; original flake.lock and files were restored", err)
 	}
 	if err := root.Sync(); err != nil {
 		return true, fmt.Errorf("sync deployment root after update: %w", err)
 	}
 	return false, nil
+}
+
+// applyMigratedFiles writes the reviewed migrations, only if every file is
+// still exactly as reviewed; on a failure it restores those already written.
+// partial reports that the restore failed too.
+func applyMigratedFiles(repository string, files []domain.MigratedFile) (partial bool, err error) {
+	for _, file := range files {
+		if !validMigrationFile(file.Path) && file.Path != domain.DeploymentMigrationsFile {
+			return false, fmt.Errorf("deployment migration names a file it may not change: %s", file.Path)
+		}
+		current, exists, err := readMigratedFile(repository, file.Path)
+		switch {
+		case err != nil:
+			return false, fmt.Errorf("%s changed after update review", file.Path)
+		case file.Create && exists:
+			return false, fmt.Errorf("%s appeared after update review", file.Path)
+		case !file.Create && (!exists || !bytes.Equal(current, file.Before)):
+			return false, fmt.Errorf("%s changed after update review", file.Path)
+		}
+	}
+	for index, file := range files {
+		if err := writeMigratedState(repository, file, false); err != nil {
+			restoreErr := restoreMigratedFiles(repository, files[:index])
+			return restoreErr != nil, errors.Join(fmt.Errorf("write deployment migration: %w", err), restoreErr)
+		}
+	}
+	return false, nil
+}
+
+// MigratedFilesSaved reports whether every migrated file on disk is exactly
+// the reviewed result (present with its new content, or removed).
+func (Local) MigratedFilesSaved(repository string, files []domain.MigratedFile) bool {
+	for _, file := range files {
+		current, exists, err := readMigratedFile(repository, file.Path)
+		if err != nil || exists == file.Delete || (!file.Delete && !bytes.Equal(current, file.After)) {
+			return false
+		}
+	}
+	return true
+}
+
+// restoreMigratedFiles puts back the reviewed originals of migrated files.
+// Files are restored in reverse order, undoing later writes first.
+func restoreMigratedFiles(repository string, files []domain.MigratedFile) error {
+	var problems []error
+	for index := len(files) - 1; index >= 0; index-- {
+		file := files[index]
+		if err := writeMigratedState(repository, file, true); err != nil {
+			problems = append(problems, fmt.Errorf("%s: %w", file.Path, err))
+		}
+	}
+	return errors.Join(problems...)
+}
+
+// writeMigratedState writes a file's state after (or, restoring, before)
+// its migrations: content, absence, and mode.
+func writeMigratedState(repository string, file domain.MigratedFile, restoring bool) error {
+	path := filepath.Join(repository, file.Path)
+	absent, content := file.Delete, file.After
+	if restoring {
+		absent, content = file.Create, file.Before
+	}
+	if absent {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return err
+	}
+	temporary, err := writeUpdateTemporary(directory, filepath.Base(file.Path), content, os.FileMode(file.Mode))
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(temporary, path); err != nil {
+		_ = os.Remove(temporary)
+		return err
+	}
+	return nil
+}
+
+func readMigratedFile(repository, name string) ([]byte, bool, error) {
+	path := filepath.Join(repository, name)
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, true, errors.New("not a regular file")
+	}
+	content, err := os.ReadFile(path)
+	return content, true, err
 }
 
 func writeUpdateTemporary(repository, name string, content []byte, mode os.FileMode) (string, error) {

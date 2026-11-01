@@ -160,7 +160,7 @@ func TestDashboardSoftwareProfileUsesBatchCallbacksAndControllerFollowUp(t *test
 			return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Controller: plan.Controller, Revision: plan.Revision, Applied: true, Verified: true, Issues: []domain.ValidationIssue{}}
 		},
 	}
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	model := newTestModel(t, withReadyLab(), withActions(actions))
 	model.screen = dashboardSoftware
 	model.software.catalog = catalog
 	model.width, model.height = 100, 30
@@ -264,7 +264,7 @@ func TestSoftwareProfilePartialResultRetriesTheBatchSave(t *testing.T) {
 }
 
 func TestSoftwareDetailsChangeScopeAndControllerRemovalWarning(t *testing.T) {
-	model := experienceFixture(2)
+	model := experienceFixture(t, 2)
 	model.screen = dashboardSoftware
 	model.software.catalog = testSoftwareCatalogReport()
 	model.software.catalog.Controller = "pc99"
@@ -272,7 +272,7 @@ func TestSoftwareDetailsChangeScopeAndControllerRemovalWarning(t *testing.T) {
 	var requests []domain.SoftwareChangeRequest
 	model.actions.PlanSoftware = func(_ context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 		requests = append(requests, request)
-		report := domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "SAVE", ManagedFile: "lab-software.json"}
+		report := domain.SoftwareChangePlanReport{State: "ready", Request: request, ManagedFile: "lab-software.json"}
 		if request.Scope.Kind == domain.SoftwareScopeShared {
 			report.AffectedController = "pc99"
 		}

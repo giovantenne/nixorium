@@ -74,8 +74,12 @@ type Registry struct {
 	cache    map[string][]byte
 }
 
+// NewRegistry reads the public npm registry through the system proxy
+// (http_proxy, https_proxy, no_proxy), like the controller's other clients:
+// a school whose Internet passes through a mandatory proxy can still prepare
+// packages. Redirects are never followed.
 func NewRegistry(ctx context.Context) *Registry {
-	return &Registry{Context: ctx, Origin: "https://registry.npmjs.org", HTTP: &http.Client{Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, cache: map[string][]byte{}}
+	return &Registry{Context: ctx, Origin: "https://registry.npmjs.org", HTTP: &http.Client{Transport: &http.Transport{Proxy: http.ProxyFromEnvironment}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, cache: map[string][]byte{}}
 }
 
 func (r *Registry) Get(path string, limit int) ([]byte, error) {

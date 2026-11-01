@@ -92,3 +92,75 @@ func backupPassphrase(options options, stderr io.Writer) ([]byte, error) {
 	}
 	return passphrase, nil
 }
+
+// parseBackupFlags reads the backup-only flags.
+func parseBackupFlags(result *options, arguments []string, index int) (int, bool, error) {
+	switch arguments[index] {
+	case "--to", "--passphrase-file":
+		flag := arguments[index]
+		index++
+		if index >= len(arguments) || arguments[index] == "" {
+			return index, true, fmt.Errorf("%s requires a path", flag)
+		}
+		if flag == "--to" {
+			result.backupTarget = arguments[index]
+		} else {
+			result.passphraseFile = arguments[index]
+		}
+	default:
+		return index, false, nil
+	}
+	return index, true, nil
+}
+
+// parseBackupWord reads backup create/verify/restore (and install usb verify, which shares the word).
+func parseBackupWord(result *options, word string) (bool, error) {
+	switch word {
+	case "create", "verify", "restore":
+		if result.command == "backup" && result.subcommand == "" {
+			result.subcommand = word
+			return true, nil
+		}
+		if word != "verify" {
+			return true, fmt.Errorf("%s must follow backup", word)
+		}
+		if result.command != "install" || result.subcommand != "usb" {
+			return true, errors.New("verify must follow install usb or backup")
+		}
+		result.subcommand = "usb-verify"
+		return true, nil
+	}
+	return false, nil
+}
+
+// parseBackupPositional takes the backup file after backup verify or restore.
+func parseBackupPositional(result *options, word string) bool {
+	if result.command == "backup" && (result.subcommand == "verify" || result.subcommand == "restore") && result.backupFile == "" {
+		result.backupFile = word
+		return true
+	}
+	return false
+}
+
+// validateBackup rejects option combinations that do not belong to the command.
+func validateBackup(result *options) error {
+	if result.command == "backup" {
+		switch {
+		case result.subcommand != "create" && result.subcommand != "verify" && result.subcommand != "restore":
+			return errors.New("backup requires create, verify or restore")
+		case result.subcommand == "create" && result.backupTarget == "":
+			return errors.New("backup create requires --to <directory>")
+		case result.subcommand == "create" && result.backupFile != "":
+			return errors.New("backup create does not take a file")
+		case result.subcommand != "create" && result.backupFile == "":
+			return fmt.Errorf("backup %s requires the backup file", result.subcommand)
+		case result.subcommand == "verify" && result.backupTarget != "":
+			return errors.New("--to is only valid with backup create or restore")
+		case result.subcommand == "restore" && result.backupTarget == "":
+			return errors.New("backup restore requires --to <empty directory>")
+		}
+	} else if result.backupTarget != "" || result.passphraseFile != "" {
+		return errors.New("--to and --passphrase-file are only valid with backup")
+	}
+	return nil
+}

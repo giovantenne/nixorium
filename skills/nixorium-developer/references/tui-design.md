@@ -32,6 +32,8 @@ same paragraph. Preserve the operator's context while work is running; show
 progress in place instead of replacing the whole screen with unrelated text.
 The `l` progress toggle expands details in the current operation view, including
 update candidate validation; retain the target, phase, elapsed time and notices.
+Offer the `l` hint and key only while expanding shows something the compact view
+does not; otherwise the key is inert and an expanded flag renders compact.
 Long content must have an explicit scroll surface while the primary action and
 cancellation path remain visible.
 
@@ -77,6 +79,33 @@ what Enter will do before the user presses it.
 Avoid decorative borders, badges, and colors that do not improve hierarchy.
 Review both light and dark backgrounds and ASCII, ANSI, and ANSI-256 output.
 
+## Show the next step
+
+Owner decision 2026-10-20: a novice must see at once what to do next.
+
+- One primary action per screen. When the footer contains an Enter action
+  that does more than navigate, the shell draws it as a button: a rounded
+  border in the accent colour around `⏎ Enter  label` (bold, no background,
+  so it never looks like a selected row), directly above the key footer and
+  after the notices. An action that erases or replaces data uses the failure
+  red for border and key; its typed word stays. The footer then lists only
+  the other, secondary keys, in muted text. Terminals under 32 rows keep it
+  inline in its footer place as bold accent text with the `⏎` prefix and no
+  border (the border costs two rows), so nothing else is pushed off the
+  screen; list budgets subtract `ctaRows(height)` for the border. Navigation
+  labels (Open, Details, Select, Return, Back and area
+  names) stay ordinary footer keys. A screen may name another key as its
+  primary (`tuiShell.primary`).
+- Enter does what the next step says. When the text says "Next: …", Enter
+  performs that step; other actions keep their letter keys.
+- Colours keep their meaning: green for done and verified, amber for
+  attention, red for failure or danger. A success is never shown in amber
+  with "!". Meaning never depends on colour alone: arrow, symbol and text
+  remain.
+- Every result screen names its next step (as the primary action, with a
+  "Next: …" line when it needs explaining) or says that nothing else is
+  needed.
+
 ## Make interactions predictable
 
 Prefer a small shared vocabulary:
@@ -98,9 +127,14 @@ action bar. Responsive layouts may shorten labels, but must not silently omit
 the primary action, cancellation, safety state, or indication that more help is
 available.
 
-Use exact typed confirmation only when a mistake has material destructive or
-operational impact. A review must distinguish desired configuration, observed
-state, and the action that will happen now. Keep the existing token binding,
+Confirm a review with Enter in the TUI and `Continue? [y/N]` in the CLI. Use an
+exact typed word only where something is destroyed or cannot be undone
+(`ERASE`, `RESET DEPLOYMENT`/`RESTORE`, `DISCARD`, `ROTATE HOST KEY`, `CLEAN`,
+`CLOSE` after a possible disk change, `MATCH`, and the CLI `SHUTDOWN`/`RESTART`
+when a session is active or unknown; ADR 0026 as amended 2026-10-19). The
+screen says in one plain sentence what Enter does ("Enter updates these
+computers."). A review must distinguish desired configuration, observed state,
+and the action that will happen now. Keep the existing token binding,
 rechecks, privilege boundaries, and typed callbacks; visual simplification must
 not weaken operational safety.
 
@@ -130,9 +164,10 @@ step. Apply these rules to every operation, refusal and recovery state:
 7. Every loss of access (password, keys, controller disk) has a recovery
    procedure exercised at least in a VM.
 8. Recovery adds a review; it never removes review tokens, rechecks or
-   privilege boundaries. A typed word stays for destructive or uncertain
-   actions; a recovery that changes nothing on any computer and only archives
-   a record is confirmed with Enter (ADR 0026). Every recovery screen has
+   privilege boundaries. A typed word stays only for what destroys data or
+   cannot be undone; every other review, including a recovery that changes
+   nothing on any computer and only archives a record, is confirmed with
+   Enter (ADR 0026). Every recovery screen has
    three parts in plain words: what Nixorium found, what you can do (each
    action named by what it does), and the confirmation, which says what
    Enter or the typed word will change.

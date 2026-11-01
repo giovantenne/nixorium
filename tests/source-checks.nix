@@ -37,7 +37,7 @@ let
   });
   documentationSource = pkgs.lib.fileset.toSource {
     root = ../.;
-    fileset = ../docs/tui-gallery.md;
+    fileset = pkgs.lib.fileset.unions [ ../docs/tui-gallery.md ../docs/menu-map.md ];
   };
 in
 {
@@ -67,6 +67,8 @@ in
   workspace-editor-vm = import ./workspace-reset-service-vm.nix { inherit pkgs; editorQualification = true; };
   programming-profile-vm = import ./programming-profile-vm.nix { inherit pkgs; };
   session-state-vm = import ./session-state-vm.nix { inherit pkgs; };
+  stay-active-vm = import ./stay-active-vm.nix { inherit pkgs; };
+  staff-home-writes-vm = import ./staff-home-writes-vm.nix { inherit pkgs; };
   classroom-view-vm = import ./classroom-view-vm.nix { inherit pkgs; };
   telemetry-vm = import ./telemetry-vm.nix { inherit pkgs; };
   clean-generations-vm = import ./clean-generations-vm.nix { inherit pkgs; };

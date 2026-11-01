@@ -101,13 +101,14 @@ validate_plan() {
     (.operationId | type == "string" and test("^[0-9a-f]{32}$")) and
     (.bootId | type == "string" and test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")) and
     (.deploymentRevision | type == "string" and test("^[0-9a-f]{40,64}$")) and
-    (.systemPath | type == "string" and test("^/nix/store/[0-9a-z]{32}-nixos-system-pc[0-9]{2}-[^/[:space:]]+$")) and
+    (.systemPath | type == "string" and test("^/nix/store/[0-9a-z]{32}-nixos-system-(pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])|nixorium-client-shared-[0-9]{1,4})-[^/[:space:]]+$")) and
     (.adminPublicKey | type == "string" and length <= 1024 and test("^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$")) and
     (.hostKeyPublic | type == "string" and length <= 1024 and test("^ssh-ed25519 [A-Za-z0-9+/=]+( .*)?$")) and
     (.hostKeyRotation | type == "boolean") and
-    (.host | type == "object" and (keys | sort) == (["interface","liveIp","name","staticIp"] | sort)) and
-    (.host.name | type == "string" and test("^pc[0-9]{2}$")) and
-    (.host.interface | type == "string" and test("^[A-Za-z0-9_.:-]{1,64}$")) and
+    (.host | type == "object" and (keys | sort) == (["class","interface","liveIp","name","staticIp"] | sort)) and
+    (.host.name | type == "string" and test("^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$")) and
+    (.host.class | type == "string" and test("^(|pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])|shared-[0-9]{1,4})$")) and
+    (.host.interface | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}$")) and
     (.host.liveIp | type == "string" and test("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")) and
     (.host.staticIp | type == "string" and test("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")) and
     (.cache | type == "object" and (keys | sort) == (["publicKey","url"] | sort)) and
@@ -123,11 +124,12 @@ validate_plan() {
 }
 
 validate_plan_semantics() {
-  local plan_file=$1 live_ip static_ip cache_url cache_address cache_port host_name system_path
+  local plan_file=$1 live_ip static_ip cache_url cache_address cache_port host_name host_class system_name system_path
   live_ip=$(jq -r .host.liveIp "$plan_file")
   static_ip=$(jq -r .host.staticIp "$plan_file")
   cache_url=$(jq -r .cache.url "$plan_file")
   host_name=$(jq -r .host.name "$plan_file")
+  host_class=$(jq -r .host.class "$plan_file")
   system_path=$(jq -r .systemPath "$plan_file")
   nixorium_valid_unicast_ipv4 "$live_ip" || { echo "invalid live IPv4 address" >&2; return 2; }
   nixorium_valid_unicast_ipv4 "$static_ip" || { echo "invalid static IPv4 address" >&2; return 2; }
@@ -137,7 +139,8 @@ validate_plan_semantics() {
   cache_port=${cache_url##*:}
   nixorium_valid_unicast_ipv4 "$cache_address" || { echo "invalid cache IPv4 address" >&2; return 2; }
   (( cache_port >= 1 && cache_port <= 65535 )) || { echo "invalid cache port" >&2; return 2; }
-  [[ "$system_path" == *"-nixos-system-$host_name-"* ]] || { echo "system path does not match host" >&2; return 2; }
+  system_name=$(nixorium_expected_system_name "$host_name" "$host_class") || { echo "invalid class of host" >&2; return 2; }
+  [[ "$system_path" == *"-nixos-system-$system_name-"* ]] || { echo "system path does not match host" >&2; return 2; }
 }
 
 read_and_validate_plan() {
@@ -331,19 +334,24 @@ run_plan() {
   (umask 022; nixorium_run_disko "$NIXORIUM_DISKO_SCRIPT" "$selected_disk")
 
   RUN_PHASE=install
-  nixos-install --system "$system_path" \
+  # The installation activates the system once; a shared class system reads
+  # the computer's number from this record then (ADR 0033).
+  nixorium_write_identity_record "$host_name"
+  echo "Copying the prepared system from the controller (this can take several minutes)..."
+  nixorium_with_udev_in_target /mnt nixos-install --system "$system_path" \
     --option substituters "$cache_url" \
     --option trusted-public-keys "$cache_key" \
     --option require-sigs true \
     --option fallback false \
     --option builders "" \
-    --no-channel-copy --no-root-passwd
+    --no-channel-copy --no-root-passwd 2>&1 | nixorium_summarize_copy_output
 
   RUN_PHASE=verify
   install -D -o root -g root -m 0600 /etc/ssh/ssh_host_ed25519_key /mnt/etc/ssh/ssh_host_ed25519_key
   install -D -o root -g root -m 0644 /etc/ssh/ssh_host_ed25519_key.pub /mnt/etc/ssh/ssh_host_ed25519_key.pub
 
   nixorium_verify_installed_profile "$system_path" "$selected_disk"
+  nixorium_write_identity_record "$host_name"
   admin_key_found=false
   for authorized_keys_path in /mnt/etc/ssh/authorized_keys.d /mnt/root/.ssh/authorized_keys; do
     [[ -e "$authorized_keys_path" ]] || continue
@@ -361,8 +369,28 @@ run_plan() {
   RUN_INSTALLED=true
   RUN_PHASE=ready-to-reboot
   write_receipt "$operation_dir" "$operation_id" ready-to-reboot "$RUN_PHASE" true true \
-    "installation completed; remove or deprioritize the USB before reboot"
+    "installation completed; the PC restarts from its disk"
   trap - EXIT
+}
+
+# boot_installed_disk_next makes the next start use the boot entry that the
+# installation created on the selected disk, so the PC starts the installed
+# system even while the USB stick is still connected (removing it under the
+# running live system breaks that system before it restarts). It is best
+# effort: without the entry the firmware's order applies.
+boot_installed_disk_next() {
+  local plan_file=$1 disk partuuids entry
+  command -v efibootmgr >/dev/null 2>&1 || return 0
+  disk=$(jq -r '.disk.path // empty' "$plan_file" 2>/dev/null) || return 0
+  [[ "$disk" =~ ^/dev/[A-Za-z0-9_.+-]+$ ]] || return 0
+  partuuids=$(lsblk -nro PARTUUID -- "$disk" 2>/dev/null | tr 'A-Z' 'a-z' | grep -E '^[0-9a-f-]{36}$') || return 0
+  entry=$(efibootmgr -v 2>/dev/null | tr 'A-Z' 'a-z' | awk -v ids="$partuuids" '
+    BEGIN { n = split(ids, list, "\n") }
+    /^boot[0-9a-f]{4}/ {
+      for (i = 1; i <= n; i++) if (list[i] != "" && index($0, list[i]) > 0) { print substr($1, 5, 4); exit }
+    }') || return 0
+  [[ "$entry" =~ ^[0-9a-f]{4}$ ]] || return 0
+  efibootmgr -q -n "$entry" >/dev/null 2>&1 || true
 }
 
 reboot_operation() {
@@ -376,6 +404,7 @@ reboot_operation() {
       echo "operation is not ready for an explicit reboot" >&2
       return 1
     }
+  boot_installed_disk_next "$operation_dir/plan.json"
   reboot_unit="nixorium-remote-reboot-$operation_id"
   if ! "$SYSTEMD_RUN" --no-ask-password \
     --unit="$reboot_unit" --collect --quiet --on-active=10s \

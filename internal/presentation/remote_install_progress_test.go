@@ -181,7 +181,7 @@ func TestUSBInstallChecklistWaitsAndSizesAndIdentitiesAreReadable(t *testing.T) 
 // must load it instead of reporting that no computers are configured.
 func TestUSBHostSelectionLoadsInventoryInAFreshSession(t *testing.T) {
 	loads := 0
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		LoadInventory: func(context.Context) (domain.StatusReport, error) {
 			loads++
 			report := domain.StatusReport{}
@@ -189,7 +189,7 @@ func TestUSBHostSelectionLoadsInventoryInAFreshSession(t *testing.T) {
 			report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}, {Name: "pc02", IP: "10.0.0.2"}}
 			return report, nil
 		},
-	}, false)
+	}))
 	next, cmd := m.openRemoteInstallHostSelection()
 	m = next.(dashboardModel)
 	if cmd == nil || m.busy == "" {

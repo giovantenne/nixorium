@@ -81,7 +81,6 @@ func (model dashboardModel) finishWorkspacePlan(message dashboardWorkspacePlanMs
 	}
 	model.workspace.plan = report
 	model.workspace.scroll = 0
-	model.workspace.confirmation = ""
 	model.workspace.stage = workspaceReview
 	return model, nil
 }
@@ -108,9 +107,9 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 	}
 	if (key.String() == "shift+up" || key.String() == "shift+down") && !(model.workspace.stage == workspaceFieldEdit && model.workspace.field.kind == "favorites") {
 		if key.String() == "shift+up" {
-			model.pageScroll = max(0, model.pageScroll-1)
+			model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 		} else {
-			model.pageScroll++
+			model.navigation.pageScroll++
 		}
 		return model, nil
 	}
@@ -174,48 +173,28 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 			return model.startWorkspaceRead(false)
 		}
 	case workspaceFieldEdit:
-		if model.workspace.searching && key.String() == "enter" {
-			return model.startWorkspaceSearch()
-		}
-		if model.workspace.field.kind == "extensions" && !model.workspace.searching && model.workspace.pending == nil && key.String() == "u" {
-			ids := []string{}
-			for id := range model.workspace.marketplace {
-				ids = append(ids, id)
-			}
-			if len(ids) == 0 {
-				model.message = "No Marketplace extensions have been added to these draft settings."
-				return model, nil
-			}
-			slices.Sort(ids)
-			return model.startWorkspaceMarketplace(ids, true)
-		}
 		model.message = model.workspace.editField(key)
 	case workspaceReview:
 		switch key.String() {
 		case "esc":
 			model.workspace.stage = workspaceOverview
-			model.workspace.confirmation = ""
 			model.message = "Review cancelled; no file changed."
 		case "up":
 			model.workspace.scroll = max(0, model.workspace.scroll-1)
 		case "down":
 			model.workspace.scroll++
 		case "pgup":
-			model.workspace.scroll = max(0, model.workspace.scroll-max(1, model.height-17))
+			model.workspace.scroll = max(0, model.workspace.scroll-max(1, model.height-ctaRows(model.height)-17))
 		case "pgdown":
-			model.workspace.scroll += max(1, model.height-17)
-		case "backspace":
-			if len(model.workspace.confirmation) > 0 {
-				model.workspace.confirmation = model.workspace.confirmation[:len(model.workspace.confirmation)-1]
-			}
+			model.workspace.scroll += max(1, model.height-ctaRows(model.height)-17)
 		case "enter":
 			if model.workspace.plan.State == "unchanged" {
 				model.workspace.stage = workspaceOverview
 				model.message = "The settings are unchanged; nothing needed saving."
 				return model, nil
 			}
-			if model.workspace.plan.HasErrors() || model.workspace.plan.State != "ready" || model.workspace.plan.Confirmation != "SAVE" || model.workspace.plan.ReviewToken == "" || model.workspace.confirmation != "SAVE" {
-				model.message = "Type SAVE to save these settings. Computers are updated separately."
+			if model.workspace.plan.HasErrors() || model.workspace.plan.State != "ready" || model.workspace.plan.ReviewToken == "" {
+				model.message = "This review cannot be saved. Go back and create a new one."
 				return model, nil
 			}
 			model.workspace.saving = true
@@ -224,10 +203,6 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 			model.busy = "Rechecking, saving and recording workspace-profile.json"
 			model.message = ""
 			return model, func() tea.Msg { return dashboardWorkspaceSaveMsg{id: id, report: model.actions.SaveWorkspace(plan)} }
-		default:
-			if key.Text != "" && len(model.workspace.confirmation)+len(key.Text) <= 4 {
-				model.workspace.confirmation += key.Text
-			}
 		}
 	case workspaceResult:
 		switch key.String() {
@@ -252,7 +227,7 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 func (model dashboardModel) workspaceView() string {
 	w := model.workspace
 	width := min(110, max(24, model.width-10))
-	capacity := max(2, model.height-17)
+	capacity := max(2, model.height-ctaRows(model.height)-17)
 	if model.height == 0 {
 		capacity = 8
 	}
@@ -271,7 +246,7 @@ func (model dashboardModel) workspaceView() string {
 		resolved := w.loaded.Inspection.Resolution
 		switch w.stage {
 		case workspaceOverview:
-			fixed = "Packaged extensions update with Maintenance → Update system and packages;\nMarketplace pins with u in VSCode → extensions."
+			fixed = "Ask the Assistant to change students' VS Code settings and extensions."
 			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %s", resolved.StudentUser, countNoun(len(resolved.Targets)-1, "client")), workspaceApplicationText(), "")
 			if w.loaded.Inspection.Base == nil {
 				lines = append(lines, "No saved profile; this is a new draft.")
@@ -293,29 +268,10 @@ func (model dashboardModel) workspaceView() string {
 		case workspaceFieldEdit:
 			lines = append(lines, w.field.label, "")
 			actions = []tuiAction{{key: "Enter", label: "Keep draft"}, {key: "Esc", label: "Cancel field"}, {key: "F1", label: "Help"}}
-			if w.field.kind == "settings" {
-				settingLines, settingFixed, settingActions := w.settings.view(width, capacity, model.isDark)
-				lines = append(lines, settingLines...)
-				fixed = settingFixed
-				actions = append(settingActions, tuiAction{key: "F1", label: "Help"})
-			} else if w.field.kind == "number" {
+			if w.field.kind == "number" {
 				lines = append(lines, "Value: "+w.number+"_", "Leave empty to inherit the deployment baseline.")
 			} else {
-				multiple := w.field.kind == "favorites" || w.field.kind == "extensions"
-				if w.pending != nil {
-					lines = append(lines, w.marketplaceView(width)...)
-					actions = []tuiAction{{key: "Enter", label: "Add to draft"}, {key: "Esc", label: "Do not add"}, {key: "F1", label: "Help"}}
-					break
-				}
-				if w.searching && w.searchMode == "marketplace" {
-					lines = append(lines, "Marketplace identifier: "+w.query+"_", "Type publisher.name exactly as on the Marketplace page, for example platformio.platformio-ide.", "The controller needs Internet access; the package is downloaded into its Nix store.", "")
-					actions = []tuiAction{{key: "Enter", label: "Download"}, {key: "Esc", label: "Close"}, {key: "F1", label: "Help"}}
-				} else if w.searching {
-					lines = append(lines, "Search packaged extensions: "+w.query+"_", "Type part of a name, for example python or java, then press Enter.", "")
-					actions = []tuiAction{{key: "Enter", label: "Search"}, {key: "Esc", label: "Close search"}, {key: "F1", label: "Help"}}
-				} else if w.field.kind == "extensions" {
-					actions = append([]tuiAction{{key: "/", label: "Search"}, {key: "m", label: "Marketplace"}, {key: "u", label: "Check updates"}}, actions...)
-				}
+				multiple := w.field.kind == "favorites"
 				if multiple {
 					mode := "Explicit selection"
 					if w.inherit {
@@ -337,9 +293,6 @@ func (model dashboardModel) workspaceView() string {
 							}
 						}
 						label = marker + label
-						if note := w.choiceNotes[w.choices[index]]; note != "" {
-							label += "  " + note
-						}
 					}
 					lines = append(lines, tuiSelection(workspaceShort(label, width-2), index == w.choice, model.isDark))
 				}
@@ -364,7 +317,7 @@ func (model dashboardModel) workspaceView() string {
 			start := min(w.scroll, max(0, len(wrapped)-capacity))
 			lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
 			lines = append(lines, fmt.Sprintf("Review lines %d–%d of %d", start+1, min(len(wrapped), start+capacity), len(wrapped)))
-			fixed = "Save and record only the profile JSON; no system apply or reset.\nType SAVE: " + w.confirmation + "_"
+			fixed = "Enter saves and records only the profile JSON; no system apply or reset."
 			label := "Save JSON"
 			if w.plan.State == "unchanged" {
 				fixed = "Settings unchanged. Student home folders have not been checked."

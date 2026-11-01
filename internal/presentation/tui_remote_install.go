@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -16,7 +17,7 @@ import (
 )
 
 func (model dashboardModel) installationAreaView() string {
-	if model.menuRows == 0 {
+	if model.navigation.menuRows == 0 {
 		return model.fitMenu(len(installationAreaTasks), func(fitted dashboardModel) string { return fitted.installationAreaView() })
 	}
 	lines := []string{
@@ -24,7 +25,7 @@ func (model dashboardModel) installationAreaView() string {
 		"Choose how to start the client PC. Both methods erase its chosen disk.",
 		"",
 	}
-	lines = append(lines, model.taskMenu(installationAreaTasks, model.installationAreaCursor))
+	lines = append(lines, model.taskMenu(installationAreaTasks, model.navigation.installationAreaCursor))
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
 	}
@@ -108,7 +109,7 @@ func (model dashboardModel) remoteInstallView() string {
 			lines = append(lines, tuiStatus("No client computers are configured yet", tuiStatusFailure, model.isDark), "Set the number of computers in Maintenance → Change settings → Computers.")
 		} else {
 			// Each identity takes two rows; keep the focused one visible.
-			start, end := listWindow(len(hosts), remote.hostCursor, max(2, (model.height-16)/2))
+			start, end := listWindow(len(hosts), remote.hostCursor, max(2, (model.height-ctaRows(model.height)-16)/2))
 			for index := start; index < end; index++ {
 				host := hosts[index]
 				detail := fmt.Sprintf("address %s · network card %s", host.IP, host.Interface)
@@ -124,7 +125,7 @@ func (model dashboardModel) remoteInstallView() string {
 		// small screens: each command is one row with what it is for.
 		lines = append(lines, "",
 			tuiSection("On the PC to install ("+remote.host+")", model.isDark),
-			"Boot NixOS 26.05 (Minimal or Graphical) from USB (UEFI), connect it to the network, run:",
+			"Boot NixOS 26.05 (Minimal or Graphical) from USB (UEFI), connect the laboratory cable, run:",
 		)
 		lines = append(lines, tuiFields(model.isDark,
 			[2]string{"1", tuiFieldValue("passwd", model.isDark) + tuiMuted("   set a temporary password", model.isDark)},
@@ -181,7 +182,7 @@ func (model dashboardModel) remoteInstallView() string {
 			"Disks that cannot be used, such as the USB stick, are listed but not selectable.", "")
 		preparation := remote.response.Session.Preparation
 		for index, disk := range preparation.Facts.Disks {
-			detail := fmt.Sprintf("%s · %s · serial %s", humanBytes(disk.SizeBytes), disk.Model, disk.Serial)
+			detail := fmt.Sprintf("%s · %s · serial %s", humanBytes(disk.SizeBytes), unescapeUdev(disk.Model), disk.Serial)
 			if !disk.Eligible {
 				detail = "not selectable: " + remoteDiskExclusions(disk.ExclusionReasons) + " · " + detail
 			}
@@ -193,6 +194,22 @@ func (model dashboardModel) remoteInstallView() string {
 		configured := ""
 		if remote.response.Session != nil && remote.response.Session.Preparation != nil {
 			configured = remote.response.Session.Preparation.Host.Interface
+		}
+		if domain.WirelessInterfaceName(remote.liveInterface) {
+			// The laboratory network is wired: a Wi-Fi card is never saved.
+			lines = append(lines, "",
+				fmt.Sprintf("%s is set to use the network card %s, but this PC is connected", remote.host, configured),
+				fmt.Sprintf("through the Wi-Fi card %s. The laboratory needs the cable.", remote.liveInterface),
+				"",
+				remoteInstallField("Computer", remote.host, false, false),
+				remoteInstallField("Configured card", configured, false, false),
+				remoteInstallField("This PC's card", remote.liveInterface+" (Wi-Fi)", false, false),
+				"",
+				fmt.Sprintf("Connect %s to the laboratory network with a cable, restart the PC from", configured),
+				"the USB stick and start again. No disk has been touched.",
+			)
+			actions = []tuiAction{{key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+			break
 		}
 		lines = append(lines, "",
 			fmt.Sprintf("%s is set to use the network card %s, but this PC is connected", remote.host, configured),
@@ -222,9 +239,9 @@ func (model dashboardModel) remoteInstallView() string {
 		lines = append(lines, "")
 		lines = append(lines, tuiFields(model.isDark,
 			[2]string{"Disk to erase", tuiStatus(fmt.Sprintf("%s · %s", plan.Disk.Path, humanBytes(plan.Disk.SizeBytes)), tuiStatusFailure, model.isDark)},
-			[2]string{"Disk serial / WWN", plan.Disk.Serial + " / " + plan.Disk.WWN},
+			[2]string{"Disk serial / WWN", joinNonEmpty(" / ", plan.Disk.Serial, plan.Disk.WWN)},
 			[2]string{"Computer", plan.Host.Name},
-			[2]string{"Address afterwards", plan.Host.StaticIP + " on " + plan.Host.Interface},
+			[2]string{"Address afterwards", remoteInstallAddressAfterwards(plan.Host)},
 			[2]string{"PC on the USB stick", plan.Host.LiveIP},
 		)...)
 		// Exact identifiers stay available for audit, below the facts to check.
@@ -244,7 +261,7 @@ func (model dashboardModel) remoteInstallView() string {
 	case remoteInstallConfirmReboot, remoteInstallConfirmClose, remoteInstallConfirmCancel:
 		label := "Restart the PC"
 		title := "Restart the installed computer?"
-		detail := "Remove the USB stick first (or make the disk boot first). The PC restarts once, then the controller checks that it came back as installed."
+		detail := "Keep the USB stick in: the PC restarts once from its new disk, then the controller checks that it came back as installed. Remove the stick after the restart (if the PC starts from the USB stick again, remove it and restart the PC)."
 		switch {
 		case remote.stage == remoteInstallConfirmCancel:
 			label = "Cancel safely"
@@ -266,7 +283,7 @@ func (model dashboardModel) remoteInstallView() string {
 		kind := tuiStatusNeutral
 		if remoteInstallResponseFailed(remote.response) {
 			kind = tuiStatusFailure
-		} else if remote.response.State == "verified" {
+		} else if remote.response.State == "verified" || remote.response.State == "cancelled" {
 			kind = tuiStatusSuccess
 		} else if remote.response.State == "ready-to-reboot" || remote.response.State == "reboot-requested" {
 			kind = tuiStatusAttention
@@ -275,7 +292,7 @@ func (model dashboardModel) remoteInstallView() string {
 		// stays in the details (d).
 		outcome, _ := model.remoteInstallOutcome()
 		if remote.response.State == "ready-to-reboot" {
-			outcome = "Installation completed. Remove the USB stick before restarting the PC."
+			outcome = "Installation completed. Restart the PC; remove the USB stick after it has restarted."
 		}
 		notices = append(notices, tuiNotice{kind: kind, title: outcome, plain: true})
 		if step, found := remoteInstallSituation(remote.response); found {
@@ -408,7 +425,7 @@ func (model dashboardModel) remoteInstallDetailLines() []string {
 		lines = append(lines, "The installation command may have started. Do not start it again; check the existing operation.")
 	}
 	if response.State == "ready-to-reboot" {
-		lines = append(lines, "", "Remove the USB stick (or make the disk boot first) before restarting.")
+		lines = append(lines, "", "Remove the USB stick after the restart, not before: the system on it is still running.")
 	}
 	if response.State == "reconciliation-required" {
 		lines = append(lines, "", "Do not start another installation. Refresh this operation until its result can be confirmed.")
@@ -582,6 +599,9 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 		case "esc":
 			return model.cancelRemoteInstall()
 		case "enter":
+			if domain.WirelessInterfaceName(remote.liveInterface) {
+				return model, nil
+			}
 			return model.saveRemoteLiveInterface()
 		}
 		return model, nil
@@ -952,13 +972,26 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 		remote.plan = *message.response.Plan
 		remote.stage = remoteInstallReview
 		remote.confirmation = ""
-	case "apply", "status", "reconcile", "verify", "reboot", "close":
+	case "reconcile":
+		remote.stage = remoteInstallResult
+		// A reopened session that was prepared on another card gets the same
+		// card screen as a fresh preparation, instead of a refused plan.
+		if session := message.response.Session; message.response.State == "prepared" && session != nil && session.Preparation != nil {
+			preparation := session.Preparation
+			if live := remoteLiveInterface(preparation.Facts, preparation.Host.LiveIP); live != "" && live != preparation.Host.Interface {
+				remote.host = preparation.Host.Name
+				remote.liveInterface = live
+				remote.stage = remoteInstallInterfaceMismatch
+			}
+		}
+	case "apply", "status", "verify", "reboot", "close":
 		remote.stage = remoteInstallResult
 	case "cancel":
 		remote.stage = remoteInstallResult
 		if message.response.State == "cancelled" {
 			remote.bootstrapError = ""
-			model.message = "Cancellation and pre-apply cleanup were confirmed."
+			// The result screen reports it as a success; no warning message.
+			model.message = ""
 		}
 	}
 	return model, nil
@@ -1013,6 +1046,16 @@ func remoteDiskExclusions(reasons []string) string {
 }
 
 // remoteLiveInterface names the network card that carries the live address.
+// remoteInstallAddressAfterwards names the card that carries the laboratory
+// address after the restart. A PC installed over Wi-Fi uses its wired card
+// then, so the cable must be connected before the restart.
+func remoteInstallAddressAfterwards(host domain.RemoteInstallHost) string {
+	if domain.WirelessInterfaceName(host.Interface) {
+		return host.StaticIP + " on the wired card (connect the cable before the restart)"
+	}
+	return host.StaticIP + " on " + host.Interface
+}
+
 func remoteLiveInterface(facts domain.RemoteMachineFacts, address string) string {
 	for _, networkInterface := range facts.Interfaces {
 		if slices.Contains(networkInterface.Addresses, address) {
@@ -1105,4 +1148,33 @@ func (model dashboardModel) handleRemoteInterfaceSaved(message dashboardRemoteIn
 		response, err := prepare(host)
 		return dashboardRemoteInstallMsg{action: "prepare", response: response, err: err}
 	}
+}
+
+// unescapeUdev turns the \xNN escapes udev puts in device names ("VBOX\x20HARDDISK")
+// back into the characters they stand for, for display only.
+func unescapeUdev(value string) string {
+	var out strings.Builder
+	for index := 0; index < len(value); index++ {
+		if value[index] == '\\' && index+3 < len(value) && value[index+1] == 'x' {
+			if decoded, err := strconv.ParseUint(value[index+2:index+4], 16, 8); err == nil {
+				out.WriteByte(byte(decoded))
+				index += 3
+				continue
+			}
+		}
+		out.WriteByte(value[index])
+	}
+	return strings.TrimSpace(out.String())
+}
+
+// joinNonEmpty joins the values that exist, so an absent one leaves no
+// dangling separator.
+func joinNonEmpty(separator string, values ...string) string {
+	kept := make([]string, 0, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			kept = append(kept, value)
+		}
+	}
+	return strings.Join(kept, separator)
 }

@@ -64,12 +64,18 @@ func TestReadyDeploymentPlanShowsRevisionBoundNextCommand(t *testing.T) {
 		State:           "ready",
 		Revision:        "0123456789abcdef",
 		ColmenaSelector: "@lab",
-		Targets:         []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}},
+		Targets:         []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1", Class: "shared-1"}, {Name: "pc02", IP: "10.0.0.2", Class: "shared-1"}},
 	}
 	output := &bytes.Buffer{}
 	DeploymentPlanText(output, report)
+	if !strings.Contains(output.String(), "Builds:          1 configuration for 2 computers\n") {
+		t.Fatalf("ready plan does not count configurations:\n%s", output.String())
+	}
 	if !strings.Contains(output.String(), "nixorium deploy apply --on @lab --expect 0123456789abcdef") {
 		t.Fatalf("ready plan does not show exact next command:\n%s", output.String())
+	}
+	if !strings.Contains(output.String(), "build each configuration once (identical computers share one), then copy and activate it on each computer") || strings.Contains(strings.ToLower(output.String()), "colmena") {
+		t.Fatalf("ready plan does not describe the update engine in plain words:\n%s", output.String())
 	}
 }
 
@@ -107,7 +113,7 @@ func TestControllerRebuildTextShowsReviewAndVerifiedResult(t *testing.T) {
 	planOutput := &bytes.Buffer{}
 	ControllerRebuildPlanText(planOutput, domain.ControllerRebuildPlanReport{
 		State: "ready", Repository: "/deployment", Controller: "pc99", Revision: revision,
-		CurrentDetail: "not active", Confirmation: "REBUILD", Issues: []domain.ValidationIssue{},
+		CurrentDetail: "not active", Issues: []domain.ValidationIssue{},
 	})
 	for _, expected := range []string{"READY", "pc99", revision, "controller apply --expect"} {
 		if !strings.Contains(planOutput.String(), expected) {
@@ -205,12 +211,11 @@ func TestGitCommitTextShowsPlanAndLocalResult(t *testing.T) {
 		Paths:         []string{"lab-settings.json"},
 		ReviewToken:   "sha256:review",
 		CommitMessage: "chore: update laboratory settings",
-		Confirmation:  "COMMIT",
 		Diff:          domain.GitDiff{Content: "+password: <redacted>\n"},
 	}
 	var output bytes.Buffer
 	GitCommitPlanText(&output, plan)
-	for _, expected := range []string{"commit plan: READY", "lab-settings.json", "sha256:review", "COMMIT", "No remote or push", "<redacted>"} {
+	for _, expected := range []string{"commit plan: READY", "lab-settings.json", "sha256:review", "No remote or push", "<redacted>"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("commit plan output omits %q:\n%s", expected, output.String())
 		}
@@ -229,13 +234,20 @@ func TestUpdateTextShowsValidatedPlanAndReviewableResult(t *testing.T) {
 		State: "ready", Repository: "/deployment", Revision: strings.Repeat("a", 40),
 		CurrentRef: "v2.0.0", CurrentRev: strings.Repeat("b", 40), CurrentChannel: domain.UpdateChannelStable,
 		Target: "v2.1.0-beta.1", TargetChannel: domain.UpdateChannelPrerelease,
-		ReviewToken: "sha256:review", Confirmation: "UPDATE",
-		Checks: []domain.UpdateCheck{{ID: "client", State: "passed", Message: "built"}},
-		Diff:   domain.GitDiff{Content: "+github:owner/repo/v2.1.0-beta.1\n"},
+		ReviewToken: "sha256:review",
+		Checks:      []domain.UpdateCheck{{ID: "client", State: "passed", Message: "built"}},
+		Diff:        domain.GitDiff{Content: "+github:owner/repo/v2.1.0-beta.1\n"},
+		Migrations: []domain.DeploymentMigrationResult{
+			{ID: "2026-10-a", Description: "Find the controller with isController.", State: domain.MigrationApplied, Files: []string{"modules/workstation.nix"}},
+			{ID: "2026-10-b", Description: "Import the new module.", State: domain.MigrationManual, Detail: "modules/shared.nix was changed by hand. Replace \"a\" with \"b\"."},
+			{ID: "2026-10-c", Description: "Already done.", State: domain.MigrationDone},
+		},
 	}
 	var output bytes.Buffer
 	UpdatePlanText(&output, plan)
-	for _, expected := range []string{"update plan: READY", "v2.0.0", "prerelease", "client", "PASSED", "sha256:review", plan.Confirmation, "No branch, commit, push", "flake.nix/flake.lock"} {
+	for _, expected := range []string{"update plan: READY", "v2.0.0", "prerelease", "client", "PASSED", "sha256:review", plan.Confirmation, "No branch, commit, push", "Proposed changes to deployment files",
+		"Migration:        Find the controller with isController.", "Files: modules/workstation.nix",
+		"Manual change:    Import the new module.", "modules/shared.nix was changed by hand. Replace \"a\" with \"b\"."} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("update plan output omits %q:\n%s", expected, output.String())
 		}
@@ -285,11 +297,11 @@ func TestSoftwareTextSeparatesDeclarationFromBuildAndDeployment(t *testing.T) {
 	plan := domain.SoftwareChangePlanReport{
 		State: "ready", ManagedFile: "lab-software.json",
 		Request:         domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "media"}},
-		AffectedClients: []string{"pc01", "pc02"}, ReviewToken: "sha256:review", Confirmation: "SAVE",
-		Message: "no system has been built or changed",
+		AffectedClients: []string{"pc01", "pc02"}, ReviewToken: "sha256:review",
+		Message: "no computer changes until you update it",
 	}
 	SoftwareChangePlanText(&output, plan)
-	for _, expected := range []string{"Software proposal: READY", "vlc", "media", "pc01, pc02", "sha256:review", plan.Confirmation, "no system has been built or changed"} {
+	for _, expected := range []string{"Software proposal: READY", "vlc", "media", "pc01, pc02", "sha256:review", "no computer changes until you update it"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("software plan omits %q:\n%s", expected, output.String())
 		}
@@ -321,11 +333,11 @@ func TestSoftwarePresetTextShowsDefaultsPreservedScopesAndReviewBoundary(t *test
 		SelectedPackages:   []domain.SoftwareCatalogItem{{ID: "firefox"}},
 		Existing:           []domain.SoftwareDeclaration{{Package: "firefox", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeController}}},
 		Additions:          []domain.SoftwareDeclaration{{Package: "libreoffice", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}}},
-		AffectedController: "controller", AffectedClients: []string{"pc01"}, ReviewToken: "sha256:preset", Confirmation: "ADD PROFILE",
+		AffectedController: "controller", AffectedClients: []string{"pc01"}, ReviewToken: "sha256:preset",
 		Message: "No system has been built or changed.",
 	}
 	SoftwarePresetPlanText(&output, plan)
-	for _, expected := range []string{"Software profile proposal: READY", "Essential (essential)", "Excluded:                 vlc", "scope preserved", "controller", "libreoffice", "pc01", "sha256:preset", "ADD PROFILE", "No system has been built or changed"} {
+	for _, expected := range []string{"Software profile proposal: READY", "Essential (essential)", "Excluded:                 vlc", "scope preserved", "controller", "libreoffice", "pc01", "sha256:preset", "No system has been built or changed"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("software profile plan omits %q:\n%s", expected, output.String())
 		}

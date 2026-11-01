@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_RELEASE="v3.7.0"
+DEFAULT_RELEASE="v3.12.0"
 RELEASE="${NIXORIUM_RELEASE:-}"
 INSTALL_DISK=""
 REPOSITORY="giovantenne/nixorium"
@@ -322,10 +322,10 @@ activate_bootstrap_keyboard() {
   case "$BOOTSTRAP_ENVIRONMENT" in
     gnome)
       if activate_gnome_keyboard; then
-        ui_success "Keyboard set to $BOOTSTRAP_KEYBOARD for this session. The same layout is used after installation."
+        ui_success "Keyboard set to $(keyboard_label "$BOOTSTRAP_KEYBOARD") for this session. The same layout is used after installation."
       else
         ui_feedback "Could not change the layout automatically."
-        ui_note "Choose '$BOOTSTRAP_KEYBOARD' from the keyboard menu in the GNOME top bar,"
+        ui_note "Choose '$(keyboard_label "$BOOTSTRAP_KEYBOARD")' from the keyboard menu in the GNOME top bar,"
         ui_note "then press Enter to continue."
         IFS= read -r -u "$BOOTSTRAP_INPUT_FD" _ || true
       fi
@@ -347,7 +347,7 @@ activate_bootstrap_keyboard() {
       "No password has been asked yet. Check the live console and run the command again."
     return 1
   fi
-  ui_success "Keyboard set to $BOOTSTRAP_KEYBOARD. It is used from now on and after installation."
+  ui_success "Keyboard set to $(keyboard_label "$BOOTSTRAP_KEYBOARD"). It is used from now on and after installation."
 }
 
 suggest_time_zone() {
@@ -361,6 +361,23 @@ suggest_time_zone() {
     de) BOOTSTRAP_TIME_ZONE="Europe/Berlin" ;;
     es) BOOTSTRAP_TIME_ZONE="Europe/Madrid" ;;
   esac
+}
+
+keyboard_name() {
+  case "$1" in
+    us) echo "English (US)" ;;
+    gb) echo "English (UK)" ;;
+    it) echo "Italian" ;;
+    fr) echo "French" ;;
+    de) echo "German" ;;
+    es) echo "Spanish" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# "Italian (it)": the name people know, then the code the system uses.
+keyboard_label() {
+  printf '%s (%s)' "$(keyboard_name "$1")" "$1"
 }
 
 keyboard_number() {
@@ -469,7 +486,7 @@ collect_bootstrap_configuration() {
     collect_passwords || return 1
 
     ui_section "Check your answers"
-    ui_detail "Keyboard" "$BOOTSTRAP_KEYBOARD"
+    ui_detail "Keyboard" "$(keyboard_label "$BOOTSTRAP_KEYBOARD")"
     ui_detail "Time zone" "$BOOTSTRAP_TIME_ZONE"
     echo
     ui_detail "Administrator" "admin"
@@ -554,72 +571,65 @@ configure_bootstrap_settings() {
   fi
 }
 
+# release_menu_entries prints the versions the installer offers, one per
+# line, the default first: the latest stable release, the latest prerelease
+# when it is newer than that stable release, and master. RELEASES lists tags
+# newest first, as the GitHub release list does; when it is empty (the list
+# could not be read) the release this installer was published with stands in.
+release_menu_entries() {
+  local RELEASES="$1"
+  local LATEST_PRERELEASE=""
+  local LATEST_STABLE=""
+  local TAG
+  while IFS= read -r TAG; do
+    if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+      continue
+    fi
+    if [[ "$TAG" == *-* ]]; then
+      if [[ -z "$LATEST_PRERELEASE" && -z "$LATEST_STABLE" ]]; then
+        LATEST_PRERELEASE="$TAG"
+      fi
+    elif [[ -z "$LATEST_STABLE" ]]; then
+      LATEST_STABLE="$TAG"
+    fi
+  done <<< "$RELEASES"
+  if [[ -z "$LATEST_STABLE" && -z "$LATEST_PRERELEASE" && "$DEFAULT_RELEASE" != "master" ]]; then
+    if [[ "$DEFAULT_RELEASE" == *-* ]]; then
+      LATEST_PRERELEASE="$DEFAULT_RELEASE"
+    else
+      LATEST_STABLE="$DEFAULT_RELEASE"
+    fi
+  fi
+  if [[ -n "$LATEST_STABLE" ]]; then
+    printf '%s\n' "$LATEST_STABLE"
+  fi
+  if [[ -n "$LATEST_PRERELEASE" ]]; then
+    printf '%s\n' "$LATEST_PRERELEASE"
+  fi
+  printf 'master\n'
+}
+
 choose_release() {
-  local API_RESPONSE
-  local API_SUCCEEDED=false
+  local API_RESPONSE=""
   local CHOICE
   local CHOICE_NUMBER
-  local DEFAULT_AVAILABLE=false
   local INDEX
   local LABEL
-  local LATEST_PRERELEASE=""
-  local MENU_DEFAULT="$DEFAULT_RELEASE"
+  local MENU_DEFAULT
   local TAG
-  local -a AVAILABLE_RELEASES=("master")
-  local -a STABLE_RELEASES=()
+  local -a AVAILABLE_RELEASES=()
 
   ui_section "Version" >&3
   ui_log "Fetching published Nixorium releases..." >&3
-  if API_RESPONSE="$(curl -fsSL "$RELEASES_API_URL")"; then
-    API_SUCCEEDED=true
-    while IFS= read -r TAG; do
-      if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-        continue
-      fi
-
-      if [[ "$TAG" == *-* ]]; then
-        if [[ -z "$LATEST_PRERELEASE" ]]; then
-          LATEST_PRERELEASE="$TAG"
-        fi
-      else
-        STABLE_RELEASES+=("$TAG")
-      fi
-    done < <(
-      printf '%s\n' "$API_RESPONSE" |
-        sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\(v[^"]*\)",*$/\1/p'
-    )
-  else
+  if ! API_RESPONSE="$(curl -fsSL "$RELEASES_API_URL")"; then
+    API_RESPONSE=""
     ui_feedback "Could not retrieve the GitHub release list." >&3
   fi
-
-  if [[ -n "$LATEST_PRERELEASE" ]]; then
-    AVAILABLE_RELEASES+=("$LATEST_PRERELEASE")
-  fi
-  AVAILABLE_RELEASES+=("${STABLE_RELEASES[@]}")
-
-  if [[ "$API_SUCCEEDED" == "false" && "$DEFAULT_RELEASE" != "master" ]]; then
-    AVAILABLE_RELEASES+=("$DEFAULT_RELEASE")
-  fi
-
-  if [[ "$DEFAULT_RELEASE" == *-* && -n "$LATEST_PRERELEASE" ]]; then
-    MENU_DEFAULT="$LATEST_PRERELEASE"
-  fi
-
-  for TAG in "${AVAILABLE_RELEASES[@]}"; do
-    if [[ "$TAG" == "$MENU_DEFAULT" ]]; then
-      DEFAULT_AVAILABLE=true
-      break
-    fi
-  done
-  if [[ "$DEFAULT_AVAILABLE" == "false" ]]; then
-    if [[ -n "$LATEST_PRERELEASE" ]]; then
-      MENU_DEFAULT="$LATEST_PRERELEASE"
-    elif (( ${#STABLE_RELEASES[@]} > 0 )); then
-      MENU_DEFAULT="${STABLE_RELEASES[0]}"
-    else
-      MENU_DEFAULT="master"
-    fi
-  fi
+  mapfile -t AVAILABLE_RELEASES < <(release_menu_entries "$(
+    printf '%s\n' "$API_RESPONSE" |
+      sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\(v[^"]*\)",*$/\1/p'
+  )")
+  MENU_DEFAULT="${AVAILABLE_RELEASES[0]}"
 
   echo >&3
   ui_note "Select a Nixorium version:" >&3
@@ -930,6 +940,7 @@ ui_note "  1. Remove the USB stick, then type ${UI_BOLD}reboot${UI_RESET} and pr
 ui_note "  2. Sign in as ${UI_BOLD}admin${UI_RESET} with the administrator password."
 ui_note "  3. Open ${UI_BOLD}Nixorium${UI_RESET} from the app grid, or type nixorium in a terminal."
 ui_note "     To add the student computers, choose Installation > Network boot (PXE)."
+ui_note "  4. Replacing a controller? After signing in, open ${UI_BOLD}Nixorium → Maintenance → Restore lab${UI_RESET}."
 echo
 ui_note "${UI_MUTED}The lab configuration is saved in ~/${DEPLOYMENT_NAME}.${UI_RESET}"
 echo

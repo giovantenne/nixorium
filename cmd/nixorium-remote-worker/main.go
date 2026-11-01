@@ -5,11 +5,10 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -39,7 +38,7 @@ func run() error {
 	if len(os.Args) != 1 {
 		return errors.New("usage: nixorium-remote-worker [--controller-rebuild-check]")
 	}
-	repository, err := readFixedDeploymentPath(workerDeploymentPathFile)
+	repository, err := adapters.ReadFixedDeploymentPath(workerDeploymentPathFile)
 	if err != nil {
 		return err
 	}
@@ -130,6 +129,20 @@ func (worker *remoteWorker) recover() error {
 		return nil
 	}
 	session, err := worker.state.Load(operationID)
+	if errors.Is(err, fs.ErrNotExist) {
+		// Reserved, but the worker stopped before the first session record:
+		// nothing can have been authorized or applied without one. Drop the
+		// local key of that live session and release the reservation instead
+		// of failing at every start.
+		if err := worker.bootstrap.DiscardLocalSession(adapters.VerifiedLiveSession{OperationID: operationID}); err != nil {
+			return fmt.Errorf("discard the live session of an unrecorded reservation: %w", err)
+		}
+		if err := reservation.ReleaseResolved(); err != nil {
+			return fmt.Errorf("release an unrecorded reservation: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "released USB installation reservation %s: it had no session record; restart the live USB computer before trying again\n", operationID)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("recover reserved operation state: %w", err)
 	}
@@ -137,6 +150,9 @@ func (worker *remoteWorker) recover() error {
 	worker.reservation = reservation
 	if session.State == "closed-before-apply" && remoteSessionNeverDispatched(session) {
 		return worker.releaseClosedBeforeApplyLocked(session)
+	}
+	if session.State == "closed-unverified" {
+		return worker.finishClosedUnverifiedLocked(session)
 	}
 	if session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
 		if err := worker.releaseResolvedFailureLocked(&session); err != nil {
@@ -414,9 +430,17 @@ func (worker *remoteWorker) handleClose(ctx context.Context, request domain.Remo
 		response.Message = "never-dispatched session closed; local credentials discarded, remote key revocation unconfirmed; a new installation requires a new review"
 		return response
 	}
-	if err != nil || worker.liveSession == nil || session.Receipt == nil || !session.Receipt.Installed || session.RebootRequested || session.DispatchUncertain {
-		response.Message = "only a confirmed installed session before reboot can be closed"
+	if err != nil || session.BootVerified {
+		response.Message = "the session cannot be read or is already verified"
 		return response
+	}
+	if worker.liveSession == nil || session.Receipt == nil || !session.Receipt.Installed || session.RebootRequested || session.DispatchUncertain {
+		// The disk may have been written and the computer cannot be checked:
+		// it did not come back from the restart (a broken disk, a computer
+		// switched off or started from the USB stick again) or the outcome is
+		// unknown. The administrator closes the record (CLOSE) and the
+		// computer is left to be checked or installed again.
+		return worker.closeUnverifiedLocked(ctx, session)
 	}
 	if err := worker.bootstrap.CloseSession(ctx, *worker.liveSession); err != nil {
 		response.Message = "live key cleanup was not confirmed; reservation retained"
@@ -470,6 +494,57 @@ func (worker *remoteWorker) releaseClosedBeforeApplyLocked(session domain.Remote
 	}
 	if err := worker.reservation.ReleaseResolved(); err != nil {
 		return fmt.Errorf("release closed session reservation: %w", err)
+	}
+	worker.operationID = ""
+	worker.liveSession = nil
+	worker.reservation = nil
+	return nil
+}
+
+// closeUnverifiedLocked closes a session whose disk may have been written
+// without verifying the computer, and frees the controller for other work.
+func (worker *remoteWorker) closeUnverifiedLocked(ctx context.Context, session domain.RemoteInstallSession) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: session.OperationID, State: "reconciliation-required"}
+	if session.State != "closed-unverified" {
+		// The live key exists only in the memory of the USB system: revoke it
+		// when that system still answers, and always discard the local copy.
+		if worker.liveSession != nil {
+			_ = worker.bootstrap.CloseSession(ctx, *worker.liveSession)
+		}
+		if err := worker.bootstrap.DiscardLocalSession(adapters.VerifiedLiveSession{OperationID: session.OperationID}); err != nil {
+			response.Message = "local live-session credentials could not be removed; reservation retained"
+			return response
+		}
+		session.State = "closed-unverified"
+		session.Events = append(session.Events, domain.RemoteInstallProgress{
+			Phase:  domain.RemoteInstallPhaseReconciliationRequired,
+			Detail: "operator closed the record without verifying the computer; its disk may have been written, check it or install it again",
+		})
+		if err := worker.state.Save(session); err != nil {
+			response.Message = "could not persist the closure; reservation retained"
+			return response
+		}
+	}
+	if err := worker.finishClosedUnverifiedLocked(session); err != nil {
+		response.Message = err.Error()
+		return response
+	}
+	response.State = session.State
+	response.Session = &session
+	response.Message = "record closed without verifying the computer; check it or install it again"
+	return response
+}
+
+// finishClosedUnverifiedLocked releases what a closed, unverified session
+// still holds; a restarted worker finishes it the same way.
+func (worker *remoteWorker) finishClosedUnverifiedLocked(session domain.RemoteInstallSession) error {
+	if (session.Artifacts != nil || session.Preparation != nil) && worker.preparer != nil {
+		if err := worker.preparer.Discard(session.OperationID); err != nil {
+			return fmt.Errorf("record closed but preparation GC roots could not be removed; reservation retained")
+		}
+	}
+	if err := worker.reservation.ReleaseResolved(); err != nil {
+		return fmt.Errorf("record closed but the controller reservation could not be released")
 	}
 	worker.operationID = ""
 	worker.liveSession = nil
@@ -596,6 +671,10 @@ func (worker *remoteWorker) handleApply(ctx context.Context, request domain.Remo
 
 func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
 	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "unavailable"}
+	// Load under the mutex: an apply or reconcile in progress saves events
+	// that a copy read earlier would overwrite when the refresh is saved.
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
 	session, err := worker.state.Load(request.OperationID)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -605,8 +684,6 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 		}
 		return response
 	}
-	worker.mutex.Lock()
-	defer worker.mutex.Unlock()
 	message := domain.RemoteStatusLoaded
 	if worker.operationID == request.OperationID && session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
 		if cleanupErr := worker.releaseResolvedFailureLocked(&session); cleanupErr != nil {
@@ -719,10 +796,6 @@ func (source *workerInstallSource) CurrentRevision(ctx context.Context, reposito
 	return source.local.GitRevision(ctx, repository)
 }
 
-func (source *workerInstallSource) ClientOperationActive() (bool, error) {
-	return source.local.ClientOperationActive()
-}
-
 func (source *workerInstallSource) ServiceState(ctx context.Context, name string) domain.ServiceState {
 	return source.local.ServiceState(ctx, name)
 }
@@ -736,10 +809,6 @@ func (*workerInstallSource) RemoteIdentityReachable(ctx context.Context, address
 	}
 	_ = connection.Close()
 	return true, nil
-}
-
-func (*workerInstallSource) ReserveRemoteInstall(context.Context, domain.RemoteInstallPlan, string) (domain.RemoteInstallReservation, error) {
-	return nil, errors.New("worker already owns the remote installation reservation")
 }
 
 func (source *workerInstallSource) RevalidateRemoteInstall(ctx context.Context, preparation domain.RemoteInstallPreparation, plan domain.RemoteInstallPlan) error {
@@ -946,6 +1015,15 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 	}()
 	liveSession, err := worker.bootstrap.Establish(ctx, operationID, request.Address, request.Fingerprint, secret)
 	if err != nil {
+		if adapters.BootstrapCleanupUnconfirmed(err) && !reusingArtifacts {
+			// Establish already deleted the private half of the temporary key,
+			// so the entry left on the live computer cannot be used, and nothing
+			// was prepared or authorized: keeping the reservation without a
+			// session record only blocked the controller (and a restarted worker
+			// could not recover it).
+			response.Message = err.Error() + "; the controller deleted its private key, so the entry cannot be used: restart the live USB computer before trying again"
+			return response
+		}
 		if adapters.BootstrapCleanupUnconfirmed(err) {
 			keepReservation = true
 			worker.operationID = operationID
@@ -1186,27 +1264,4 @@ func (worker *remoteWorker) releaseResolvedFailureLocked(session *domain.RemoteI
 		_ = worker.state.Save(*session)
 	}
 	return nil
-}
-
-func readFixedDeploymentPath(path string) (string, error) {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
-		return "", errors.New("deployment path configuration filename is invalid")
-	}
-	info, err := os.Lstat(path)
-	if err != nil {
-		return "", fmt.Errorf("inspect deployment path configuration: %w", err)
-	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0022 != 0 || !ok || stat.Uid != 0 || info.Size() < 2 || info.Size() > 4096 {
-		return "", errors.New("deployment path configuration must be a small root-owned non-writable regular file")
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	repository := strings.TrimSpace(string(content))
-	if strings.ContainsAny(repository, "\r\n\x00") || !filepath.IsAbs(repository) || filepath.Clean(repository) != repository {
-		return "", errors.New("configured deployment path is not canonical")
-	}
-	return repository, nil
 }

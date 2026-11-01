@@ -87,3 +87,26 @@ round-trip behavior and preserve old files without adding fields. `mkLab` tests
 evaluate controller, client-role, and host-specific networking and firewall
 interfaces. Full validation covers real controller/client builds, the generated
 site template, installer bundle, and offline derivation equivalence.
+
+## Amendment (2026-10-20): one NetworkManager profile on every laboratory host
+
+Explicit names no longer mean scripted networking. A controller, or a client
+with a configured name in a class of its own, used to get
+`networking.interfaces.<card>` (a scripted static address and dhcpcd) while
+NetworkManager also managed the card. At boot NetworkManager could activate
+its own DHCP connection after the script and remove the static address: DHCP
+kept working, the laboratory address was gone, and a restart often fixed it.
+It was seen on 3.9.0 clients with `clientIfaceName`.
+
+Every laboratory host now uses only the `nixorium-lab` profile. A configured
+name binds the profile to the card (`connection.interface-name`); without one,
+a client's profile matches any wired card as before. The controller keeps
+NetworkManager's automatic DHCP on its other cards and disables it only on the
+laboratory card. Network installation takes the controller's laboratory
+address out of the connection applied to the card (`nmcli device modify
+-ipv4.addresses`), never out of the profile, so a DHCP renewal does not bring
+it back and a restart does; it falls back to `ip` where NetworkManager does
+not manage the card. The controller apply waits for the profile's address
+instead of writing it. On the first upgrade the controller's DHCP client
+changes from dhcpcd to NetworkManager, so the school's DHCP server may give it
+another address: prepare the installation files again if it does.

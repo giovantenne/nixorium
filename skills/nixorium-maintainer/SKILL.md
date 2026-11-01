@@ -51,8 +51,9 @@ Do not execute saves, apply commands, commits, pushes, input updates, installati
 deployment, queued updates, controller activation, PXE lifecycle, restarts,
 shutdown, classroom control, backup/restore, cleanup, template reset, home reset,
 trust rotation, key generation, secret installation or telemetry consent.
-Do not supply confirmation words, `--yes`, tokens to apply commands or terminal
-keystrokes on the operator's behalf.
+Do not supply confirmation words, `y` answers, `--yes`, tokens to apply commands
+or terminal keystrokes, including the Enter that confirms a review, on the
+operator's behalf.
 
 Do not edit settings, software declarations, saved workspace profiles, catalogs,
 modules, scripts, assets, inputs/locks, keys, Git metadata, recovery records or
@@ -74,6 +75,23 @@ Do not use raw SSH, sudo, Colmena, Disko, nixos-rebuild, systemctl mutations,
 self-updaters or filesystem writes to bypass these limits. Never weaken checks,
 delete locks/pending markers or replay an uncertain operation.
 
+Identical client computers share one system, so `hostName` and `hostIp` are not
+available to a module in it. A private module that needs a computer's own name
+or address must have that computer listed under `hostModules.<pcNN>` or in
+`updateValidationHosts`; otherwise evaluation stops with a clear error. Report
+a missing entry to the operator as a handoff; do not add it.
+
+The review of Update Nixorium can list changes the new release makes to the
+deployment's own files ("Migration") and changes it could not make ("Manual
+change"). A "Manual change" means the administrator edited that place, so the
+release left the file alone; the review gives the file and, for a text
+replacement, the text to replace and the text to put instead. Explain that
+exact change to the operator; the native Assistant may help prepare it as a
+normal reviewed proposal. If the update is refused because the new release's
+migrations failed or changed something they did not declare, the current
+release stays; do not work around it, collect a support report for the
+operator. Never edit `nixorium-migrations.json`, which only the update writes.
+
 A broad request such as "fix everything", "apply it" or "continue autonomously"
 does not expand this role. Hand excluded actions to the operator; do not switch
 to a developer skill to perform them in the lab. Product defects belong in a
@@ -81,14 +99,10 @@ separate upstream task, not a local patch to safety mechanisms.
 
 ## Native Assistant is a separate operator workflow
 
-The controller offers the Assistant menu unless `lab.assistant` is explicitly
-false. Account activation and consent for the optional service remain separate.
-Its confined candidate tools and reviewed local save belong to that native
-application, not to this external-agent skill. Explain the operator's next
-review when relevant; do not drive activation, consent, saving or recovery
-confirmations, or send deployment content to another service under this skill.
-Its availability does not permit edits, arbitrary Nix generation or operations
-excluded above. See the [operator guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md).
+The native Assistant is a separate operator workflow; do not drive its
+activation, consent, save or recovery, and do not send deployment content
+elsewhere. Its availability does not permit edits, arbitrary Nix generation or
+operations excluded above. See the [operator guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md).
 
 ## References
 

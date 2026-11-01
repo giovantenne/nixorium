@@ -27,7 +27,7 @@ operations, with a settings record carrying its state:
   controller carries both addresses, every client keeps its previous address
   next to the new one, trusts both controller addresses and tries the new
   cache first. Then **Apply to controller**, then **Update computers**, each
-  with its own review and typed confirmation (`REBUILD`, `DEPLOY`); computers
+  with its own review confirmed with Enter; computers
   that are off can be queued.
 - During the change every per-computer probe tries the new address first and
   the previous one second and reports which one answered. Update computers

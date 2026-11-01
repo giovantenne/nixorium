@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -219,11 +220,12 @@ func runBoundedGit(ctx context.Context, repository string, limit int, arguments 
 }
 
 func runBoundedGitWithEnvironment(ctx context.Context, repository string, environment []string, limit int, arguments ...string) (string, bool, error) {
-	command := exec.CommandContext(ctx, "git", append([]string{"-C", repository}, arguments...)...)
+	command := exec.CommandContext(ctx, "git", append(append([]string{"-C", repository}, gitHardeningArguments()...), arguments...)...)
 	configureCommandCancellation(command)
-	if environment != nil {
-		command.Env = environment
+	if environment == nil {
+		environment = os.Environ()
 	}
+	command.Env = gitHardenedEnvironment(environment)
 	stdout := &boundedCommandBuffer{limit: limit}
 	stderr := &boundedCommandBuffer{limit: 16 * 1024}
 	command.Stdout = stdout
@@ -236,4 +238,23 @@ func runBoundedGitWithEnvironment(ctx context.Context, repository string, enviro
 		return stdout.buffer.String(), stdout.truncated, fmt.Errorf("git: %s", sanitizeOperationLog([]byte(message)))
 	}
 	return stdout.buffer.String(), stdout.truncated, nil
+}
+
+// gitHardeningArguments are the Git options every command that runs in a
+// deployment repository needs: no repository hooks and no external file
+// system monitor, whatever the repository's own configuration says.
+func gitHardeningArguments() []string {
+	return []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false"}
+}
+
+// gitHardenedEnvironment hides the system and user Git configuration from a
+// command, so neither can add hooks, filters or other programs to run.
+func gitHardenedEnvironment(environment []string) []string {
+	hardened := make([]string, 0, len(environment)+2)
+	for _, variable := range environment {
+		if !strings.HasPrefix(variable, "GIT_CONFIG_NOSYSTEM=") && !strings.HasPrefix(variable, "GIT_CONFIG_GLOBAL=") {
+			hardened = append(hardened, variable)
+		}
+	}
+	return append(hardened, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 }

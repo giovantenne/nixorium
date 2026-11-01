@@ -19,6 +19,11 @@ const ProtocolVersion = 1
 // MaxMessageBytes bounds one encoded message, including future image payloads.
 const MaxMessageBytes = 4 << 20
 
+// MaxImageBytes is the largest picture (a JPEG) a message can carry: pictures
+// travel as base64, four bytes for every three, and the rest of the message
+// needs a few kilobytes at most.
+const MaxImageBytes = (MaxMessageBytes - 4096) / 4 * 3
+
 // Message types.
 const (
 	TypeHello            = "hello"
@@ -37,6 +42,12 @@ const (
 	TypeBroadcastFrame = "broadcast.frame"
 	TypeBroadcastStop  = "broadcast.stop"
 	TypeBroadcastShown = "broadcast.shown"
+	// Shared clipboard while the teacher controls the computer (clipboard.go).
+	TypeClipboardBegin = "clipboard.begin"
+	TypeClipboardSet   = "clipboard.set"
+	TypeClipboardGet   = "clipboard.get"
+	TypeClipboardEnd   = "clipboard.end"
+	TypeClipboardDone  = "clipboard.done"
 )
 
 // Frame width limits accepted by the agent: small for the overview, up to
@@ -113,6 +124,10 @@ const (
 	CodeLockUnavailable = "lock-unavailable"
 	// CodeBroadcastFailed: the session could not show the teacher's screen.
 	CodeBroadcastFailed = "broadcast-failed"
+	// CodeClipboard: the session could not share its clipboard.
+	CodeClipboard = "clipboard-failed"
+	// CodeClipboardTooLarge: the text is over MaxClipboardBytes.
+	CodeClipboardTooLarge = "clipboard-too-large"
 )
 
 // MaxBroadcastBytes bounds one picture of the teacher's screen.
@@ -157,6 +172,8 @@ type Message struct {
 	Text        string `json:"text,omitempty"`
 	Seconds     int    `json:"seconds,omitempty"`
 	UntilUnlock bool   `json:"untilUnlock,omitempty"`
+	// Notice is the kind of a notice.show (see message.go).
+	Notice string `json:"notice,omitempty"`
 }
 
 // Write encodes a message as a big-endian length followed by JSON.
@@ -212,9 +229,20 @@ type Session interface {
 	// it.
 	ShowFrame(image []byte) error
 	StopBroadcast() error
+	// ClipboardBegin turns the shared clipboard on for the length of a
+	// control; ClipboardEnd turns it off. ClipboardSet puts text on the
+	// computer's clipboard; ClipboardGet returns text its user copied since
+	// the last call ("" when nothing new).
+	ClipboardBegin() error
+	ClipboardEnd() error
+	ClipboardSet(text string) error
+	ClipboardGet() (string, error)
 	// SendFiles places files on the session's desktop; content opens the
 	// file at an entry's position. It returns the names given there.
 	SendFiles(entries []FileEntry, content func(int) (io.ReadCloser, error)) ([]string, error)
+	// Notice tells the student, briefly, what the teacher did (one of the
+	// Notice kinds).
+	Notice(kind string) error
 	Close() error
 }
 

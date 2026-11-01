@@ -11,7 +11,7 @@ import (
 )
 
 func TestSavedInstallationSummaryContinuesEditsAndCancels(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+	m := newTestModel(t)
 	m.installation = installationModel{flow: true, startingLabSetup: true, method: "pxe"}
 	m.actions.LoadSetup = func(context.Context) domain.SetupReport {
 		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageValidate}
@@ -43,5 +43,43 @@ func TestSavedInstallationSummaryContinuesEditsAndCancels(t *testing.T) {
 	continued = workspaceComplete(t, continued, cmd)
 	if !continued.installation.failed {
 		t.Fatal("incomplete fresh preflight accepted")
+	}
+}
+
+func TestSavedInstallationSummaryAlsoServesUSBInstallation(t *testing.T) {
+	m := newTestModel(t)
+	m.installation = installationModel{flow: true, startingLabSetup: true, method: domain.RemoteInstallUSBSSH}
+	m.actions.LoadSetup = func(context.Context) domain.SetupReport {
+		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageValidate}
+	}
+	updated, cmd := m.Update(dashboardSettingsMsg{settings: wizardSettings()})
+	m = updated.(dashboardModel)
+	if cmd != nil || !m.installation.savedSummary || m.screen != dashboardSettings {
+		t.Fatal("complete settings replayed the form for a USB installation")
+	}
+	m.width, m.height = 120, 30
+	if view := m.View().Content; !strings.Contains(view, "USB over SSH") || strings.Contains(view, "Network boot") {
+		t.Fatal("summary names the wrong installation method")
+	}
+	cancel, cmd := workspaceKey(m, demoCode(tea.KeyEscape))
+	if cmd != nil || cancel.installation.flow || cancel.screen != dashboardInstallationArea {
+		t.Fatal("cancel did not return to the installation area")
+	}
+	continued, cmd := workspaceKey(m, demoCode(tea.KeyEnter))
+	if cmd == nil || continued.installation.savedSummary {
+		t.Fatal("preflight skipped")
+	}
+}
+
+func TestSummaryShowsTheDHCPAddressTheControllerHasNow(t *testing.T) {
+	addresses := domain.ControllerAddresses{Detected: true, Choices: []domain.DHCPAddressChoice{{Address: "10.0.2.15", Device: "enp0s8"}, {Address: "192.168.57.99", Device: "enp0s3"}}}
+	if got := summaryDHCPAddress("192.168.57.99", "enp0s3", addresses); got != "192.168.57.99" {
+		t.Fatalf("present address = %q", got)
+	}
+	if got := summaryDHCPAddress("192.168.56.99", "enp0s3", addresses); got != "192.168.57.99 (detected now; the saved 192.168.56.99 is no longer on this controller)" {
+		t.Fatalf("stale address = %q", got)
+	}
+	if got := summaryDHCPAddress("192.168.56.99", "enp0s3", domain.ControllerAddresses{}); got != "192.168.56.99" {
+		t.Fatalf("undetected = %q", got)
 	}
 }

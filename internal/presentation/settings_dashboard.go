@@ -44,7 +44,6 @@ var routineSettingsGroups = []routineSettingsGroup{
 		fields: []settingsField{
 			{id: "lab.controllerIfaceName", group: "Network", label: "Controller network interface"},
 			{id: "lab.clientIfaceName", group: "Network", label: "Client computers' network interface"},
-			{id: "lab.ifaceName", group: "Network", label: "Shared fallback interface (controller and clients)"},
 			{id: "lab.masterDhcpIp", group: "Network", label: "Current controller DHCP address"},
 			{id: "lab.networkBase", group: "Network", label: "Static laboratory network address"},
 			{id: "lab.networkPrefixLength", group: "Network", label: "Network prefix length"},
@@ -87,6 +86,15 @@ var routineSettingsGroups = []routineSettingsGroup{
 		description: "Default classroom homepage",
 		fields: []settingsField{
 			{id: "lab.homepageUrl", group: "Browser", label: "Browser homepage"},
+		},
+	},
+	{
+		id:          "classroom",
+		shortcut:    "v",
+		label:       "Classroom view",
+		description: "Turn the teacher's classroom view on or off",
+		fields: []settingsField{
+			{id: "lab.classroomView", group: "Classroom view", label: "Classroom view", choices: classroomViewChoices, closed: true},
 		},
 	},
 	{
@@ -399,7 +407,7 @@ func (model dashboardModel) settingsView() string {
 			lines = append(lines, "", "A new password takes effect only after you apply the configuration to this controller and then update the computers.")
 		}
 		if model.message != "" {
-			notice := tuiNotice{kind: tuiStatusAttention, title: model.message}
+			notice := model.messageNotice()
 			if !success && model.settings.result.State != "saved" {
 				notice = failureNotice("The settings were not saved", model.message)
 			}
@@ -491,7 +499,7 @@ func (model dashboardModel) settingsPasswordsView() string {
 func (model dashboardModel) settingsReviewView() string {
 	lines := []string{
 		tuiTitle("Review settings", model.isDark),
-		"Validated managed-setting changes",
+		"Changes to save",
 	}
 	for _, change := range model.settings.plan.Changes {
 		before := change.Before
@@ -499,6 +507,9 @@ func (model dashboardModel) settingsReviewView() string {
 		if change.Sensitive {
 			before = "configured"
 			after = "updated"
+		}
+		if change.Field == "lab.classroomView" {
+			before, after = onOff(before), onOff(after)
 		}
 		lines = append(lines, fmt.Sprintf("  %s: %v → %v", settingLabel(change.Field), before, after))
 	}
@@ -519,7 +530,7 @@ func (model dashboardModel) settingsReviewView() string {
 		question = "Saving is blocked by the network check"
 		actions = nil
 	}
-	if len(model.settings.plan.NetworkPreflight.Missing()) > 0 {
+	if len(model.settings.plan.NetworkPreflight.Missing()) > 0 && len(model.settings.plan.NetworkPreflight.Wireless()) == 0 {
 		label := "Save anyway for the computers listed"
 		if model.settings.saveAnyway {
 			label = "Do not save anyway"
@@ -529,7 +540,7 @@ func (model dashboardModel) settingsReviewView() string {
 	actions = append(actions, tuiAction{key: "Esc", label: "Cancel"}, tuiAction{key: "F1", label: "Help"})
 	lines = append(lines,
 		"",
-		"Only lab-settings.json will be replaced atomically.",
+		"Only the lab settings file (lab-settings.json) is updated, in one step.",
 		"Existing unrelated files and changes are preserved.",
 		"Saving does not rebuild or change any computer.",
 		"",
@@ -592,4 +603,15 @@ func (model dashboardModel) openSettingsEditor(fields []settingsField, title str
 	model.message = ""
 	model.screen = dashboardSettingsEdit
 	return model
+}
+
+// onOff shows a yes/no setting value in plain words.
+func onOff(value any) any {
+	if on, ok := value.(bool); ok {
+		if on {
+			return "on"
+		}
+		return "off"
+	}
+	return value
 }

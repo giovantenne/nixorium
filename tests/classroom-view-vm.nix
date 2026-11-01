@@ -14,6 +14,10 @@ let
     export GI_TYPELIB_PATH="${pkgs.glib.out}/lib/girepository-1.0:${pkgs.gobject-introspection}/lib/girepository-1.0"
     exec ${python}/bin/python3 ${./classroom-view-key.py}
   '';
+  f11Key = pkgs.writeShellScript "classroom-view-f11" ''
+    export GI_TYPELIB_PATH="${pkgs.glib.out}/lib/girepository-1.0:${pkgs.gobject-introspection}/lib/girepository-1.0"
+    exec ${python}/bin/python3 ${./classroom-view-f11.py}
+  '';
   labSettings = {
     classroomView = true;
     deploymentMode = "laboratory";
@@ -24,13 +28,16 @@ pkgs.testers.runNixOSTest {
   name = "nixorium-classroom-view";
   nodes.client = { ... }: {
     imports = [ ../modules/classroom-view.nix ];
-    _module.args = { inherit labSettings nixoriumPackage; hostName = "pc01"; };
+    _module.args = { inherit labSettings nixoriumPackage; hostName = "pc01"; isController = false; };
     virtualisation.memorySize = 3072;
+    environment.systemPackages = [ pkgs.gnome-text-editor ];
     virtualisation.resolution = { x = 1280; y = 800; };
     services.displayManager.gdm.enable = true;
     services.desktopManager.gnome.enable = true;
     # As on Nixorium workstations: no modal welcome dialog over the top bar.
-    services.desktopManager.gnome.extraGSettingsOverrides = "[org.gnome.shell]\nwelcome-dialog-last-shown-version='9999'\n";
+    # As on Nixorium computers (modules/desktop.nix): a blank screen is not
+    # locked; loginctl lock-sessions still locks it.
+    services.desktopManager.gnome.extraGSettingsOverrides = "[org.gnome.shell]\nwelcome-dialog-last-shown-version='9999'\n\n[org.gnome.desktop.screensaver]\nlock-enabled=false\n";
     services.displayManager.autoLogin = { enable = true; user = "student"; };
     users.users.student = { isNormalUser = true; uid = 1000; };
     services.openssh.enable = true;
@@ -74,6 +81,9 @@ pkgs.testers.runNixOSTest {
     # The indicator stays visible but a student's click no longer stops the view.
     extensions = "su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gnome-extensions "
     client.wait_until_succeeds(extensions + "info nixorium-classroom@nixorium.org' | grep -E 'State: (ENABLED|ACTIVE)'", timeout=60)
+    # The capture ends with the last controller channel, so one stays open
+    # (as the hub's does) while the clicks below need the capture running.
+    client.execute("(sleep 45 | nixorium-classroom-connect >/dev/null 2>&1 &)")
     client.succeed("${agent} probe --thumbnail /tmp/thumb2.jpg nixorium-classroom-connect")
     client.sleep(2)
     client.screenshot("sharing-indicator")
@@ -152,6 +162,48 @@ pkgs.testers.runNixOSTest {
     client.succeed(classroom_property + "MessageShown' | grep -F false")
     client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
 
+    # While the teacher controls the computer, a banner says so: it comes
+    # with the first input and goes when the control ends.
+    client.succeed(classroom_property + "Controlled' | grep -F false")
+    client.succeed("(${agent} probe --control 12 --thumbnail /tmp/thumb-control.jpg nixorium-classroom-connect > /tmp/control.log 2>&1 &)")
+    client.wait_until_succeeds("grep -F input.done /tmp/control.log", timeout=30)
+    client.wait_until_succeeds(classroom_property + "Controlled' | grep -F true", timeout=10)
+    client.sleep(1)
+    client.screenshot("classroom-control")
+    client.wait_until_succeeds(classroom_property + "Controlled' | grep -F false", timeout=30)
+    client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
+
+    # While a window is full screen GNOME hides the top bar and its sharing
+    # icon: the extension then shows its own small indicator, and only then.
+    # One controller channel stays open, as the hub's does, or the capture
+    # (and the indicator with it) ends between the probes.
+    client.execute("(sleep 45 | nixorium-classroom-connect >/dev/null 2>&1 &)")
+    client.succeed("systemd-run --user -M student@ --collect --unit classroom-view-editor ${pkgs.gnome-text-editor}/bin/gnome-text-editor")
+    client.sleep(8)
+    client.succeed("systemctl --user -M student@ is-active classroom-view-editor")
+    client.screenshot("classroom-editor-window")
+    client.succeed("${agent} probe --thumbnail /tmp/thumb-fullscreen.jpg nixorium-classroom-connect")
+    client.wait_until_succeeds(classroom_property + "IndicatorShown' | grep -F false", timeout=10)
+    client.succeed("systemd-run --user -M student@ --wait --pipe --collect ${f11Key}")
+    client.succeed("${agent} probe --thumbnail /tmp/thumb-fullscreen.jpg nixorium-classroom-connect")
+    client.wait_until_succeeds(classroom_property + "IndicatorShown' | grep -F true", timeout=10)
+    client.sleep(1)
+    client.screenshot("classroom-fullscreen-indicator")
+    client.succeed("systemd-run --user -M student@ --wait --pipe --collect ${f11Key}")
+    client.wait_until_succeeds(classroom_property + "IndicatorShown' | grep -F false", timeout=10)
+    client.succeed("systemctl --user -M student@ stop classroom-view-editor")
+    client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
+
+    # When the teacher saves a picture of the screen, the student's screen
+    # says so for a few seconds. Only the known kinds are accepted.
+    client.succeed("${agent} probe --notice screenshot nixorium-classroom-connect | grep -F 'notice.shown'")
+    client.succeed(classroom_property + "NoticeKind' | grep -F screenshot")
+    client.sleep(1)
+    client.screenshot("classroom-notice-screenshot")
+    client.wait_until_succeeds(classroom_property + "NoticeKind' | grep -vF screenshot", timeout=20)
+    client.fail("${agent} probe --notice 'Free text' nixorium-classroom-connect")
+    client.succeed(classroom_property + "NoticeKind' | grep -vF screenshot")
+
     # Files sent to the desktop belong to the student and are never
     # executable; links are not sent and nothing on the desktop is replaced.
     client.succeed("mkdir -p /tmp/share/Lesson && echo notes > /tmp/share/Lesson/notes.txt && printf 'ls\\n' > /tmp/share/run.sh && chmod 755 /tmp/share/run.sh && ln -s /etc/shadow /tmp/share/secret")
@@ -165,8 +217,19 @@ pkgs.testers.runNixOSTest {
     # arrive with explicit modes, links stay out, and the student keeps
     # every file.
     client.succeed("ln -s /etc/shadow /home/student/Desktop/shadow && install -d /tmp/collected")
+    client.succeed(classroom_property + "NoticeKind' | grep -vF collect")
     client.succeed("${agent} probe --collect /tmp/collected nixorium-classroom-connect | tee /dev/stderr | grep -F 'collect.done Lesson, Lesson (2), run (2).sh, run.sh skipped=0'")
     client.succeed("grep -qx notes /tmp/collected/Lesson/notes.txt && grep -qx notes '/tmp/collected/Lesson (2)/notes.txt' && test ! -e /tmp/collected/shadow")
+    # The agent does not tell by itself (a review lists and ends too): the
+    # controller asks for the notice once a collection succeeded, which the
+    # probe stands in for here. The notice uses the extension's own words
+    # and goes by itself.
+    client.succeed(classroom_property + "NoticeKind' | grep -vF collect")
+    client.succeed("${agent} probe --notice collect nixorium-classroom-connect | grep -F 'notice.shown'")
+    client.succeed(classroom_property + "NoticeKind' | grep -F collect")
+    client.sleep(1)
+    client.screenshot("classroom-notice-collect")
+    client.wait_until_succeeds(classroom_property + "NoticeKind' | grep -vF collect", timeout=20)
     client.succeed("test \"$(stat -c %a /tmp/collected/Lesson /tmp/collected/Lesson/notes.txt /tmp/collected/run.sh | tr '\\n' ' ')\" = '755 644 644 '")
     client.succeed("test -L /home/student/Desktop/shadow && grep -qx notes /home/student/Desktop/Lesson/notes.txt && test -f '/home/student/Desktop/run (2).sh'")
 
@@ -176,7 +239,19 @@ pkgs.testers.runNixOSTest {
     client.succeed("loginctl lock-sessions")
     client.sleep(3)
     client.succeed("(${agent} probe --thumbnail /tmp/thumb-locked.jpg nixorium-classroom-connect || true) | grep -F 'code=screen-locked'")
+    # GNOME's SetActive(false) would lift a password lock too: the agent never
+    # wakes a locked session, so it is still locked.
+    client.succeed("loginctl show-session \"$(loginctl list-sessions --no-legend | awk '$3 == \"student\" { print $1; exit }')\" -p LockedHint | grep -Fx LockedHint=yes")
     client.succeed("loginctl unlock-sessions")
+    client.wait_until_succeeds("loginctl show-session \"$(loginctl list-sessions --no-legend | awk '$3 == \"student\" { print $1; exit }')\" -p LockedHint | grep -Fx LockedHint=no", timeout=20)
+
+    # A screen that is only blank (Nixorium never locks it) is woken for the
+    # classroom view and captured.
+    saver = "su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gdbus call --session --dest org.gnome.ScreenSaver --object-path /org/gnome/ScreenSaver --method org.gnome.ScreenSaver."
+    client.succeed(saver + "SetActive true'")
+    client.wait_until_succeeds(saver + "GetActive' | grep -F true", timeout=10)
+    client.succeed("loginctl show-session \"$(loginctl list-sessions --no-legend | awk '$3 == \"student\" { print $1; exit }')\" -p LockedHint | grep -Fx LockedHint=no")
+    client.succeed("${agent} probe --thumbnail /tmp/thumb-blank.jpg nixorium-classroom-connect | grep -E '^thumbnail width='")
 
     # The student's terminal cannot stop the agent or its extension helper:
     # a manual stop is refused, and a killed agent starts again by itself.

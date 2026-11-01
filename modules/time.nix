@@ -16,10 +16,9 @@
 #   IP_FREEBIND, so the address need not be up at start). chrony binds only one
 #   address, so during a change of laboratory network, when the interface has
 #   two, the interface-scoped firewall and `allow` are the scope.
-{ hostName, labSettings, lib, ... }:
+{ isController, labSettings, lib, ... }:
 let
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
-  isController = hostName == labSettings.masterHostName;
   transition = labSettings.networkTransition or null;
   # Like the cache, both controller addresses answer during a change of
   # laboratory network: clients list the new one first and the previous second,

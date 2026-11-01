@@ -51,7 +51,7 @@ func TestEveryNextStepCodeIsDocumented(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, code := range NextStepCodes() {
+	for code := range nextSteps {
 		if !strings.Contains(string(guide), "`"+code+"`") {
 			t.Fatalf("code %s is not explained in docs/troubleshooting.md", code)
 		}
@@ -59,7 +59,7 @@ func TestEveryNextStepCodeIsDocumented(t *testing.T) {
 }
 
 func TestSituationCatalogueIsComplete(t *testing.T) {
-	for _, code := range NextStepCodes() {
+	for code := range nextSteps {
 		step, _ := NextStepByCode(code)
 		if step.Code != code || step.Title == "" || step.Why == "" || step.Action == "" {
 			t.Fatalf("situation %s is incomplete: %+v", code, step)
@@ -88,9 +88,10 @@ func TestSituationCatalogueIsComplete(t *testing.T) {
 func TestBlockedErrorRoundTrip(t *testing.T) {
 	raw := errors.New("something the operator should not have to read")
 	err := fmt.Errorf("controller build failed: %w", Blocked("RESET-PENDING", raw))
-	step, found := NextStepForError(err)
-	if !found || step.Code != "RESET-PENDING" {
-		t.Fatalf("NextStepForError = %+v, %v", step, found)
+	code, typed := BlockedCodeOf(err)
+	step, found := NextStepByCode(code)
+	if !typed || !found || step.Code != "RESET-PENDING" {
+		t.Fatalf("BlockedCodeOf = %q, %v; step = %+v, %v", code, typed, step, found)
 	}
 	if err.Error() != "controller build failed: "+raw.Error() || !errors.Is(err, raw) {
 		t.Fatalf("blocked error text or chain changed: %v", err)
@@ -99,11 +100,15 @@ func TestBlockedErrorRoundTrip(t *testing.T) {
 	if !errors.As(err, &blocked) || blocked.Code != "RESET-PENDING" {
 		t.Fatalf("errors.As = %+v", blocked)
 	}
-	// Untyped errors still fall back to the message.
-	if step, found := NextStepForError(errors.New(MessageDeploymentPending)); !found || step.Code != "DEPLOY-PENDING" {
+	// Untyped errors are recognized by their message instead.
+	untyped := errors.New(MessageDeploymentPending)
+	if _, typed := BlockedCodeOf(untyped); typed {
+		t.Fatal("untyped error reported as typed")
+	}
+	if step, found := NextStepFor(untyped.Error()); !found || step.Code != "DEPLOY-PENDING" {
 		t.Fatalf("fallback = %+v, %v", step, found)
 	}
-	if _, found := NextStepForError(nil); found {
+	if _, typed := BlockedCodeOf(nil); typed {
 		t.Fatal("nil error recognized")
 	}
 	issue := BlockedIssue("git", "GIT-DIRTY", "2 files")

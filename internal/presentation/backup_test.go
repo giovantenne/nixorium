@@ -10,15 +10,15 @@ import (
 	"testing"
 )
 
-func TestGitBackupRequiresReviewAndConfirmationAndMasksSecrets(t *testing.T) {
+func TestGitBackupPushesOnEnterAfterReviewAndMasksSecrets(t *testing.T) {
 	calls := 0
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{PublishGitBackup: func(p domain.GitBackupPlan, pass []byte) domain.BackupReport {
+	m := newTestModel(t, withActions(DashboardActions{PublishGitBackup: func(p domain.GitBackupPlan, pass []byte) domain.BackupReport {
 		calls++
 		if string(pass) != "quiet passphrase!" || p.Revision != "reviewed" {
 			t.Fatal("wrong reviewed input")
 		}
 		return domain.BackupReport{State: "completed", Operation: "backup-publish"}
-	}}, false)
+	}}))
 	m.screen = dashboardBackup
 	m.backup = backupModel{reviewed: true, plan: domain.GitBackupPlan{Revision: "reviewed"}}
 	for _, char := range "quiet passphrase!" {
@@ -31,14 +31,14 @@ func TestGitBackupRequiresReviewAndConfirmationAndMasksSecrets(t *testing.T) {
 	if strings.Contains(m.View().Content, "quiet passphrase!") {
 		t.Fatal("passphrase shown")
 	}
-	m.backup.repeat = append([]rune{}, m.backup.passphrase...)
-	m.backup.field = 2
+	m.backup.repeat = []rune("another passphrase")
+	m.backup.field = 1
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = next.(dashboardModel)
 	if cmd != nil || calls != 0 {
-		t.Fatal("push without confirmation")
+		t.Fatal("push with a passphrase that was not repeated")
 	}
-	m.backup.confirmation = "PUSH"
+	m.backup.repeat = append([]rune{}, m.backup.passphrase...)
 	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	m = next.(dashboardModel)
 	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -66,10 +66,10 @@ func TestGitBackupRequiresReviewAndConfirmationAndMasksSecrets(t *testing.T) {
 
 func TestRestoreLabReviewAndCancellation(t *testing.T) {
 	called := false
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{RestoreLab: func(string, string, string, []byte) domain.BackupReport {
+	m := newTestModel(t, withActions(DashboardActions{RestoreLab: func(string, string, string, []byte) domain.BackupReport {
 		called = true
 		return domain.BackupReport{State: "completed"}
-	}}, false)
+	}}))
 	m.screen = dashboardBackup
 	m.backup = backupModel{restore: true, standalone: true, field: 3, remote: "git@host:lab.git", branch: "main", destination: "/new/lab", passphrase: []rune("restore password")}
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -88,7 +88,7 @@ func TestBackupScreensFitAndKeepActions(t *testing.T) {
 	var gallery strings.Builder
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {160, 40}} {
 		for _, dark := range []bool{false, true} {
-			m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+			m := newTestModel(t)
 			m.screen = dashboardBackup
 			m.width = size[0]
 			m.height = size[1]
@@ -125,7 +125,7 @@ func TestBackupScreensFitAndKeepActions(t *testing.T) {
 
 func TestBackupChoiceAndArchiveReview(t *testing.T) {
 	calls, pushes := 0, 0
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		CreateBackup: func(destination string, pass []byte) domain.BackupReport {
 			calls++
 			if destination != "/media/usb" || string(pass) != "quiet passphrase!" {
@@ -137,7 +137,7 @@ func TestBackupChoiceAndArchiveReview(t *testing.T) {
 			pushes++
 			return domain.BackupReport{}
 		},
-	}, false)
+	}))
 	next, _ := m.openBackup()
 	m = next.(dashboardModel)
 	if view := m.View().Content; !strings.Contains(view, "Encrypted file") || !strings.Contains(view, "USB drive") || !strings.Contains(view, "Private Git repository") || !strings.Contains(view, "optional") {
@@ -182,7 +182,7 @@ func TestBackupChoiceAndArchiveReview(t *testing.T) {
 }
 
 func TestBackupChoiceCancellationClearsSecrets(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{}, false)
+	m := newTestModel(t)
 	next, _ := m.openBackup()
 	m = next.(dashboardModel)
 	next, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
@@ -211,7 +211,7 @@ func TestBackupChoiceCancellationClearsSecrets(t *testing.T) {
 func TestConfiguredGitBackupPushesWithoutPassphraseUnlessKeysChanged(t *testing.T) {
 	state := "completed"
 	syncs := 0
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		GitBackupDestination: func() (string, string) { return "git@example.invalid:school/lab.git", "main" },
 		SyncGitBackup: func(_ context.Context, skip string) domain.BackupReport {
 			syncs++
@@ -223,7 +223,7 @@ func TestConfiguredGitBackupPushesWithoutPassphraseUnlessKeysChanged(t *testing.
 		PlanGitBackup: func(context.Context, string, string) (domain.GitBackupPlan, error) {
 			return domain.GitBackupPlan{}, nil
 		},
-	}, false)
+	}))
 	next, _ := m.openBackup()
 	m = next.(dashboardModel)
 	view := m.View().Content
@@ -257,12 +257,12 @@ func TestConfiguredGitBackupPushesWithoutPassphraseUnlessKeysChanged(t *testing.
 
 func TestAutomaticGitBackupRunsOnOverviewAndRemembersFailures(t *testing.T) {
 	var skips []string
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		SyncGitBackup: func(_ context.Context, skip string) domain.BackupReport {
 			skips = append(skips, skip)
 			return domain.BackupReport{State: "blocked", Revision: "abc123", Message: "Automatic Git backup failed: offline"}
 		},
-	}, false)
+	}))
 	m.screen = dashboardAdministration
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	m = next.(dashboardModel)
@@ -288,7 +288,7 @@ func TestAutomaticGitBackupRunsOnOverviewAndRemembersFailures(t *testing.T) {
 
 func TestRestoreLabFromBackupFileReview(t *testing.T) {
 	restores := 0
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		RestoreLabArchive: func(source, target string, pass []byte) domain.BackupReport {
 			restores++
 			if source != "/media/usb/nixorium-backup.age" || target != "/home/admin/lab" || string(pass) != "long passphrase" {
@@ -296,7 +296,7 @@ func TestRestoreLabFromBackupFileReview(t *testing.T) {
 			}
 			return domain.BackupReport{State: "completed", Message: "Lab restored"}
 		},
-	}, false)
+	}))
 	next, _ := m.openRestoreLab()
 	m = next.(dashboardModel)
 	if view := m.View().Content; !strings.Contains(view, "Backup file") || !strings.Contains(view, "Private Git repository") {
@@ -304,7 +304,7 @@ func TestRestoreLabFromBackupFileReview(t *testing.T) {
 	}
 	next, _ = m.Update(tea.KeyPressMsg{Text: "f", Code: 'f'})
 	m = next.(dashboardModel)
-	for _, field := range []string{"/media/usb/nixorium-backup.age", "/home/admin/lab", "long passphrase"} {
+	for _, field := range []string{"/media/usb/nixorium-backup.age", "long passphrase", "/home/admin/lab"} {
 		next, _ = m.Update(tea.KeyPressMsg{Text: field})
 		m = next.(dashboardModel)
 		next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -342,14 +342,146 @@ func drainBackupSync(cmd tea.Cmd) []tea.Msg {
 }
 
 func TestBackupFileProposesTheHomeFolder(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	m := newTestModel(t, withActions(DashboardActions{
 		BackupFileFolder: func() string { return "/home/admin" },
-	}, false)
+	}))
 	next, _ := m.openBackup()
 	m = next.(dashboardModel)
 	next, _ = m.Update(tea.KeyPressMsg{Text: "f", Code: 'f'})
 	m = next.(dashboardModel)
 	if m.backup.destination != "/home/admin" || !strings.Contains(m.View().Content, "/home/admin") {
 		t.Fatalf("home folder not proposed: %q", m.backup.destination)
+	}
+}
+
+func TestRestoreLabProposesTheNewestBackupAndAFolder(t *testing.T) {
+	m := newTestModel(t, withActions(DashboardActions{
+		RestoreLabArchive: func(string, string, []byte) domain.BackupReport { return domain.BackupReport{} },
+		FindBackupFiles: func() []string {
+			return []string{"/run/media/admin/USB/nixorium-backup-20261020-153344.age", "/home/admin/nixorium-backup-20261001-090000.age"}
+		},
+		RestoreFolder: func() string { return "/home/admin/nixorium-restored" },
+	}))
+	next, _ := m.openRestoreLab()
+	m = next.(dashboardModel)
+	next, _ = m.Update(tea.KeyPressMsg{Text: "f", Code: 'f'})
+	m = next.(dashboardModel)
+	b := m.backup
+	if b.source != "/run/media/admin/USB/nixorium-backup-20261020-153344.age" || b.destination != "/home/admin/nixorium-restored" || b.field != 1 {
+		t.Fatalf("restore form not prefilled: %+v", b)
+	}
+	view := m.View().Content
+	for _, text := range []string{"Found 2 backup files; the newest is proposed.", "Restore into", "/home/admin/nixorium-restored"} {
+		if !strings.Contains(view, text) {
+			t.Fatalf("restore form misses %q:\n%s", text, view)
+		}
+	}
+	if strings.Contains(view, "New folder") {
+		t.Fatal("restore form still says New folder")
+	}
+}
+
+func TestRestoredLabIsOfferedForThisController(t *testing.T) {
+	var used domain.BackupReport
+	var usedFile string
+	planned := false
+	m := newTestModel(t, withActions(DashboardActions{
+		RestoreLabArchive: func(string, string, []byte) domain.BackupReport { return domain.BackupReport{} },
+		UseRestoredLab: func(restored domain.BackupReport, file string) domain.BackupReport {
+			used, usedFile = restored, file
+			return domain.BackupReport{State: "completed", Message: "This controller now manages the restored lab and has its keys.", Previous: "/home/admin/nixorium-deployment-before-restore-20261020-195600"}
+		},
+		PlanController: func(context.Context) domain.ControllerRebuildPlanReport {
+			planned = true
+			return domain.ControllerRebuildPlanReport{}
+		},
+	}))
+	m.screen = dashboardBackup
+	m.backup = backupModel{restore: true, archive: true, done: true, source: "/run/media/admin/USB/nixorium-backup.age", result: domain.BackupReport{State: "completed", Path: "/home/admin/nixorium-restored", Message: "Lab restored into /home/admin/nixorium-restored with its original keys and trusted computers. No system was activated."}}
+	view := m.View().Content
+	if !strings.Contains(view, "Use this lab on this controller") || !strings.Contains(view, "nothing is deleted") {
+		t.Fatalf("restored lab not offered:\n%s", view)
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	if cmd == nil {
+		t.Fatal("using the restored lab did not start")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	if used.Path != "/home/admin/nixorium-restored" || usedFile != "/run/media/admin/USB/nixorium-backup.age" || !m.backup.adopted {
+		t.Fatalf("restored lab not used: %+v %q", used, usedFile)
+	}
+	view = m.View().Content
+	for _, text := range []string{"nixorium-deployment-before-restore-20261020-195600", "Next: apply the restored lab to this controller", "Review controller", "SSH key changed"} {
+		if !strings.Contains(view, text) {
+			t.Fatalf("adopt result misses %q:\n%s", text, view)
+		}
+	}
+	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	if m.screen != dashboardController || cmd == nil {
+		t.Fatal("next step does not open the controller review")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	if !planned {
+		t.Fatal("controller review not planned")
+	}
+}
+
+func TestStandaloneRestoreDoesNotOfferThisController(t *testing.T) {
+	m := newTestModel(t, withActions(DashboardActions{
+		UseRestoredLab: func(domain.BackupReport, string) domain.BackupReport { t.Fatal("used"); return domain.BackupReport{} },
+	}))
+	m.screen = dashboardBackup
+	m.backup = backupModel{restore: true, archive: true, done: true, standalone: true, result: domain.BackupReport{State: "completed", Path: "/home/admin/restored", Message: "Lab restored"}}
+	if view := m.View().Content; strings.Contains(view, "Use this lab on this controller") || !strings.Contains(view, "Replacing the controller") {
+		t.Fatalf("standalone restore result:\n%s", view)
+	}
+}
+
+func TestFreshLabOverviewDoesNotOfferRestore(t *testing.T) {
+	// Restore lab is in Maintenance; the overview lists only what needs
+	// attention, not a choice a new lab may never need.
+	m := newTestModel(t, withActions(DashboardActions{
+		RestoreLabArchive: func(string, string, []byte) domain.BackupReport { return domain.BackupReport{} },
+		LabComputerCount:  func() (int, bool) { return 0, true },
+	}))
+	m.recovery.report = domain.RecoveryReport{Conditions: []domain.BlockingCondition{{Kind: domain.RecoveryBackupDue, Title: "This laboratory has no backup yet", Next: domain.NextStep{Code: "BACKUP-NONE"}}}}
+	for _, task := range m.pendingTasks() {
+		if strings.Contains(task.title, "Restore") {
+			t.Fatalf("overview offers %q", task.title)
+		}
+	}
+}
+
+func TestPartialAdoptRetriesTheKeysAndEscOpensTheOverview(t *testing.T) {
+	installs := 0
+	m := newTestModel(t, withActions(DashboardActions{
+		InstallSetupSecrets: func() domain.ActionReport { installs++; return domain.ActionReport{State: "completed"} },
+		LoadInitial: func(context.Context) (domain.StatusReport, domain.SetupReport, error) {
+			return domain.StatusReport{}, domain.SetupReport{}, nil
+		},
+	}))
+	m.screen = dashboardBackup
+	m.backup = backupModel{restore: true, done: true, adopted: true, adoptResult: domain.BackupReport{State: "partial", Message: "keys could not be installed"}}
+	if view := m.View().Content; !strings.Contains(view, "Install the keys again") {
+		t.Fatalf("partial result offers no retry:\n%s", view)
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	if cmd == nil {
+		t.Fatal("retry did not start")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	if installs != 1 || m.backup.adoptResult.State != "completed" {
+		t.Fatalf("retry result: installs=%d %+v", installs, m.backup.adoptResult)
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = next.(dashboardModel)
+	if m.screen != dashboardHome {
+		t.Fatalf("Esc after using the restored lab went to %d", m.screen)
 	}
 }

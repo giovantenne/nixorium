@@ -92,7 +92,6 @@ func TestDeploymentUSBRecoveryVerifiesThenRequiresFreshReview(t *testing.T) {
 		}
 		return domain.DeploymentPlanReport{State: "ready", Requested: requested, Revision: strings.Repeat("b", 40), ColmenaSelector: requested}
 	}
-	model.deployment.confirmation = "DEPLOY"
 	model = settleDeploymentUSB(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if probes != 1 || plans != 0 || verifies != 0 || !strings.Contains(model.View().Content, "Verify pc01 and resume") {
 		t.Fatalf("missing guided recovery:\n%s", model.View().Content)
@@ -103,9 +102,8 @@ func TestDeploymentUSBRecoveryVerifiesThenRequiresFreshReview(t *testing.T) {
 	if verifies != 1 || probes != 2 || plans != 1 || model.screen != dashboardDeployReview || model.deployment.confirmation != "" || model.deployment.plan.Revision != strings.Repeat("b", 40) {
 		t.Fatalf("did not return to fresh review: %+v", model.deployment)
 	}
-	model = settleDeploymentUSB(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if model.deployment.applying {
-		t.Fatal("recovery reused deployment authorization")
+		t.Fatal("recovery started the deployment before its fresh review was confirmed")
 	}
 }
 

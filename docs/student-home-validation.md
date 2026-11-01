@@ -9,7 +9,7 @@ disposable VMs; no real laboratory controller or student machine was changed.
 Evidence below was collected on 2026-10-13. Source commits include `4e4bd7b`
 (schema/seed), `5162a8c` (capture/save), `316878c` (CLI/TUI) and `25a2ed7`
 (runtime fixture).
-The real-provider qualification used the exact frozen core `f568aa4`; its
+The production-client preflight used the exact frozen core `f568aa4`; its
 evidence and the runtime result are recorded separately below.
 
 | Scenario | Status | Executed evidence |
@@ -43,34 +43,21 @@ evidence and the runtime result are recorded separately below.
 | Representative controller and client systems build together | PASS | Batched `pc99` and `pc01` toplevel builds |
 | Complete evaluation/quick gate on the final integration | PASS | `./scripts/validate.sh --eval` completed, including the quick/package/guidance checks and complete mkLab evaluation |
 | Local production-client preflight on exact core `f568aa4` | PASS | Native capability discovery, candidate evaluation and ready local review completed in a synthetic fixture. Build was partial: two build targets built, five targets blocked and home preparation skipped with `needs_other_builds`; private qualification helper code is not part of this public ledger |
-| Four natural-language cases through the real OpenRouter-backed Assistant | PASS | Exact frozen core `f568aa4`, production `openai/gpt-6.1-sol` at medium reasoning: requested text/application configuration/empty directory; opaque imported-source reuse; explicit executable choice; protected `.ssh/config` refusal with a safe `Documents/Corso/ssh-example.txt` alternative. All four evaluated successfully and reached ready local review |
-| Exact frozen model-generated candidate restores after student edits and executable choice | PASS | Original combined model-generated candidate: seven files and one empty directory, verified on three boots with two actual reboots after student mutations; exact hashes, UID 2000/GID 100, private modes, explicit executable restoration and offline operation |
+| Assistant qualification of the home-files tools | PASS (private) | Qualification of the service side is kept outside this repository |
+| Exact frozen generated candidate restores after student edits and executable choice | PASS | Original combined generated candidate: seven files and one empty directory, verified on three boots with two actual reboots after student mutations; exact hashes, UID 2000/GID 100, private modes, explicit executable restoration and offline operation |
 | Physical controller/student hardware, real GNOME interaction and real classroom data | NOT RUN | Outside this synthetic qualification |
 | Power-loss or injected filesystem fsync failure during native multi-file publication | NOT RUN | Partial-result classification is covered above; this separate filesystem fault was not executed |
 
-The four authorized OpenRouter cases made 40 settled provider requests with no
-retry. Actual costs were USD 0.057787 (text/configuration), 0.054023 (opaque
-import reuse), 0.048781 (executable choice) and 0.051846 (protected-path
-alternative), totaling **USD 0.212437**, within the USD 1 limit. Private Assistant
-instructions, credentials and qualification-helper code are not published here.
-
-The Assistant build tool reported partial builds: 3, 1, 3 and 2 build targets built
-respectively, with five blocked targets in each case. Home preparation was
-skipped with `needs_other_builds`. The successful candidate evaluations and
-ready local reviews therefore do not establish a full build of these four
-candidates; the separate frozen-candidate runtime check records its own outcome.
-
-The original model-generated declaration had SHA-256
+The original generated declaration had SHA-256
 `a03ffe252b47d596f079c433b795758af4f50b737a9c628eb3318d35e1077323`.
 The separate runtime test produced
-`2kwbrjq6kmfhmqqgb1lq4m5n41m01xha-vm-test-run-nixorium-original-model-home-files-runtime`.
+`2kwbrjq6kmfhmqqgb1lq4m5n41m01xha-vm-test-run-nixorium-original-generated-home-files-runtime`.
 It checked exact file hashes, UID/GID and modes on all three boots, with no NIC
 and no default IPv4 or IPv6 routes. The root-reviewed harmless script was run
 manually on each boot and returned exit 0 with its exact expected greeting. An
 initial offline fixture-only attempt failed Python type checking before boot;
 that fixture error was corrected and its log retained before the successful
-run. The model output was preserved unchanged, no model retry was made, and
-the provider cost remained USD 0.212437.
+run.
 
 ## Reproduction commands
 

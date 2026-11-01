@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -45,6 +46,31 @@ func (fakeViewSource) Input(name string, events []classroomview.InputEvent, rele
 	return nil
 }
 
+// clipboardSource records the shared clipboard calls; only pc01 is under
+// control after Control("pc01", true).
+var clipboardCalls []string
+var clipboardControlled bool
+
+func (fakeViewSource) Control(name string, on bool) error {
+	clipboardControlled = on && name == "pc01"
+	return nil
+}
+
+func (fakeViewSource) ClipboardSet(name, text string) error {
+	if name != "pc01" || !clipboardControlled {
+		return app.ErrClassroomNotControlled
+	}
+	clipboardCalls = append(clipboardCalls, "set:"+text)
+	return nil
+}
+
+func (fakeViewSource) ClipboardGet(name string) (string, error) {
+	if name != "pc01" || !clipboardControlled {
+		return "", app.ErrClassroomNotControlled
+	}
+	return "copied", nil
+}
+
 func viewRequest(server *viewServer, path, host, cookie string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(http.MethodGet, path, nil)
 	request.Host = host
@@ -54,6 +80,27 @@ func viewRequest(server *viewServer, path, host, cookie string) *httptest.Respon
 	recorder := httptest.NewRecorder()
 	server.ServeHTTP(recorder, request)
 	return recorder
+}
+
+func TestOpenPageStopsAnsweringWhenTheViewIsTurnedOff(t *testing.T) {
+	server := newViewServer(fakeViewSource{})
+	on := true
+	server.enabled = func() bool { return on }
+	address, err := server.Open(1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := strings.TrimPrefix(strings.SplitN(address, "/open", 2)[0], "http://")
+	entered := viewRequest(server, "/open"+strings.SplitN(address, "/open", 2)[1], host, "")
+	cookie := entered.Result().Cookies()[0]
+	if page := viewRequest(server, "/api/computers", host, cookie.Value); page.Code != http.StatusOK {
+		t.Fatalf("on = %d", page.Code)
+	}
+	on = false
+	page := viewRequest(server, "/api/computers", host, cookie.Value)
+	if page.Code != http.StatusForbidden || !strings.Contains(page.Body.String(), "turned off") {
+		t.Fatalf("off = %d %q", page.Code, page.Body.String())
+	}
 }
 
 func TestClassroomViewNeedsTheOneTimeTokenAndTheLoopbackHost(t *testing.T) {
@@ -182,5 +229,99 @@ func TestPageNamesAComputerWhoseMonitoringStopped(t *testing.T) {
 	}
 	if !strings.Contains(string(page), `id="icon-alert"`) {
 		t.Fatal("index.html lacks the warning icon of the stopped state")
+	}
+}
+
+func TestSharedClipboardEndpoints(t *testing.T) {
+	server := newViewServer(fakeViewSource{})
+	address, _ := server.Open(1000)
+	host := strings.TrimPrefix(strings.SplitN(address, "/open", 2)[0], "http://")
+	cookie := viewRequest(server, "/open"+strings.SplitN(address, "/open", 2)[1], host, "").Result().Cookies()[0]
+	post := func(path, body, session string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+		request.Host = host
+		request.Header.Set("Origin", "http://"+host)
+		request.Header.Set("Content-Type", "application/json")
+		if session != "" {
+			request.AddCookie(&http.Cookie{Name: viewCookie, Value: session})
+		}
+		recorder := httptest.NewRecorder()
+		server.ServeHTTP(recorder, request)
+		return recorder
+	}
+	clipboardCalls, clipboardControlled = nil, false
+	// Without control nothing reaches the computer, and the words are plain.
+	if response := post("/api/clipboard/set", `{"computer":"pc01","text":"hi"}`, cookie.Value); response.Code != http.StatusConflict || strings.Contains(response.Body.String(), "classroom") || len(clipboardCalls) != 0 {
+		t.Fatalf("set without control = %d %q", response.Code, response.Body.String())
+	}
+	if response := post("/api/clipboard/get", `{"computer":"pc01"}`, cookie.Value); response.Code != http.StatusConflict {
+		t.Fatalf("get without control = %d", response.Code)
+	}
+	if response := post("/api/control", `{"computer":"pc01","on":true}`, cookie.Value); response.Code != http.StatusNoContent {
+		t.Fatalf("control = %d", response.Code)
+	}
+	if response := post("/api/clipboard/set", `{"computer":"pc01","text":"a\u0000b"}`, cookie.Value); response.Code != http.StatusNoContent || len(clipboardCalls) != 1 || clipboardCalls[0] != "set:ab" {
+		t.Fatalf("set = %d %v", response.Code, clipboardCalls)
+	}
+	if response := post("/api/clipboard/get", `{"computer":"pc01"}`, cookie.Value); response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"text":"copied"`) {
+		t.Fatalf("get = %d %q", response.Code, response.Body.String())
+	}
+	// Another computer, an oversized text, a stranger and unknown fields.
+	if response := post("/api/clipboard/set", `{"computer":"pc02","text":"hi"}`, cookie.Value); response.Code != http.StatusConflict {
+		t.Fatalf("other computer = %d", response.Code)
+	}
+	big, _ := json.Marshal(map[string]string{"computer": "pc01", "text": strings.Repeat("x", classroomview.MaxClipboardBytes+1)})
+	if response := post("/api/clipboard/set", string(big), cookie.Value); response.Code != http.StatusRequestEntityTooLarge || !strings.Contains(response.Body.String(), "64 KiB") || len(clipboardCalls) != 1 {
+		t.Fatalf("large text = %d %q", response.Code, response.Body.String())
+	}
+	if response := post("/api/clipboard/set", `{"computer":"pc01","text":"hi"}`, ""); response.Code == http.StatusNoContent {
+		t.Fatal("clipboard without a session")
+	}
+	if response := post("/api/clipboard/set", `{"computer":"pc01","text":"hi","x":1}`, cookie.Value); response.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field = %d", response.Code)
+	}
+	if response := post("/api/control", `{"computer":"pc01","on":false}`, cookie.Value); response.Code != http.StatusNoContent {
+		t.Fatalf("control end = %d", response.Code)
+	}
+	if response := post("/api/clipboard/get", `{"computer":"pc01"}`, cookie.Value); response.Code != http.StatusConflict {
+		t.Fatalf("get after control = %d", response.Code)
+	}
+}
+
+func TestHiddenPageEndsTheControlAndResumesIt(t *testing.T) {
+	script, err := viewAssets.ReadFile("view/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The clipboard of a control does not survive the capture restart that
+	// a hidden page causes, so the control ends with the page and comes back.
+	for _, words := range []string{
+		"if (controlling) {\n      send([], true);\n      setControl(false);\n      resumeControl = true;\n    }",
+		"if (resumeControl) {\n          resumeControl = false;\n          setControl(true);\n        }",
+	} {
+		if !strings.Contains(string(script), words) {
+			t.Fatalf("app.js lacks %s", words)
+		}
+	}
+}
+
+func TestRemoteTypingLetsGoOfShiftAndAltGrBeforeACharacter(t *testing.T) {
+	script, err := viewAssets.ReadFile("view/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A character is typed by the computer's own layout: Shift and AltGr
+	// still held from the teacher's keyboard would change its level (AltGr+
+	// Shift+è for { on an Italian keyboard), so they are let go first, and
+	// their own release is not sent twice.
+	for _, words := range []string{
+		"const levelModifiers = [0xffe1, 0xfe03];",
+		"if (character && !event.ctrlKey && !event.altKey && !event.metaKey) {",
+		"for (const modifier of heldModifiers) queueEvent({ kind: 'key', keysym: modifier, pressed: false });",
+		"if (levelModifiers.includes(symbol) && !heldModifiers.delete(symbol)) return;",
+	} {
+		if !strings.Contains(string(script), words) {
+			t.Fatalf("app.js lacks %s", words)
+		}
 	}
 }

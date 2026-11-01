@@ -17,8 +17,6 @@ func TestWorkspaceArguments(t *testing.T) {
 		"workspace plan --file candidate.json --repo /deployment --json",
 		"workspace apply --file candidate.json --expect sha256:review --yes --json",
 		"workspace apply --file candidate.json --expect sha256:review",
-		"workspace marketplace --extension platformio.platformio-ide",
-		"workspace marketplace --extension platformio.platformio-ide --repo /deployment --json",
 	} {
 		if _, err := parseArguments(strings.Fields(command)); err != nil {
 			t.Fatalf("%s: %v", command, err)
@@ -30,9 +28,7 @@ func TestWorkspaceArguments(t *testing.T) {
 		"workspace plan --file candidate.json --scope shared", "workspace plan --file candidate.json --on pc01",
 		"workspace plan --file candidate.json --remove", "workspace plan --file candidate.json --target master",
 		"workspace apply --file candidate.json --expect token --full",
-		"workspace marketplace", "workspace marketplace --file candidate.json --extension a.b",
-		"workspace marketplace --extension a.b --yes", "workspace plan --file candidate.json --extension a.b",
-		"software search --query code --extension a.b",
+		"workspace marketplace --extension a.b", "workspace plan --file candidate.json --extension a.b",
 	} {
 		if _, err := parseArguments(strings.Fields(command)); err == nil {
 			t.Fatalf("invalid command accepted: %s", command)
@@ -81,7 +77,7 @@ func TestWorkspaceCommandReviewAndSaveBoundaries(t *testing.T) {
 	} {
 		t.Run(item.name, func(t *testing.T) {
 			manager := &fakeWorkspaceCommands{
-				plan:   domain.WorkspacePlanReport{SchemaVersion: 1, Operation: "workspace-plan", State: item.planState, ReviewToken: "review", Confirmation: "SAVE"},
+				plan:   domain.WorkspacePlanReport{SchemaVersion: 1, Operation: "workspace-plan", State: item.planState, ReviewToken: "review"},
 				result: domain.WorkspaceApplyReport{SchemaVersion: 1, Operation: "workspace-apply", State: item.resultState},
 			}
 			var stdout, stderr bytes.Buffer

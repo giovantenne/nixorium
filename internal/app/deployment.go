@@ -27,12 +27,21 @@ type DeploymentSource interface {
 
 const deploymentVerificationTimeout = 3 * time.Second
 
+// A computer that has just activated its system may need a few seconds before
+// it answers the host-state check, so a missing answer is asked for again.
+const (
+	deploymentVerificationAttempts  = 3
+	deploymentVerificationRetryWait = 5 * time.Second
+)
+
 func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, expectedRevision, logPath string, progress io.Writer) domain.DeploymentExecutionReport {
 	return m.ExecuteWithProgress(ctx, repository, requested, expectedRevision, logPath, progress, nil)
 }
 
 func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository, requested, expectedRevision, logPath string, output io.Writer, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+	startedAt := m.now().UTC()
 	plan := m.Plan(ctx, repository, requested)
+	reviewedAt := m.now().UTC()
 	report := executionFromPlan(plan, logPath)
 	if plan.HasErrors() {
 		return report
@@ -54,8 +63,14 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Activity: fmt.Sprintf("Building configurations for %d selected computer(s)", len(report.Targets)),
 	})
 	fmt.Fprintf(output, "Deployment revision: %s\nTargets: %s\n\n", report.Revision, report.ColmenaSelector)
-	fmt.Fprintln(output, "==> Building selected configurations with Colmena")
-	if err := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4}, output, observe); err != nil {
+	timing := deploymentTiming{now: m.now, output: output}
+	timing.heading("==> Reviewing the selected computers", startedAt)
+	timing.took("Reviewing", startedAt, reviewedAt)
+	defer func() { timing.total(startedAt) }()
+	timing.begin("==> Building the systems of the selected computers")
+	err := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4}, output, observe)
+	timing.end("Building")
+	if err != nil {
 		report.State = "failed"
 		report.Message = fmt.Sprintf("build failed before any deployment was started: %v", err)
 		return report
@@ -66,7 +81,9 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Activity: "Build completed; revalidating the reviewed revision and targets",
 	})
 
+	timing.begin("\n==> Revalidating the reviewed revision and targets")
 	verified := m.Plan(ctx, repository, requested)
+	timing.end("Revalidating")
 	if verified.HasErrors() {
 		report.State = "failed"
 		report.Phase = domain.DeploymentPhasePreflight
@@ -81,18 +98,38 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		return deploymentExecutionIssue(report, "review", "run deploy plan again and review the new revision and targets")
 	}
 
+	// A computer switched off during the build is left out of the apply and
+	// reported: nothing is started on it, so it never becomes pending work
+	// that blocks the laboratory. Computers that still answer are updated.
+	applyTargets, skipped := answeringDeploymentTargets(verified)
+	report.Skipped = skipped
+	if len(applyTargets) == 0 {
+		report.State = "failed"
+		report.Phase = domain.DeploymentPhasePreflight
+		report.Message = "no selected computer answered after the build; nothing was applied"
+		return report
+	}
+	if len(skipped) > 0 {
+		fmt.Fprintf(output, "\nNot answering after the build, left unchanged: %s\n", strings.Join(skipped, ", "))
+	}
+
 	report.Phase = domain.DeploymentPhaseApply
 	emitDeploymentProgress(observe, domain.DeploymentProgress{
 		Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4,
-		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(report.Targets)),
+		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(applyTargets)),
 	})
-	fmt.Fprintln(output, "\n==> Applying the built configurations with Colmena")
+	timing.begin("\n==> Copying and activating the built systems")
 	// Apply over the addresses that answered just now: during a change of
 	// laboratory network a computer not yet moved is reached on its
 	// previous address.
 	applyPlan := plan
 	applyPlan.Availability = verified.Availability
+	if len(skipped) > 0 {
+		applyPlan.Targets = applyTargets
+		applyPlan.ColmenaSelector = strings.Join(deploymentTargetNames(applyTargets), ",")
+	}
 	applyErr := m.runPhase(ctx, applyPlan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4}, output, observe)
+	timing.end("Applying")
 	var unconfirmed *domain.DeploymentUnconfirmedError
 	report.RecoveryRequired = errors.As(applyErr, &unconfirmed)
 	report.RetrySafe = !report.RecoveryRequired
@@ -101,11 +138,12 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 	}
 	emitDeploymentProgress(observe, domain.DeploymentProgress{
 		Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
-		TargetTotal: len(report.Targets), Activity: "Verifying authenticated client state",
+		TargetTotal: len(applyTargets), Activity: "Verifying authenticated client state",
 	})
-	fmt.Fprintln(output, "\n==> Verifying selected computers through authenticated host state")
+	timing.begin("\n==> Verifying selected computers through authenticated host state")
 	// Local cancellation must not skip the separately time-bounded observations.
-	recordErr := m.verifySuccessfulDeployments(context.WithoutCancel(ctx), &report, output, observe)
+	recordErr := m.verifySuccessfulDeployments(context.WithoutCancel(ctx), &report, applyTargets, output, observe)
+	timing.end("Verifying")
 	if applyErr != nil {
 		report.State = "failed"
 		report.Phase = domain.DeploymentPhaseApply
@@ -130,9 +168,15 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		report.Message = fmt.Sprintf("apply completed, but authenticated reconciliation verified only %d/%d targets; inspect host state and retry from a fresh plan", report.Verification.Verified, report.Verification.Attempted)
 		return report
 	}
+	if len(report.Skipped) > 0 {
+		report.State = "partial"
+		report.Phase = domain.DeploymentPhaseComplete
+		report.Message = fmt.Sprintf("%d computer(s) updated and verified; %s stopped answering after the build and kept their current system", report.Verification.Verified, strings.Join(report.Skipped, ", "))
+		return report
+	}
 	report.Phase = domain.DeploymentPhaseComplete
 	report.State = "completed"
-	report.Message = "all selected targets were built, applied, authenticated, and recorded successfully"
+	report.Message = "The selected computers were updated, checked, and recorded."
 	emitDeploymentProgress(observe, domain.DeploymentProgress{
 		Phase: domain.DeploymentPhaseComplete, Completed: 4, Total: 4,
 		TargetCurrent: report.Verification.Verified, TargetTotal: report.Verification.Attempted,
@@ -141,17 +185,60 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 	return report
 }
 
-func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, report *domain.DeploymentExecutionReport, output io.Writer, observe func(domain.DeploymentProgress)) error {
+// deploymentTiming writes the start time of each step of a client update and
+// how long it took into the private deployment log, using the manager clock.
+type deploymentTiming struct {
+	now     func() time.Time
+	output  io.Writer
+	started time.Time
+}
+
+// begin writes a heading followed by the UTC start time.
+func (t *deploymentTiming) begin(heading string) {
+	t.started = t.now().UTC()
+	t.heading(heading, t.started)
+}
+
+// end writes how long the step started by begin took.
+func (t *deploymentTiming) end(phase string) {
+	t.took(phase, t.started, t.now().UTC())
+}
+
+func (t *deploymentTiming) heading(heading string, at time.Time) {
+	fmt.Fprintf(t.output, "%s (%s)\n", heading, at.Format(time.RFC3339))
+}
+
+func (t *deploymentTiming) took(phase string, started, ended time.Time) {
+	fmt.Fprintf(t.output, "    %s took %s\n", phase, ended.Sub(started).Round(time.Second))
+}
+
+func (t *deploymentTiming) total(started time.Time) {
+	fmt.Fprintf(t.output, "\nTotal time: %s\n", t.now().UTC().Sub(started).Round(time.Second))
+}
+
+func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, report *domain.DeploymentExecutionReport, targets []domain.DeploymentTarget, output io.Writer, observe func(domain.DeploymentProgress)) error {
 	report.Verification = domain.DeploymentVerificationSummary{
-		Attempted: len(report.Targets),
-		Targets:   make([]domain.DeploymentTargetVerification, 0, len(report.Targets)),
+		Attempted: len(targets),
+		Targets:   make([]domain.DeploymentTargetVerification, 0, len(targets)),
 	}
-	hosts := targetHosts(report.Targets)
+	hosts := targetHosts(targets)
 	observed := m.source.CurrentSystems(ctx, hosts, deploymentVerificationTimeout)
+	if observed == nil {
+		observed = map[string]domain.HostSystemProbe{}
+	}
+	for attempt := 1; attempt < deploymentVerificationAttempts; attempt++ {
+		pending := hostsWithoutState(hosts, observed)
+		if len(pending) == 0 || m.sleep(ctx, deploymentVerificationRetryWait) != nil {
+			break
+		}
+		for name, probe := range m.source.CurrentSystems(ctx, pending, deploymentVerificationTimeout) {
+			observed[name] = probe
+		}
+	}
 	availability := m.source.SSHStatus(ctx, hosts, sshProbeTimeout)
 	updates := map[string]domain.LastSuccessfulDeployment{}
 	verifiedAt := m.now().UTC()
-	for index, target := range report.Targets {
+	for index, target := range targets {
 		probe, found := observed[target.Name]
 		verification := domain.DeploymentTargetVerification{
 			Reachability:     availability[target.Name].Reachability,
@@ -175,6 +262,8 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 			}
 		case probe.Revision != report.Revision:
 			verification.Detail = "authenticated host revision differs from the reviewed revision"
+		case target.SharedSystem() && probe.Number != expectedNumber(target.Name):
+			verification.Detail = identityMismatchDetail(probe.Number)
 		default:
 			verification.State = "verified"
 			verification.Detail = ""
@@ -193,8 +282,8 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 		fmt.Fprintln(output)
 		emitDeploymentProgress(observe, domain.DeploymentProgress{
 			Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
-			TargetCurrent: index + 1, TargetTotal: len(report.Targets),
-			Activity: fmt.Sprintf("Checked authenticated state for %d/%d computer(s)", index+1, len(report.Targets)),
+			TargetCurrent: index + 1, TargetTotal: len(targets),
+			Activity: fmt.Sprintf("Checked authenticated state for %d/%d computer(s)", index+1, len(targets)),
 		})
 	}
 	if report.RecoveryRequired {
@@ -257,10 +346,54 @@ func sameDeploymentTargets(left, right []domain.DeploymentTarget) bool {
 type DeploymentManager struct {
 	source DeploymentSource
 	now    func() time.Time
+	sleep  func(context.Context, time.Duration) error
 }
 
 func NewDeploymentManager(source DeploymentSource) *DeploymentManager {
-	return &DeploymentManager{source: source, now: time.Now}
+	return &DeploymentManager{source: source, now: time.Now, sleep: sleepContext}
+}
+
+// sleepContext waits for the duration, or returns the context's error as soon
+// as the context ends.
+func expectedNumber(name string) int {
+	number, _ := domain.ClientNumber(name)
+	return number
+}
+
+// identityMismatchDetail explains why a computer running a shared system is
+// not verified: its identity record names no computer or another one.
+func identityMismatchDetail(recorded int) string {
+	if recorded == 0 {
+		return "the computer reports no identity record; its name and address are not set"
+	}
+	return fmt.Sprintf("the computer's identity record names computer number %d", recorded)
+}
+
+func sleepContext(ctx context.Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+// hostsWithoutState are the hosts whose check returned no result or no system
+// state, except those whose SSH host key changed: asking again cannot fix that.
+func hostsWithoutState(hosts []domain.HostMeta, observed map[string]domain.HostSystemProbe) []domain.HostMeta {
+	var pending []domain.HostMeta
+	for _, host := range hosts {
+		probe, found := observed[host.Name]
+		if probe.HostKeyCondition == domain.HostKeyChanged {
+			continue
+		}
+		if !found || probe.Revision == "" || probe.SystemPath == "" {
+			pending = append(pending, host)
+		}
+	}
+	return pending
 }
 
 func (m *DeploymentManager) Plan(ctx context.Context, repository, requested string) domain.DeploymentPlanReport {
@@ -278,6 +411,10 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 		return deploymentIssue(report, "repository", fmt.Sprintf("resolve path: %v", err))
 	}
 	report.Repository = root
+	if issue, found := flakePinIssue(m.source, root); found {
+		report.Issues = append(report.Issues, issue)
+		return report
+	}
 	meta, err := m.source.LabMeta(ctx, root)
 	if err != nil {
 		report.Issues = append(report.Issues, domain.EvaluationIssue("configuration", "labMeta", err))
@@ -344,6 +481,30 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 		report.State = "ready"
 	}
 	return report
+}
+
+// flakePinConsistencySource is implemented by sources that can compare
+// flake.lock with flake.nix without Nix or network access.
+type flakePinConsistencySource interface {
+	FlakeLockConsistency(string) error
+}
+
+// flakePinIssue refuses early when flake.lock no longer matches flake.nix.
+// The client build uses an immutable copy of the deployment, where Nix cannot
+// rewrite the lock and would fail with a read-only file system error.
+func flakePinIssue(source any, repository string) (domain.ValidationIssue, bool) {
+	checker, ok := source.(flakePinConsistencySource)
+	if !ok {
+		return domain.ValidationIssue{}, false
+	}
+	err := checker.FlakeLockConsistency(repository)
+	if err == nil {
+		return domain.ValidationIssue{}, false
+	}
+	if code, typed := domain.BlockedCodeOf(err); typed {
+		return domain.BlockedIssue("pin", code, err.Error()), true
+	}
+	return domain.ValidationIssue{Field: "pin", Message: err.Error()}, true
 }
 
 // PlanReachable creates a new review for an explicit subset. It neither edits
@@ -415,7 +576,7 @@ func selectDeploymentTargets(hosts []domain.HostMeta, requested string) ([]domai
 	targets := make([]domain.DeploymentTarget, 0, len(names))
 	for _, name := range names {
 		host := available[name]
-		targets = append(targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP, PreviousIP: host.PreviousIP})
+		targets = append(targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP, PreviousIP: host.PreviousIP, Class: host.Class})
 	}
 	selector := strings.Join(names, ",")
 	if requested == "@lab" && len(issues) == 0 {
@@ -440,4 +601,28 @@ func targetHosts(targets []domain.DeploymentTarget) []domain.HostMeta {
 func deploymentIssue(report domain.DeploymentPlanReport, field, message string) domain.DeploymentPlanReport {
 	report.Issues = append(report.Issues, domain.ValidationIssue{Field: field, Message: message})
 	return report
+}
+
+// answeringDeploymentTargets splits a revalidated plan's computers into those
+// whose SSH port answered just before the apply and those that did not.
+func answeringDeploymentTargets(plan domain.DeploymentPlanReport) ([]domain.DeploymentTarget, []string) {
+	answering := reachableDeploymentNames(plan)
+	targets := []domain.DeploymentTarget{}
+	skipped := []string{}
+	for _, target := range plan.Targets {
+		if slices.Contains(answering, target.Name) {
+			targets = append(targets, target)
+		} else {
+			skipped = append(skipped, target.Name)
+		}
+	}
+	return targets, skipped
+}
+
+func deploymentTargetNames(targets []domain.DeploymentTarget) []string {
+	names := make([]string, 0, len(targets))
+	for _, target := range targets {
+		names = append(names, target.Name)
+	}
+	return names
 }

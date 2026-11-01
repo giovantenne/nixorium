@@ -68,7 +68,7 @@ func TestSystemUpdateJourneyRequiresReviewAndUsesSeparateSave(t *testing.T) {
 					t.Fatalf("target=%s allow=%t", target, allow)
 				}
 				progress(domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 1, Total: 2})
-				return domain.UpdatePlanReport{Kind: "package-base", State: "ready", Target: target, Confirmation: "MIGRATE", Diff: domain.GitDiff{Content: "+ reviewed base\n"}, PackageBase: &domain.PackageBaseChange{CurrentChannel: "nixos-26.05", TargetChannel: target}}
+				return domain.UpdatePlanReport{Kind: "package-base", State: "ready", Target: target, Diff: domain.GitDiff{Content: "+ reviewed base\n"}, PackageBase: &domain.PackageBaseChange{CurrentChannel: "nixos-26.05", TargetChannel: target}}
 			},
 			SavePackageBase: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
 				saved++

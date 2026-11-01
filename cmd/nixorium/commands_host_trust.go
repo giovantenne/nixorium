@@ -30,8 +30,8 @@ func parseHostTrustArguments(arguments []string) (options, error) {
 	if err := flags.Parse(arguments[1:]); err != nil {
 		return result, err
 	}
-	if flags.NArg() != 0 || !domain.ValidRemoteHostName(result.host) {
-		return result, errors.New("host-key requires exactly one --host pcNN")
+	if flags.NArg() != 0 || !domain.ValidHostName(result.host) {
+		return result, errors.New("host-key requires exactly one --host with a computer name such as pc07")
 	}
 	if result.subcommand == "plan" && (result.expect != "" || result.yes) {
 		return result, errors.New("--expect and --yes are only valid with host-key apply")
@@ -56,23 +56,15 @@ func runHostTrustCommand(ctx context.Context, repository string, options options
 		}
 		return 0
 	}
-	if plan.ReviewToken != options.expect {
-		fmt.Fprintln(stderr, "Host-key review changed; create a fresh plan.")
+	plan, match := manager.Reviewed(plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "Host-key review changed; create a fresh plan.")
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Host-key apply requires interactive confirmation or --yes.")
-			return 2
-		}
-		approved, err := presentation.ConfirmHostTrust(os.Stdin, stderr, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		if !approved {
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Host-key apply requires interactive confirmation or --yes."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmHostTrust(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.Apply(ctx, plan, options.expect)
 	report.Message = operationRecordMessage(report.Message, report)

@@ -120,8 +120,15 @@ suggestions in `software-catalog.nix`, desktop and shell policy under
 as `hostSoftwarePackages`. The template uses this list to enable Docker, npm
 setup, application favorites, shortcuts, browser policy, VS Code extensions,
 and the site screensaver only when their packages apply to that host. Every
-built-in profile, including Essential, declares the Ghostty and TTE dependencies
-required by the screensaver.
+built-in profile, including Essential, declares the Ghostty and TTE packages
+that switch the screensaver on; its effects come from `ttfx` (`pkgs/ttfx.nix`,
+until nixpkgs ships it) at 30 frames per second. After 30 idle minutes GNOME
+blanks and switches off the screen and the screensaver stops; the session is
+never locked and the computer does not sleep. Every user has a **Caffeine**
+toggle in the quick settings (the Caffeine GNOME Shell extension, enabled by
+`modules/stay-active.nix`): while it is on, or while an application asks GNOME
+to keep the screen on, neither the screensaver nor the blank screen starts.
+It is off at every sign-in.
 Removing a declaration therefore does not leave an upstream launcher or service
 behind.
 
@@ -165,13 +172,23 @@ override, role override, then fallback. `labMeta.network.ifaceName` remains the
 effective controller interface for older management consumers; controller and
 client records also expose their effective interface explicitly.
 
-A host is configured by name only when it is the controller or has a
-`hostIfaceNames` entry or a `clientIfaceName`. `labMeta.clients.hosts[].ifaceExplicit`
-and `labSettings.ifaceExplicit` (passed to every module; absent means `true`)
-state this. Other clients ignore the fallback name: `modules/networking.nix`
-declares a NetworkManager profile `nixorium-lab` for any wired Ethernet device
-(DHCP plus the static lab address, no interface name), disables NetworkManager's
-automatic default profiles on those clients, and `modules/client-internet.nix`
+Every laboratory host, the controller included, gets its address from one
+NetworkManager profile, `nixorium-lab` (`modules/networking.nix`): DHCP plus
+the static laboratory address (and the previous one during a change of
+laboratory network), with no NixOS scripted address and no dhcpcd on the same
+card. Earlier releases gave the controller and named clients a scripted
+address next to NetworkManager and dhcpcd; at boot NetworkManager could
+remove the static address while DHCP kept working. The controller's profile
+is bound to its card, and NetworkManager keeps automatic DHCP on its other
+cards (`no-auto-default=interface-name:<card>`); on clients automatic profiles
+are disabled.
+
+A host's profile is bound to its card by name only when it is the controller
+or has a `hostIfaceNames` entry or a `clientIfaceName`.
+`labMeta.clients.hosts[].ifaceExplicit` and `labSettings.ifaceExplicit` (passed
+to every module; absent means `true`) state this. Other clients ignore the
+fallback name: their profile has no interface name and matches any wired
+Ethernet device, and `modules/client-internet.nix`
 and `modules/firewall.nix` omit `iifname`/`oifname` from their rules
 (`lib/client-internet-rules.nix` and `lib/client-firewall-rules.nix` take
 `interface = null`). With several wired cards, only the first to come up carries
@@ -181,9 +198,9 @@ carries the live address. See ADR 0017.
 
 Clients answer Wake-on-LAN magic packets on their lab card, so **Switch on**
 can start them (see [Classroom view](#classroom-view)); the controller does
-not. A client configured by type sets `ethernet.wake-on-lan=64` (magic packet)
-in the `nixorium-lab` profile, which NetworkManager applies to the card each
-time it activates the profile. A client configured by name gets a udev rule
+not. Every client sets `ethernet.wake-on-lan=64` (magic packet) in the
+`nixorium-lab` profile, which NetworkManager applies to the card each time it
+activates the profile. A client configured by name also gets a udev rule
 that runs `ethtool -s <interface> wol g` when that card appears, matching the
 final interface name, or the kernel name when nothing renames it. The NixOS
 `networking.interfaces.<name>.wakeOnLan` option is not used: its systemd
@@ -193,6 +210,47 @@ setting takes effect from the first restart after the client update. The
 computer's firmware must also allow it (BIOS/UEFI options often called "Wake
 on LAN" or "Power on by PCI-E"), and the computer must keep standby power: a
 switched-off power strip or a power cut disarms it.
+
+## Client classes and identity
+
+Computers with the same module groups, managed software and network interface
+form a class and share one system, so an update or a network installation
+builds it once instead of once per computer. The controller, every host in
+`hostModules` and every host in `updateValidationHosts` is a class of one and
+keeps its own system. A class of one is named after its computer (`pc03`); a
+class with several computers is `shared-1`, `shared-2` and so on, numbered by
+its first computer. `nixosConfigurations.pc01` and the other computers of a
+shared class are aliases of that one system. `labMeta.clients.classes` lists
+the classes and `labMeta.clients.hosts[].class` names the class of each
+computer.
+
+Each computer keeps its name and address in `/var/lib/nixorium/identity.json`,
+which holds only its number, for example `{"schemaVersion":1,"number":3}`.
+The system of a class carries the inventory (number, name, address and
+previous address of every computer, `labSettings.clientIdentities`). At
+activation a shared system reads the record, writes
+`/run/nixorium/identity.env` with the name, number and addresses, and sets the
+running host name. The `nixorium-lab` network profile takes the address from
+that file, so every computer of the class uses the same profile. DHCP never
+renames a computer. A duplicated number is refused by address conflict
+detection and retried only a few times.
+
+The update writes the record over SSH before it switches a computer to a
+shared system, and the installers (network and USB/SSH) write it before the
+first start. A record that names another computer is never overwritten: the
+update leaves that computer unchanged and reports "identity record names
+another computer". A computer without a valid record gets no laboratory
+address, and `nixorium-identity.service` fails with the message "This computer
+has no Nixorium identity". See [Troubleshooting](troubleshooting.md#this-computer-has-no-nixorium-identity).
+`nixorium-host-state` reports the number of a valid record on a third line,
+and the update verifies a shared system by it.
+
+A private module that needs a computer's name or address (`hostName`,
+`hostIp`) cannot run in a shared system. List that computer in `hostModules`
+or `updateValidationHosts` to give it its own system. To roll back, choose the
+previous generation in the boot menu: a per-host system from before the change
+starts with its own name and address and ignores the record. The decision is
+recorded in [ADR 0033](adr/0033-client-classes.md).
 
 ### Laboratory network transition
 
@@ -278,16 +336,14 @@ accepted. This workflow does not depend on PXE services or alter the
 controller's static address.
 
 The declared client interface must carry the reviewed live IPv4 address.
-Connect Wi-Fi in the live ISO before the SSH workflow and arrange persistent
-system connectivity separately; live profiles and credentials are not copied.
-An installed client uses a wired Ethernet card unless a `clientIfaceName` or
-`hostIfaceNames` entry (see [Network interfaces](#network-interfaces)) names
-its interface; with the name of a wireless card, the lab address is applied to
-that card.
-After reboot, the configured static client address must be reachable for
-verification. Keep Wi-Fi secrets out of Git and the Nix store. PXE may be
-incompatible with Wi-Fi depending on hardware, firmware, and network setup;
-that restriction is not part of USB/SSH transport.
+The laboratory network is wired: the `nixorium-lab` NetworkManager profile is
+an Ethernet profile, so a Wi-Fi card never carries the laboratory address, and
+the settings refuse a Wi-Fi card name (`wl…`) for any interface.
+Without an explicit name (see [Network interfaces](#network-interfaces)) the
+live ISO may reach the controller over Wi-Fi for the installation itself; the
+installed client then uses its wired card, which must be connected before the
+restart because verification needs the configured static address. Live Wi-Fi
+profiles and credentials are not copied. PXE and Wake-on-LAN need the cable.
 
 `packages.x86_64-linux.remoteInstallerBundle` contains the target-independent
 remote helper, metadata, and Disko programs. It deliberately excludes a client
@@ -396,7 +452,8 @@ installed by the reset student account are intentionally ephemeral.
 
 ## Classroom view
 
-`lab.classroomView` in `lab-settings.json` (on unless set to `false`) installs the
+`lab.classroomView` in `lab-settings.json` (on unless set to `false`; the administrator
+changes it in Maintenance → Change settings → Classroom view) installs the
 classroom view agent on client computers only. It is a systemd user service
 started with the graphical session; it listens on
 `$XDG_RUNTIME_DIR/nixorium-classroom.sock` (mode 0600) and opens no network
@@ -427,8 +484,7 @@ or not reachable** instead of its last picture; other pictures that are no
 longer live (nobody signed in, for example) are dimmed. The page asks for the
 cards every two seconds and keeps asking when the controller does not answer,
 giving up on a request after 15 seconds; after two failed requests in a row
-the summary says **Reconnecting…**. **Refresh** asks at once, closes the
-notice of the last action and draws every card again.
+the summary says **Reconnecting…**.
 
 A computer that answers over SSH with someone signed in, but whose agent does
 not answer (the socket is missing, or the agent is frozen and gives no answer
@@ -436,7 +492,7 @@ to the relay's own hello within 3 seconds), shows a warning sign over its
 dimmed last picture and **Monitoring stopped on this PC**. The login screen does not count as someone signed in
 (only a session of class `user` does), so a computer waiting at it says
 **Nobody is signed in**. The same words explain the computer wherever an
-action skips it (Lock, Send files, Share screen, Collect from desktop and
+action skips it (Lock, Share files, Share screen, Collect from students' desktops and
 Save screenshot), and a result notice counts such computers apart, as
 "monitoring stopped on this PC". The agent restarts by itself: its user unit
 is `Restart=always` with a one-second delay and no start limit, and both
@@ -463,6 +519,20 @@ closing the view, or leaving the browser window releases every key and
 button still pressed. Input is accepted only as JSON from the page itself
 (same Origin, session cookie), at most 128 events per message, and only for
 a computer currently open in the large view.
+
+While controlling, the clipboard is shared as plain text in both directions.
+Ctrl+V (or Shift+Insert) takes the text of the teacher's own clipboard from the
+browser's paste event, the worker hands it to the agent, which offers it to
+the student's session through the remote desktop session's clipboard
+(`EnableClipboard`, `SetSelection`, and `SelectionTransfer` answered with
+`SelectionWrite`), and the page then types Ctrl+V there, so the keystroke is
+not sent twice. After Ctrl+C or Ctrl+X the page asks for the text the student
+copied (`SelectionOwnerChanged`, `SelectionRead`) and writes it to the
+teacher's clipboard; a short note in the window bar says "Copied from" or
+"Pasted into" the computer. The clipboard is turned on when control starts and
+off when it ends, the window closes or the connection drops; only the text
+formats are offered or read, at most 64 KiB (NUL removed), only for the
+computer under control and not locked, and the text is never logged or kept.
 
 Check boxes on the overview select computers for **Block/Allow Internet**,
 **Lock/Unlock**, **Restart** and **Shut down**; a computer's window offers the
@@ -572,8 +642,12 @@ lock is a classroom aid, not a security boundary. Locking also works from
 not take the administrative operation lock, since it changes no system
 state.
 
-**Send files** sends a file, or a folder with its name and contents, chosen
-by whoever uses the controller. The classroom service runs as `admin` and cannot read that
+The page's **Share files** menu (toolbar) holds **Send a folder…**,
+**Send a file…** and **Collect from students' desktops**, in this order, and so does a
+computer's **Actions** menu.
+
+Sending a file, or a folder with its name and contents, is chosen by whoever
+uses the controller. The classroom service runs as `admin` and cannot read that
 user's home, so Nixorium starts the page's browser through a small helper
 running as the user; while the classroom browser is open, the helper waits
 on the classroom socket. When the page asks, the service gives that user's
@@ -617,8 +691,8 @@ the helper downloads the picture once through the browser instead
 minutes. Only the save's own user (the socket's kernel peer credentials) may
 list, read or end a save, and the service itself never writes into a home.
 
-**Collect from desktop** (beside Send files in the toolbar, and in a
-computer's Actions menu) is the reverse of Send files. The review lists each
+**Collect from students' desktops** (in **Share files** in the toolbar, and in a
+computer's Actions menu) is the reverse of sending files. The review lists each
 selected computer's desktop; a computer whose agent predates collecting is
 left out and named. After the one confirmation, the service reads at most
 four computers at a time with `collect.list` (the regular files and folders
@@ -690,36 +764,9 @@ shows the teacher's screen, and then Close is not offered. A computer has one
 message at a time (a new one replaces the previous); it belongs to the
 session, not to the controller's connection, and logging out clears it.
 
-**Exam mode** (toolbar, selected computers) opens a dialog with three check
-boxes, all on: block Internet, lock the screens now (until you unlock them),
-and show a message (default "Exam in progress. Wait for the teacher.",
-editable; it stays until the screens are unlocked). After one combined review
-and one button such as "Start exam mode on 12 computers", the page applies
-three existing reviewed actions in this order: Internet block, lock, message.
-Each keeps its own review that applies once, and each computer's result lists
-the three steps. The page composes the chain and the computers keep no exam
-state. The classroom service remembers, in memory only, which steps it applied
-for exam mode on each computer and since when: the page tags each step of the
-chain, and a step counts once the computer confirmed it. The service sends
-that with the list of computers (`exam`), so a page opened later, and another
-user's page, show the same: the cards say "Exam mode" and the button reads
-**End exam mode**. The service also drops what it can see end: nobody signed in
-ends the lock and the message, an Internet state that reads as allowed again
-ends that step, and a restart or shutdown from the page ends all of them. A
-review lasts at most five minutes, so close to its end the page makes the
-reviews again before it starts, and asks again when the computers that qualify
-changed: an expired review never leaves exam mode half started. **End exam
-mode** (the same button, when a selected computer is in exam mode) reverses the
-steps that are in effect, in this order: remove the message, unlock, allow
-Internet. Then it opens the usual **Collect from desktop** review for the same
-computers; nothing is collected unless the teacher confirms it. Restarting the
-classroom service (`nixorium-classroom.service`) forgets exam mode while the
-computers stay locked and blocked: then use **Remove message**, **Unlock** and
-**Allow Internet**.
-
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a
-frame and stops after 30 seconds without requests. While it runs, GNOME shows
+frame and stops after 30 seconds without requests, or as soon as the controller's last channel closes. While it runs, GNOME shows
 its screen sharing indicator in the top bar; the
 `nixorium-classroom@nixorium.org` Shell extension, enabled in every client
 session, keeps that indicator visible but removes its stop button, so a
@@ -822,6 +869,25 @@ installer so client installation needs no second checkout.
 | `updateValidationHosts` | Extra generated hosts with private host-conditional policy; included in base-update builds and offline equivalence |
 | `netbootModules` | Additional modules applied only to the PXE environment |
 
+Every module of a deployment receives these special arguments:
+
+| Argument | Value |
+|---|---|
+| `isController` | `true` on the controller, `false` on every client computer |
+| `nixoriumRole` | `"controller"` or `"client"` |
+| `hostName` | The generated host name, for example `pc01`; an error in a system shared by several computers |
+| `hostIp` | The host's static address on the laboratory network; an error in a shared system |
+| `nixoriumClass` | `{ id, shared, members, representative }` of the system's class of computers |
+| `hostSoftwarePackages` | The host's effective managed package IDs |
+
+Test the computer's role with `isController` or `nixoriumRole`, not by comparing
+`hostName` with `labSettings.masterHostName`; the built-in modules do the same.
+Use `hostName` only for a real per-host difference, and declare it through
+`hostModules` or `updateValidationHosts`: a computer listed there has its own
+system, where `hostName` and `hostIp` have their values. In a system shared by
+a class of computers they stop the evaluation with an error naming the
+computers and this remedy. See [Client classes and identity](#client-classes-and-identity).
+
 `groupModules` defaults to `{}` and refers to existing `clientGroups`:
 
 ```nix
@@ -857,9 +923,6 @@ Python and PHP toolchains, `mysql84` and `mysql-workbench`. Where `mysql84` is
 selected, the site development module runs a teaching MySQL server that
 listens on loopback only, leaves `root` without a password and discards every
 database at boot; where `php` is selected it adds a PHP build with Xdebug.
-Where `apacheHttpd` is selected it runs Apache with that PHP as the student
-account, on loopback only, serving the student's `~/public_html` (recreated
-empty after the boot reset) with `.htaccess` overrides and folder listings.
 The controller management module also installs Git independently of profile
 selection, and the packaged Nixorium command carries it in its runtime PATH.
 Global npm uses each user's `~/.local/npm`, which precedes the system PATH.
@@ -983,18 +1046,19 @@ reconstruction. Evaluation and saving do not activate a system or reset a home.
 
 A Marketplace pin replaces a packaged extension with the same identifier. The
 controller fetches the pinned bytes when it builds the seed; clients receive
-the result like any package. `nixorium workspace marketplace --extension
-<publisher.name>` (and `m`/`u` in the TUI) asks the public gallery for the
-newest stable Linux version the pinned VS Code accepts, downloads it into the
-controller's Nix store under the fetcher's own name so later builds work
-offline, and reports its dependencies and any native programs. That command
-and the gallery request use the controller's Internet access only when invoked;
-nothing is contacted at build review, reset or login. Pins do not change with
-package-base updates: check them with `u` after an editor update.
+the result like any package. Assistant adds extensions and Marketplace pins on
+request: it asks the public gallery for the newest stable Linux version the
+pinned VS Code accepts, downloads it into the controller's Nix store under the
+fetcher's own name so later builds work offline, and reports its dependencies
+and any native programs. The gallery request uses the controller's Internet
+access only when made; nothing is contacted at build review, reset or login.
+Pins do not change with package-base updates: ask Assistant to check them after
+an editor update. The student workspace screen and `nixorium workspace` keep
+existing extensions and pins when they save other preferences.
 
 Package search accepts `vscode-extensions.<text>` and then matches
 `publisher.name` across all publishers, listing only extensions selectable by
-their lowercase ID. The TUI uses it for extension search.
+their lowercase ID.
 
 The immutable seed combines supported preferences with a neutral shell/Git/XDG
 scaffold. XDG folders use stable English names. It does not copy a live home,
@@ -1032,8 +1096,15 @@ Reset success records bind the seed, user and boot ID under the root-only
 `/var/lib/home-snapshots/.workspace-reset` directory. They are not fleet status
 and are not currently consumed by the TUI.
 
-An incomplete attempt leaves `pending.json` and recovery data, blocks normal
-login and refuses subsequent attempts, including after reboot. The root-only helper is not an interactive reset or
+An attempt records its phase in `pending.json`. A refusal before the original
+home changes (for example a student-owned process) removes that attempt's own
+work, so the next boot simply tries again. An interruption, such as a power
+loss, is recovered automatically at the next boot: before the read-only
+snapshot exists the reset starts again; after it, the reset completes from
+that snapshot and publishes it, so the student's files are kept. If that
+single automatic attempt fails too (`recovery.json`), or the evidence is
+unknown or inconsistent, the computer stays at the login barrier until an
+administrator inspects it. The root-only helper is not an interactive reset or
 recovery command. Inspect the `home-reset.service` journal and preserve the
 private evidence before administrator-led recovery; never delete the marker
 or rerun the reset just to clear an error. Snapshot recovery, external backups
@@ -1060,8 +1131,11 @@ subscription, consent, confined tools and reviewed local-save workflow.
 `nixoriumHostClasses` is a cheap `mkLab` output: sorted records with
 `representative` and `members`, covering every host exactly once. The controller,
 `hostModules` hosts and `updateValidationHosts` are singleton classes; remaining
-clients group by applicable software, interface and non-empty module groups. Private modules branching
-on `networking.hostName` must declare exceptional hosts through those inputs.
+clients group by applicable software, interface and non-empty module groups.
+The same classes decide which computers share a system (see
+[Client classes and identity](#client-classes-and-identity)). Private modules
+branching on `networking.hostName` must declare exceptional hosts through those
+inputs.
 Assistant evaluates representatives and conservatively includes hosts whose
 assigned representative changes, even when their own system is unchanged.
 
@@ -1071,8 +1145,9 @@ The upstream keeps its standalone example evaluable while private deployments
 consume `lib.mkLab`. Important generated outputs include:
 
 - `nixosConfigurations.<host>` for the controller, clients, and netboot system;
-- Colmena deployment metadata and target groups;
-- `labMeta` for non-sensitive operational identity and network data;
+  the clients of a shared class are aliases of one system;
+- `labMeta` for non-sensitive operational identity, network and class data
+  (`clients.hosts[].class`, `clients.classes`);
 - `deploymentStatus` for readiness blockers;
 - `nixoriumSoftware` for the supported pinned catalog, evaluated scopes, and managed declarations;
 - `nixoriumSoftwarePresets` for the normalized optional profile catalog, or `null` when a deployment does not provide one;

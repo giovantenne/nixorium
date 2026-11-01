@@ -497,6 +497,9 @@ func TestAssistantRunnerAdvertisesPrefetchAndNamesItsHost(t *testing.T) {
 	if !slices.Contains(strings.Split(headers[0], ","), "settings_v1") {
 		t.Fatal("settings_v1 not advertised", headers)
 	}
+	if !slices.Contains(strings.Split(headers[0], ","), "settings_v2") {
+		t.Fatal("settings_v2 not advertised", headers)
+	}
 	if !slices.Contains(activities, "Downloading downloads.example.org to compute its hash") {
 		t.Fatal(activities)
 	}

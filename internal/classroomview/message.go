@@ -22,6 +22,25 @@ const (
 	CodeMessageUnavailable = "message-unavailable"
 )
 
+// A short notice tells the student what the teacher just did: notice.show
+// carries Notice, one of the kinds below (never text, so the wording stays in
+// the student's own extension), and is answered by notice.shown. A notice
+// disappears by itself after a few seconds. Agents that predate notices
+// answer CodeUnsupported.
+const (
+	TypeNotice      = "notice.show"
+	TypeNoticeShown = "notice.shown"
+	// NoticeScreenshot: the teacher saved a picture of the screen.
+	NoticeScreenshot = "screenshot"
+	// NoticeCollect: the teacher collected the files on the desktop.
+	NoticeCollect = "collect"
+)
+
+// ValidNotice reports whether kind is a notice the agent can show.
+func ValidNotice(kind string) bool {
+	return kind == NoticeScreenshot || kind == NoticeCollect
+}
+
 // Limits of a message and its duration. A message stays until the student
 // closes it when Seconds is 0 (the Close button appears after
 // MessageCloseSeconds), disappears after Seconds, or, with UntilUnlock,

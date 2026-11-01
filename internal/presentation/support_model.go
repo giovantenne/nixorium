@@ -46,7 +46,7 @@ func (model dashboardModel) openSupportPreview() (tea.Model, tea.Cmd) {
 	model.support.snapshot = domain.SupportSnapshot{}
 	model.support.result = domain.SupportExportResult{}
 	model.support.scroll = 0
-	model.pageScroll = 0
+	model.navigation.pageScroll = 0
 	model.message = ""
 	model.screen = dashboardSupport
 	model.busy = "Collecting local diagnostics; no build or upload"
@@ -138,7 +138,9 @@ func (model dashboardModel) updateSupportKey(key tea.KeyPressMsg) (tea.Model, te
 	return model, nil
 }
 
-func (model dashboardModel) supportViewportHeight() int { return max(3, model.height-16) }
+func (model dashboardModel) supportViewportHeight() int {
+	return max(3, model.height-ctaRows(model.height)-16)
+}
 
 func (model dashboardModel) supportLines() []string {
 	width := min(116, max(20, model.width-6))

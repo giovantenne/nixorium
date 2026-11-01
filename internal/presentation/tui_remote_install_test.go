@@ -288,8 +288,8 @@ func TestUSBInstallPasswordConsumesGlobalShortcutCharacters(t *testing.T) {
 	if model.screen != dashboardUSBInstall || model.installation.remote.stage != remoteInstallPassword {
 		t.Fatal("password shortcut characters left the password form")
 	}
-	if model.helpOpen || model.installation.remote.password != "q?" {
-		t.Fatalf("help open=%t password=%q", model.helpOpen, model.installation.remote.password)
+	if model.navigation.helpOpen || model.installation.remote.password != "q?" {
+		t.Fatalf("help open=%t password=%q", model.navigation.helpOpen, model.installation.remote.password)
 	}
 }
 
@@ -617,5 +617,94 @@ func TestUSBInstallKeepsTheConfiguredNetworkCardWhenItMatches(t *testing.T) {
 	next, _ := model.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "finalize", response: response})
 	if stage := next.(dashboardModel).installation.remote.stage; stage != remoteInstallSelectDisk {
 		t.Fatalf("matching card left disk selection: stage %d", stage)
+	}
+}
+
+func TestUSBInstallNeverSavesAWiFiCard(t *testing.T) {
+	response := remoteTUITestPreparedResponse("prepared")
+	response.Session.Preparation.Facts.Interfaces = []domain.RemoteNetworkInterface{{Name: "wlp2s0", Addresses: []string{"192.0.2.20"}}}
+	model := dashboardModel{
+		width: 120, height: 30, screen: dashboardUSBInstall,
+		installation: installationModel{remote: remoteInstallationModel{stage: remoteInstallBootstrap, host: "pc01", operationID: remoteTUITestOperationID, address: "192.0.2.20"}},
+	}
+	model.actions = DashboardActions{
+		RemoteInstallRequest: func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+			t.Fatal("a Wi-Fi card started a request")
+			return domain.RemoteInstallResponse{}, nil
+		},
+	}
+	next, _ := model.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "finalize", response: response})
+	model = next.(dashboardModel)
+	if model.installation.remote.stage != remoteInstallInterfaceMismatch {
+		t.Fatalf("stage=%d", model.installation.remote.stage)
+	}
+	view := model.View().Content
+	for _, expected := range []string{"through the Wi-Fi card wlp2s0", "The laboratory needs the cable", "Connect enp1s0", "No disk has been touched"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("Wi-Fi view omits %q:\n%s", expected, view)
+		}
+	}
+	if strings.Contains(view, "Use wlp2s0") {
+		t.Fatalf("Wi-Fi view offers to save the card:\n%s", view)
+	}
+	if _, command := model.updateRemoteInstallKey(tea.KeyPressMsg{Code: tea.KeyEnter}); command != nil {
+		t.Fatal("Enter saved the Wi-Fi card")
+	}
+}
+
+func TestUSBInstallReopenedSessionShowsTheCardScreen(t *testing.T) {
+	response := remoteTUITestPreparedResponse("prepared")
+	response.Session.Preparation.Facts.Interfaces = []domain.RemoteNetworkInterface{{Name: "wlp2s0", Addresses: []string{"192.0.2.20"}}}
+	model := dashboardModel{width: 120, height: 30, screen: dashboardUSBInstall, installation: installationModel{remote: remoteInstallationModel{stage: remoteInstallBootstrap, operationID: remoteTUITestOperationID}}}
+	next, _ := model.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "reconcile", response: response})
+	model = next.(dashboardModel)
+	if model.installation.remote.stage != remoteInstallInterfaceMismatch || model.installation.remote.host != "pc01" {
+		t.Fatalf("stage=%d host=%q", model.installation.remote.stage, model.installation.remote.host)
+	}
+	if view := model.View().Content; !strings.Contains(view, "through the Wi-Fi card wlp2s0") {
+		t.Fatalf("reopened session view:\n%s", view)
+	}
+	response = remoteTUITestPreparedResponse("prepared")
+	response.Session.Preparation.Facts.Interfaces = []domain.RemoteNetworkInterface{{Name: "enp1s0", Addresses: []string{"192.0.2.20"}}}
+	next, _ = dashboardModel{width: 120, height: 30, screen: dashboardUSBInstall}.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "reconcile", response: response})
+	if stage := next.(dashboardModel).installation.remote.stage; stage != remoteInstallResult {
+		t.Fatalf("matching card left the result: stage %d", stage)
+	}
+}
+
+func TestUSBInstallReviewAsksForTheCableAfterAWiFiInstallation(t *testing.T) {
+	host := domain.RemoteInstallHost{Name: "pc01", Interface: "wlp2s0", StaticIP: "10.0.0.1"}
+	if got := remoteInstallAddressAfterwards(host); !strings.Contains(got, "10.0.0.1 on the wired card") {
+		t.Fatalf("address afterwards = %q", got)
+	}
+	host.Interface = "enp1s0"
+	if got := remoteInstallAddressAfterwards(host); got != "10.0.0.1 on enp1s0" {
+		t.Fatalf("address afterwards = %q", got)
+	}
+}
+
+func TestUnescapeUdevShowsReadableDiskNames(t *testing.T) {
+	for input, want := range map[string]string{
+		`VBOX\x20HARDDISK`: "VBOX HARDDISK",
+		`Samsung\x20SSD `:  "Samsung SSD",
+		`plain`:            "plain",
+		`bad\xZZ`:          `bad\xZZ`,
+		`end\x2`:           `end\x2`,
+	} {
+		if got := unescapeUdev(input); got != want {
+			t.Errorf("unescapeUdev(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestJoinNonEmptyLeavesNoDanglingSeparator(t *testing.T) {
+	if got := joinNonEmpty(" / ", "VB123", ""); got != "VB123" {
+		t.Errorf("serial only = %q", got)
+	}
+	if got := joinNonEmpty(" / ", "", "eui.1"); got != "eui.1" {
+		t.Errorf("wwn only = %q", got)
+	}
+	if got := joinNonEmpty(" / ", "VB123", "eui.1"); got != "VB123 / eui.1" {
+		t.Errorf("both = %q", got)
 	}
 }

@@ -39,6 +39,9 @@ type BackupReport struct {
 	PrivateKeys   []string          `json:"privateKeys"`
 	Message       string            `json:"message,omitempty"`
 	Issues        []ValidationIssue `json:"issues"`
+	// Previous is where the lab in use before a restored lab took its place
+	// was kept.
+	Previous string `json:"previous,omitempty"`
 }
 
 func (r BackupReport) HasErrors() bool {
@@ -57,3 +60,7 @@ type BackupRecord struct {
 
 // RecoveryBackupDue is reported while no recent backup exists.
 const RecoveryBackupDue = "backup-due"
+
+// BackupNeverMadeReason is the backup reminder of a laboratory that has never
+// been backed up, reported under its own next step (BACKUP-NONE).
+const BackupNeverMadeReason = "No backup is recorded. Backup is optional: Maintenance → Back up lab saves an encrypted file (for example on a USB drive) or pushes to a private Git repository."

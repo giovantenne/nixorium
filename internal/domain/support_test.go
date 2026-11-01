@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -55,7 +56,7 @@ func TestSupportSnapshotClassification(t *testing.T) {
 func TestSupportGuidanceUsesOnlyStaticRoutes(t *testing.T) {
 	input := supportFixture()
 	input.Doctor.Findings = nil
-	for _, id := range SupportFindingIDs() {
+	for id := range supportGuides {
 		input.Doctor.Findings = append(input.Doctor.Findings, Finding{ID: id, Level: LevelWarning, Remediation: "SECRET"})
 		if SupportFindingGuide(id) == "" {
 			t.Fatalf("missing route for %s", id)
@@ -72,7 +73,7 @@ func TestSupportGuidanceUsesOnlyStaticRoutes(t *testing.T) {
 	if err := json.Unmarshal([]byte(snapshot.JSON()), &report); err != nil {
 		t.Fatal(err)
 	}
-	if report.GuidanceVersion != SupportGuidanceVersion || len(report.Doctor.Findings) != len(SupportFindingIDs()) {
+	if report.GuidanceVersion != SupportGuidanceVersion || len(report.Doctor.Findings) != len(supportGuides) {
 		t.Fatal("incomplete guidance catalog")
 	}
 	for _, finding := range report.Doctor.Findings {
@@ -252,4 +253,29 @@ func FuzzSupportSnapshotPrivateStrings(f *testing.F) {
 			t.Fatal("private text changed shared output")
 		}
 	})
+}
+
+func TestSupportGuidesPointToTroubleshootingHeadings(t *testing.T) {
+	guide, err := os.ReadFile("../../docs/troubleshooting.md")
+	if os.IsNotExist(err) {
+		t.Skip("documentation is not part of this source tree")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id := range supportGuides {
+		path, fragment, ok := strings.Cut(SupportFindingGuide(id), "#")
+		if !ok || path != "docs/troubleshooting.md" || fragment == "" {
+			t.Fatalf("invalid static guide for %s", id)
+		}
+		found := false
+		for _, line := range strings.Split(string(guide), "\n") {
+			if strings.HasPrefix(line, "## ") && strings.Join(strings.Fields(strings.ToLower(strings.TrimPrefix(line, "## "))), "-") == fragment {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s points to a missing guide fragment: %s", id, fragment)
+		}
+	}
 }

@@ -61,6 +61,7 @@ type assistantModel struct {
 	labName                      textinput.Model
 	initialized                  bool
 	changedFiles                 int
+	unfinished, turnAdmitted     bool
 	review                       assistantReviewModel
 	state                        string
 	input                        textarea.Model
@@ -124,6 +125,7 @@ type assistantStreamMsg struct {
 	err          error
 	result       *domain.AssistantTurnResult
 	changedFiles int
+	changedErr   error
 	conversation domain.AssistantConversation
 }
 
@@ -163,7 +165,7 @@ func newAssistantModel() assistantModel {
 	labName.Prompt = "› "
 	labName.Placeholder = "For example Lab 2 – Informatica"
 	labName.CharLimit = assistantLabNameLimit
-	return assistantModel{initialized: true, state: "chat", input: input, code: code, reportComment: comment, labName: labName}
+	return assistantModel{initialized: true, state: "chat", sharing: true, input: input, code: code, reportComment: comment, labName: labName}
 }
 
 func (model dashboardModel) openAssistant() (tea.Model, tea.Cmd) {
@@ -238,6 +240,10 @@ func (model dashboardModel) assistantAccess(ctx context.Context, id uint64, acce
 	}
 	if result.err == nil && actions.ReadSharing != nil {
 		result.sharing, result.err = actions.ReadSharing()
+	}
+	if result.err == nil && !result.consent {
+		// Saving is pre-selected On on the consent screen; the administrator can switch it off.
+		result.sharing = true
 	}
 	if result.err != nil || !result.consent {
 		return result
@@ -342,6 +348,11 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 		if message.conversation.ID != "" {
 			model.assistant.conversation = message.conversation
 		}
+		// Only an admitted turn can change the proposal; one refused before it
+		// started leaves the previous state as it was.
+		if model.assistant.turnAdmitted {
+			model.assistant.unfinished = message.result == nil || message.result.Outcome != "final"
+		}
 		if message.result != nil {
 			if model.assistant.summary == "" && message.result.Summary != "" {
 				model.assistant.appendSummary(message.result.Summary)
@@ -359,6 +370,9 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			model = updated.(dashboardModel)
 			return model, model.refreshAssistantAccount()
 		}
+		if message.changedErr != nil {
+			model.message = "Could not count the files changed in this session."
+		}
 		return model, model.refreshAssistantAccount()
 	}
 	event := message.event
@@ -370,6 +384,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 	}
 	switch event.Type {
 	case "turn_started":
+		model.assistant.turnAdmitted = true
 		model.assistant.input.Reset()
 	case "transcript_size":
 		model.assistant.maxRequestBytes = event.MaxRequestBytes
@@ -611,6 +626,7 @@ func (model dashboardModel) startAssistantRunner() (tea.Model, tea.Cmd) {
 	actions := model.actions.AssistantService
 	conversationID := model.assistant.conversation.ID
 	model.assistant.canReport = false
+	model.assistant.turnAdmitted = false
 	model.assistant.streamed, model.assistant.summary = "", ""
 	model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "user", text: model.assistant.input.Value()})
 	model.assistant.historyScroll = 0
@@ -650,11 +666,12 @@ func (model dashboardModel) finishAssistantPrepared(message assistantPreparedMsg
 				}
 			})
 			changedFiles := 0
+			var changedErr error
 			if actions.ChangedFiles != nil {
-				changedFiles, _ = actions.ChangedFiles(message.conversation.ID)
+				changedFiles, changedErr = actions.ChangedFiles(message.conversation.ID)
 			}
 			select {
-			case events <- assistantStreamMsg{id: id, done: true, result: &result, changedFiles: changedFiles, conversation: message.conversation, err: err}:
+			case events <- assistantStreamMsg{id: id, done: true, result: &result, changedFiles: changedFiles, changedErr: changedErr, conversation: message.conversation, err: err}:
 			case <-ctx.Done():
 			}
 		}()

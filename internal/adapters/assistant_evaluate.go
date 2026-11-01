@@ -162,9 +162,12 @@ var assistantBaseCommit = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
 const assistantNeedsUpdate = "Update Nixorium in this deployment before using Assistant."
 
 func EvaluateAssistantCandidate(ctx context.Context, workspace *AssistantWorkspace) (domain.AssistantEvaluation, error) {
-	return evaluateAssistantCandidate(ctx, workspace, runBoundedNix)
+	return evaluateAssistantCandidate(ctx, workspace, runBoundedNix, runIsolatedNix)
 }
-func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run assistantNixRunner) (result domain.AssistantEvaluation, err error) {
+
+// evaluateAssistantCandidate evaluates the committed base with run and the
+// candidate, which holds the model's changes, with isolated (no network).
+func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run, isolated assistantNixRunner) (result domain.AssistantEvaluation, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	result.ChangedHosts = []string{}
@@ -186,12 +189,17 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 			result.Error = assistantEvaluationError(err.Error())
 		}
 	}()
+	candidateRef := ""
 	evaluate := func(ref string, apply string, target any) error {
 		args := []string{"eval", "--json", "--no-write-lock-file", "--no-update-lock-file", "--option", "allow-import-from-derivation", "false", ref}
 		if apply != "" {
 			args = append(args, "--apply", apply)
 		}
-		data, runErr := run(ctx, 1024*1024, args...)
+		runner := run
+		if candidateRef != "" && strings.HasPrefix(ref, candidateRef+"#") {
+			runner = isolated
+		}
+		data, runErr := runner(ctx, 1024*1024, args...)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -288,7 +296,7 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 	if _, err = resetGit(ctx, candidate, nil, 1024*1024, "add", "-A"); err != nil {
 		return result, err
 	}
-	candidateRef := (&url.URL{Scheme: "git+file", Path: candidate}).String()
+	candidateRef = (&url.URL{Scheme: "git+file", Path: candidate}).String()
 	var candidateClasses []assistantHostClass
 	if err = evaluate(candidateRef+"#nixoriumHostClasses", "", &candidateClasses); err != nil {
 		return result, err

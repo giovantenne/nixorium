@@ -3,6 +3,7 @@ package presentation
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
@@ -145,9 +146,14 @@ func tuiShortcut(value string, darkBackground bool) string {
 	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).controls).Render(value)
 }
 
+// tuiSpinnerFrames is four frames a second instead of ten: without a graphics
+// card each frame makes the terminal redraw the whole window on the CPU, which
+// took more than a processor away from long builds.
+var tuiSpinnerFrames = spinner.Spinner{Frames: spinner.Dot.Frames, FPS: time.Second / 4}
+
 func newTUISpinner(darkBackground bool) spinner.Model {
 	return spinner.New(
-		spinner.WithSpinner(spinner.Dot),
+		spinner.WithSpinner(tuiSpinnerFrames),
 		spinner.WithStyle(lipgloss.NewStyle().Foreground(newTUITheme(darkBackground).accent)),
 	)
 }
@@ -196,6 +202,15 @@ type tuiShell struct {
 	fixedBody string
 	notices   []tuiNotice
 	actions   []tuiAction
+	// primary names the key of the action that is the next step on this
+	// screen. It is shown on its own line above the key footer, which then
+	// lists only the other actions; compactPrimary keeps it first in the
+	// footer instead, for short terminals.
+	primary        string
+	compactPrimary bool
+	// primaryDanger draws the next step in red: it erases or replaces data
+	// although its label does not say so.
+	primaryDanger bool
 	// jump: Enter opens the screen of the situation shown in a notice.
 	jump bool
 	// detailsKey: d toggles the technical text of a situation notice;
@@ -210,6 +225,55 @@ type tuiShellRegions struct {
 	fixedBody string
 	notices   string
 	actions   string
+}
+
+// navigationLabels are Enter actions that only move around; they stay in
+// the key footer instead of being shown as the next step.
+var navigationLabels = map[string]bool{"Open": true, "Details": true, "Select": true, "Return": true, "Next field": true, "Choose": true, "Back": true, "Overview": true, "Computers": true, "Maintenance": true, "Installation": true, "Software": true}
+
+// defaultPrimaryKey makes Enter the next step of a screen when it does more
+// than navigate: Enter always invokes the visible primary action.
+func defaultPrimaryKey(actions []tuiAction) string {
+	for _, action := range actions {
+		if action.key == "Enter" && !navigationLabels[action.label] {
+			return "Enter"
+		}
+	}
+	return ""
+}
+
+// destructiveAction reports an action that erases or replaces data.
+func destructiveAction(label string) bool {
+	lower := strings.ToLower(label)
+	for _, word := range []string{"erase", "reset", "discard", "delete", "rotate"} {
+		if strings.Contains(lower, word) {
+			return true
+		}
+	}
+	return false
+}
+
+// tuiPrimaryActionStyled renders the next step of a screen as a button: a
+// rounded border in the accent colour (red for danger) around "⏎ Enter  label".
+// It has no background, so it never resembles a selected row. Short terminals
+// (compact) keep it inline in the footer without the border, which would cost
+// two lines.
+func tuiPrimaryActionStyled(action tuiAction, darkBackground, compact, danger bool) string {
+	theme := newTUITheme(darkBackground)
+	colour := theme.accent
+	if danger {
+		colour = theme.failure
+	}
+	if compact {
+		return lipgloss.NewStyle().Bold(true).Foreground(colour).Render("⏎ " + action.key + " " + action.label)
+	}
+	content := lipgloss.NewStyle().Bold(true).Foreground(colour).Render("⏎ "+action.key) +
+		lipgloss.NewStyle().Bold(true).Foreground(theme.text).Render("  "+action.label)
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colour).
+		Padding(0, 1).
+		Render(content)
 }
 
 func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShellRegions {
@@ -251,8 +315,33 @@ func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShe
 		}
 		regions.notices = strings.Join(lines, "\n")
 	}
-	if len(shell.actions) > 0 {
-		regions.actions = tuiActionBar(width, darkBackground, shell.actions...)
+	actions := shell.actions
+	if shell.primary == "" {
+		shell.primary = defaultPrimaryKey(actions)
+	}
+	primary := ""
+	if shell.primary != "" && shell.compactPrimary {
+		regions.actions = tuiActionItems(width, darkBackground, shell.primary, shell.primaryDanger, actions...)
+		return regions
+	}
+	if shell.primary != "" {
+		rest := make([]tuiAction, 0, len(actions))
+		for _, action := range actions {
+			if action.key == shell.primary && primary == "" {
+				primary = tuiPrimaryActionStyled(action, darkBackground, false, shell.primaryDanger || destructiveAction(action.label))
+				continue
+			}
+			rest = append(rest, action)
+		}
+		actions = rest
+	}
+	switch {
+	case primary != "" && len(actions) > 0:
+		regions.actions = primary + "\n" + tuiActionBar(width, darkBackground, actions...)
+	case primary != "":
+		regions.actions = primary
+	case len(actions) > 0:
+		regions.actions = tuiActionBar(width, darkBackground, actions...)
 	}
 	return regions
 }
@@ -269,10 +358,21 @@ func renderTUIShell(shell tuiShell, width int, darkBackground bool) string {
 }
 
 func tuiActionBar(width int, darkBackground bool, actions ...tuiAction) string {
+	return tuiActionItems(width, darkBackground, "", false, actions...)
+}
+
+// tuiActionItems lays out the key footer; the action whose key is primary
+// keeps its place but is drawn as the next step (short terminals).
+func tuiActionItems(width int, darkBackground bool, primary string, danger bool, actions ...tuiAction) string {
 	theme := newTUITheme(darkBackground)
 	labelStyle := lipgloss.NewStyle().Foreground(theme.muted)
 	items := make([]string, 0, len(actions))
 	for _, action := range actions {
+		if primary != "" && action.key == primary {
+			items = append(items, tuiPrimaryActionStyled(action, darkBackground, true, danger || destructiveAction(action.label)))
+			primary = ""
+			continue
+		}
 		items = append(items, tuiShortcut(action.key, darkBackground)+" "+labelStyle.Render(action.label))
 	}
 	separator := tuiMuted("  ·  ", darkBackground)
@@ -410,4 +510,17 @@ func tuiNoticeTitle(title string, kind tuiStatusKind, dark bool) string {
 		return tuiStatus(title, kind, dark)
 	}
 	return tuiNoticeText("○ "+title, kind, dark)
+}
+
+// compactTerminal reports a terminal too short for the bordered next-step
+// button: the 30-row layouts keep their content, so they get the inline form.
+func compactTerminal(height int) bool { return height > 0 && height < 32 }
+
+// ctaRows is the height of the next-step button border, which only taller
+// terminals can afford; list budgets subtract it from the screen.
+func ctaRows(height int) int {
+	if height >= 32 {
+		return 2
+	}
+	return 0
 }

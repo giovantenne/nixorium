@@ -110,6 +110,23 @@ func (local Local) controllerStateForSystem(ctx context.Context, repository, des
 	return false, "reviewed controller configuration is not the active system generation", nil
 }
 
+// ControllerActivated reports whether the apply unit's record names revision
+// and the active system. The unit writes the record (root, 0644) only after
+// it activated the system it built from that revision and checked that it is
+// active, so this is the same evidence without evaluating the controller.
+func (local Local) ControllerActivated(_ context.Context, revision string) (bool, string, error) {
+	active, err := filepath.EvalSymlinks("/run/current-system")
+	if err != nil {
+		return false, "", fmt.Errorf("cannot inspect active system generation: %w", err)
+	}
+	data, mode, err := readRegularFileNoFollowLimit(controllerActivationPath, maximumControllerActivationBytes)
+	if err != nil {
+		return false, "no successful controller activation is recorded", nil
+	}
+	current, detail := controllerActivationMatches(data, mode, revision, active)
+	return current, detail, nil
+}
+
 func controllerActivationMatches(data []byte, mode uint32, revision, desired string) (bool, string) {
 	if mode != 0o644 {
 		return false, fmt.Sprintf("active system matches, but the controller activation record has unsafe mode %04o", mode)

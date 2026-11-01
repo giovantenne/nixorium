@@ -77,8 +77,15 @@ func TestControllerProgressReadFailureIsVisibleAndCanRecover(t *testing.T) {
 		controller: controllerModel{applying: true, progressID: 4, started: time.Now()}, progressDetails: true}
 	updated, _ := model.Update(dashboardControllerProgressMsg{id: 4, err: errors.New("private filesystem error")})
 	model = updated.(dashboardModel)
+	if strings.Contains(model.View().Content, "cannot be read") {
+		t.Fatal("a single unreadable poll was reported")
+	}
+	for range controllerProgressMissesShown - 1 {
+		updated, _ = model.Update(dashboardControllerProgressMsg{id: 4, err: errors.New("private filesystem error")})
+		model = updated.(dashboardModel)
+	}
 	view := model.View().Content
-	if !strings.Contains(view, "could not be refreshed") || strings.Contains(view, "private filesystem error") || !strings.Contains(view, "journalctl") {
+	if !strings.Contains(view, "cannot be read") || strings.Contains(view, "private filesystem error") || !strings.Contains(view, "journalctl") {
 		t.Fatalf("missing safe progress fallback:\n%s", view)
 	}
 	updated, _ = model.Update(dashboardControllerProgressMsg{id: 3})
@@ -148,8 +155,26 @@ func TestGroupedUpdateBuildRetainsDetailsWithoutInventingCompletion(t *testing.T
 	}
 }
 
+func TestLaboratoryReviewSaysWhichOutputsAreOnlyChecked(t *testing.T) {
+	model := dashboardModel{screen: dashboardUpdate, busy: "Checking systems", width: 140, height: 40,
+		updates: updateModel{planning: true, target: "master", planStarted: time.Now(), planProgress: domain.UpdatePlanProgress{
+			Phase: domain.UpdatePlanPhaseBuild, Detail: "Building 2 systems and evaluating 3 installation outputs", Total: 5,
+		}}}
+	model.beginRead(dashboardBuildTimeout)
+	t.Cleanup(model.read.cancel)
+	view := demoANSI.ReplaceAllString(model.View().Content, "")
+	for _, expected := range []string{"Testing the required systems", "2 systems built together · 3 installation files checked, built when network installation is prepared"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("grouped build lost %q:\n%s", expected, view)
+		}
+	}
+	if strings.Contains(view, "Required outputs") || strings.Contains(view, "installation files\n") {
+		t.Fatalf("grouped build still says every output is built:\n%s", view)
+	}
+}
+
 func TestControllerReviewStatesChangesOrUpToDate(t *testing.T) {
-	m := experienceFixture(1)
+	m := experienceFixture(t, 1)
 	m.screen = dashboardControllerReview
 	m.controller.plan = domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("a", 40), ChangesKnown: true, Changes: []string{"Saved settings", "Nixorium version"}}
 	view := m.View().Content
@@ -180,5 +205,141 @@ func TestControllerReviewStatesChangesOrUpToDate(t *testing.T) {
 	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if next.(dashboardModel).screen == dashboardControllerReview {
 		t.Fatal("Esc did not leave the up-to-date review")
+	}
+}
+
+func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
+	revision := "0123456789abcdef0123456789abcdef01234567"
+	applied := 0
+	refreshed := 0
+	actions := DashboardActions{
+		Refresh: func(ctx context.Context) (domain.StatusReport, error) {
+			refreshed++
+			return domain.StatusReport{Deployment: domain.DeploymentStatus{Ready: true}}, nil
+		},
+		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
+			return domain.ControllerRebuildPlanReport{
+				SchemaVersion: domain.SchemaVersion,
+				Operation:     "controller-plan",
+				State:         "ready",
+				Controller:    "pc99",
+				Revision:      revision,
+				Confirmation:  "REBUILD",
+				Issues:        []domain.ValidationIssue{},
+			}
+		},
+		ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			applied++
+			return domain.ControllerRebuildExecutionReport{
+				SchemaVersion: domain.SchemaVersion,
+				Operation:     "controller-apply",
+				State:         "completed",
+				Controller:    plan.Controller,
+				Revision:      plan.Revision,
+				Phase:         domain.ControllerRebuildPhaseComplete,
+				Applied:       true,
+				Verified:      true,
+			}
+		},
+		LoadControllerProgress: func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{}, nil
+		},
+	}
+	model := dashboardModel{actions: actions}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "m"})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardAdministration {
+		t.Fatalf("maintenance did not open: screen=%d", model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("controller plan did not start: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardControllerReview || !strings.Contains(model.View().Content, revision) || strings.Contains(model.View().Content, "REBUILD pc99") || !strings.Contains(model.View().Content, "Press Enter") {
+		t.Fatalf("controller review missing:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("controller apply did not start: %+v", model)
+	}
+	if !strings.Contains(model.View().Content, "Waiting for managed progress") {
+		t.Fatalf("controller apply omits managed progress feedback:\n%s", model.View().Content)
+	}
+	batch, ok := command().(tea.BatchMsg)
+	if !ok || len(batch) != 2 {
+		t.Fatalf("controller apply did not schedule action and progress polling")
+	}
+	operation, ok := batch[0]().(tea.BatchMsg)
+	if !ok || len(operation) != 2 {
+		t.Fatal("controller result and status refresh are not separate")
+	}
+	updated, _ = model.Update(operation[0]())
+	model = updated.(dashboardModel)
+	if refreshed != 0 || model.busy != "" {
+		t.Fatal("result waited for the status refresh")
+	}
+	updated, _ = model.Update(operation[1]())
+	model = updated.(dashboardModel)
+	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Applied to this controller and verified") || !strings.Contains(model.View().Content, "Enter") || !strings.Contains(model.View().Content, "Maintenance") {
+		t.Fatalf("controller result missing: applied=%d refreshed=%d\n%s", applied, refreshed, model.View().Content)
+	}
+	model.controller.progress = domain.OperationProgress{
+		Operation: "controller-apply", State: "completed", Phase: "complete",
+		Current: 4, Total: 4, Recent: []string{"Controller revision activated and verified"},
+	}
+	if strings.Contains(model.View().Content, "progress details") {
+		t.Fatalf("completed controller details should start collapsed:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "d"})
+	model = updated.(dashboardModel)
+	if !strings.Contains(model.View().Content, "Recent activity") || !strings.Contains(model.View().Content, "Hide details") {
+		t.Fatalf("controller details did not expand:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardAdministration {
+		t.Fatalf("controller completion did not return to Maintenance: screen=%d", model.screen)
+	}
+}
+
+func TestDashboardControllerProgressShowsTypedBuildState(t *testing.T) {
+	started := time.Now().UTC().Add(-2 * time.Second)
+	model := dashboardModel{
+		screen: dashboardController,
+		busy:   "Building and activating the reviewed controller revision",
+		controller: controllerModel{
+			applying:   true,
+			started:    started,
+			progressID: 3,
+		},
+		width: 90,
+		actions: DashboardActions{LoadControllerProgress: func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{}, nil
+		}},
+	}
+	updated, command := model.Update(dashboardControllerProgressMsg{
+		id: 3,
+		progress: domain.OperationProgress{
+			Operation: "controller-apply", State: "running", Phase: "build",
+			StartedAt: started, UpdatedAt: time.Now().UTC(), Current: 1, Total: 4,
+			Recent: []string{"Validated configuration and installed keys", "Building the reviewed controller system"},
+		},
+	})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("controller apply did not schedule another progress poll")
+	}
+	view := model.View().Content
+	for _, expected := range []string{"Building system", "1/4", "Progress details", "Building the reviewed controller system", "Elapsed:"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("controller progress omits %q:\n%s", expected, view)
+		}
+	}
+	if strings.Count(view, "Progress details") != 1 || strings.Contains(view, "l progress details") {
+		t.Fatalf("controller progress duplicates the contextual action bar:\n%s", view)
 	}
 }

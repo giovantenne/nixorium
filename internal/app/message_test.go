@@ -156,7 +156,7 @@ func TestMessageApplyRefusesStaleOrChangedReviews(t *testing.T) {
 	if report := manager.Apply(context.Background(), forged, forged.ReviewToken); report.State != "blocked" || !strings.Contains(report.Message, "control characters") {
 		t.Fatalf("forged text = %+v", report)
 	}
-	manager.now = func() time.Time { return time.Now().Add(6 * time.Minute) }
+	manager.now = func() time.Time { return time.Now().Add(11 * time.Minute) }
 	if report := manager.Apply(context.Background(), plan, plan.ReviewToken); report.State != "blocked" || !strings.Contains(report.Message, "expired") {
 		t.Fatalf("expired = %+v", report)
 	}

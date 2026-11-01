@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -232,4 +233,37 @@ func runShutdownCommand(ctx context.Context, repository string, options options,
 		return 1
 	}
 	return commandOutputError(err, stderr)
+}
+
+// parseOperationsFlags reads the shutdown/restart flags.
+func parseOperationsFlags(result *options, arguments []string, index int) (int, bool, error) {
+	switch arguments[index] {
+	case "--acknowledge-unknown-sessions":
+		result.acknowledgeUnknown = true
+	default:
+		return index, false, nil
+	}
+	return index, true, nil
+}
+
+// validateShutdownRestart rejects option combinations that do not belong to the command.
+func validateShutdownRestart(result *options) error {
+	if (result.command == "shutdown" || result.command == "restart") && result.subcommand != "plan" && result.subcommand != "apply" {
+		return fmt.Errorf("%s requires the plan or apply subcommand", result.command)
+	}
+	if (result.command == "shutdown" || result.command == "restart") && result.on == "" {
+		return fmt.Errorf("%s %s requires --on", result.command, result.subcommand)
+	}
+	if (result.command == "shutdown" || result.command == "restart") && result.subcommand == "apply" && result.expect == "" {
+		return fmt.Errorf("%s apply requires --expect from %s plan", result.command, result.command)
+	}
+	return nil
+}
+
+// validateAcknowledgeUnknown rejects option combinations that do not belong to the command.
+func validateAcknowledgeUnknown(result *options) error {
+	if result.acknowledgeUnknown && result.command != "shutdown" && result.command != "restart" {
+		return errors.New("--acknowledge-unknown-sessions is only valid with shutdown or restart")
+	}
+	return nil
 }

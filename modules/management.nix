@@ -1,6 +1,5 @@
-{ config, hostName, labSettings, nixoriumPackage, lib, pkgs, ... }:
+{ config, isController, labSettings, nixoriumPackage, lib, pkgs, ... }:
 let
-  isController = hostName == labSettings.masterHostName;
   cfg = config.services.nixorium;
   migrateKnownHosts = pkgs.writeShellApplication {
     name = "nixorium-migrate-known-hosts";
@@ -77,7 +76,9 @@ let
       [[ "$(stat -c '%U' "$REPOSITORY")" == admin ]] \
         || fail "deployment repository must be owned by admin"
 
-      nixorium setup keys --verify-only --repo "$REPOSITORY" --json >/dev/null \
+      # Parse the admin-owned key files as admin; only the copy below runs as root.
+      runuser -u admin -- env HOME=/tmp XDG_CACHE_HOME=/tmp \
+        nixorium setup keys --verify-only --repo "$REPOSITORY" --json >/dev/null \
         || fail "deployment key correspondence verification failed"
 
       install_checked() {
@@ -117,258 +118,18 @@ let
       pkgs.git
       pkgs.iproute2
       pkgs.jq
+      pkgs.networkmanager
       pkgs.nix
       pkgs.systemd
       pkgs.util-linux
       nixoriumPackage
     ];
-    text = ''
-      REPOSITORY=${lib.escapeShellArg cfg.deploymentPath}
-      EXPECTED_REVISION="''${1:-}"
-
-      STATE_DIRECTORY=/var/lib/nixorium/controller
-      [[ -d "$STATE_DIRECTORY" && ! -L "$STATE_DIRECTORY" \
-          && "$(stat -c '%U:%G:%a' "$STATE_DIRECTORY")" == root:root:755 ]] || {
-        echo "Error: controller state directory has unsafe ownership or permissions" >&2
-        exit 1
-      }
-      PROGRESS_FILE="$STATE_DIRECTORY/progress.json"
-      PROGRESS_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
-      PROGRESS_STATE=running
-      PROGRESS_PHASE=starting
-      PROGRESS_CURRENT=0
-      PROGRESS_TOTAL=4
-      PROGRESS_RECENT='[]'
-      TEMPORARY_RECORD=""
-      keep_temporary=false
-      USB_WORKER_PAUSED=false
-
-      publish_progress() {
-        local state="$1"
-        local phase="$2"
-        local activity="$3"
-        local current="$4"
-        local temporary
-
-        PROGRESS_STATE="$state"
-        PROGRESS_PHASE="$phase"
-        PROGRESS_CURRENT="$current"
-        PROGRESS_RECENT="$(jq -c --arg activity "$activity" \
-          '. + [$activity] | if length > 5 then .[-5:] else . end' \
-          <<<"$PROGRESS_RECENT")"
-        temporary="$(mktemp "$STATE_DIRECTORY/.progress.XXXXXX")"
-        jq -n \
-          --arg operation controller-apply \
-          --arg state "$PROGRESS_STATE" \
-          --arg phase "$PROGRESS_PHASE" \
-          --arg startedAt "$PROGRESS_STARTED_AT" \
-          --arg updatedAt "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
-          --argjson current "$PROGRESS_CURRENT" \
-          --argjson total "$PROGRESS_TOTAL" \
-          --argjson recent "$PROGRESS_RECENT" \
-          '{schemaVersion: 1, operation: $operation, state: $state, phase: $phase,
-            startedAt: $startedAt, updatedAt: $updatedAt, current: $current,
-            total: $total, recent: $recent}' >"$temporary"
-        chown admin:users "$temporary"
-        chmod 0600 "$temporary"
-        mv -fT -- "$temporary" "$PROGRESS_FILE"
-        echo "$activity"
-      }
-
-      cleanup_controller() {
-        local status="$?"
-        if [[ "$keep_temporary" == true && -n "$TEMPORARY_RECORD" ]]; then
-          rm -f -- "$TEMPORARY_RECORD"
-        fi
-        if [[ "$status" -ne 0 && "$PROGRESS_STATE" == running ]]; then
-          publish_progress failed "$PROGRESS_PHASE" \
-            "Controller apply stopped unexpectedly" "$PROGRESS_CURRENT" || true
-        fi
-        if [[ "$USB_WORKER_PAUSED" == true ]]; then
-          # Release both locks before restarting the owner of the retained USB
-          # reservation, including when validation/build/activation failed.
-          exec 8>&- 9>&-
-          systemctl --no-ask-password start --no-block nixorium-remote-install.service || true
-        fi
-      }
-      trap cleanup_controller EXIT
-
-      fail() {
-        local message="$*"
-        if [[ "$PROGRESS_STATE" == running ]]; then
-          publish_progress failed "$PROGRESS_PHASE" \
-            "Failed: $message" "$PROGRESS_CURRENT" || true
-        fi
-        echo "Error: $message" >&2
-        exit 1
-      }
-
-      ${operationGate true}
-
-      publish_progress running starting "Starting controller apply" 0
-      publish_progress running validate "Validating the reviewed controller configuration" 0
-
-      [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
-        || fail "configured deployment path is not a real directory"
-      [[ -f "$REPOSITORY/flake.nix" && -d "$REPOSITORY/.git" ]] \
-        || fail "configured deployment path is not a Git Flake"
-      [[ "$(stat -c '%U' "$REPOSITORY")" == admin ]] \
-        || fail "deployment repository must be owned by admin"
-      [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
-        || fail "deployment worktree must be clean before controller apply"
-      [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
-          secret-key admin-ssh lab-credentials.json)" ]] \
-        || fail "private key files must not be tracked by Git"
-
-      REVISION="$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)"
-      [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]] \
-        || fail "deployment HEAD is not a full Git object ID"
-      if [[ -n "$EXPECTED_REVISION" ]]; then
-        [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]] \
-          || fail "expected controller revision is invalid"
-        [[ "$REVISION" == "$EXPECTED_REVISION" ]] \
-          || fail "deployment revision differs from the reviewed controller plan"
-      fi
-
-      # Pin the Git fetcher to the reviewed commit so ignored private keys are
-      # excluded and a concurrent clean commit cannot change the build input.
-      [[ -d /var/cache/nixorium/admin && ! -L /var/cache/nixorium/admin \
-          && "$(stat -c '%U:%G:%a' /var/cache/nixorium/admin)" == admin:users:700 ]] \
-        || fail "administrator Nix cache directory has unsafe ownership or permissions"
-      export XDG_CACHE_HOME=/var/cache/nixorium/admin
-      export NIX_CONFIG="experimental-features = nix-command flakes"
-
-      as_admin() {
-        runuser -u admin -- "$@"
-      }
-
-      FLAKE_URL="$(as_admin nixorium config source --repo "$REPOSITORY" --revision "$REVISION")"
-
-      as_admin nixorium config validate --repo "$REPOSITORY" --json \
-        || fail "deployment configuration validation failed"
-      CONTROLLER_READINESS="$(as_admin nix eval "$FLAKE_URL#deploymentStatus" --json --no-write-lock-file \
-        | jq -ce '.controller')" \
-        || fail "deployment status does not report controller readiness"
-      jq -e '.ready == true' <<<"$CONTROLLER_READINESS" >/dev/null \
-        || fail "controller readiness must be true before controller apply"
-
-      # Only an explicit capability from the pinned configuration can omit lab
-      # keys. Old deployments continue to require both installed pairs.
-      if ! jq -e '.requiresKeys == false' <<<"$CONTROLLER_READINESS" >/dev/null; then
-        as_admin nixorium setup keys --verify-only --repo "$REPOSITORY" --json \
-          || fail "deployment key correspondence verification failed"
-        cmp -s "$REPOSITORY/admin-ssh" /home/admin/.ssh/id_ed25519 \
-          || fail "installed admin SSH key is absent or differs"
-        cmp -s "$REPOSITORY/secret-key" /var/lib/nixorium/keys/harmonia-secret-key \
-          || fail "installed Harmonia signing key is absent or differs"
-      fi
-
-      publish_progress running build "Validated controller prerequisites" 1
-      publish_progress running build "Building the reviewed controller system" 1
-
-      LAB_META="$(as_admin nix eval "$FLAKE_URL#labMeta" --json --no-write-lock-file)" \
-        || fail "could not evaluate controller network metadata"
-      CONTROLLER_NAME="$(jq -er '.controller.name' <<<"$LAB_META")" \
-        || fail "evaluated controller name is missing"
-      [[ "$CONTROLLER_NAME" =~ ^pc[0-9]+$ ]] \
-        || fail "evaluated controller name is invalid"
-      DEPLOYMENT_MODE="$(jq -er '.deploymentMode // "laboratory"' <<<"$LAB_META")" \
-        || fail "evaluated deployment mode is missing"
-      [[ "$DEPLOYMENT_MODE" == controller || "$DEPLOYMENT_MODE" == laboratory ]] \
-        || fail "evaluated deployment mode is invalid"
-      if [[ "$DEPLOYMENT_MODE" == laboratory ]]; then
-        [[ ! -e /var/lib/nixorium/pxe/session.json \
-            && ! -L /var/lib/nixorium/pxe/session.json ]] \
-          || fail "PXE networking is transitioning or active; stop or recover installation mode before controller apply"
-        CONTROLLER_IFACE="$(jq -er '.controller.ifaceName // .network.ifaceName' <<<"$LAB_META")" \
-          || fail "evaluated controller interface is missing"
-        CONTROLLER_STATIC_IP="$(jq -er '.controller.staticIp' <<<"$LAB_META")" \
-          || fail "evaluated controller static address is missing"
-        CONTROLLER_PREFIX_LENGTH="$(jq -er '.network.prefixLength' <<<"$LAB_META")" \
-          || fail "evaluated network prefix is missing"
-        [[ "$CONTROLLER_IFACE" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,14}$ ]] \
-          || fail "evaluated controller interface is invalid"
-        [[ "$CONTROLLER_STATIC_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] \
-          || fail "evaluated controller static address is invalid"
-        [[ "$CONTROLLER_PREFIX_LENGTH" =~ ^[0-9]+$ \
-            && "$CONTROLLER_PREFIX_LENGTH" -ge 1 \
-            && "$CONTROLLER_PREFIX_LENGTH" -le 30 ]] \
-          || fail "evaluated network prefix is invalid"
-      fi
-
-      SYSTEM_PATH="$(as_admin nix build "$FLAKE_URL#nixosConfigurations.$CONTROLLER_NAME.config.system.build.toplevel" \
-        --no-write-lock-file --no-link --print-out-paths)"
-      [[ "$SYSTEM_PATH" == /nix/store/* && "$SYSTEM_PATH" != *[[:space:]]* \
-          && -x "$SYSTEM_PATH/bin/switch-to-configuration" ]] \
-        || fail "controller build did not return one valid NixOS system closure"
-      [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" \
-          && "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)" == "$REVISION" ]] \
-        || fail "deployment changed while the controller was building; activation refused"
-
-      publish_progress running activate "Built controller system; beginning activation" 2
-      ACTIVATION_RECORD="$STATE_DIRECTORY/applied.json"
-      if [[ -L "$ACTIVATION_RECORD" ]]; then
-        fail "refusing symlink controller activation record"
-      fi
-      if [[ -e "$ACTIVATION_RECORD" && ! -f "$ACTIVATION_RECORD" ]]; then
-        fail "controller activation record is not a regular file"
-      fi
-
-      # Invalidate any earlier success before activation. A failed switch can
-      # update /run/current-system before a later activation snippet fails, so
-      # the active symlink alone is not durable evidence of completion.
-      rm -f -- "$ACTIVATION_RECORD"
-      # Match nixos-rebuild switch: register the generation before activation
-      # so boot entries, rollback history, and GC retention use this system.
-      nix-env --profile /nix/var/nix/profiles/system --set "$SYSTEM_PATH" \
-        || fail "could not register the controller system generation"
-      [[ "$(readlink -f /nix/var/nix/profiles/system)" == "$SYSTEM_PATH" ]] \
-        || fail "persistent system profile differs before controller activation"
-      "$SYSTEM_PATH/bin/switch-to-configuration" switch
-      ACTIVE_SYSTEM="$(readlink -f /run/current-system)"
-      [[ "$ACTIVE_SYSTEM" == "$SYSTEM_PATH" ]] \
-        || fail "active system differs after controller activation"
-      [[ "$(readlink -f /nix/var/nix/profiles/system)" == "$SYSTEM_PATH" ]] \
-        || fail "persistent system profile differs after controller activation"
-
-      # A controller-only installation already has a live interface when the
-      # first laboratory configuration is activated. The generated NixOS
-      # address unit is persistent across reboot, but it is not guaranteed to
-      # receive a fresh device event during a live switch. Reconcile the one
-      # reviewed static address before PXE preparation is allowed to continue.
-      if [[ "$DEPLOYMENT_MODE" == laboratory ]]; then
-        CONTROLLER_STATIC_CIDR="$CONTROLLER_STATIC_IP/$CONTROLLER_PREFIX_LENGTH"
-        ip link show dev "$CONTROLLER_IFACE" >/dev/null \
-          || fail "configured controller interface is not present after activation"
-        if ! ip -4 -o address show dev "$CONTROLLER_IFACE" scope global \
-            | awk -v cidr="$CONTROLLER_STATIC_CIDR" \
-              '$3 == "inet" && $4 == cidr { found = 1 } END { exit !found }'; then
-          ip address replace "$CONTROLLER_STATIC_CIDR" dev "$CONTROLLER_IFACE" \
-            || fail "could not apply the controller static address after activation"
-        fi
-        ip -4 -o address show dev "$CONTROLLER_IFACE" scope global \
-          | awk -v cidr="$CONTROLLER_STATIC_CIDR" \
-            '$3 == "inet" && $4 == cidr { found = 1 } END { exit !found }' \
-          || fail "controller static address is absent after activation"
-      fi
-
-      publish_progress running verify "Activated controller system and verified networking" 3
-
-      TEMPORARY_RECORD="$(mktemp --tmpdir="$STATE_DIRECTORY" .applied.json.XXXXXX)"
-      keep_temporary=true
-      jq -n \
-        --arg revision "$REVISION" \
-        --arg systemPath "$SYSTEM_PATH" \
-        --arg activatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        '{schemaVersion: 1, revision: $revision, systemPath: $systemPath, activatedAt: $activatedAt}' \
-        > "$TEMPORARY_RECORD"
-      chmod 0644 "$TEMPORARY_RECORD"
-      sync "$TEMPORARY_RECORD"
-      mv -fT -- "$TEMPORARY_RECORD" "$ACTIVATION_RECORD"
-      keep_temporary=false
-      sync "$STATE_DIRECTORY"
-      publish_progress completed complete "Controller revision activated and verified" 4
-    '';
+    # The script lives in scripts/apply-controller.sh; Nix fills in the deployment path and
+    # the operation gate.
+    text = builtins.replaceStrings
+      [ "@REPOSITORY@" "@OPERATION_GATE@" ]
+      [ (lib.escapeShellArg cfg.deploymentPath) (operationGate true) ]
+      (builtins.readFile ../scripts/apply-controller.sh);
   };
   preparePxe = pkgs.writeShellApplication {
     name = "nixorium-prepare-pxe";
@@ -385,258 +146,12 @@ let
       pkgs.util-linux
       nixoriumPackage
     ];
-    text = ''
-      REPOSITORY=${lib.escapeShellArg cfg.deploymentPath}
-
-      PROGRESS_FILE="$STATE_DIRECTORY/progress.json"
-      PROGRESS_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
-      PROGRESS_STATE=running
-      PROGRESS_PHASE=starting
-      PROGRESS_CURRENT=0
-      PROGRESS_TOTAL=0
-      PROGRESS_RECENT='[]'
-      CLIENTS_FILE=""
-      MANIFEST_TEMP=""
-      BUILD_DIRECTORY=""
-
-      publish_progress() {
-        local state="$1"
-        local phase="$2"
-        local activity="$3"
-        local current="$4"
-        local total="$5"
-        local temporary
-
-        PROGRESS_STATE="$state"
-        PROGRESS_PHASE="$phase"
-        PROGRESS_CURRENT="$current"
-        PROGRESS_TOTAL="$total"
-        if [[ -n "$activity" ]]; then
-          PROGRESS_RECENT="$(jq -c --arg activity "$activity" \
-            '. + [$activity] | if length > 5 then .[-5:] else . end' \
-            <<<"$PROGRESS_RECENT")"
-        fi
-        temporary="$(mktemp "$STATE_DIRECTORY/.progress.XXXXXX")"
-        jq -n \
-          --arg operation pxe-prepare \
-          --arg state "$PROGRESS_STATE" \
-          --arg phase "$PROGRESS_PHASE" \
-          --arg startedAt "$PROGRESS_STARTED_AT" \
-          --arg updatedAt "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
-          --argjson current "$PROGRESS_CURRENT" \
-          --argjson total "$PROGRESS_TOTAL" \
-          --argjson recent "$PROGRESS_RECENT" \
-          '{
-            schemaVersion: 1,
-            operation: $operation,
-            state: $state,
-            phase: $phase,
-            startedAt: $startedAt,
-            updatedAt: $updatedAt,
-            current: $current,
-            total: $total,
-            recent: $recent
-          }' >"$temporary"
-        chmod 0600 "$temporary"
-        mv -fT -- "$temporary" "$PROGRESS_FILE"
-        [[ -z "$activity" ]] || echo "$activity"
-      }
-
-      cleanup() {
-        local status="$?"
-        [[ -z "$CLIENTS_FILE" ]] || rm -f -- "$CLIENTS_FILE"
-        [[ -z "$MANIFEST_TEMP" ]] || rm -f -- "$MANIFEST_TEMP"
-        [[ -z "$BUILD_DIRECTORY" ]] || rm -rf -- "$BUILD_DIRECTORY"
-        if [[ "$status" -ne 0 && "$PROGRESS_STATE" == running ]]; then
-          publish_progress failed "$PROGRESS_PHASE" \
-            "Preparation stopped unexpectedly" "$PROGRESS_CURRENT" "$PROGRESS_TOTAL" || true
-        fi
-      }
-      trap cleanup EXIT
-
-      fail() {
-        local message="$*"
-        if [[ "$PROGRESS_STATE" == running ]]; then
-          publish_progress failed "$PROGRESS_PHASE" \
-            "Failed: $message" "$PROGRESS_CURRENT" "$PROGRESS_TOTAL" || true
-        fi
-        echo "Error: $message" >&2
-        exit 1
-      }
-
-      ${operationGate false}
-
-      publish_progress running starting "Starting PXE preparation" 0 0
-      publish_progress running validate "Validating the reviewed deployment" 0 0
-
-      [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
-        || fail "configured deployment path is not a real directory"
-      [[ -f "$REPOSITORY/flake.nix" && -d "$REPOSITORY/.git" ]] \
-        || fail "configured deployment path is not a Git Flake"
-      [[ "$(stat -c '%U' "$REPOSITORY")" == admin ]] \
-        || fail "deployment repository must be owned by admin"
-      [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
-        || fail "deployment worktree must be clean before PXE preparation"
-      [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
-          secret-key admin-ssh lab-credentials.json)" ]] \
-        || fail "private key files must not be tracked by Git"
-
-      [[ -d /var/cache/nixorium/admin && ! -L /var/cache/nixorium/admin \
-          && "$(stat -c '%U:%G:%a' /var/cache/nixorium/admin)" == admin:users:700 ]] \
-        || fail "administrator Nix cache directory has unsafe ownership or permissions"
-      export XDG_CACHE_HOME=/var/cache/nixorium/admin
-      export NIX_CONFIG="experimental-features = nix-command flakes"
-
-      REVISION="$(git -C "$REPOSITORY" rev-parse HEAD)" \
-        || fail "could not resolve deployment revision"
-      FLAKE_URL="$(nixorium config source --repo "$REPOSITORY" --revision "$REVISION")"
-
-      nixorium config validate --repo "$REPOSITORY" --json >/dev/null \
-        || fail "deployment configuration validation failed"
-      [[ "$(nix eval "$FLAKE_URL#deploymentStatus.ready" --json --no-write-lock-file)" == true ]] \
-        || fail "deploymentStatus.ready must be true before PXE preparation"
-
-      publish_progress running validate "Validated deployment configuration" 0 0
-      publish_progress running network "Checking controller network and binary cache" 0 0
-
-      META="$(nix eval "$FLAKE_URL#labMeta" --json --no-write-lock-file)" \
-        || fail "could not evaluate labMeta"
-      IFACE="$(jq -er '.network.ifaceName' <<<"$META")" \
-        || fail "labMeta does not contain a valid interface"
-      CONFIGURED_DHCP_IP="$(jq -er '.controller.dhcpIp' <<<"$META")" \
-        || fail "labMeta does not contain a valid controller DHCP address"
-      STATIC_IP="$(jq -er '.controller.staticIp' <<<"$META")" \
-        || fail "labMeta does not contain a valid controller static address"
-      CACHE_PORT="$(jq -er '.network.cachePort' <<<"$META")" \
-        || fail "labMeta does not contain a valid cache port"
-      PXE_HTTP_PORT="$(jq -er '.network.pxeHttpPort' <<<"$META")" \
-        || fail "labMeta does not contain a valid PXE HTTP port"
-
-      ip link show dev "$IFACE" >/dev/null \
-        || fail "configured interface $IFACE does not exist"
-      mapfile -t ADDRESSES < <(ip -4 -o addr show dev "$IFACE" scope global \
-        | awk '{ split($4, address, "/"); print address[1] }')
-      ((''${#ADDRESSES[@]} > 0)) \
-        || fail "configured interface $IFACE has no global IPv4 address"
-      DHCP_IP=""
-      OBSERVED_NON_STATIC=()
-      for address in "''${ADDRESSES[@]}"; do
-        if [[ "$address" != "$STATIC_IP" && "$address" != 169.254.* ]]; then
-          OBSERVED_NON_STATIC+=("$address")
-          [[ "$address" == "$CONFIGURED_DHCP_IP" ]] && DHCP_IP="$address"
-        fi
-      done
-      if [[ -z "$DHCP_IP" ]]; then
-        if [[ "''${#OBSERVED_NON_STATIC[@]}" -eq 1 ]]; then
-          DHCP_IP="''${OBSERVED_NON_STATIC[0]}"
-          echo "Configured DHCP address $CONFIGURED_DHCP_IP is no longer assigned; preparing PXE for the unambiguous live address $DHCP_IP"
-        else
-          OBSERVED="''${OBSERVED_NON_STATIC[*]:-none}"
-          fail "configured DHCP address $CONFIGURED_DHCP_IP is not assigned to $IFACE and the live controller address is ambiguous (observed non-static addresses: $OBSERVED)"
-        fi
-      fi
-
-      systemctl --no-ask-password is-active --quiet nixorium-harmonia.service \
-        || fail "Harmonia cache service is not active"
-      curl --fail --silent --show-error --max-time 5 \
-        "http://$DHCP_IP:$CACHE_PORT/nix-cache-info" | grep -q '^StoreDir:' \
-        || fail "Harmonia cache health check failed at $DHCP_IP:$CACHE_PORT"
-
-      publish_progress running network "Controller network and binary cache are ready" 0 0
-
-      ${builtins.readFile ../scripts/lib/pxe-build.sh}
-
-      mapfile -t CLIENT_NAMES < <(jq -er '.clients.hosts[].name' <<<"$META")
-      publish_progress running clients \
-        "Evaluating shared artifacts and client systems in bounded batches" 0 "''${#CLIENT_NAMES[@]}"
-      build_pxe_outputs "$FLAKE_URL" "''${CLIENT_NAMES[@]}"
-      [[ -f "$KERNEL_PATH/bzImage" ]] || fail "prepared kernel output lacks bzImage"
-      [[ -f "$INITRD_PATH/initrd" ]] || fail "prepared initrd output lacks initrd"
-      [[ -f "$IPXE_SCRIPT_PATH/netboot.ipxe" ]] || fail "prepared iPXE output lacks netboot.ipxe"
-      [[ -f "$FIRMWARE_PATH/snponly.efi" ]] || fail "prepared firmware output lacks snponly.efi"
-
-      CLIENTS_FILE="$(mktemp "$STATE_DIRECTORY/.clients.XXXXXX")"
-      MANIFEST_TEMP="$(mktemp "$STATE_DIRECTORY/.prepared.XXXXXX")"
-      for index in "''${!CLIENT_NAMES[@]}"; do
-        printf '%s\t%s\n' "''${CLIENT_NAMES[$index]}" "''${CLIENT_PATHS[$index]}" >>"$CLIENTS_FILE"
-      done
-      publish_progress running clients "Built shared artifacts and all client systems" \
-        "''${#CLIENT_NAMES[@]}" "''${#CLIENT_NAMES[@]}"
-      CLIENTS="$(jq -Rn '[inputs | split("\t") | {name: .[0], storePath: .[1]}]' <"$CLIENTS_FILE")"
-
-      publish_progress running publish "Retaining artifacts and publishing the manifest" 0 0
-      ROOTS_DIRECTORY="$STATE_DIRECTORY/roots"
-      ROOT_GENERATION="$ROOTS_DIRECTORY/$REVISION"
-      install -d -m 0755 "$ROOT_GENERATION"
-      root_path() {
-        local name="$1"
-        local store_path="$2"
-        local root="$ROOT_GENERATION/$name"
-        if [[ -L "$root" ]]; then
-          [[ "$(readlink -f "$root")" == "$store_path" ]] \
-            || fail "existing PXE GC root $name differs at revision $REVISION"
-          return
-        fi
-        [[ ! -e "$root" ]] || fail "PXE GC root $name is not a symlink"
-        nix-store --realise "$store_path" --add-root "$root" --indirect >/dev/null \
-          || fail "could not retain prepared store path for $name"
-      }
-      root_path kernel "$KERNEL_PATH"
-      root_path initrd "$INITRD_PATH"
-      root_path ipxe-script "$IPXE_SCRIPT_PATH"
-      root_path firmware "$FIRMWARE_PATH"
-      while IFS=$'\t' read -r name client_path; do
-        root_path "client-$name" "$client_path"
-      done <"$CLIENTS_FILE"
-
-      [[ "$(git -C "$REPOSITORY" rev-parse HEAD)" == "$REVISION" \
-          && -z "$(git -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
-        || fail "deployment changed during preparation; prepare the reviewed revision again"
-
-      jq -n \
-        --arg revision "$REVISION" \
-        --arg preparedAt "$(date --utc --iso-8601=seconds)" \
-        --arg iface "$IFACE" \
-        --arg dhcpIp "$DHCP_IP" \
-        --arg staticIp "$STATIC_IP" \
-        --argjson cachePort "$CACHE_PORT" \
-        --argjson pxeHttpPort "$PXE_HTTP_PORT" \
-        --arg kernel "$KERNEL_PATH" \
-        --arg initrd "$INITRD_PATH" \
-        --arg ipxeScript "$IPXE_SCRIPT_PATH" \
-        --arg firmware "$FIRMWARE_PATH" \
-        --argjson clients "$CLIENTS" \
-        '{
-          schemaVersion: 1,
-          revision: $revision,
-          preparedAt: $preparedAt,
-          controller: { dhcpIp: $dhcpIp, staticIp: $staticIp },
-          network: { ifaceName: $iface, cachePort: $cachePort, pxeHttpPort: $pxeHttpPort },
-          artifacts: {
-            kernel: { storePath: $kernel, relativePath: "bzImage" },
-            initrd: { storePath: $initrd, relativePath: "initrd" },
-            ipxeScript: { storePath: $ipxeScript, relativePath: "netboot.ipxe" },
-            firmware: { storePath: $firmware, relativePath: "snponly.efi" }
-          },
-          clients: $clients
-        }' >"$MANIFEST_TEMP"
-      chmod 0644 "$MANIFEST_TEMP"
-      sync -f "$MANIFEST_TEMP"
-      mv -T "$MANIFEST_TEMP" "$STATE_DIRECTORY/prepared.json"
-      sync -f "$STATE_DIRECTORY"
-      MANIFEST_TEMP=""
-      rm -f -- "$CLIENTS_FILE"
-      CLIENTS_FILE=""
-      find "$ROOTS_DIRECTORY" -mindepth 1 -maxdepth 1 -type d \
-        ! -name "$REVISION" -exec rm -rf -- {} +
-      publish_progress completed complete \
-        "Prepared PXE artifacts for ''${#CLIENT_NAMES[@]} clients" \
-        "''${#CLIENT_NAMES[@]}" "''${#CLIENT_NAMES[@]}"
-      rm -rf -- "$BUILD_DIRECTORY"
-      BUILD_DIRECTORY=""
-      trap - EXIT
-      echo "Prepared PXE artifacts at revision $REVISION"
-    '';
+    # The script lives in scripts/prepare-pxe.sh; Nix fills in the deployment path and
+    # the operation gate.
+    text = builtins.replaceStrings
+      [ "@REPOSITORY@" "@OPERATION_GATE@" "@PXE_BUILD@" ]
+      [ (lib.escapeShellArg cfg.deploymentPath) (operationGate false) (builtins.readFile ../scripts/lib/pxe-build.sh) ]
+      (builtins.readFile ../scripts/prepare-pxe.sh);
   };
   restartCache = pkgs.writeShellApplication {
     name = "nixorium-restart-cache";
@@ -673,19 +188,63 @@ let
   # The dashboard's terminal window carries this class, so the Nixorium icon
   # brings an open dashboard forward instead of starting another.
   dashboardWindowClass = "org.nixorium.Nixorium";
-  nixoriumOpen = pkgs.writeShellApplication {
-    name = "nixorium-open";
-    runtimeInputs = [ pkgs.coreutils ];
+  nixoriumOpenAs = { name, class }: pkgs.writeShellApplication {
+    inherit name;
+    # GNOME Console is the launcher's own fallback, so it is there even where
+    # the desktop leaves it out.
+    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep (pkgs.callPackage ../pkgs/nixorium-console.nix { }) ];
     text = ''
       SESSION=${nixoriumSession}/bin/nixorium-session
-      if command -v ghostty >/dev/null; then exec ghostty --class=${dashboardWindowClass} -e "$SESSION"; fi
-      if command -v kgx >/dev/null; then exec kgx -- "$SESSION"; fi
-      if command -v gnome-terminal >/dev/null; then exec gnome-terminal -- "$SESSION"; fi
-      if command -v xterm >/dev/null; then exec xterm -e "$SESSION"; fi
+      if command -v ghostty >/dev/null; then
+        # Maximized: below 32 rows the dashboard draws its next-step buttons
+        # without their border, and a default-size window is about 26.
+        # Ghostty needs OpenGL 4.3. Without it (an old graphics card, a virtual
+        # machine with 3D acceleration) it either closes at once ("OpenGL
+        # version is too old") or keeps an empty window ("create a GL
+        # context"), and it exits with status 0 either way. Watch its first
+        # seconds and open another terminal instead.
+        log=$(mktemp -t nixorium-open.XXXXXX)
+        ghostty --class=${class} --title=Nixorium --maximize=true -e "$SESSION" 2> >(tee "$log" >&2) &
+        pid=$!
+        cannot_draw() {
+          grep -qE 'OpenGL version is too old|OpenGLOutdated|gtk-opengl-context|create a GL context' "$log"
+        }
+        failed=false
+        for _ in $(seq 50); do
+          if cannot_draw; then
+            failed=true
+            break
+          fi
+          if ! kill -0 "$pid" 2>/dev/null; then
+            # Ghostty has exited: give its last messages time to reach the log.
+            sleep 0.3
+            if cannot_draw; then failed=true; fi
+            break
+          fi
+          sleep 0.1
+        done
+        rm -f "$log"
+        if [ "$failed" = false ]; then
+          status=0
+          wait "$pid" || status=$?
+          exit "$status"
+        fi
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+        echo "Ghostty cannot draw on this computer (OpenGL 4.3 is missing); opening GNOME Console." >&2
+      fi
+      if command -v nixorium-console >/dev/null; then exec nixorium-console "$SESSION"; fi
+      if command -v gnome-terminal >/dev/null; then exec gnome-terminal --title=Nixorium -- "$SESSION"; fi
+      if command -v xterm >/dev/null; then exec xterm -T Nixorium -e "$SESSION"; fi
       echo "No terminal application is installed; open a terminal and run: nixorium" >&2
       exit 1
     '';
   };
+  nixoriumOpen = nixoriumOpenAs { name = "nixorium-open"; class = dashboardWindowClass; };
+  # The teacher's icon opens this when the classroom view is off. Its window
+  # carries the classroom icon's class, so the dock groups it with the icon.
+  classroomDashboardOpen = nixoriumOpenAs { name = "nixorium-classroom-dashboard"; class = classroomWindowClass; };
+  classroomWindowClass = "nixorium-classroom";
   nixoriumLauncher = pkgs.makeDesktopItem {
     name = "nixorium";
     desktopName = "Nixorium";
@@ -705,14 +264,22 @@ let
       ${nixoriumPackage}/bin/nixorium classroom-view >/dev/null || exec ${nixoriumOpen}/bin/nixorium-open
     '';
   };
+  # The same desktop file name in both states, so the teacher's pinned icon
+  # keeps working. With the classroom view off it opens the Nixorium menu
+  # (power, Internet, schedule) directly.
+  classroomViewOn = labSettings.classroomView or true;
   classroomLauncher = pkgs.makeDesktopItem {
     name = "nixorium-classroom";
-    desktopName = "Classroom view";
-    comment = "See and manage the student computers of this classroom";
-    exec = "${classroomOpen}/bin/nixorium-classroom-open";
+    desktopName = if classroomViewOn then "Classroom view" else "Nixorium classroom";
+    comment = if classroomViewOn
+      then "See and manage the student computers of this classroom"
+      else "Switch computers on and off, pause Internet, set the schedule";
+    exec = if classroomViewOn
+      then "${classroomOpen}/bin/nixorium-classroom-open"
+      else "${classroomDashboardOpen}/bin/nixorium-classroom-dashboard";
     icon = "${../assets/nixorium-icon.svg}";
     categories = [ "Education" ];
-    startupWMClass = "nixorium-classroom";
+    startupWMClass = classroomWindowClass;
   };
 
   # Remove this controller's old system generations reviewed under the
@@ -751,6 +318,17 @@ in
     users.users.admin.extraGroups = [ "nixorium-operations" "nixorium-classroom" ];
     users.users.${labSettings.teacherUser}.extraGroups = [ "nixorium-classroom" ];
 
+    # Whether this controller offers the classroom view, for the TUI, the
+    # commands and the classroom worker. Written by apply to the controller,
+    # like the dock icon below; a missing file means off.
+    environment.etc."nixorium/classroom-view.json" = {
+      mode = "0444";
+      text = builtins.toJSON {
+        schemaVersion = 1;
+        enabled = labSettings.classroomView or true;
+      };
+    };
+
     environment.etc."nixorium/deployment-path" = {
       text = "${cfg.deploymentPath}\n";
       mode = "0444";
@@ -761,10 +339,9 @@ in
     environment.systemPackages = [
       nixoriumPackage
       nixoriumLauncher
-      pkgs.colmena
       pkgs.git
-    ] ++ lib.optionals (labSettings.classroomView or true) [
       classroomLauncher
+    ] ++ lib.optionals classroomViewOn [
       # The classroom view's Send files opens it to choose a file or folder.
       pkgs.zenity
     ];
@@ -800,8 +377,9 @@ in
                /^nixorium-clean-generations@[0-9a-f]{16}\.service$/.test(unit) ||
                unit == "nixorium-pxe-recover.service")) ||
              (unit == "nixorium-pxe.service" &&
-              (verb == "start" || verb == "stop")) ||
-             (unit == "nixorium-pxe-network.service" && verb == "stop")) &&
+              (verb == "start" || verb == "stop" || verb == "reset-failed")) ||
+             (unit == "nixorium-pxe-network.service" &&
+              (verb == "stop" || verb == "reset-failed"))) &&
             subject.isInGroup("wheel")) {
           return polkit.Result.YES;
         }
@@ -814,6 +392,7 @@ in
       "d /var/cache/nixorium/admin 0700 admin users -"
       "d /var/lib/nixorium/coordination 0770 root nixorium-operations -"
       "f /var/lib/nixorium/coordination/operation.lock 0660 root nixorium-operations -"
+      "f /var/lib/nixorium/coordination/classroom.lock 0660 root nixorium-operations -"
       "d /var/lib/nixorium/remote-install 0700 admin users -"
       "d /var/lib/nixorium/remote-install/logs 0700 admin users -"
       "d /home/admin/.local 0700 admin users -"
@@ -843,7 +422,7 @@ in
           "/var/lib/nixorium/coordination"
         ];
         NoNewPrivileges = true;
-        CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_DAC_OVERRIDE" "CAP_FOWNER" ];
+        CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_DAC_OVERRIDE" "CAP_FOWNER" "CAP_SETUID" "CAP_SETGID" ];
       };
     };
 
@@ -1021,15 +600,21 @@ in
       };
     };
 
-    # Client updates queued for computers that were off: each pass updates,
-    # one at a time and under the operation gate, those that answer again
-    # (nixorium deploy queue run). Without a queue nothing starts.
+    # Client updates queued for computers that were off: each pass updates
+    # those that answer again together, with one ordinary update under the
+    # operation gate (nixorium deploy queue run). Without a queue nothing
+    # starts.
     systemd.services.nixorium-deferred-updates = {
       description = "Apply queued Nixorium client updates to computers that are back";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
-      unitConfig.ConditionPathExists = "/var/lib/nixorium/coordination/deferred-updates.json";
-      path = [ pkgs.colmena pkgs.git pkgs.nix pkgs.openssh pkgs.util-linux ];
+      # It also runs while an interrupted client update waits, so that the
+      # record closes itself once every computer's result is known.
+      unitConfig.ConditionPathExists = [
+        "|/var/lib/nixorium/coordination/deferred-updates.json"
+        "|/var/lib/nixorium/coordination/deployment-pending.json"
+      ];
+      path = [ pkgs.git pkgs.nix pkgs.openssh pkgs.util-linux ];
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${nixoriumPackage}/bin/nixorium --repo ${lib.escapeShellArg cfg.deploymentPath} deploy queue run";
@@ -1037,7 +622,8 @@ in
         Group = "users";
         SupplementaryGroups = [ "nixorium-operations" ];
         UMask = "0077";
-        TimeoutStartSec = "3h";
+        # One build (at most 6 h) and one apply (at most 2 h) per pass.
+        TimeoutStartSec = "9h";
         Environment = [
           "XDG_CACHE_HOME=/var/cache/nixorium/admin"
           "XDG_STATE_HOME=/home/admin/.local/state"

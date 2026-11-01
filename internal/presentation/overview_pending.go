@@ -30,7 +30,7 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 			add("pending-jobs", managedJobTitle(job.Operation)+" — "+job.State, "View observed progress and its journal. No job will be started.")
 		}
 	}
-	for _, condition := range model.recovery.Conditions {
+	for _, condition := range model.recovery.report.Conditions {
 		switch condition.Kind {
 		case domain.RecoveryDeploymentPending:
 			add("pending-deploy-recovery", condition.Title, condition.Detail)
@@ -109,11 +109,71 @@ func (model dashboardModel) refreshOverview() (tea.Model, tea.Cmd) {
 		model.message = "Local refresh is unavailable in this session."
 		return model, nil
 	}
+	model.overviewReads++
 	model.busy = "Refreshing local configuration and service observations"
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		report, setup, err := model.actions.LoadInitial(ctx)
 		return overviewRefreshMsg{report: report, setup: setup, err: err, usbReserved: model.usbReservationPresent(), recovery: model.observeRecovery(ctx)}
 	})
+}
+
+// overviewQuietRefreshMsg re-reads the local observations the Overview lists
+// when the administrator returns to it, without a busy screen or a message.
+type overviewQuietRefreshMsg struct {
+	report      domain.StatusReport
+	setup       domain.SetupReport
+	err         error
+	usbReserved bool
+	recovery    domain.RecoveryReport
+	jobs        []domain.ManagedJob
+	jobsErr     error
+	jobsID      uint64
+	read        uint64
+}
+
+// withQuietOverviewRefresh re-reads, in the background, what the Overview
+// lists, so items about finished work disappear without pressing r.
+func (model dashboardModel) withQuietOverviewRefresh(command tea.Cmd) (dashboardModel, tea.Cmd) {
+	if model.actions.LoadInitial == nil || model.actions.ClassroomMode || model.busy != "" {
+		return model, command
+	}
+	model.jobs.id++
+	model.overviewReads++
+	id, read := model.jobs.id, model.overviewReads
+	return model, tea.Batch(command, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+		defer cancel()
+		jobs, jobsErr := model.observeManagedJobs(ctx)
+		report, setup, err := model.actions.LoadInitial(ctx)
+		return overviewQuietRefreshMsg{report: report, setup: setup, err: err, usbReserved: model.usbReservationPresent(), recovery: model.observeRecovery(ctx), jobs: jobs, jobsErr: jobsErr, jobsID: id, read: read}
+	})
+}
+
+func (model dashboardModel) finishQuietOverviewRefresh(message overviewQuietRefreshMsg) (tea.Model, tea.Cmd) {
+	// Starting the refresh took a new identity for the job observations and
+	// dropped the pending tick of the previous polling chain. This is the only
+	// place that can start the new chain, whatever happens to the rest of the
+	// result: without it a finished job would stay "running" forever.
+	var poll tea.Cmd
+	if message.jobsID == model.jobs.id {
+		poll = model.scheduleManagedJobsTick()
+	}
+	if message.err != nil || model.busy != "" || message.read != model.overviewReads {
+		return model, poll
+	}
+	if message.jobsID == model.jobs.id {
+		model.jobs.items, model.jobs.err = message.jobs, message.jobsErr
+	}
+	message.report.PXEPreparation = model.report.PXEPreparation
+	message.report.Meta = model.report.Meta
+	model.report, model.setup = message.report, message.setup
+	model.usbReserved = message.usbReserved
+	model.observeSetupController(message.setup)
+	model.observeRecoveryController(message.recovery)
+	if model.screen == dashboardHome {
+		model.syncHomeTasks()
+	}
+	return model, poll
 }
 
 func (model *dashboardModel) syncHomeTasks() {

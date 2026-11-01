@@ -50,11 +50,8 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 	case dashboardDeploy:
 		switch key.String() {
 		case "esc", "left":
-			destination := dashboardHome
-			if model.context != "" {
-				destination = dashboardSoftware
-				model.context = ""
-			}
+			destination := model.escDestination()
+			model.context, model.origin = "", dashboardHome
 			return model, deploymentIntent{kind: deploymentCloseIntent, destination: destination}
 		case "up", "k":
 			model.cursor = max(0, model.cursor-1)
@@ -93,28 +90,15 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 		case "esc":
 			model.confirmation = ""
 			return model, deploymentIntent{kind: deploymentCloseIntent, destination: dashboardDeploy, message: "Deployment cancelled; no build or apply was started."}
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
-			if model.confirmation != "DEPLOY" {
-				model.confirmation = ""
-				return model, deploymentIntent{message: "Confirmation did not match; no build or apply was started."}
-			}
+			// The review on screen is the confirmation; the application still
+			// rechecks its token, revision and computers before any apply.
 			model.applying = true
 			model.progress = domain.DeploymentProgress{}
 			model.recent = nil
 			model.started = time.Now()
 			model.confirmation = ""
 			return model, deploymentIntent{kind: deploymentApplyIntent}
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
-			}
 		}
 	}
 	return model, deploymentIntent{}
@@ -127,6 +111,9 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 	if model.screen == dashboardDeploy && model.deployment.result.Operation == "" && !model.deployment.applying {
 		switch key.String() {
 		case "r":
+			// A fresh check supersedes the availability the last review
+			// probed, which the selection would otherwise keep showing.
+			model.deployment.plan.Availability = nil
 			return model.checkComputersThen()
 		case "n":
 			chosen, message := model.selectComputers(model.deployment.chosen, hostNeedsUpdate, "No computer needed an update at the last check.")
@@ -151,7 +138,7 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		previous := model.deployment.plan
 		model.busy = "Creating a fresh review for the reachable computers"
 		model.message = ""
-		return model.startRead(func(ctx context.Context) tea.Msg {
+		return model.startBoundedRead(dashboardBuildTimeout, func(ctx context.Context) tea.Msg {
 			return dashboardDeploymentPlanMsg{report: model.actions.PlanReachableDeployment(ctx, previous)}
 		})
 	case deploymentCloseIntent:
@@ -176,7 +163,7 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		model.busy = "Building and applying the reviewed deployment"
 		model.message = ""
 		plan := model.deployment.plan
-		events := make(chan tea.Msg)
+		events := make(chan tea.Msg, deploymentEventBuffer)
 		model.deployment.events = events
 		ctx, cancel := context.WithCancel(context.Background())
 		model.deployment.cancel = cancel
@@ -228,4 +215,24 @@ func deploymentSelectionLabel(plan domain.DeploymentPlanReport, host domain.Host
 		}
 	}
 	return deploymentStateLabel(observed, found)
+}
+
+// escDestination is where Esc leaves the computer selection: the screen of
+// the saved change that opened it, or Computers.
+func (model deploymentModel) escDestination() dashboardScreen {
+	if model.context != "" && model.origin != dashboardHome {
+		return model.origin
+	}
+	return dashboardComputersArea
+}
+
+// escLabel names that destination in the key footer.
+func (model deploymentModel) escLabel() string {
+	switch model.escDestination() {
+	case dashboardComputersArea:
+		return "Computers"
+	case dashboardSoftware:
+		return "Software"
+	}
+	return "Back"
 }

@@ -99,3 +99,22 @@ func TestRemotePreparationDiscardRemovesOnlySelectedGCRoots(t *testing.T) {
 		t.Fatalf("idempotent discard: %v", err)
 	}
 }
+
+func TestRemoteLiveAddressPresentAcceptsAnotherCard(t *testing.T) {
+	facts := domain.RemoteMachineFacts{Interfaces: []domain.RemoteNetworkInterface{
+		{Name: "enp1s0"},
+		{Name: "wlp2s0", Addresses: []string{"192.0.2.20"}},
+	}}
+	// The declared card has no address: the dashboard decides what to do
+	// with the card that carries it.
+	if !remoteLiveAddressPresent(facts, "enp1s0", "192.0.2.20") {
+		t.Fatal("a live address on another card stopped the preparation")
+	}
+	if remoteLiveAddressPresent(facts, "enp1s0", "192.0.2.21") {
+		t.Fatal("a vanished live address was accepted")
+	}
+	facts.Interfaces[0].Addresses = []string{"192.0.2.20"}
+	if !remoteLiveAddressPresent(facts, "enp1s0", "192.0.2.20") {
+		t.Fatal("the declared card was not accepted")
+	}
+}

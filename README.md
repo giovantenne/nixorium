@@ -16,7 +16,10 @@ applications locally and returns to a clean desktop at every boot.
 [Releases](https://github.com/giovantenne/nixorium/releases)
 
 
-https://github.com/user-attachments/assets/3dfc054b-4f10-40a4-b26a-1c317d0d7fcf
+
+
+https://github.com/user-attachments/assets/956a1608-c1f2-446b-867d-5e9605bc8900
+
 
 
 
@@ -53,6 +56,13 @@ in plain language and review them before saving.
 
 The **Community Edition** is free and open source.
 
+Assistant grew out of the maintainer's own lab: for customizations the menu
+does not offer, asking an AI had become more common than editing the
+configuration by hand, so it became a bounded, reviewed part of the product.
+It is paid because every request runs on a commercial AI model; the
+subscription also supports Nixorium's development, and Nixorium stays complete
+and MIT-licensed without it.
+
 ![The Nixorium administrator menu, with Computers, Installation, Software, Maintenance and the optional Assistant area enabled](docs/images/nixorium-tui.png)
 
 - **One description, every PC.** Add software or change the student desktop
@@ -76,8 +86,8 @@ The **Community Edition** is free and open source.
   Assistant can also inspect bounded computer diagnostics and saved configuration
   history after renewed consent, without changing systems or Git.
 
-Under the hood: NixOS builds every PC from the same description, Colmena
-deploys it, Harmonia serves the cache and Disko lays out the disks.
+Under the hood: NixOS builds every PC from the same description, Nixorium
+copies and activates it, Harmonia serves the cache and Disko lays out the disks.
 
 [Administrator guide](templates/site/README.md) · [Menu tour](docs/tui-gallery.md)
 
@@ -95,9 +105,13 @@ together. Open **Nixorium** for the restricted classroom dashboard.
   sidebar.
 - **Help students from your desk.** See every student screen at once, open
   one in its own window, take control or save a screenshot of it, lock
-  screens, show students a message, start an exam in one click (Internet off,
-  screens locked, a message), collect students' files from their desktops,
+  screens, show students a message, collect students' files from their desktops,
   share your own screen, and send a file or folder to the students' desktops.
+  Students can tell when the classroom view is open: while it is, GNOME shows
+  its screen-sharing indicator at the top of their screen. Live screens are
+  shown, not recorded; a file is written only when you save a screenshot or
+  collect files, into your own home folder on the controller. Nothing leaves
+  the laboratory network.
 - **Control the room.** See which PCs are on, switch them on from the
   classroom view, pause or restore Internet on selected PCs, and shut them
   down or restart them. Teacher controls do not change the laboratory
@@ -122,16 +136,16 @@ start with one controller and one client of your own.
 Two 64-bit PCs with UEFI that you can erase (or two virtual machines), a USB
 stick with the official [NixOS ISO](https://nixos.org/download/#nixos-iso)
 (Minimal for a text console, or Graphical with GNOME),
-Internet on the controller, and a network where the two PCs reach each other.
+Internet on the controller, and a wired network where the two PCs reach each
+other: the laboratory network uses Ethernet cables, not Wi-Fi.
 Installation erases the disk you confirm on each PC: back up anything you need
 first.
 
 Network installation also needs UEFI network boot on the clients and permission
-to run ProxyDHCP beside the existing DHCP server; Wi-Fi may not support it,
-and USB over SSH works without it, including over Wi-Fi. An installed client
-uses a wired card unless its
-[network interface name](templates/site/README.md#configuration-and-first-run-setup)
-is set in the lab settings. The
+to run ProxyDHCP beside the existing DHCP server; USB over SSH works without
+it. The USB live system may reach the controller over Wi-Fi during the
+installation, but an installed computer uses its wired card: connect the cable
+before it restarts. The
 [administrator guide](templates/site/README.md#requirements-for-installing-clients)
 lists the network, storage and console requirements in full.
 
@@ -278,4 +292,5 @@ change the license or grant privileged access to releases or decisions.
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE). The Nixorium name and logo are
+covered by the [trademark policy](TRADEMARKS.md).

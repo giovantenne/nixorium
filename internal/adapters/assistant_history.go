@@ -108,6 +108,7 @@ func (store AssistantWorkspaceStore) CompleteTurn(c domain.AssistantConversation
 	defer root.Close()
 	metadata.LastActivityAt = time.Now().UTC().Format(time.RFC3339Nano)
 	metadata.Title = domain.AssistantConversationTitle(messages)
+	metadata.Unfinished = answer == nil
 	if answer != nil {
 		text := domain.AssistantHistoryText(*answer, 2000)
 		metadata.LastAnswer = &text

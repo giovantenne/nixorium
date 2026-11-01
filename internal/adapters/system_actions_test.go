@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -138,5 +139,21 @@ func TestControlSystemUnitKeepsManagedJobConflictForControllerApply(t *testing.T
 	}, "start", "nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service")
 	if !errors.Is(err, busy) || called {
 		t.Fatalf("controller apply ignored a managed job in flight: err=%v called=%t", err, called)
+	}
+}
+
+func TestUnitFailureCauseNamesWhatTheAdministratorCanFix(t *testing.T) {
+	offline := "Building the reviewed controller system\nwarning: unable to download 'https://cache.nixos.org/x.narinfo': Could not resolve hostname (6) Could not resolve host: cache.nixos.org; retrying in 270 ms (attempt 1/5)\nerror: unable to download 'https://cache.nixos.org/x.narinfo': Could not resolve hostname (6) Could not resolve host: cache.nixos.org\nController apply stopped unexpectedly\n"
+	if got := unitFailureCause(offline); got != "the controller cannot reach the Internet: it could not find cache.nixos.org. Check its network cable and its DNS server, then try again" {
+		t.Fatalf("offline cause = %q", got)
+	}
+	if got := unitFailureCause("copying\nerror: writing to file: No space left on device\n"); !strings.Contains(got, "disk is full") {
+		t.Fatalf("disk cause = %q", got)
+	}
+	if got := unitFailureCause("building\nerror: builder for '/nix/store/x.drv' failed with exit code 2\nstopped\n"); got != "Nix reported: builder for '/nix/store/x.drv' failed with exit code 2" {
+		t.Fatalf("nix cause = %q", got)
+	}
+	if got := unitFailureCause("all good\nstopped\n"); got != "" {
+		t.Fatalf("unknown cause = %q", got)
 	}
 }

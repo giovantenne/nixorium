@@ -13,7 +13,7 @@ valid_plan() {
     bootId:"01234567-89ab-cdef-0123-456789abcdef",
     deploymentRevision:"0123456789abcdef0123456789abcdef01234567",
     systemPath:"/nix/store/00000000000000000000000000000000-nixos-system-pc01-test",
-    host:{name:"pc01",interface:"enp0s2",liveIp:"192.0.2.20",staticIp:"10.0.0.1"},
+    host:{name:"pc01",interface:"enp0s2",liveIp:"192.0.2.20",staticIp:"10.0.0.1",class:"pc01"},
     cache:{url:"http://192.0.2.10:5000",publicKey:"cache.example:YWJjZA=="},
     disk:{path:"/dev/sda",kname:"sda",majorMinor:"8:0",sizeBytes:17179869184,serial:"serial",wwn:"",model:"disk",transport:"sata",diskSeq:"1"},
     adminPublicKey:"ssh-ed25519 YWJjZA== admin@test",
@@ -46,6 +46,10 @@ test_noncanonical_or_unsafe_addresses_are_rejected() {
 test_cross_field_mismatch_is_rejected() {
   ! valid_plan | jq '.host.name = "pc02"' | "${HELPER_COMMAND[@]}" validate-plan >/dev/null 2>&1
   ! valid_plan | jq '.host.staticIp = .host.liveIp' | "${HELPER_COMMAND[@]}" validate-plan >/dev/null 2>&1
+  # A computer of a shared class installs the class system, and only it.
+  valid_plan | jq '.host.class = "shared-1" | .systemPath |= sub("nixos-system-pc01-"; "nixos-system-nixorium-client-shared-1-")' | "${HELPER_COMMAND[@]}" validate-plan >/dev/null
+  ! valid_plan | jq '.host.class = "shared-1"' | "${HELPER_COMMAND[@]}" validate-plan >/dev/null 2>&1
+  ! valid_plan | jq '.systemPath |= sub("nixos-system-pc01-"; "nixos-system-nixorium-client-shared-1-")' | "${HELPER_COMMAND[@]}" validate-plan >/dev/null 2>&1
 }
 
 test_size_limit_precedes_parsing() {

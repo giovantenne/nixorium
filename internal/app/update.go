@@ -82,6 +82,7 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 	report.Upstream = "github:" + snapshot.SourcePrefix
 	report.CurrentRef = snapshot.CurrentRef
 	report.CurrentRev = snapshot.CurrentRev
+	report.PinOutdated = snapshot.PinOutdated
 	baseline, baselineErr := parseUpdateRelease(snapshot.CurrentRef)
 	if baselineErr == nil {
 		report.CurrentChannel = baseline.Channel()
@@ -207,7 +208,7 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 		report.CurrentChannel = current.Channel()
 		if report.TargetChannel != domain.UpdateChannelMoving {
 			comparison := compareUpdateReleases(targetRelease, current)
-			if comparison == 0 {
+			if comparison == 0 && snapshot.PinOutdated == "" {
 				report = updatePlanIssue(report, "target", "target release is already configured")
 			} else if comparison < 0 {
 				report.Downgrade = true
@@ -256,12 +257,9 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 	report.Snapshot = snapshot
 	report.Proposal = proposal
 	report.Workspace = proposal.Workspace
+	report.Migrations = proposal.Migrations
 	report.ReviewToken = updateReviewToken(report, snapshot, proposal)
-	verb := "UPDATE"
-	if report.Downgrade {
-		verb = "DOWNGRADE"
-	}
-	report.Confirmation = verb
+	report.TargetRev = proposal.NixoriumRevision
 	report.State = "ready"
 	return report
 }
@@ -271,11 +269,6 @@ func emitUpdatePlanProgress(progress func(domain.UpdatePlanProgress), phase doma
 		return
 	}
 	progress(domain.UpdatePlanProgress{Phase: phase, Detail: detail, Current: current, Total: total})
-}
-
-func (m *UpdateManager) Apply(ctx context.Context, repository, target, expectedToken string, allowPrerelease, allowDowngrade bool) domain.UpdateApplyReport {
-	plan := m.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
-	return m.ApplyPlan(ctx, plan, expectedToken)
 }
 
 func (m *UpdateManager) ApplyPlan(ctx context.Context, plan domain.UpdatePlanReport, expectedToken string) domain.UpdateApplyReport {
@@ -336,6 +329,19 @@ func updateReviewToken(report domain.UpdatePlanReport, snapshot domain.UpdateInp
 	}
 	if report.Kind != "" {
 		fmt.Fprintf(digest, "%s\x00%t\x00%s\x00", report.Kind, report.AllowUnverified, report.Repository)
+	}
+	// The files the release's migrations change are part of what is reviewed.
+	if proposal.Migrator != "" {
+		fmt.Fprintf(digest, "migrator\x00%s\x00", proposal.Migrator)
+		_, _ = digest.Write(proposal.MigrationReport)
+		_, _ = digest.Write([]byte{0})
+	}
+	for _, file := range proposal.MigratedFiles {
+		fmt.Fprintf(digest, "migration\x00%s\x00%t\x00%t\x00%o\x00", file.Path, file.Create, file.Delete, file.Mode)
+		for _, content := range [][]byte{file.Before, file.After} {
+			_, _ = digest.Write(content)
+			_, _ = digest.Write([]byte{0})
+		}
 	}
 	if proposal.Workspace != nil || report.Workspace != nil {
 		// Bind both the displayed report and the retained proposal. Neither may

@@ -132,6 +132,17 @@ func TestAssistantSharingDefaultPersistenceAndConsentCompatibility(t *testing.T)
 			t.Fatal("toggle changed ordinary consent")
 		}
 	}
+	if consentTextVersionForTest := assistantConsentTextVersion; consentTextVersionForTest != 4 {
+		t.Fatal("saving-by-default text must be version 4")
+	}
+	// A version 3 consent (sharing off) must be asked again once, never authorize saving.
+	os.WriteFile(filepath.Join(store.Directory, "consent.json"), []byte(`{"schemaVersion":1,"acceptedAt":"2026-10-10T00:00:00Z","textVersion":3,"shareConversations":false}`), 0600)
+	if accepted, err := store.ReadConsent(); err != nil || accepted {
+		t.Fatal("version 3 consent still accepted", err)
+	}
+	if share, err := store.ReadSharing(); err != nil || share {
+		t.Fatal("old consent allows saving before the new consent", err)
+	}
 	// Earlier disclosure must be accepted again before logs or history are shared.
 	os.WriteFile(filepath.Join(store.Directory, "consent.json"), []byte(`{"schemaVersion":1,"acceptedAt":"2026-10-10T00:00:00Z","textVersion":1}`), 0600)
 	if share, err := store.ReadSharing(); err != nil || share {

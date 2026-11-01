@@ -39,7 +39,7 @@ var nextSteps = map[string]NextStep{
 	"DEPLOY-PENDING": {
 		Code:   "DEPLOY-PENDING",
 		Title:  "A previous update of the student computers was interrupted",
-		Why:    "Nixorium does not know how it ended on every computer, so the student computers wait until you review it.",
+		Why:    "Nixorium does not know how it ended on every computer, so maintenance waits until you review it; classroom controls leave only those computers alone.",
 		Action: "Review the interrupted update",
 		TUI:    "Overview", Command: "nixorium deploy recover plan", Screen: RecoveryDeploymentPending,
 	},
@@ -127,10 +127,24 @@ var nextSteps = map[string]NextStep{
 		Action: "Nothing to do",
 		TUI:    "Computers → Queued updates", Command: "nixorium deploy queue status", Screen: RecoveryDeferredUpdates,
 	},
+	"UPDATES-NEED-REVIEW": {
+		Code:   "UPDATES-NEED-REVIEW",
+		Title:  "A queued update needs a new review",
+		Why:    "The configuration changed after the update was queued, which the controller never sends on its own, or the update kept failing.",
+		Action: "Review the queued updates",
+		TUI:    "Computers → Queued updates", Command: "nixorium deploy queue status", Screen: RecoveryDeferredUpdates,
+	},
 	"BACKUP-DUE": {
 		Code:   "BACKUP-DUE",
 		Title:  "A backup of this laboratory is due",
 		Why:    "Keys and settings changed since the last one.",
+		Action: "Back up the lab",
+		TUI:    "Maintenance → Back up lab", Command: "nixorium backup plan --remote git@github.com:OWNER/REPOSITORY.git --branch main", Screen: RecoveryBackupDue,
+	},
+	"BACKUP-NONE": {
+		Code:   "BACKUP-NONE",
+		Title:  "This laboratory has no backup yet",
+		Why:    "Its keys and settings exist only on this controller.",
 		Action: "Back up the lab",
 		TUI:    "Maintenance → Back up lab", Command: "nixorium backup plan --remote git@github.com:OWNER/REPOSITORY.git --branch main", Screen: RecoveryBackupDue,
 	},
@@ -155,21 +169,19 @@ var nextSteps = map[string]NextStep{
 		Action: "Open Diagnostics and fix the first reported error",
 		TUI:    "Maintenance → Diagnostics", Command: "nixorium doctor", Stop: true,
 	},
+	"PIN-OUTDATED": {
+		Code:   "PIN-OUTDATED",
+		Title:  "The saved Nixorium version is recorded inconsistently",
+		Why:    "The student computers are built from a fixed copy of the saved configuration, which cannot correct this record by itself.",
+		Action: "Repeat the update for the configured Nixorium version",
+		TUI:    "Maintenance → Update Nixorium", Command: "nixorium update check",
+	},
 }
 
 // NextStepByCode returns a catalog entry.
 func NextStepByCode(code string) (NextStep, bool) {
 	step, found := nextSteps[code]
 	return step, found
-}
-
-// NextStepCodes lists every catalog code.
-func NextStepCodes() []string {
-	codes := make([]string, 0, len(nextSteps))
-	for code := range nextSteps {
-		codes = append(codes, code)
-	}
-	return codes
 }
 
 // BlockedError is a refusal caused by a catalogued situation. Its text stays
@@ -236,24 +248,9 @@ func EvaluationIssue(field, what string, err error) ValidationIssue {
 	return BlockedIssue(field, code, fmt.Sprintf("evaluate %s: %v", what, err))
 }
 
-// NextStepForError recognizes a catalogued situation in an error: a typed
-// refusal first, then the text of the error.
-func NextStepForError(err error) (NextStep, bool) {
-	if err == nil {
-		return NextStep{}, false
-	}
-	var coder blockedCoder
-	if errors.As(err, &coder) {
-		if step, found := nextSteps[coder.BlockedCode()]; found {
-			return step, true
-		}
-	}
-	return NextStepFor(err.Error())
-}
-
 // NextStepFor recognizes the shared blocking situations in an operator
 // message. Messages that already carry a code (teacher text) are left alone.
-// Typed refusals are recognized by NextStepForError before their text is
+// Typed refusals are recognized by BlockedCodeOf before their text is
 // matched here.
 func NextStepFor(message string) (NextStep, bool) {
 	text := strings.ToLower(message)
@@ -292,6 +289,8 @@ func NextStepFor(message string) (NextStep, bool) {
 		code = "CLIENT-UNCONFIRMED"
 	case has("disk space may be too low", "low nix store disk space"):
 		code = "DISK-LOW"
+	case has("flake.lock does not match flake.nix", "requires lock file changes", `flake.lock": read-only file system`):
+		code = "PIN-OUTDATED"
 	case has("nix evaluation rejected", "evaluate labmeta"):
 		code = "EVAL-FAILED"
 	default:
@@ -357,3 +356,7 @@ func BlockedIssue(field, code, message string) ValidationIssue {
 	}
 	return issue
 }
+
+// ClassroomBusyReason is why a classroom control (Internet access, power)
+// leaves a computer alone: it is named in an unfinished client update.
+const ClassroomBusyReason = "it is being updated, or its last update was interrupted; try again when the administrator has finished"

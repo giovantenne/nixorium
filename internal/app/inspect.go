@@ -328,6 +328,9 @@ func (i *Inspector) addLocalFindings(ctx context.Context, repository string, rep
 			add(domain.Finding{ID: "RECOVERY-" + strings.ToUpper(condition.Kind), Level: level, Summary: condition.Title, Evidence: condition.Detail, Remediation: remediation})
 		}
 	}
+	if issue, found := flakePinIssue(i.source, repository); found {
+		add(domain.Finding{ID: "PIN-OUTDATED", Level: domain.LevelError, Summary: "flake.lock does not match flake.nix; updating the computers will fail", Evidence: issue.Message, Remediation: "Select the configured version again in Maintenance → Update Nixorium (`nixorium update plan --target <configured version>`), or run `nix flake lock` in the deployment folder and save flake.lock in Maintenance → Review Git changes"})
+	}
 	if clock, ok := i.source.(clockSource); ok {
 		if synchronized, err := clock.ClockSynchronized(); err == nil && !synchronized {
 			add(domain.Finding{ID: "TIME-SYNC", Level: domain.LevelWarning, Summary: "The controller clock is not synchronized", Remediation: "Check network time (`timedatectl`); review expiry and update checks depend on a correct clock."})
@@ -335,6 +338,42 @@ func (i *Inspector) addLocalFindings(ctx context.Context, repository string, rep
 			add(domain.Finding{ID: "TIME-SYNC", Level: domain.LevelOK, Summary: "The controller clock is synchronized"})
 		}
 	}
+	if finding, found := lastControllerApplyFailure(i.source); found {
+		add(finding)
+	}
+}
+
+type operationRecordSource interface {
+	OperationRecords(int) ([]domain.OperationRecord, error)
+}
+
+// lastControllerApplyFailure reports the latest controller apply when it
+// failed, with its recorded cause, so Diagnostics shows it after the screen
+// that reported it is gone. A later successful apply clears it.
+func lastControllerApplyFailure(source any) (domain.Finding, bool) {
+	records, ok := source.(operationRecordSource)
+	if !ok {
+		return domain.Finding{}, false
+	}
+	recent, err := records.OperationRecords(20)
+	if err != nil {
+		return domain.Finding{}, false
+	}
+	for _, record := range recent {
+		if record.Operation != "controller-apply" && record.Operation != "setup-apply-controller" {
+			continue
+		}
+		if record.State != "failed" {
+			return domain.Finding{}, false
+		}
+		return domain.Finding{
+			ID: "LAST-CONTROLLER-APPLY", Level: domain.LevelWarning,
+			Summary:     "The last apply to the controller failed",
+			Evidence:    record.RecordedAt.Local().Format("2006-01-02 15:04") + ": " + record.Summary,
+			Remediation: "Fix the cause shown, then apply again in Maintenance → Apply to controller (`nixorium controller plan`).",
+		}, true
+	}
+	return domain.Finding{}, false
 }
 
 func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusReport, options DoctorOptions) domain.DoctorReport {
@@ -354,10 +393,10 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 		}
 	}
 
-	add(domain.Finding{ID: "CONFIG-EVAL", Level: domain.LevelOK, Summary: "Typed deployment configuration evaluates", Evidence: fmt.Sprintf("labMeta schema %d, Nixorium %s", status.Meta.SchemaVersion, status.Meta.Version)})
-	add(domain.Finding{ID: "NETWORK-SUBNET", Level: domain.LevelOK, Summary: "Static network and host offsets passed typed validation", Evidence: fmt.Sprintf("%s/%d; controller %s", status.Meta.Network.Base, status.Meta.Network.PrefixLength, status.Meta.Controller.StaticIP)})
+	add(domain.Finding{ID: "CONFIG-EVAL", Level: domain.LevelOK, Summary: "Lab configuration can be read", Evidence: fmt.Sprintf("labMeta schema %d, Nixorium %s", status.Meta.SchemaVersion, status.Meta.Version)})
+	add(domain.Finding{ID: "NETWORK-SUBNET", Level: domain.LevelOK, Summary: "Lab network settings are consistent", Evidence: fmt.Sprintf("%s/%d; controller %s", status.Meta.Network.Base, status.Meta.Network.PrefixLength, status.Meta.Controller.StaticIP)})
 	if status.Deployment.Ready {
-		add(domain.Finding{ID: "DEPLOYMENT-READY", Level: domain.LevelOK, Summary: "Deployment has no reported readiness blockers"})
+		add(domain.Finding{ID: "DEPLOYMENT-READY", Level: domain.LevelOK, Summary: "Lab configuration is ready to deploy"})
 	} else {
 		add(domain.Finding{ID: "DEPLOYMENT-READY", Level: domain.LevelError, Summary: "Deployment is not ready", Evidence: strings.Join(status.Deployment.Issues, "; "), Remediation: "Resolve each deploymentStatus issue before installation or deployment."})
 	}
@@ -370,11 +409,11 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 
 	i.addNetworkFindings(status, add)
 	if status.PXEPreparation.Ready {
-		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelOK, Summary: "Managed PXE artifacts and client closures are current", Evidence: status.PXEPreparation.Detail})
+		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelOK, Summary: "Network-boot files and client systems are up to date", Evidence: status.PXEPreparation.Detail})
 	} else if status.PXEPreparation.Present {
-		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Managed PXE preparation is stale or invalid", Evidence: status.PXEPreparation.Detail, Remediation: "Review the reported mismatch and run `nixorium pxe prepare` again."})
+		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Network-boot preparation is out of date", Evidence: status.PXEPreparation.Detail, Remediation: "Review the reported mismatch and run `nixorium pxe prepare` again."})
 	} else {
-		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Managed PXE preparation has not run", Remediation: "Run `nixorium pxe prepare` before starting installation mode."})
+		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Network-boot preparation has not been done yet", Remediation: "Prepare the installation files in Installation → Network boot (PXE) (`nixorium pxe prepare`) before starting network installation."})
 	}
 	for _, artifact := range status.Artifacts {
 		level := domain.LevelOK
@@ -405,9 +444,9 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 	case "ready", "stopped":
 		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelOK, Summary: "PXE installation mode is " + status.PXE.Mode, Evidence: status.PXE.Detail})
 	case "degraded", "recovery-required":
-		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelError, Summary: "PXE lifecycle requires recovery", Evidence: status.PXE.Detail, Remediation: "Run `nixorium pxe recover` before starting installation mode again."})
+		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelError, Summary: "Network installation needs recovery", Evidence: status.PXE.Detail, Remediation: "Recover the controller network in Installation → Network boot (PXE) (`nixorium pxe recover`) before starting network installation again."})
 	default:
-		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelWarning, Summary: "PXE lifecycle is unavailable", Evidence: status.PXE.Detail})
+		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelWarning, Summary: "Network installation state is unavailable", Evidence: status.PXE.Detail})
 	}
 
 	i.addCacheKeyFinding(ctx, status.Repository, add)
@@ -424,7 +463,7 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 		add(domain.Finding{ID: "DISK-FREE", Level: domain.LevelWarning, Summary: "Available disk space could not be determined", Evidence: freeErr.Error()})
 	}
 
-	for _, command := range []string{"nix", "git", "systemctl", "ssh", "colmena"} {
+	for _, command := range []string{"nix", "git", "systemctl", "ssh", "nix-copy-closure"} {
 		if i.source.CommandAvailable(command) {
 			add(domain.Finding{ID: "COMMAND-" + strings.ToUpper(command), Level: domain.LevelOK, Summary: command + " is available"})
 		} else {
@@ -456,7 +495,7 @@ func (i *Inspector) addNetworkFindings(status domain.StatusReport, add func(doma
 		} else if status.PXEPreparation.Ready && status.PXEPreparation.DHCPAddress != "" && containsAddress(addresses, status.PXEPreparation.DHCPAddress) {
 			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelOK, Summary: "Prepared runtime controller address is assigned", Evidence: fmt.Sprintf("prepared: %s; configured hint: %s", status.PXEPreparation.DHCPAddress, status.Meta.Controller.DHCPIP)})
 		} else {
-			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelWarning, Summary: "Configured controller DHCP address is not currently assigned", Evidence: "configured hint: " + status.Meta.Controller.DHCPIP, Remediation: "Run `nixorium pxe prepare`; it will capture the live address when exactly one non-static candidate exists."})
+			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelWarning, Summary: "Configured controller DHCP address is not currently assigned", Evidence: "configured hint: " + status.Meta.Controller.DHCPIP, Remediation: "Usually harmless: the school network gave the controller a new address. Preparing the installation files again (Installation → Network boot (PXE), or `nixorium pxe prepare`) uses the current one when there is exactly one candidate."})
 		}
 	}
 
@@ -475,26 +514,26 @@ func (i *Inspector) addNetworkFindings(status domain.StatusReport, add func(doma
 func (i *Inspector) addCacheKeyFinding(ctx context.Context, repository string, add func(domain.Finding)) {
 	key, err := i.source.CacheKeyState(ctx, repository)
 	if err != nil {
-		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelError, Summary: "Harmonia signing key could not be verified", Evidence: err.Error(), Remediation: "Inspect the key files without copying private material into Git or logs."})
+		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelError, Summary: "Software cache signing key could not be checked", Evidence: err.Error(), Remediation: "Inspect the key files without copying private material into Git or logs."})
 		return
 	}
 	if !key.PrivatePresent {
-		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelWarning, Summary: "Harmonia signing key is missing", Remediation: "Generate the signing key outside Git before starting Harmonia."})
+		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelWarning, Summary: "Software cache signing key is missing", Remediation: "Generate the signing key outside Git before starting Harmonia."})
 		return
 	}
 	if key.PrivateMode&0077 != 0 {
-		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelError, Summary: "Harmonia signing key permissions are too broad", Evidence: fmt.Sprintf("mode %04o", key.PrivateMode), Remediation: "Restrict the signing key to its owner."})
+		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelError, Summary: "Software cache signing key is readable by too many users", Evidence: fmt.Sprintf("mode %04o", key.PrivateMode), Remediation: "Restrict the signing key to its owner."})
 		return
 	}
 	if !key.PublicPresent {
-		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelError, Summary: "Harmonia public key is missing", Remediation: "Derive and add only the public key to the private deployment."})
+		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelError, Summary: "Software cache public key is missing", Remediation: "Derive and add only the public key to the private deployment."})
 		return
 	}
 	if !key.Matches {
-		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelError, Summary: "Harmonia public key does not match the signing key", Remediation: "Derive the public key again; do not overwrite the private key."})
+		add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelError, Summary: "Software cache public key does not match the signing key", Remediation: "Derive the public key again; do not overwrite the private key."})
 		return
 	}
-	add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelOK, Summary: "Harmonia signing/public key pair matches and private permissions are restricted", Evidence: fmt.Sprintf("private mode %04o", key.PrivateMode)})
+	add(domain.Finding{ID: "CACHE-SIGNING-KEY", Level: domain.LevelOK, Summary: "Software cache signing key is present and protected", Evidence: fmt.Sprintf("private mode %04o", key.PrivateMode)})
 }
 
 func (i *Inspector) addCacheHealthFinding(ctx context.Context, status domain.StatusReport, add func(domain.Finding)) {
@@ -517,13 +556,13 @@ func (i *Inspector) addCacheHealthFinding(ctx context.Context, status domain.Sta
 	errorsByAddress := []string{}
 	for _, address := range addresses {
 		if err := i.source.CacheHealth(ctx, address, status.Meta.Network.CachePort); err == nil {
-			add(domain.Finding{ID: "CACHE-HEALTH", Level: domain.LevelOK, Summary: "Binary cache responds with valid Nix cache metadata", Evidence: fmt.Sprintf("%s:%d", address, status.Meta.Network.CachePort)})
+			add(domain.Finding{ID: "CACHE-HEALTH", Level: domain.LevelOK, Summary: "Software cache responds correctly", Evidence: fmt.Sprintf("%s:%d", address, status.Meta.Network.CachePort)})
 			return
 		} else {
 			errorsByAddress = append(errorsByAddress, address+": "+err.Error())
 		}
 	}
-	add(domain.Finding{ID: "CACHE-HEALTH", Level: domain.LevelWarning, Summary: "Binary cache is not reachable", Evidence: strings.Join(errorsByAddress, "; "), Remediation: "Start Harmonia and verify its configured address, port, and signing key."})
+	add(domain.Finding{ID: "CACHE-HEALTH", Level: domain.LevelWarning, Summary: "Software cache is not reachable", Evidence: strings.Join(errorsByAddress, "; "), Remediation: "Start Harmonia and verify its configured address, port, and signing key."})
 }
 
 func (i *Inspector) addPortFindings(status domain.StatusReport, add func(domain.Finding)) {

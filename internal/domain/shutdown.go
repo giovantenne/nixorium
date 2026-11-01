@@ -87,6 +87,20 @@ func (r ShutdownPlanReport) HasErrors() bool {
 	return r.State == "blocked" || r.State == "failed" || len(r.Issues) > 0
 }
 
+// InterruptsSessions reports whether an eligible computer has a session that
+// is in use or whose state is unknown, so that student work may be lost. Only
+// then the operator types the action word (ADR 0026, amended 2026-10-19);
+// when every eligible computer is idle or only logged in without recent
+// input, Enter confirms the review.
+func (r ShutdownPlanReport) InterruptsSessions() bool {
+	for _, target := range r.Targets {
+		if target.Eligible && (target.Session == ShutdownSessionActive || target.Session == ShutdownSessionUnknown) {
+			return true
+		}
+	}
+	return false
+}
+
 type ShutdownTargetOutcome struct {
 	Name            string `json:"name"`
 	State           string `json:"state"`

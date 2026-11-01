@@ -97,7 +97,7 @@ func assistantFlowFixture(t *testing.T, handler http.HandlerFunc) (dashboardMode
 	client := adapters.AssistantClient{Endpoint: server.URL + "/v1", Version: "3.2.0"}
 	actions := DashboardActions{Assistant: domain.AssistantConfig{Enabled: true, Endpoint: server.URL + "/v1", SubscribeURL: "https://example.org/subscribe"}, AssistantService: &AssistantActions{
 		ReadToken: store.ReadToken, WriteToken: store.WriteToken, DeleteToken: store.DeleteToken,
-		ReadConsent: store.ReadConsent, WriteConsent: store.WriteConsent, Activate: client.Activate,
+		ReadConsent: store.ReadConsent, WriteConsent: store.WriteConsent, WriteConsentSharing: store.WriteConsentSharing, ReadSharing: store.ReadSharing, WriteSharing: store.WriteSharing, Activate: client.Activate,
 	}}
 	fixture := &assistantFlowStore{AssistantStateStore: store}
 	runner := app.AssistantTurnRunner{Client: client, Store: fixture, Tools: fixture, Version: client.Version}
@@ -105,7 +105,7 @@ func assistantFlowFixture(t *testing.T, handler http.HandlerFunc) (dashboardMode
 	actions.AssistantService.PrepareConversation = func(string) (domain.AssistantConversation, error) {
 		return domain.AssistantConversation{ID: flowTurnID}, nil
 	}
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, actions, false)
+	m := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}), withActions(actions))
 	m.width, m.height = 120, 30
 	opened, _ := m.openAssistant()
 	m = opened.(dashboardModel)
@@ -531,19 +531,24 @@ type assistantFlowStore struct {
 func (s *assistantFlowStore) ReadTranscript(domain.AssistantConversation) ([]domain.AssistantMessage, error) {
 	return s.messages, nil
 }
+
 func (s *assistantFlowStore) WriteTranscript(_ domain.AssistantConversation, m []domain.AssistantMessage) error {
 	s.messages = m
 	return nil
 }
+
 func (s *assistantFlowStore) CompleteTurn(domain.AssistantConversation, []domain.AssistantMessage, *string) error {
 	return nil
 }
+
 func (s *assistantFlowStore) VisibleFiles(domain.AssistantConversation) ([]string, error) {
 	return []string{}, nil
 }
+
 func (s *assistantFlowStore) CoreIdentity(domain.AssistantConversation) (*domain.AssistantCore, error) {
 	return nil, nil
 }
+
 func (s *assistantFlowStore) Execute(context.Context, domain.AssistantConversation, domain.AssistantToolCall) string {
 	panic("unexpected tool call in HTTP-only flow test")
 }
@@ -564,5 +569,72 @@ func TestAssistantProposalReadyUsesActualChangeCount(t *testing.T) {
 				t.Fatal(m.View().Content)
 			}
 		}
+	}
+}
+
+func TestAssistantQuotaHeaderUsesServiceStateAndRecovers(t *testing.T) {
+	for _, test := range []struct{ plan, code, want string }{
+		{"trial", "subscription_inactive", "Free trial ended"},
+		{"trial", "quota_exhausted", "Free trial ended"},
+		{"annual", "subscription_inactive", "Subscription inactive"},
+		{"annual", "quota_exhausted", "No requests left"},
+	} {
+		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("state update sent HTTP") })
+		m.assistant.account = domain.AssistantAccount{Plan: test.plan, Status: "active", TurnsRemaining: 3}
+		updated, _ := m.finishAssistantAccess(assistantAccessMsg{id: m.assistant.id, err: &domain.AssistantError{Code: test.code}})
+		m = updated.(dashboardModel)
+		header := ansi.Strip(m.assistantHeader(76))
+		if !strings.Contains(header, test.want) || strings.Contains(header, "3") || m.assistant.input.Value() != "Synthetic private request" {
+			t.Fatal("header contradicts the unavailable service state", header)
+		}
+		updated, _ = m.newAssistantChat()
+		m = updated.(dashboardModel)
+		if !strings.Contains(m.assistantHeader(76), test.want) {
+			t.Fatal("new chat forgot the known quota state")
+		}
+		account := domain.AssistantAccount{Plan: "annual", Status: "active", TurnsRemaining: 1000}
+		updated, _ = m.finishAssistantAccount(assistantAccountMsg{id: m.assistant.id, token: flowToken, account: &account})
+		m = updated.(dashboardModel)
+		if !strings.Contains(m.assistantHeader(76), "1000 requests left") || m.assistant.accessError != "" {
+			t.Fatal("fresh account did not restore the quota")
+		}
+	}
+}
+
+func TestAssistantProposalIncompleteAfterAnUnfinishedAdmittedTurn(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) {})
+	turn := func(admitted bool, result *domain.AssistantTurnResult, err error) {
+		m.assistant.turnAdmitted = false
+		m.assistant.state = "running"
+		if admitted {
+			updated, _ := m.finishAssistantStream(assistantStreamMsg{id: m.assistant.id, event: domain.AssistantEvent{Type: "turn_started"}})
+			m = updated.(dashboardModel)
+		}
+		updated, _ := m.finishAssistantStream(assistantStreamMsg{id: m.assistant.id, done: true, changedFiles: 2, result: result, err: err})
+		m = updated.(dashboardModel)
+	}
+	banner := func() string {
+		view := ansi.Strip(m.View().Content)
+		switch {
+		case strings.Contains(view, "Proposal incomplete · 2 files changed"):
+			return "incomplete"
+		case strings.Contains(view, "Proposal ready · 2 files changed"):
+			return "ready"
+		}
+		return view
+	}
+	failure := &domain.AssistantError{Code: "protocol_error", Message: "Synthetic invalid response"}
+	turn(true, &domain.AssistantTurnResult{}, failure)
+	if banner() != "incomplete" || !m.assistant.unfinished {
+		t.Fatal("failed turn advertised a ready proposal", banner())
+	}
+	// A request refused before it starts cannot change the proposal.
+	turn(false, nil, &domain.AssistantError{Code: "quota_exhausted"})
+	if banner() != "incomplete" {
+		t.Fatal("refused request hid the unfinished proposal")
+	}
+	turn(true, &domain.AssistantTurnResult{Outcome: "final", Summary: "Done"}, nil)
+	if banner() != "ready" {
+		t.Fatal("finished turn not ready", banner())
 	}
 }

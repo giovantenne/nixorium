@@ -9,12 +9,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/classroomview"
 	"github.com/giovantenne/nixorium/internal/domain"
 	"github.com/giovantenne/nixorium/internal/presentation"
 )
 
-// Collect from desktop: the files on the desktops of the selected
+// Collect from students' desktops: the files on the desktops of the selected
 // students' computers are copied, through the classroom service, into a
 // folder of whoever runs Nixorium (teacher or administrator), as that
 // user: <folder>/<YYYY-MM-DD HH.MM>/<computer>/…, where the folder is
@@ -89,23 +90,15 @@ func runCollectCommand(ctx context.Context, options options, stdout, stderr io.W
 		}
 		return 0
 	}
-	if options.expect != plan.ReviewToken {
-		fmt.Fprintln(stderr, "The computers or the folder changed since the review; create a fresh plan.")
+	plan, match := app.ReviewedCollect(time.Now(), plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "The computers or the folder changed since the review; create a fresh plan.")
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Collect apply requires an interactive terminal or --yes.")
-			return 2
-		}
-		approved, err := presentation.ConfirmCollect(os.Stdin, stderr, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		if !approved {
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Collect apply requires an interactive terminal or --yes."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmCollect(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := applyCollect(ctx, plan)
 	if options.json {

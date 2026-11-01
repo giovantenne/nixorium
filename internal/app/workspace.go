@@ -82,13 +82,13 @@ func (m WorkspaceManager) Plan(ctx context.Context, repository string, data []by
 		return workspacePlanIssue(report, "inspection", err)
 	}
 	report.Inspection, report.ReviewToken = &inspection, token
-	report.State, report.Confirmation = "ready", "SAVE"
+	report.State = "ready"
 	report.Message = "Save initial student preferences for the controller and all clients; no commit, build, deployment or home reset is included."
 	if inspection.Base != nil {
 		base, _ := domain.MarshalWorkspaceProfile(*inspection.Base)
 		normalized, _ := domain.MarshalWorkspaceProfile(candidate)
 		if bytes.Equal(base, normalized) {
-			report.State, report.Confirmation = "unchanged", ""
+			report.State = "unchanged"
 			report.Message = "The profile already declares these preferences; this does not establish deployed or active home state."
 		}
 	}

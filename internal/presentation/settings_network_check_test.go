@@ -261,3 +261,113 @@ func TestSettingsLoadReadsControllerAddresses(t *testing.T) {
 		t.Fatalf("addresses not loaded: read=%d", read)
 	}
 }
+
+func TestInstallationFormMovesTheControllerToTheChosenDHCPDevice(t *testing.T) {
+	current := wizardSettings()
+	current.Lab.ControllerInterfaceName = "enp0s8"
+	current.Lab.MasterDHCPIP = "198.51.100.7"
+	addresses := domain.ControllerAddresses{Detected: true, Choices: []domain.DHCPAddressChoice{
+		{Address: "198.51.100.7", Device: "enp0s8"}, {Address: "192.0.2.10", Device: "enp0s3"},
+	}}
+	model := dashboardModel{width: 120, height: 40, settings: settingsModel{current: current, addresses: addresses}}
+	editor := model.newSettingsEditor(current, installationSettingsFields, "Installation / Laboratory settings")
+	for editor.fields[editor.index].id != "lab.masterDhcpIp" {
+		editor = editor.moveToField(editor.index + 1)
+	}
+	picked := editorKey(editorKey(editor, tea.KeyPressMsg{Code: tea.KeyDown}), tea.KeyPressMsg{Code: tea.KeyEnter})
+	if picked.settings.Lab.MasterDHCPIP != "192.0.2.10" || picked.settings.Lab.ControllerInterface() != "enp0s3" {
+		t.Fatalf("dhcp=%q controller=%q", picked.settings.Lab.MasterDHCPIP, picked.settings.Lab.ControllerInterface())
+	}
+	if view := ansi.Strip(renderTUIShell(picked.shell(), 160, false)); !strings.Contains(view, "The controller will use enp0s3 for the laboratory network: it carries 192.0.2.10.") {
+		t.Fatalf("change not reported:\n%s", view)
+	}
+	// Picking the address on the controller's own device changes nothing.
+	same := editorKey(editor, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if same.settings.Lab.ControllerInterface() != "enp0s8" || same.note != "" {
+		t.Fatalf("controller=%q note=%q", same.settings.Lab.ControllerInterface(), same.note)
+	}
+	// The network settings group asks for the device, so it is never moved.
+	group := dhcpFieldEditor(t, "198.51.100.7", addresses)
+	group.settings.Lab.ControllerInterfaceName = "enp0s8"
+	kept := editorKey(editorKey(group, tea.KeyPressMsg{Code: tea.KeyDown}), tea.KeyPressMsg{Code: tea.KeyEnter})
+	if kept.settings.Lab.ControllerInterface() != "enp0s8" {
+		t.Fatalf("network group moved the controller to %q", kept.settings.Lab.ControllerInterface())
+	}
+}
+
+func TestInstallationSummaryNamesTheControllerInterface(t *testing.T) {
+	current := wizardSettings()
+	current.Lab.ControllerInterfaceName = "enp0s3"
+	current.Lab.ClientInterfaceName = ""
+	model := dashboardModel{width: 120, height: 40, settings: settingsModel{current: current}}
+	view := ansi.Strip(model.installationSummaryView())
+	for _, want := range []string{"Controller interface  enp0s3", "Client interface      automatic (wired network card)"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestControllerInterfaceIsChosenAmongItsWiredCards(t *testing.T) {
+	current := wizardSettings()
+	current.Lab.InterfaceName, current.Lab.ControllerInterfaceName = "enp0s3", ""
+	addresses := domain.ControllerAddresses{Detected: true, Wired: []domain.NetworkDevice{
+		{Name: "enp0s3", Kind: domain.NetworkDeviceWired, Addresses: []domain.NetworkAddress{{Address: "192.168.57.99"}, {Address: "10.0.0.99"}}},
+		{Name: "enp0s8", Kind: domain.NetworkDeviceWired},
+	}}
+	model := dashboardModel{width: 120, height: 40, settings: settingsModel{current: current, addresses: addresses}}
+	model = model.openSettingsEditor(networkGroupFields(), "Maintenance / Settings / Network")
+	editor := model.settings.editor
+	if editor.fields[editor.index].id != "lab.controllerIfaceName" {
+		t.Fatalf("first field = %s", editor.fields[editor.index].id)
+	}
+	for _, field := range editor.fields {
+		if field.id == "lab.ifaceName" {
+			t.Fatal("the shared fallback name is still asked")
+		}
+	}
+	view := ansi.Strip(renderTUIShell(editor.shell(), 140, false))
+	for _, want := range []string{"Choose the controller's card on the laboratory network", "Wired card · 192.168.57.99, 10.0.0.99", "Wired card without an address now", "Type a device name that is not listed"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+	if selected := editor.selector.SelectedItem().(settingsChoiceItem); selected.value != "enp0s3" {
+		t.Fatalf("the card in use is not preselected: %+v", selected)
+	}
+	// Confirming the card already in use changes nothing.
+	kept := editorKey(editor, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if kept.settings.Lab.ControllerInterfaceName != "" {
+		t.Fatalf("confirming the inherited card saved %q", kept.settings.Lab.ControllerInterfaceName)
+	}
+	moved := editorKey(editorKey(editor, tea.KeyPressMsg{Code: tea.KeyDown}), tea.KeyPressMsg{Code: tea.KeyEnter})
+	if moved.settings.Lab.ControllerInterfaceName != "enp0s8" {
+		t.Fatalf("choosing another card saved %q", moved.settings.Lab.ControllerInterfaceName)
+	}
+}
+
+func TestSettingsReviewRefusesAClientWiFiCard(t *testing.T) {
+	preflight := &domain.NetworkPreflight{Clients: []domain.ClientNetworkCheck{
+		domain.CheckClientInterface(domain.HostMeta{Name: "pc01", IP: "10.0.0.1", Interface: "wlp2s0"}, "", networkCheckDevices()),
+		// A missing device elsewhere must not offer "save anyway" past the Wi-Fi card.
+		domain.CheckClientInterface(domain.HostMeta{Name: "pc02", IP: "10.0.0.2", Interface: "wlp2s0"}, "", domain.NetworkObservation{Reachable: true}),
+	}}
+	saved := []domain.ConfigPlanReport{}
+	model := networkReviewModel(t, func(lab *domain.LabSettings) { lab.ClientInterfaceName = "wlp2s0" }, preflight, &saved)
+	view := plainView(model)
+	for _, want := range []string{"× pc01  wlp2s0 is a Wi-Fi card: the laboratory needs a wired one", "Saving is blocked by the network check"} {
+		if !contains(view, want) {
+			t.Fatalf("missing %q in review:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "Save anyway") {
+		t.Fatalf("a Wi-Fi card can be saved anyway:\n%s", view)
+	}
+	model, command := pressReviewKey(t, model, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if command != nil || len(saved) != 0 || !strings.Contains(model.message, "Wi-Fi card on pc01") {
+		t.Fatalf("Wi-Fi card saved: message=%q", model.message)
+	}
+	if model, _ = pressReviewKey(t, model, tea.KeyPressMsg{Code: 'c', Text: "c"}); model.settings.saveAnyway {
+		t.Fatal("c acknowledged past a Wi-Fi card")
+	}
+}

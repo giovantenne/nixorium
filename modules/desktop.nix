@@ -1,14 +1,18 @@
-{ pkgs, lib, hostName, labSettings, labAssets, ... }:
+{ pkgs, lib, isController, labSettings, labAssets, ... }:
 let
-  isMaster = hostName == labSettings.masterHostName;
+  # A GVariant string literal: backslash and single quote are escaped.
+  gvariantString = value:
+    "'" + lib.replaceStrings [ "\\" "'" ] [ "\\\\" "\\'" ] value + "'";
   backgroundFiles = builtins.listToAttrs (map (background: {
     name = "lab/backgrounds/${builtins.baseNameOf (builtins.unsafeDiscardStringContext (toString background))}";
     value.source = background;
   }) labAssets.backgrounds);
+  asUser = import ../lib/as-user.nix { inherit pkgs lib; };
 in
 {
   imports = [
     { environment.etc = backgroundFiles; }
+    ./terminal-fallback.nix
   ];
 
   time.timeZone = labSettings.timeZone;
@@ -33,7 +37,7 @@ in
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
 
-  systemd.services.gdm-monitor-config = lib.mkIf isMaster {
+  systemd.services.gdm-monitor-config = lib.mkIf isController {
     description = "Copy admin monitor layout to GDM and teacher";
     wantedBy = [ "display-manager.service" ];
     before = [ "display-manager.service" ];
@@ -43,33 +47,46 @@ in
       ADMIN_MONITORS="/home/admin/.config/monitors.xml"
       GDM_CONFIG_DIR="/var/lib/gdm/seat0/config"
       GDM_MONITORS="$GDM_CONFIG_DIR/monitors.xml"
-      TEACHER_CONFIG_DIR="/home/${labSettings.teacherUser}/.config"
-      TEACHER_MONITORS="$TEACHER_CONFIG_DIR/monitors.xml"
+      TEACHER_MONITORS="/home/${labSettings.teacherUser}/.config/monitors.xml"
 
-      if [ ! -f "$ADMIN_MONITORS" ]; then
+      if [ ! -f "$ADMIN_MONITORS" ] || [ -L "$ADMIN_MONITORS" ]; then
         exit 0
       fi
 
+      # Reads are bounded: a FIFO swapped in must not hold the login screen.
       install -d -m 0700 "$GDM_CONFIG_DIR"
-      cp "$ADMIN_MONITORS" "$GDM_MONITORS"
+      rm -f "$GDM_MONITORS"
+      timeout 30 cp "$ADMIN_MONITORS" "$GDM_MONITORS"
       chmod 0600 "$GDM_MONITORS"
-      chown "$(stat -c '%u:%g' "$GDM_CONFIG_DIR")" "$GDM_MONITORS"
+      chown -h "$(stat -c '%u:%g' "$GDM_CONFIG_DIR")" "$GDM_MONITORS"
 
-      install -d -o "${labSettings.teacherUser}" -g users -m 0700 "$TEACHER_CONFIG_DIR"
-      cp "$ADMIN_MONITORS" "$TEACHER_MONITORS"
-      chmod 0600 "$TEACHER_MONITORS"
-      chown "${labSettings.teacherUser}:users" "$TEACHER_MONITORS"
+      # The teacher's copy is written by the teacher from what root reads:
+      # the teacher's cat reads the pipe, so the admin's file may stay private.
+      timeout 30 cat "$ADMIN_MONITORS" | ${asUser labSettings.teacherUser ''${pkgs.bash}/bin/sh -c ${lib.escapeShellArg ''
+        umask 077
+        mkdir -p "''${1%/*}"
+        rm -f "$1"
+        cat > "$1"
+      ''} sh "$TEACHER_MONITORS"''}
     '';
     path = [ pkgs.coreutils ];
   };
 
   services.gnome.gnome-keyring.enable = lib.mkForce false;
+  # Without a secret service MySQL Workbench fails every connection ("The
+  # name is not activatable"); this makes it skip the keychain. Set here, not
+  # only in the site's development module, so laboratories created before
+  # 3.8.0 get it too; it has no effect where Workbench is not installed.
+  environment.sessionVariables.WB_NO_KEYRING = "1";
   # No GNOME remote desktop server: the classroom view reaches sessions only
   # through the controller's SSH access.
   systemd.user.services.gnome-remote-desktop.enable = false;
+  # After 30 idle minutes GNOME blanks and switches off the screen; the session
+  # is never locked, so a key or the mouse brings the desktop back without a
+  # password. The computer does not sleep: it stays reachable.
   services.desktopManager.gnome.extraGSettingsOverrides = ''
     [org.gnome.desktop.session]
-    idle-delay=uint32 0
+    idle-delay=uint32 1800
 
     [org.gnome.desktop.screensaver]
     lock-enabled=false
@@ -83,7 +100,7 @@ in
     idle-dim=false
 
     [org.gnome.desktop.input-sources]
-    sources=[('xkb', '${labSettings.keyboardLayout}')]
+    sources=[('xkb', ${gvariantString labSettings.keyboardLayout})]
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [
     pkgs.gnome-settings-daemon

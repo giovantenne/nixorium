@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
+
+// internetReviewLifetime is how long an Internet review stays valid at least.
+const internetReviewLifetime = 10 * time.Minute
 
 type InternetSource interface {
 	LabMeta(context.Context, string) (domain.LabMeta, error)
@@ -54,17 +58,31 @@ func (m *InternetManager) Plan(ctx context.Context, repository, requested string
 		return fail(issues[0])
 	}
 	p.Requested = normalized
-	active, err := m.source.ClientOperationActive()
-	if message, refused := operationRefusal(active, err, "Another client operation or network installation is active; finish it first.", ""); refused {
-		return fail(message)
+	blocked := map[string]string{}
+	if lease, ok := classroomLeaseFor(m.source); ok {
+		if blocked, err = lease.ClassroomBlockedHosts(); err != nil {
+			return fail(err.Error())
+		}
+	} else {
+		active, activeErr := m.source.ClientOperationActive()
+		if message, refused := operationRefusal(active, activeErr, "Another client operation or network installation is active; finish it first.", ""); refused {
+			return fail(message)
+		}
 	}
 	if m.conflict(ctx) {
 		return fail("Another client operation or network installation is active; finish it first.")
 	}
 	eligible := 0
+	updating := []string{}
 	for _, host := range shutdownHostMeta(selected) {
 		if host.Name == meta.Controller.Name {
 			return fail("The controller cannot be selected.")
+		}
+		if _, found := blocked[host.Name]; found {
+			// Named in an unfinished client update: not touched, not observed.
+			p.Targets = append(p.Targets, domain.InternetTarget{HostMeta: host, Eligible: false})
+			updating = append(updating, host.Name)
+			continue
 		}
 		observed := m.source.ObserveInternet(ctx, host)
 		ok := observed.Valid() && (observed.State != "unknown" || action == domain.InternetUnblock)
@@ -73,12 +91,19 @@ func (m *InternetManager) Plan(ctx context.Context, repository, requested string
 		}
 		p.Targets = append(p.Targets, domain.InternetTarget{HostMeta: host, Observed: observed, Eligible: ok})
 	}
+	if eligible == 0 && len(updating) > 0 {
+		return fail("The selected computers are being updated by the administrator, or their last update was interrupted. Try again when the administrator has finished.")
+	}
 	if eligible == 0 {
 		return fail("No selected client supports authenticated Internet control. Update or reconnect the clients and review again.")
 	}
 	p.State = "ready"
-	p.ExpiresAt = m.now().UTC().Truncate(5 * time.Minute).Add(5 * time.Minute)
+	// The expiry sits on the shared review grid so Reviewed can rebuild it.
+	p.ExpiresAt = reviewExpiry(m.now(), internetReviewLifetime)
 	p.Message = fmt.Sprintf("%d of %d clients available. Internet is restored on reboot; offline clients are never queued. Lab access remains available.", eligible, len(p.Targets))
+	if len(updating) > 0 {
+		p.Message += " Left unchanged while they are being updated: " + strings.Join(updating, ", ") + "."
+	}
 	p.ReviewToken = domain.InternetReviewToken(p)
 	return p
 }
@@ -88,7 +113,14 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 	if p.HasErrors() || !p.Action.Valid() || token == "" || token != p.ReviewToken || token != domain.InternetReviewToken(p) || !m.now().Before(p.ExpiresAt) {
 		return fail("Review expired or changed; create a fresh plan.")
 	}
-	lease, err := acquireOperation(m.source, "Internet access")
+	var lease io.Closer
+	blocked := map[string]string{}
+	var err error
+	if classroom, ok := classroomLeaseFor(m.source); ok {
+		lease, blocked, err = classroom.AcquireClassroomLease("Internet access")
+	} else {
+		lease, err = acquireOperation(m.source, "Internet access")
+	}
 	if err != nil {
 		return fail(err.Error())
 	}
@@ -112,7 +144,9 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 	confirmed := 0
 	for _, t := range p.Targets {
 		o := domain.InternetOutcome{Name: t.Name, State: "not-sent", Detail: "Unavailable in the reviewed plan; no request queued."}
-		if t.Eligible {
+		if reason, found := blocked[t.Name]; found {
+			o.Detail = "Not changed: " + reason + "."
+		} else if t.Eligible {
 			before := m.source.ObserveInternet(ctx, t.HostMeta)
 			if !m.now().Before(p.ExpiresAt) || !before.Valid() || before.BootID != t.Observed.BootID || before.State != t.Observed.State {
 				o.Detail = "Review expired, client rebooted or its state changed; review again."
@@ -124,7 +158,12 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 				after := m.source.ObserveInternet(ctx, t.HostMeta)
 				if after.Valid() && after.BootID == before.BootID && after.State == p.Action.DesiredState() {
 					o.State = "verified"
-					o.Detail = "Internet " + after.State + "; reboot restores Internet."
+					// The block is temporary: it lasts until Internet is enabled
+					// again or the computer restarts. Enabling needs no follow-up.
+					o.Detail = "Internet is on again."
+					if p.Action == domain.InternetBlock {
+						o.Detail = "Internet is blocked until you enable it again or the computer restarts."
+					}
 					confirmed++
 				} else {
 					o.State = "unconfirmed"
@@ -143,4 +182,19 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 	}
 	r.Message = fmt.Sprintf("Verified on %d of %d selected clients. No action is queued for offline computers.", confirmed, len(p.Targets))
 	return r
+}
+
+// Reviewed tells whether token confirms a review of the plan fresh, a plan
+// built now. A match returns fresh carrying that review's expiry and token, so
+// an apply in a later process, or in a later grid step, still matches until
+// the review expires.
+func (m *InternetManager) Reviewed(fresh domain.InternetPlan, token string) (domain.InternetPlan, ReviewMatch) {
+	if fresh.HasErrors() {
+		return fresh, ReviewChanged
+	}
+	return matchReview(m.now(), internetReviewLifetime, fresh, token, func(p domain.InternetPlan, expiry time.Time) domain.InternetPlan {
+		p.ExpiresAt = expiry
+		p.ReviewToken = domain.InternetReviewToken(p)
+		return p
+	}, func(p domain.InternetPlan) string { return p.ReviewToken })
 }

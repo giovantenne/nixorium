@@ -13,7 +13,7 @@ import (
 // network. It shows the change in progress (or a form for a new one), reviews
 // each step in the recovery-review style (what was found, what happens,
 // confirm), saves it with Enter, and continues with the ordinary controller
-// and computer reviews, which keep their typed confirmations.
+// and computer reviews, which are confirmed with Enter as well.
 
 var networkChangeTask = dashboardTask{id: "network", shortcut: "n", title: "Change network addressing", description: "Move the computers and the controller to a new laboratory network, step by step", advanced: true}
 
@@ -101,6 +101,12 @@ func (model dashboardModel) handleNetworkChangeMessage(message tea.Msg) (dashboa
 	return model, nil, false
 }
 
+// networkChangeEditing reports whether the address field accepts typing.
+func (model dashboardModel) networkChangeEditing() bool {
+	change := model.networkChange
+	return model.busy == "" && change.result.Operation == "" && !change.reviewing && !change.status.InProgress()
+}
+
 func (model dashboardModel) updateNetworkChange(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	change := &model.networkChange
 	if model.busy != "" {
@@ -148,9 +154,7 @@ func (model dashboardModel) updateNetworkChange(key tea.KeyPressMsg) (tea.Model,
 		}
 		change.input += "r"
 	case "backspace":
-		if value := []rune(change.input); len(value) > 0 {
-			change.input = string(value[:len(value)-1])
-		}
+		change.input = dropLastRune(change.input)
 	case "enter":
 		if !change.loaded || status.HasErrors() {
 			return model, nil
@@ -158,8 +162,8 @@ func (model dashboardModel) updateNetworkChange(key tea.KeyPressMsg) (tea.Model,
 		change.acknowledge = false
 		return model.planNetworkChange(domain.NetworkMigrationStart)
 	default:
-		if text := key.Text; len(text) == 1 && strings.ContainsAny(text, "0123456789./") && len(change.input) < 18 {
-			change.input += text
+		if text := key.Text; len(text) == 1 && strings.ContainsAny(text, "0123456789./") {
+			change.input = appendInputText(change.input, text, networkInputMax)
 		}
 	}
 	return model, nil
@@ -237,7 +241,7 @@ func (model dashboardModel) networkChangeController() (tea.Model, tea.Cmd) {
 }
 
 // openNetworkChangeDeployment opens Update computers with every computer
-// selected; its review and DEPLOY confirmation stay unchanged.
+// selected; its review and Enter confirmation stay unchanged.
 func (model dashboardModel) openNetworkChangeDeployment() (tea.Model, tea.Cmd) {
 	if model.actions.LoadInventory == nil || model.actions.PlanDeployment == nil {
 		model.message = "Computer deployment is unavailable in this session."
@@ -249,7 +253,7 @@ func (model dashboardModel) openNetworkChangeDeployment() (tea.Model, tea.Cmd) {
 		for _, host := range ready.report.Meta.Clients.Hosts {
 			ready.deployment.chosen[host.Name] = true
 		}
-		ready.confirmation, ready.message, ready.pageScroll = "", "", 0
+		ready.confirmation, ready.message, ready.navigation.pageScroll = "", "", 0
 		return ready, nil
 	})
 }
@@ -290,7 +294,7 @@ func (model dashboardModel) networkChangeView() string {
 	}
 	shell.body = strings.Join(lines, "\n")
 	if model.message != "" {
-		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+		shell.notices = append(shell.notices, model.messageNotice())
 	}
 	return model.renderShell(shell)
 }

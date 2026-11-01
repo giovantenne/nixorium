@@ -47,13 +47,13 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range main.Frames {
 		joined += frame.Text
 	}
-	for _, expected := range []string{"all clients, including future ones", "Affects  pc01,pc02,pc03,pc04,pc05 · 5 computers", "Reviewed revision  " + bundle.SourceCommit, "Authenticated: 5/5", "Deployment completed and verified"} {
+	for _, expected := range []string{"all clients, including future ones", "Affects  pc01, pc02, pc03, pc04, pc05 · 5 computers", "Reviewed revision  " + bundle.SourceCommit, "5 computers updated"} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("main demo omits %q", expected)
 		}
 	}
-	if !demoFramesContain(main.Frames, "Move the cursor to Software") || !demoFramesContain(main.Frames, "Open Software directly in Search") || !demoFramesContain(main.Frames, "Type the package name") || !demoFramesContain(main.Frames, "Choose Inkscape from Search") || !demoFramesContain(main.Frames, "Review deployment to all five current clients") || !demoFramesContain(main.Frames, "Type the one-word deployment confirmation") || !demoFramesContain(main.Frames, "Press Enter to start deployment") {
-		t.Fatal("main demo does not expose cursor movement and typing")
+	if !demoFramesContain(main.Frames, "Move the cursor to Software") || !demoFramesContain(main.Frames, "Open Software directly in Search") || !demoFramesContain(main.Frames, "Type the package name") || !demoFramesContain(main.Frames, "Choose Inkscape from Search") || !demoFramesContain(main.Frames, "Review deployment to all five current clients") || !demoFramesContain(main.Frames, "Press Enter to start deployment") {
+		t.Fatal("main demo does not expose cursor movement, typing and the Enter confirmation")
 	}
 	if demoFramesContain(main.Frames, "Open client distribution") || demoFramesContain(main.Frames, "Select all five clients for deployment") {
 		t.Fatal("main demo repeats client selection after choosing the all-clients declaration scope")
@@ -74,7 +74,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range installation.Frames {
 		installationText += frame.Text
 	}
-	for _, expected := range []string{"Controller address    " + demoServiceAddress, "Building system · Running", "Activating system · Running", "Verifying activation · Running", "Controller operation completed", "Type START to continue", "Next: install computers", "Start UEFI network boot", "guided installer opens automatically"} {
+	for _, expected := range []string{"Controller address    " + demoServiceAddress, "Building system · Running", "Activating system · Running", "Verifying activation · Running", "Controller operation completed", "Enter starts network installation mode", "Next: install computers", "Start UEFI network boot", "guided installer opens automatically"} {
 		if !strings.Contains(installationText, expected) {
 			t.Fatalf("installation demo omits %q", expected)
 		}
@@ -82,7 +82,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	if strings.Contains(installationText, "192.0.2.44") {
 		t.Fatal("installation demo still contains the obsolete service address")
 	}
-	for _, label := range []string{"Build the controller configuration", "Activate the controller configuration", "Verify the active controller", "Complete controller activation and verification", "Complete every preparation step", "Type the one-word network-impact confirmation", "Press Enter to start network installation", "Complete every controller-side installation step"} {
+	for _, label := range []string{"Build the controller configuration", "Activate the controller configuration", "Verify the active controller", "Complete controller activation and verification", "Complete every preparation step", "Press Enter to start network installation", "Complete every controller-side installation step"} {
 		if !demoFramesContain(installation.Frames, label) {
 			t.Fatalf("installation demo omits animation frame %q", label)
 		}
@@ -125,7 +125,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 			t.Fatalf("shutdown demo omits %q", expected)
 		}
 	}
-	if !demoFramesContain(shutdown.Frames, "Move the cursor to pc04") || !demoFramesContain(shutdown.Frames, "Type the one-word confirmation") || !demoFramesContain(shutdown.Frames, "Press Enter to send the reviewed requests") {
+	if !demoFramesContain(shutdown.Frames, "Move the cursor to pc04") || !demoFramesContain(shutdown.Frames, "Press Enter to send the reviewed requests") {
 		t.Fatal("shutdown demo does not expose cursor movement and typing")
 	}
 	usb := bundle.Scenarios[4]
@@ -136,7 +136,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range usb.Frames {
 		usbText += frame.Text
 	}
-	for _, expected := range []string{"USB over SSH", "NixOS 26.05 (Minimal or Graphical) from USB", "SHA256:AAAAAAAA", "/dev/sda", "not selectable: the USB stick you started from", "/dev/nvme0n1", "ERASE", "Remove the USB stick first", "is installed and verified"} {
+	for _, expected := range []string{"USB over SSH", "NixOS 26.05 (Minimal or Graphical) from USB", "SHA256:AAAAAAAA", "/dev/sda", "not selectable: the USB stick you started from", "/dev/nvme0n1", "ERASE", "Keep the USB stick in", "is installed and verified"} {
 		if !strings.Contains(usbText, expected) {
 			t.Fatalf("USB installation demo omits %q", expected)
 		}
@@ -218,4 +218,19 @@ func TestAccountSettingsDemoFollowsTheAccountsSubmenu(t *testing.T) {
 			t.Fatalf("Maintenance still lists account passwords:\n%s", frame.Text)
 		}
 	}
+}
+
+func TestManagedJobsDemoShowsTheInterruptedJob(t *testing.T) {
+	bundle := RenderDemoBundle(strings.Repeat("a", 40), "2026-01-01")
+	for _, scenario := range bundle.Scenarios {
+		if scenario.ID != "managed-jobs" {
+			continue
+		}
+		frame := demoFrameWithLabel(scenario.Frames, "Interrupted job with journal identity")
+		if !strings.Contains(frame.Text, "interrupted") || strings.Contains(frame.Text, "— running") {
+			t.Fatalf("the interrupted job frame does not show the interrupted job:\n%s", frame.Text)
+		}
+		return
+	}
+	t.Fatal("no managed-jobs scenario")
 }

@@ -46,6 +46,7 @@ func TestPreparePackageBaseValidatesCandidatesAndNeverWritesDeployment(t *testin
 set -eu
 printf '%s\n' "$*" >> "$NIXORIUM_TEST_BASE_LOG"
 case " $* " in
+` + fakeCandidateStoreCases + `
   *" flake lock "*)
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --output-lock-file ]; then cp "$NIXORIUM_TEST_BASE_CANDIDATE" "$2"; exit 0; fi
@@ -57,6 +58,7 @@ case " $* " in
   *"#nixoriumUpdateTargets "*) printf '%s\n' '["pc99","pc01","pc02"]' ;;
   *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
   *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
+  *" path-info "*) printf '/nix/store/%032d-output.drv\n' 0 ;;
   *" build "*) test "$NIXORIUM_TEST_BASE_MODE" != build-failed ;;
   *) exit 3 ;;
 esac

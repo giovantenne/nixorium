@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -67,7 +68,7 @@ func (f *fakeControllerSource) StartSystemUnit(_ context.Context, unit string) e
 func TestControllerPlanBindsCleanReadyRevision(t *testing.T) {
 	source := readyControllerSource()
 	report := NewControllerManager(source).Plan(context.Background(), "/deployment")
-	if report.HasErrors() || report.State != "ready" || report.Controller != "pc99" || report.Revision != source.revision || report.Confirmation != "REBUILD" {
+	if report.HasErrors() || report.State != "ready" || report.Controller != "pc99" || report.Revision != source.revision || report.Confirmation != "" {
 		t.Fatalf("plan = %+v", report)
 	}
 	source.current = true
@@ -132,5 +133,94 @@ func TestControllerApplyRejectsStaleReviewAndReportsUnitFailure(t *testing.T) {
 	source.startErr = errors.New("activation failed")
 	if report := manager.Apply(context.Background(), "/deployment", source.revision); !report.HasErrors() || report.Phase != domain.ControllerRebuildPhaseApply || report.Applied {
 		t.Fatalf("failure report = %+v", report)
+	}
+}
+
+// recordingControllerSource counts evaluations and confirms activations
+// from a record, like the local adapter.
+type recordingControllerSource struct {
+	*fakeControllerSource
+	evaluations int
+	recorded    string
+	noRecord    bool
+}
+
+func (f *recordingControllerSource) LabMeta(ctx context.Context, root string) (domain.LabMeta, error) {
+	f.evaluations++
+	return f.fakeControllerSource.LabMeta(ctx, root)
+}
+func (f *recordingControllerSource) StartSystemUnit(ctx context.Context, unit string) error {
+	err := f.fakeControllerSource.StartSystemUnit(ctx, unit)
+	if err == nil && !f.noRecord {
+		f.recorded = f.revision
+	}
+	return err
+}
+func (f *recordingControllerSource) ControllerActivated(_ context.Context, revision string) (bool, string, error) {
+	return f.recorded == revision, "", nil
+}
+
+func TestReviewedControllerApplyEvaluatesOnceAndVerifiesFromTheRecord(t *testing.T) {
+	source := &recordingControllerSource{fakeControllerSource: readyControllerSource()}
+	manager := NewControllerManager(source)
+	plan := manager.Plan(context.Background(), "/deployment")
+	report := manager.ApplyReviewed(context.Background(), "/deployment", plan)
+	if report.HasErrors() || !report.Verified || source.unit != ControllerApplyUnit(source.revision) {
+		t.Fatalf("reviewed apply = %+v", report)
+	}
+	if source.evaluations != 1 {
+		t.Fatalf("controller evaluated %d times, want only the review", source.evaluations)
+	}
+}
+
+func TestReviewedControllerApplyRefusesAChangedDeployment(t *testing.T) {
+	for name, change := range map[string]func(*recordingControllerSource){
+		"new revision": func(f *recordingControllerSource) { f.revision = "fedcba9876543210fedcba9876543210fedcba98" },
+		"dirty":        func(f *recordingControllerSource) { f.git.Dirty = true },
+	} {
+		source := &recordingControllerSource{fakeControllerSource: readyControllerSource()}
+		manager := NewControllerManager(source)
+		plan := manager.Plan(context.Background(), "/deployment")
+		change(source)
+		if report := manager.ApplyReviewed(context.Background(), "/deployment", plan); !report.HasErrors() || source.unit != "" {
+			t.Fatalf("%s: stale review applied: %+v", name, report)
+		}
+	}
+}
+
+func TestReviewedControllerApplyFailsWithoutTheRecord(t *testing.T) {
+	source := &recordingControllerSource{fakeControllerSource: readyControllerSource()}
+	manager := NewControllerManager(source)
+	plan := manager.Plan(context.Background(), "/deployment")
+	// The unit ran but recorded no activation of this revision.
+	source.noRecord = true
+	report := manager.ApplyReviewed(context.Background(), "/deployment", plan)
+	if report.Verified || report.State != "failed" {
+		t.Fatalf("unverified activation reported as verified: %+v", report)
+	}
+}
+
+// failingUnitSource is a controller whose apply unit records why it failed.
+type failingUnitSource struct {
+	*fakeControllerSource
+	progress []byte
+}
+
+func (f *failingUnitSource) ReadOperationProgress(string) ([]byte, error) { return f.progress, nil }
+
+func TestFailedControllerApplyShowsTheUnitsReason(t *testing.T) {
+	source := &failingUnitSource{fakeControllerSource: readyControllerSource()}
+	source.startErr = errors.New("systemctl: Job for nixorium-apply-controller@x.service failed")
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	source.progress = []byte(`{"schemaVersion":1,"operation":"controller-apply","state":"failed","phase":"activate","startedAt":"` + now + `","updatedAt":"` + now + `","current":2,"total":4,"recent":["Built controller system; beginning activation","Failed: controller static address is absent after activation; run: nmcli connection up nixorium-lab ifname enp0s3"]}`)
+	report := NewControllerManager(source).Apply(context.Background(), "/deployment", source.revision)
+	if report.State != "failed" || report.Message != "controller build or activation failed: controller static address is absent after activation; run: nmcli connection up nixorium-lab ifname enp0s3" {
+		t.Fatalf("report = %+v", report)
+	}
+	// A record from an earlier run is not this failure.
+	old := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+	source.progress = []byte(`{"schemaVersion":1,"operation":"controller-apply","state":"failed","phase":"activate","startedAt":"` + old + `","updatedAt":"` + old + `","recent":["Failed: an older reason"]}`)
+	if report := NewControllerManager(source).Apply(context.Background(), "/deployment", source.revision); report.Message != "controller build or activation failed: systemctl: Job for nixorium-apply-controller@x.service failed" {
+		t.Fatalf("stale reason used: %+v", report)
 	}
 }

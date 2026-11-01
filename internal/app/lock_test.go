@@ -123,7 +123,7 @@ func TestLockApplyRefusesStaleReviews(t *testing.T) {
 			t.Fatalf("%s = %+v", name, report)
 		}
 	}
-	manager.now = func() time.Time { return time.Now().Add(6 * time.Minute) }
+	manager.now = func() time.Time { return time.Now().Add(11 * time.Minute) }
 	if report := manager.Apply(context.Background(), plan, plan.ReviewToken); report.State != "blocked" || !strings.Contains(report.Message, "expired") {
 		t.Fatalf("expired = %+v", report)
 	}
@@ -152,3 +152,9 @@ func TestLockReportsUnconfirmedAndRefusesTheController(t *testing.T) {
 		t.Fatalf("unknown action = %+v", plan)
 	}
 }
+
+func (session fakeLockSession) ClipboardBegin() error         { return nil }
+func (session fakeLockSession) ClipboardEnd() error           { return nil }
+func (session fakeLockSession) Notice(string) error           { return nil }
+func (session fakeLockSession) ClipboardSet(string) error     { return nil }
+func (session fakeLockSession) ClipboardGet() (string, error) { return "", nil }

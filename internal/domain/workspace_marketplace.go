@@ -34,10 +34,6 @@ type WorkspaceMarketplaceReport struct {
 	Message       string                         `json:"message"`
 }
 
-func (r WorkspaceMarketplaceReport) HasErrors() bool {
-	return len(r.Issues) != 0 || r.State != "ready" || r.Candidate == nil
-}
-
 var workspaceMarketplaceID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$`)
 
 // NormalizeWorkspaceMarketplaceID accepts publisher.name in any case.

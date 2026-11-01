@@ -85,6 +85,7 @@ bash tests/client-installer-library.sh
 bash tests/remote-client-installer.sh
 bash tests/controller-bootstrap.sh
 bash tests/controller-installer.sh
+bash tests/install-release-menu.sh
 bash tests/software-profile-bootstrap.sh
 bash tests/canonical-copy-sync.sh
 bash tests/known-hosts-migration.sh
@@ -323,12 +324,14 @@ profile_state() {
       screensaver = config.systemd.user.services ? lab-screensaver;
       vscodeHome = builtins.match ".*vscjava[.]vscode-java-pack.*"
         config.system.activationScripts.siteHomeProfile.text != null;
+      # The core repairs ownership first; the site profile then writes into
+      # the staff homes as each home'"'"'s owner.
       homeOwnershipOrdering =
-        builtins.elem "siteHomeProfile" config.system.activationScripts.nixoriumUserHomeOwnership.deps;
+        builtins.elem "nixoriumUserHomeOwnership" config.system.activationScripts.siteHomeProfile.deps;
       vscodeHomeOwnership =
-        builtins.match ".*install -d -o admin.*[.]config/Code/User.*"
+        builtins.match ".*--reuid=[^ ]*admin[^ ]* [^\n]*install -d -m 0755 [^\n]*[.]config/Code/User.*"
           config.system.activationScripts.siteHomeProfile.text != null
-        && builtins.match ".*install -d -o teacher.*[.]vscode/extensions.*"
+        && builtins.match ".*--reuid=[^ ]*teacher[^ ]* [^\n]*install -d -m 0755 [^\n]*[.]vscode/extensions.*"
           config.system.activationScripts.siteHomeProfile.text != null;
     }
   '

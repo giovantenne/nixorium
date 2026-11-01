@@ -33,7 +33,7 @@ func applyResetRecoveryForTest(t *testing.T, plan domain.TemplateResetRecoveryPl
 func TestResetRecoveryCompletesTheBranch(t *testing.T) {
 	repository, _ := interruptedReset(t)
 	plan := TemplateReset{}.PlanTemplateResetRecovery(t.Context(), repository)
-	if plan.State != "ready" || plan.Case != domain.ResetRecoveryCompleteBranch || plan.Confirmation != "RECOVERED" {
+	if plan.State != "ready" || plan.Case != domain.ResetRecoveryCompleteBranch || plan.Confirmation != "" {
 		t.Fatalf("plan = %+v", plan)
 	}
 	result := applyResetRecoveryForTest(t, plan)

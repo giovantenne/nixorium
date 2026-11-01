@@ -48,3 +48,26 @@ func TestAssistantDiagnosticsOnlyDeclaredIdentitiesAndRoleBoundAreas(t *testing.
 		t.Fatal(got)
 	}
 }
+
+type outdatedSource struct {
+	diagnosticSource
+	err error
+}
+
+func (s *outdatedSource) HostDiagnostics(context.Context, domain.HostMeta, bool, string) (hostdiagnostics.Report, error) {
+	return hostdiagnostics.Report{}, s.err
+}
+func TestAssistantDiagnosticsReportsOutdatedHelperDistinctly(t *testing.T) {
+	s := &outdatedSource{err: hostdiagnostics.ErrHelperOutdated}
+	s.meta.Controller.Name = "pc99"
+	s.meta.Controller.StaticIP = "192.0.2.99"
+	s.meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "192.0.2.1"}}
+	d := AssistantDiagnostics{Source: s}
+	if got := d.Execute(t.Context(), "/declared", "pc01", "hardware"); got != `{"error":"helper_outdated","ok":false}` {
+		t.Fatal(got)
+	}
+	s.err = context.DeadlineExceeded
+	if got := d.Execute(t.Context(), "/declared", "pc01", "hardware"); !strings.Contains(got, "diagnostics_unavailable") {
+		t.Fatal(got)
+	}
+}

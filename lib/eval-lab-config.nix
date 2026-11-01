@@ -24,11 +24,27 @@ let
   isUserName = value:
     builtins.match "[a-z_][a-z0-9_-]{0,30}" value != null;
   isPasswordHash = value:
-    builtins.match "\\$6\\$[^$]+\\$[^$]+" value != null;
+    builtins.match "\\$6\\$(rounds=[0-9]+\\$)?[./0-9A-Za-z]+\\$[./0-9A-Za-z]+" value != null;
+  # Shape checks only, as in internal/domain/settings.go: a typo would
+  # otherwise fail at the controller build.
+  isTimeZone = value:
+    builtins.match "[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+){0,2}" value != null;
+  isLocale = value:
+    builtins.match "[a-z]{2,3}_[A-Z]{2}\\.UTF-8(@[a-z]+)?|C\\.UTF-8" value != null;
   isIfaceName = value:
     builtins.match "[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}" value != null;
   isNonEmpty = value:
     builtins.match ".*[^[:space:]].*" value != null;
+  # Git identities and the keyboard layout reach shell scripts and
+  # configuration files; internal/domain/settings.go holds the same rules.
+  # Lengths are in bytes, as in the Go validation.
+  isGitName = value:
+    builtins.stringLength value <= 256 && builtins.match "[^[:cntrl:]]*" value != null;
+  # Emails are not checked for shape: a laboratory may already use any text
+  # Git accepts. Quoting keeps them safe; only control characters are refused.
+  isGitEmail = isGitName;
+  isKeyboardLayout = value:
+    builtins.stringLength value <= 128 && builtins.match "[A-Za-z0-9_,()+-]+" value != null;
   isAbsoluteHttpUrl = value:
     builtins.match "https?://[^/[:space:]]+(/.*)?" value != null;
   # RFC 3339 date-time in the form time.RFC3339 produces and parses.
@@ -279,6 +295,16 @@ assert unknownInterfaceHosts == []
   || throw "hostIfaceNames contains unknown hosts: ${builtins.concatStringsSep ", " unknownInterfaceHosts}";
 assert emptyRequiredFields == []
   || throw "settings must not be empty: ${builtins.concatStringsSep ", " emptyRequiredFields}";
+assert isGitName config.studentGitName && isGitName config.adminGitName
+  || throw "Git names must be at most 256 bytes without control characters";
+assert isGitEmail config.studentGitEmail && isGitEmail config.adminGitEmail
+  || throw "Git emails must be at most 256 bytes without control characters";
+assert isTimeZone config.timeZone
+  || throw "timeZone must be UTC or a zone such as Europe/Rome or America/New_York";
+assert isLocale config.defaultLocale && isLocale config.extraLocale
+  || throw "defaultLocale and extraLocale must be UTF-8 locales such as en_US.UTF-8";
+assert isKeyboardLayout config.keyboardLayout
+  || throw "keyboardLayout must be an XKB layout name: letters, digits and _ - + , ( ) only, at most 128 bytes";
 assert isUserName config.teacherUser
   || throw "teacherUser must be a valid Unix user name";
 assert isUserName config.studentUser

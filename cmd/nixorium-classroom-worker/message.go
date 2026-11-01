@@ -26,12 +26,17 @@ func (worker classroomWorker) handleMessage(ctx context.Context, request domain.
 		}
 		plan := worker.message.Plan(ctx, worker.repository, request.Requested, request.MessageAction, content)
 		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
+		rememberPlan(worker.plans, "message", plan.ReviewToken, plan.ExpiresAt, plan)
 		response.MessagePlan = &plan
 	case domain.ClassroomMessageApplyOperation:
 		if request.MessagePlan == nil || request.MessagePlan.Repository != worker.repository {
 			return classroomFailure(errors.New("message review does not belong to the fixed deployment"))
 		}
-		report := worker.message.Apply(ctx, *request.MessagePlan, request.MessagePlan.ReviewToken)
+		plan, err := takePlan[domain.MessagePlan](worker.plans, "message", request.MessagePlan.ReviewToken)
+		if err != nil {
+			return classroomFailure(err)
+		}
+		report := worker.message.Apply(ctx, plan, plan.ReviewToken)
 		report.Message = teacherMessage(report.Message)
 		response.MessageReport = &report
 	default:

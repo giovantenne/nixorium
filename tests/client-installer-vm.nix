@@ -30,7 +30,8 @@ in
         # image no longer carries the system, so leave room (blocks and inodes).
         diskSize = 8192;
         memorySize = 4096;
-        emptyDiskImages = [ 20480 ];
+        # The second disk holds another system's EFI partition (see below).
+        emptyDiskImages = [ 20480 64 ];
         useBootLoader = true;
         useEFIBoot = true;
       };
@@ -46,6 +47,7 @@ in
         pkgs.nixos-install-tools
         pkgs.python3
         pkgs.curl
+        pkgs.dosfstools
         pkgs.sudo
         pkgs.util-linux
       ] ++ diskoRuntimePackages;
@@ -143,21 +145,31 @@ in
     installer.fail("grep -F 'DESTRUCTIVE REVIEW' /tmp/cache-missing.log")
     installer.succeed("systemctl stop empty-cache")
     installer.succeed("test -z \"$(lsblk -nrpo FSTYPE /dev/vdb)\"")
+    # Windows on another disk: its EFI partition holds the Windows boot manager.
+    installer.succeed("printf 'label: gpt\\ntype=C12A7328-F81F-11D2-BA4B-00A0C93EC93B\\n' | sfdisk /dev/vdc")
+    installer.succeed("udevadm settle; mkfs.vfat /dev/vdc1; mkdir -p /tmp/windows-esp; mount /dev/vdc1 /tmp/windows-esp")
+    installer.succeed("mkdir -p /tmp/windows-esp/EFI/Microsoft/Boot; touch /tmp/windows-esp/EFI/Microsoft/Boot/bootmgfw.efi /tmp/windows-esp/EFI/Microsoft/Boot/BCD; umount /tmp/windows-esp")
     # The real controller cache serves the signed closure.
     point_installer_at_cache(cache_ip, 5000)
     installer.succeed("set -o pipefail; /etc/nixorium-test/run-client-installer 2>&1 | tee /tmp/client-installer.log")
     installer.succeed("grep -F 'detected automatically' /tmp/client-installer.log")
     installer.succeed("grep -F 'DESTRUCTIVE REVIEW' /tmp/client-installer.log")
-    installer.succeed("grep -F '[1/3] Partitioning /dev/vdb' /tmp/client-installer.log")
-    installer.succeed("grep -F '[2/3] Installing pc01' /tmp/client-installer.log")
-    installer.succeed("grep -F '[3/3] Verifying' /tmp/client-installer.log")
-    installer.succeed("grep -F 'SUCCESS: pc01 is installed on /dev/vdb' /tmp/client-installer.log")
+    installer.succeed("grep -F 'Partitioning /dev/vdb' /tmp/client-installer.log")
+    installer.succeed("grep -F 'Boot loader installed' /tmp/client-installer.log")
+    installer.succeed("grep -F 'Verifying the installed system' /tmp/client-installer.log")
+    installer.succeed("grep -F 'pc01 is installed on /dev/vdb' /tmp/client-installer.log")
+    # The store path list and the boot loader noise stay in the log file.
+    installer.fail("grep -F 'copying path' /tmp/client-installer.log")
+    installer.fail("grep -E '^ +/nix/store/' /tmp/client-installer.log")
+    installer.succeed("test -s /tmp/nixorium-install.log")
     # The profile links are absolute; they resolve inside the target, not here.
     installer.succeed("test -L /mnt/nix/var/nix/profiles/system && test \"$(readlink /mnt/nix/var/nix/profiles/system-1-link)\" = ${clientSystem}")
     installer.succeed("test -e /mnt${clientSystem}")
     # It reached the target through the cache, never through the netboot store.
     installer.fail("test -e ${clientSystem}")
     installer.succeed("lsblk -nrpo PATH,FSTYPE /dev/vdb | grep -E '/dev/vdb[12] '")
+    # The first boot menu already offers Windows, as later updates do.
+    installer.succeed("grep -F 'Windows Boot Manager' /mnt/boot/grub/grub.cfg")
     installer.succeed("umount -R /mnt")
     installer.succeed("sync")
     installer.shutdown()
@@ -168,6 +180,8 @@ in
     target.wait_for_unit("multi-user.target")
     target.succeed("test \"$(systemctl show virtualbox.service --property=LoadState --value)\" = not-found")
     target.succeed("test \"$(hostname)\" = pc01")
+    # The installed system records its own number for later releases.
+    target.succeed("grep -F '\"number\":1' /var/lib/nixorium/identity.json; grep -Fx 'NIXORIUM_HOST_NUMBER=1' /run/nixorium/identity.env")
     # The only NIC is called eno7: neither the fallback name nor a configured
     # one. The lab address and DHCP still land on it, matched by type.
     target.succeed("test -d /sys/class/net/eno7; test ! -e /sys/class/net/enp0s3")

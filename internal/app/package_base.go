@@ -89,10 +89,6 @@ func (m *UpdateManager) planPackageBase(ctx context.Context, repository, target 
 	r.Snapshot, r.Proposal, r.Diff, r.Checks, r.PackageBase = snapshot, proposal, proposal.Diff, proposal.Checks, proposal.PackageBase
 	r.Workspace = proposal.Workspace
 	r.TargetChannel, r.CurrentChannel = domain.UpdateChannel(target), domain.UpdateChannel(snapshot.CurrentRef)
-	r.Confirmation = "UPDATE"
-	if target != snapshot.CurrentRef {
-		r.Confirmation = "MIGRATE"
-	}
 	r.ReviewToken = updateReviewToken(r, snapshot, proposal)
 	r.State = "ready"
 	r.Checks = append(r.Checks, domain.UpdateCheck{ID: "runtime", State: "unverified", Message: fmt.Sprintf("%s: verify controller boot/services and a selected client before fleet distribution", target)})

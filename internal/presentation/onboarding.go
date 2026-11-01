@@ -51,9 +51,9 @@ func (model dashboardModel) updateDisclaimer(key tea.KeyPressMsg) (tea.Model, te
 		model.busy = "Saving acknowledgement"
 		return model, func() tea.Msg { return disclaimerMsg{accepted: true, err: model.actions.AcceptDisclaimer()} }
 	case "down", "j":
-		model.pageScroll++
+		model.navigation.pageScroll++
 	case "up", "k":
-		model.pageScroll = max(0, model.pageScroll-1)
+		model.navigation.pageScroll = max(0, model.navigation.pageScroll-1)
 	}
 	return model, nil
 }

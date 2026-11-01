@@ -3,9 +3,11 @@ package adapters
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/giovantenne/nixorium/internal/domain"
 	"github.com/giovantenne/nixorium/internal/hostdiagnostics"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -75,5 +77,32 @@ func TestAssistantNewObservationToolsRequireNewConsentAndSavedRepository(t *test
 	}
 	if got := tools.Execute(t.Context(), conversation, call); got != `{"ok":true}` || calls != 1 {
 		t.Fatal(got, calls)
+	}
+}
+
+func TestAssistantDiagnosticsDistinguishesOutdatedHelper(t *testing.T) {
+	host := domain.HostMeta{Name: "pc01", IP: "192.0.2.1"}
+	exit := func(code string) error {
+		err := exec.Command("sh", "-c", "exit "+code).Run()
+		return &boundedCommandError{message: "ssh: failed", cause: err}
+	}
+	for _, test := range []struct {
+		stderr   string
+		err      error
+		outdated bool
+	}{
+		{hostdiagnostics.HelperRefusal + "\n", exit("1"), true},
+		{hostdiagnostics.HelperRefusal, exit("255"), false},
+		{"Connection timed out", exit("255"), false},
+		{"Connection timed out", exit("1"), false},
+		{hostdiagnostics.HelperRefusal, errors.New("not an exit status"), false},
+	} {
+		run := func(context.Context, int, string, ...string) (string, string, error) {
+			return "", test.stderr, test.err
+		}
+		_, err := hostDiagnostics(t.Context(), host, false, "hardware", run)
+		if err == nil || errors.Is(err, hostdiagnostics.ErrHelperOutdated) != test.outdated {
+			t.Fatal(test, err)
+		}
 	}
 }

@@ -9,10 +9,12 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// Examples are requests the menu does not cover; they show requests only,
+// never how the service answers them.
 var assistantExamples = []string{
-	"Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN",
-	"pc03 missed the last update: show the evidence and the next check",
-	"Prepare offline Jupyter + pandas lessons; restore the student baseline at boot",
+	"Add Python with pandas and Jupyter for class 4B",
+	"Students need access to the Arduino boards on pc05–pc12",
+	"The projector on the teacher's desk is not detected",
 }
 var assistantCommands = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/help", "/name", "/code"}
 
@@ -182,8 +184,8 @@ func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd
 		return model.openAssistantSharing()
 	case "/help":
 		model.assistant.input.Reset()
-		model.helpOpen = true
-		model.pageScroll = 0
+		model.navigation.helpOpen = true
+		model.navigation.pageScroll = 0
 		return model, nil
 	case "/name":
 		model.assistant.input.Reset()
@@ -366,7 +368,7 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 				if err == nil && actions.ReadConsent != nil {
 					accepted, err = actions.ReadConsent()
 				}
-				sharing := false
+				sharing := true
 				if err == nil && accepted && actions.ReadSharing != nil {
 					sharing, err = actions.ReadSharing()
 				}
@@ -442,4 +444,15 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 	model.assistant.commandCursor = 0
 	model.assistant.input, command = model.assistant.input.Update(key)
 	return model, command
+}
+
+// assistantUsesCtrlC reports whether Ctrl+C belongs to the Assistant step on
+// screen: it stops a running request and leaves the billing and name steps.
+// In the chat and the other steps it closes Nixorium like anywhere else.
+func (model dashboardModel) assistantUsesCtrlC() bool {
+	switch model.assistant.state {
+	case "running", "billing-loading", "name", "name-saving":
+		return true
+	}
+	return false
 }

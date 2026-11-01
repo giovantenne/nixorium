@@ -173,7 +173,6 @@ func (m SoftwareManager) PlanPreset(ctx context.Context, repository string, requ
 		return softwarePresetPlanIssue(report, "review", err.Error())
 	}
 	report.ReviewToken = domain.SoftwareReviewToken(report.BaseFingerprint, reviewData)
-	report.Confirmation = "ADD PROFILE"
 	report.State = "ready"
 	report.Message = fmt.Sprintf("Add %d package declaration(s) from %s; %d existing declaration(s) keep their current scope. No system has been built or changed.", len(report.Additions), preset.Label, len(report.Existing))
 	return report

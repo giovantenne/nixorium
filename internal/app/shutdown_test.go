@@ -93,6 +93,40 @@ func TestShutdownPlanIncludesActiveSessionsAndProtectsUnknownSessions(t *testing
 	}
 }
 
+func TestPowerConfirmationWordIsAskedOnlyWhenSessionsMayBeInterrupted(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		session domain.ShutdownSessionState
+		policy  domain.ShutdownSessionPolicy
+		action  domain.ClientPowerAction
+		word    string
+	}{
+		{"idle shutdown confirms with Enter", domain.ShutdownSessionIdle, domain.ShutdownProtectUnknown, domain.ClientPowerOff, ""},
+		{"unused login shutdown confirms with Enter", domain.ShutdownSessionUnused, domain.ShutdownProtectUnknown, domain.ClientPowerOff, ""},
+		{"active session shutdown needs SHUTDOWN", domain.ShutdownSessionActive, domain.ShutdownProtectUnknown, domain.ClientPowerOff, "SHUTDOWN"},
+		{"acknowledged unknown session shutdown needs SHUTDOWN", domain.ShutdownSessionUnknown, domain.ShutdownAcknowledgeUnknown, domain.ClientPowerOff, "SHUTDOWN"},
+		{"idle restart confirms with Enter", domain.ShutdownSessionIdle, domain.ShutdownProtectUnknown, domain.ClientRestart, ""},
+		{"active session restart needs RESTART", domain.ShutdownSessionActive, domain.ShutdownProtectUnknown, domain.ClientRestart, "RESTART"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source, manager := shutdownFixture()
+			source.observations["pc01"] = domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: test.session}
+			plan := manager.PlanAction(context.Background(), "/deployment", "pc01", test.policy, test.action)
+			if plan.HasErrors() || plan.State != "ready" || plan.Confirmation != test.word || plan.InterruptsSessions() != (test.word != "") {
+				t.Fatalf("plan = %+v", plan)
+			}
+		})
+	}
+	// An ineligible computer with an active or unknown session does not make an
+	// otherwise idle review ask for a word: nothing is sent to it.
+	source, manager := shutdownFixture()
+	plan := manager.Plan(context.Background(), "/deployment", "pc01,pc02", domain.ShutdownProtectUnknown)
+	if plan.Eligible != 1 || plan.Targets[1].Eligible || plan.Confirmation != "" {
+		t.Fatalf("a computer that is not sent anything asked for a word: %+v", plan)
+	}
+	_ = source
+}
+
 func TestShutdownPlanRejectsControllerUnknownDuplicateAndConflicts(t *testing.T) {
 	for _, requested := range []string{"pc99", "pc04", "pc01,pc01", ""} {
 		_, manager := shutdownFixture()
@@ -179,11 +213,55 @@ func TestShutdownApplyDoesNotRetryBlindlyAfterUnconfirmedDispatch(t *testing.T) 
 func TestRestartUsesDistinctReviewAndDispatchAction(t *testing.T) {
 	source, manager := shutdownFixture()
 	plan := manager.PlanAction(context.Background(), "/deployment", "pc01", domain.ShutdownProtectUnknown, domain.ClientRestart)
-	if plan.HasErrors() || plan.Action != domain.ClientRestart || plan.Confirmation != "RESTART" || plan.Operation != "restart-plan" {
+	if plan.HasErrors() || plan.Action != domain.ClientRestart || plan.Confirmation != "" || plan.Operation != "restart-plan" {
 		t.Fatalf("restart plan = %+v", plan)
 	}
 	report := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
 	if report.HasErrors() || report.Operation != "restart-apply" || report.Action != domain.ClientRestart || source.action != domain.ClientRestart {
 		t.Fatalf("restart report = %+v, dispatched action = %q", report, source.action)
+	}
+}
+
+type classroomLeaseShutdownSource struct {
+	*fakeShutdownSource
+	blocked map[string]string
+}
+
+func (s classroomLeaseShutdownSource) ClassroomBlockedHosts() (map[string]string, error) {
+	return s.blocked, nil
+}
+
+func (s classroomLeaseShutdownSource) AcquireClassroomLease(string) (io.Closer, map[string]string, error) {
+	return shutdownLease{}, s.blocked, nil
+}
+
+func TestShutdownRunsBesideMaintenanceAndLeavesComputersBeingUpdated(t *testing.T) {
+	source, _ := shutdownFixture()
+	// Maintenance holds the operation gate: classroom controls do not wait.
+	source.active, source.acquireErr = true, errors.New("another operation is running")
+	source.observations["pc02"] = domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle}
+	lease := classroomLeaseShutdownSource{fakeShutdownSource: source, blocked: map[string]string{}}
+	manager := NewShutdownManager(lease)
+	manager.now = func() time.Time { return time.Unix(1000, 0).UTC() }
+
+	plan := manager.Plan(context.Background(), "/deployment", "pc01,pc02", domain.ShutdownProtectUnknown)
+	if plan.HasErrors() || plan.Eligible != 2 {
+		t.Fatalf("plan = %+v", plan)
+	}
+	// An update naming pc01 starts after the review: pc01 is left alone.
+	lease.blocked = map[string]string{"pc01": domain.ClassroomBusyReason}
+	manager.source = lease
+	report := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
+	if len(source.dispatchHosts) != 1 || source.dispatchHosts[0].Name != "pc02" || report.NotSent != 1 {
+		t.Fatalf("dispatched %v, report %+v", source.dispatchHosts, report)
+	}
+	if !strings.Contains(report.Targets[0].Detail, "being updated") {
+		t.Fatalf("pc01 outcome = %+v", report.Targets[0])
+	}
+
+	// A review made while pc01 is named marks it ineligible with the reason.
+	plan = manager.Plan(context.Background(), "/deployment", "pc01,pc02", domain.ShutdownProtectUnknown)
+	if plan.HasErrors() || plan.Eligible != 1 || plan.Targets[0].Eligible || plan.Targets[0].Detail != domain.ClassroomBusyReason {
+		t.Fatalf("plan = %+v", plan)
 	}
 }

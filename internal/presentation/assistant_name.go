@@ -100,7 +100,7 @@ func (model dashboardModel) assistantNameView() string {
 	}
 	input := model.assistant.labName
 	input.SetWidth(max(10, min(70, width-2)))
-	body := "Shown on invoices, emails and in support, to tell this laboratory apart from the others of your school.\n\nLaboratory name (up to 60 characters)\n" + input.View()
+	body := "Shown on invoices and emails, to tell this laboratory apart from the others of your school.\n\nLaboratory name (up to 60 characters)\n" + input.View()
 	hint := "Enter save · Esc cancel · empty name removes it"
 	if model.assistant.state == "name-saving" {
 		body += "\n\nSaving…"

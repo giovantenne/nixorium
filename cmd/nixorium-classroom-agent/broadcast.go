@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -31,13 +30,7 @@ type extensionShower struct {
 var errBroadcast = errors.New("the classroom extension could not show the picture")
 
 func (shower *extensionShower) call(method string, arguments ...any) error {
-	object, err := shower.locker.object()
-	if err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
-	defer cancel()
-	return object.CallWithContext(ctx, lockBusName+"."+method, 0, arguments...).Err
+	return shower.locker.call(method, arguments...)
 }
 
 func (shower *extensionShower) Show(image []byte) error {

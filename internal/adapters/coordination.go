@@ -2,8 +2,6 @@ package adapters
 
 import (
 	"bytes"
-	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -218,23 +216,6 @@ func inspectReservationAt(directory *os.File) (bool, error) {
 	return true, nil
 }
 
-func ensureTestCoordinationDirectory(stateRoot string) (string, error) {
-	directory := filepath.Join(stateRoot, "nixorium", "coordination")
-	if err := os.MkdirAll(directory, 0700); err != nil {
-		return "", err
-	}
-	lockPath := filepath.Join(directory, coordinationLockName)
-	file, err := os.OpenFile(lockPath, os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		return "", err
-	}
-	if err := file.Chmod(0600); err != nil {
-		file.Close()
-		return "", err
-	}
-	return directory, file.Close()
-}
-
 type remoteInstallReservation struct {
 	directoryPath string
 	operationID   string
@@ -259,10 +240,6 @@ func (Local) RemoteReservationPresent() bool {
 	defer directory.Close()
 	present, _ := inspectReservationAt(directory)
 	return present
-}
-
-func (Local) ReserveRemoteInstall(_ context.Context, plan domain.RemoteInstallPlan, reviewToken string) (domain.RemoteInstallReservation, error) {
-	return reserveRemoteInstallAt(managedCoordinationDirectory, true, plan, reviewToken)
 }
 
 func (Local) ReserveRemoteSession(operationID string) (domain.RemoteInstallReservation, error) {
@@ -378,17 +355,6 @@ func readRemoteReservationAt(directory *os.File) (remoteReservationRecord, bool,
 		return record, true, errors.New("reservation record does not bind valid state")
 	}
 	return record, true, nil
-}
-
-func reserveRemoteInstallAt(directoryPath string, managed bool, plan domain.RemoteInstallPlan, reviewToken string) (domain.RemoteInstallReservation, error) {
-	if err := domain.ValidateRemoteInstallPlan(plan); err != nil {
-		return nil, err
-	}
-	if len(reviewToken) != len("sha256:")+64 || !stringsHasHexDigest(reviewToken[len("sha256:"):]) {
-		return nil, errors.New("remote installation review token is invalid")
-	}
-	digest := sha256.Sum256([]byte(reviewToken))
-	return createRemoteReservationAt(directoryPath, managed, plan.OperationID, "sha256:"+hex.EncodeToString(digest[:]))
 }
 
 func createRemoteReservationAt(directoryPath string, managed bool, operationID, tokenDigest string) (domain.RemoteInstallReservation, error) {

@@ -8,10 +8,10 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func TestWorkspaceTextAndConfirmationKeepSaveSeparate(t *testing.T) {
+func TestWorkspaceTextAndYesNoConfirmationKeepSaveSeparate(t *testing.T) {
 	profile := domain.WorkspaceProfile{SchemaVersion: 1}
 	plan := domain.WorkspacePlanReport{
-		State: "ready", Repository: "/deployment", ManagedFile: domain.WorkspaceFileName, Confirmation: "SAVE", ReviewToken: "token",
+		State: "ready", Repository: "/deployment", ManagedFile: domain.WorkspaceFileName, ReviewToken: "token",
 		Inspection: &domain.WorkspaceInspection{Resolution: domain.WorkspaceResolution{
 			StudentUser: "learner", Declared: profile, Effective: profile,
 			Targets:    []domain.WorkspaceTarget{{Name: "controller", Role: "controller"}, {Name: "pc01", Role: "client"}},
@@ -20,10 +20,10 @@ func TestWorkspaceTextAndConfirmationKeepSaveSeparate(t *testing.T) {
 		}},
 		Message: "No commit, deployment or reset is included.",
 	}
-	for _, input := range []string{"SAVE\n", "save\n", "cancel\n"} {
+	for _, input := range []string{"y\n", "yes\n", "SAVE\n", "\n", "cancel\n"} {
 		var output bytes.Buffer
 		approved, err := ConfirmWorkspace(strings.NewReader(input), &output, plan)
-		if err != nil || approved != (input == "SAVE\n") {
+		if err != nil || approved != (input == "y\n" || input == "yes\n") {
 			t.Fatalf("confirmation %q: %v %v", input, approved, err)
 		}
 		for _, want := range []string{"learner", "controller (controller)", "pc01 (client)", "no saved profile", "Effective preferences", "vscode @ 1.0", "example.plugin @ 2.0", "nodejs", "next computer start after system application", "No commit, deployment or reset"} {

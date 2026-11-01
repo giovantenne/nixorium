@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -80,7 +81,16 @@ func TestAssistantWritableSettingsMatchTheSettingsFields(t *testing.T) {
 			t.Fatalf("%s is not writable", spec.field)
 		}
 		changed := base
-		*spec.target(&changed.Lab) = "changed"
+		var sample any = "changed"
+		switch spec.field {
+		case "lab.pcCount":
+			sample = float64(21)
+		case "lab.classroomView":
+			sample = false
+		}
+		if problem := spec.set(&changed.Lab, true, sample); problem != "" {
+			t.Fatalf("%s: %s", spec.field, problem)
+		}
 		diff := DiffLabSettings(base, changed)
 		if len(diff) != 1 || diff[0].Field != spec.field {
 			t.Fatalf("%s: DiffLabSettings reports %+v", spec.field, diff)
@@ -89,7 +99,7 @@ func TestAssistantWritableSettingsMatchTheSettingsFields(t *testing.T) {
 			t.Fatalf("%s is not a settings key", spec.key)
 		}
 	}
-	for _, field := range []string{"lab.pcCount", "lab.masterHostNumber", "lab.networkBase", "lab.ifaceName", "lab.teacherUser", "lab.studentUser", "lab.teacherPassword", "lab.adminPassword", "lab.credentialsVersion", "lab.classroomView", "lab.assistant", "lab.masterDhcpIp", "lab.deploymentMode", "lab.networkTransition", "lab.consoleKeyMap", "schemaVersion", "lab", ""} {
+	for _, field := range []string{"lab.masterHostNumber", "lab.networkBase", "lab.ifaceName", "lab.controllerIfaceName", "lab.clientIfaceName", "lab.hostIfaceNames", "lab.teacherPassword", "lab.adminPassword", "lab.credentialsVersion", "lab.assistant", "lab.masterDhcpIp", "lab.deploymentMode", "lab.networkTransition", "lab.consoleKeyMap", "schemaVersion", "lab", ""} {
 		if AssistantSettingWritable(field) {
 			t.Fatalf("%q must stay read-only", field)
 		}
@@ -155,7 +165,7 @@ func TestMergeAssistantSettingsRefusesEveryReadOnlyFieldByName(t *testing.T) {
 	for _, spec := range assistantSettingSpecs {
 		delete(fields, spec.field)
 	}
-	if len(fields) < 18 {
+	if len(fields) < 14 {
 		t.Fatalf("only %d read-only fields found", len(fields))
 	}
 	for field := range fields {
@@ -186,11 +196,11 @@ func TestMergeAssistantSettingsRefusesReadOnlyChangeEvenWithWritableChange(t *te
 	view := assistantSettingsViewOf(t, base)
 	proposed := assistantSettingsEdit(t, view, func(lab map[string]any) {
 		lab["timeZone"] = "Europe/London"
-		lab["pcCount"] = 25
+		lab["masterHostNumber"] = 100
 		lab["ifaceName"] = "eth0"
 	})
 	_, err := MergeAssistantSettings(base, view, proposed)
-	if err == nil || err.Error() != "settings_field_read_only: lab.ifaceName, lab.pcCount" {
+	if err == nil || err.Error() != "settings_field_read_only: lab.ifaceName, lab.masterHostNumber" {
 		t.Fatalf("err=%v", err)
 	}
 }
@@ -328,11 +338,11 @@ func TestReviewAssistantSettingsRefusesWhatANativeSaveRefuses(t *testing.T) {
 	if _, err = ReviewAssistantSettings(base, assistantSettingsBytes(t, renumbered)); assistantSettingsCode(err) != AssistantSettingsBlocked || !strings.Contains(err.Error(), ControllerNumberLockedMessage(20)) {
 		t.Fatalf("controller number: %v", err)
 	}
-	counted := saved
-	counted.Lab.PCCount = 19
-	_, err = ReviewAssistantSettings(base, assistantSettingsBytes(t, counted))
-	if assistantSettingsCode(err) != AssistantSettingsReadOnly || err.Error() != "settings_field_read_only: lab.pcCount" || !strings.Contains(err.(*AssistantSettingsError).ReviewMessage(), "(lab.pcCount)") {
-		t.Fatalf("count: %v", err)
+	renamed := saved
+	renamed.Lab.InterfaceName = "eth0"
+	_, err = ReviewAssistantSettings(base, assistantSettingsBytes(t, renamed))
+	if assistantSettingsCode(err) != AssistantSettingsReadOnly || err.Error() != "settings_field_read_only: lab.ifaceName" || !strings.Contains(err.(*AssistantSettingsError).ReviewMessage(), "(lab.ifaceName)") {
+		t.Fatalf("interface: %v", err)
 	}
 	for name, candidate := range map[string][]byte{
 		"formatting": bytes.ReplaceAll(base, []byte("  "), []byte("\t")),
@@ -346,5 +356,169 @@ func TestReviewAssistantSettingsRefusesWhatANativeSaveRefuses(t *testing.T) {
 	}
 	if _, err := ReviewAssistantSettings([]byte("{}"), base); assistantSettingsCode(err) != AssistantSettingsInvalid {
 		t.Fatalf("invalid base: %v", err)
+	}
+}
+
+func TestMergeAssistantSettingsClassroomViewWritesWhatTheMenuWrites(t *testing.T) {
+	// Saved with the key left out (the default): off writes false.
+	saved := assistantPublicSettings()
+	saved.Lab.ClassroomView = nil
+	base := assistantSettingsBytes(t, saved)
+	if strings.Contains(string(base), "classroomView") {
+		t.Fatal("the default must leave the key out")
+	}
+	view := assistantSettingsViewOf(t, base)
+	off, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, func(lab map[string]any) { lab["classroomView"] = false }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	disabled := saved
+	no := false
+	disabled.Lab.ClassroomView = &no
+	if !bytes.Equal(off, assistantSettingsBytes(t, disabled)) || !strings.Contains(string(off), `"classroomView": false`) {
+		t.Fatalf("off: %s", off)
+	}
+	// Back on from off: the key is left out again, not written as true.
+	offView := assistantSettingsViewOf(t, off)
+	on, err := MergeAssistantSettings(off, offView, assistantSettingsEdit(t, offView, func(lab map[string]any) { lab["classroomView"] = true }))
+	if err != nil || !bytes.Equal(on, base) {
+		t.Fatalf("on: %s %v", on, err)
+	}
+	// Removing the key means on as well.
+	removed, err := MergeAssistantSettings(off, offView, assistantSettingsEdit(t, offView, func(lab map[string]any) { delete(lab, "classroomView") }))
+	if err != nil || !bytes.Equal(removed, base) {
+		t.Fatalf("removed: %s %v", removed, err)
+	}
+	// An explicit true stays when it is already on.
+	explicit := assistantPublicSettings()
+	explicitBase := assistantSettingsBytes(t, explicit)
+	explicitView := assistantSettingsViewOf(t, explicitBase)
+	merged, err := MergeAssistantSettings(explicitBase, explicitView, assistantSettingsEdit(t, explicitView, func(lab map[string]any) { lab["classroomView"] = true; lab["timeZone"] = "Europe/London" }))
+	if err != nil || !strings.Contains(string(merged), `"classroomView": true`) {
+		t.Fatalf("explicit: %s %v", merged, err)
+	}
+}
+
+func TestMergeAssistantSettingsAcceptsCountAndAccounts(t *testing.T) {
+	base := assistantSettingsBytes(t, assistantPublicSettings())
+	view := assistantSettingsViewOf(t, base)
+	proposed := assistantSettingsEdit(t, view, func(lab map[string]any) {
+		lab["pcCount"] = 24
+		lab["teacherUser"] = "docente"
+		lab["studentUser"] = "alunno"
+	})
+	merged, err := MergeAssistantSettings(base, view, proposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := assistantPublicSettings()
+	want.Lab.PCCount, want.Lab.TeacherUser, want.Lab.StudentUser = 24, "docente", "alunno"
+	if !bytes.Equal(merged, assistantSettingsBytes(t, want)) {
+		t.Fatalf("merged %s", merged)
+	}
+	review, err := ReviewAssistantSettings(base, merged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := []string{}
+	for _, impact := range review.Impacts {
+		kinds = append(kinds, impact.Kind)
+	}
+	if !slices.Contains(kinds, "computers-added") || !slices.Contains(kinds, "accounts") {
+		t.Fatalf("impacts %v", kinds)
+	}
+	for name, edit := range map[string]func(map[string]any){
+		"zero":     func(lab map[string]any) { lab["pcCount"] = 0 },
+		"too many": func(lab map[string]any) { lab["pcCount"] = 254 },
+	} {
+		_, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, edit))
+		if assistantSettingsCode(err) != AssistantSettingsInvalid || !strings.HasPrefix(err.Error(), "settings_invalid: lab.pcCount: must be between 1 and 253 in laboratory mode") {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	_, err = MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, func(lab map[string]any) { lab["pcCount"] = 2.5 }))
+	if err == nil || err.Error() != "settings_invalid: lab.pcCount must be an integer" {
+		t.Fatalf("fraction: %v", err)
+	}
+}
+
+func TestMergeAssistantSettingsNoOpClassroomViewKeepsANonCanonicalFile(t *testing.T) {
+	// A hand-edited file: tabs instead of the canonical indentation.
+	absent := assistantPublicSettings()
+	absent.Lab.ClassroomView = nil
+	explicit := assistantPublicSettings()
+	for name, test := range map[string]struct {
+		saved LabSettingsFile
+		edit  func(lab map[string]any)
+	}{
+		"true where the key is absent":   {absent, func(lab map[string]any) { lab["classroomView"] = true }},
+		"key removed from explicit true": {explicit, func(lab map[string]any) { delete(lab, "classroomView") }},
+	} {
+		base := []byte(strings.ReplaceAll(string(assistantSettingsBytes(t, test.saved)), "  ", "\t"))
+		view := assistantSettingsViewOf(t, base)
+		merged, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, test.edit))
+		if err != nil || !bytes.Equal(merged, base) {
+			t.Fatalf("%s: merged=%q err=%v", name, merged, err)
+		}
+	}
+}
+
+func TestMergeAssistantSettingsRefusesNullAndDuplicateMenuValues(t *testing.T) {
+	base := assistantSettingsBytes(t, assistantPublicSettings())
+	view := assistantSettingsViewOf(t, base)
+	for key, want := range map[string]string{
+		"pcCount":       "settings_invalid: lab.pcCount must be an integer",
+		"classroomView": "settings_invalid: lab.classroomView must be true or false",
+		"teacherUser":   "settings_invalid: lab.teacherUser must be text",
+	} {
+		_, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, func(lab map[string]any) { lab[key] = nil }))
+		if err == nil || err.Error() != want {
+			t.Fatalf("null %s: %v", key, err)
+		}
+	}
+	// With a duplicate key the last value wins, in the merge and in the review.
+	duplicated := []byte(strings.Replace(string(view), `"pcCount": 20`, `"pcCount": 21, "pcCount": 22`, 1))
+	merged, err := MergeAssistantSettings(base, view, duplicated)
+	if err == nil {
+		settings, _ := DecodeLabSettings(merged)
+		if settings.Lab.PCCount != 22 {
+			t.Fatalf("merge kept %d", settings.Lab.PCCount)
+		}
+		if _, reviewErr := ReviewAssistantSettings(base, merged); reviewErr != nil {
+			t.Fatal(reviewErr)
+		}
+	} else if assistantSettingsCode(err) != AssistantSettingsInvalid {
+		t.Fatalf("duplicate: %v", err)
+	}
+	if _, err := ReviewAssistantSettings(base, []byte(strings.Replace(string(base), `"pcCount": 20`, `"pcCount": 21, "pcCount": 22`, 1))); assistantSettingsCode(err) != AssistantSettingsInvalid {
+		t.Fatalf("review of a duplicate: %v", err)
+	}
+}
+
+func TestMergeAssistantSettingsRefusesCountBelowAHostInterface(t *testing.T) {
+	saved := assistantPublicSettings()
+	saved.Lab.HostInterfaceNames = map[string]string{"pc15": "enp3s0"}
+	base := assistantSettingsBytes(t, saved)
+	view := assistantSettingsViewOf(t, base)
+	_, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, func(lab map[string]any) { lab["pcCount"] = 12 }))
+	if err == nil || err.Error() != "settings_invalid: lab.hostIfaceNames.pc15: must name a configured client or controller" {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestMergeAssistantSettingsRefusesCountGrowthDuringANetworkTransition(t *testing.T) {
+	saved := assistantPublicSettings()
+	saved.Lab.NetworkBase = "10.1.0.0"
+	saved.Lab.PCCount, saved.Lab.MasterHostNumber = 10, 14
+	saved.Lab.HostInterfaceNames = nil
+	saved.Lab.NetworkTransition = &NetworkTransition{PreviousBase: "10.0.0.0", PreviousPrefixLength: 28, StartedAt: "2026-10-15T08:00:00Z"}
+	base := assistantSettingsBytes(t, saved)
+	if _, issues := DecodeLabSettings(base); len(issues) > 0 {
+		t.Fatal(issues)
+	}
+	view := assistantSettingsViewOf(t, base)
+	_, err := MergeAssistantSettings(base, view, assistantSettingsEdit(t, view, func(lab map[string]any) { lab["pcCount"] = 15 }))
+	if err == nil || !strings.Contains(err.Error(), "the previous network must hold every configured host number") {
+		t.Fatalf("growth: %v", err)
 	}
 }

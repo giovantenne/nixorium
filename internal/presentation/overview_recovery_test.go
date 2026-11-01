@@ -45,7 +45,7 @@ func TestUnconfirmedResultsOfferAComputerCheck(t *testing.T) {
 	if !strings.Contains(model.View().Content, "Check computers") {
 		t.Fatalf("result view:\n%s", model.View().Content)
 	}
-	model.internet = internetModel{stage: 2, chosen: map[string]bool{}, result: domain.InternetReport{Targets: []domain.InternetOutcome{{Name: "pc01", State: "unconfirmed"}}}}
+	model.internet = internetModel{stage: 2, hostPicker: newHostPicker(), result: domain.InternetReport{Targets: []domain.InternetOutcome{{Name: "pc01", State: "unconfirmed"}}}}
 	model.screen = dashboardInternet
 	if !strings.Contains(model.View().Content, "Check computers") {
 		t.Fatalf("internet result view:\n%s", model.View().Content)

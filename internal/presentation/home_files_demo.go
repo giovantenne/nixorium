@@ -28,7 +28,7 @@ func demoHomeFilesPlan() domain.HomeFilesPlanReport {
 			{Destination: "Documents/Lessons/run.sh", Kind: "added", AfterSize: 96, AfterExecutable: true},
 			{Destination: "Documents/Lessons/Empty", Kind: "added", Directory: true, AfterDirectory: true},
 		},
-		Entries: c.Entries, StudentUser: "student", Targets: []domain.WorkspaceTarget{{Name: "pc99", Role: "controller"}, {Name: "pc01", Role: "client"}, {Name: "pc02", Role: "client"}}, ReviewToken: "synthetic-home-files-review", Confirmation: "SAVE",
+		Entries: c.Entries, StudentUser: "student", Targets: []domain.WorkspaceTarget{{Name: "pc99", Role: "controller"}, {Name: "pc01", Role: "client"}, {Name: "pc02", Role: "client"}}, ReviewToken: "synthetic-home-files-review",
 		Message: "Only the manifest and captured copies will be saved locally; system application and home restoration are separate."}
 }
 
@@ -78,7 +78,6 @@ func RenderHomeFilesDemo(revision string, width, height int) DemoScenario {
 	r.key(demoCode(tea.KeyEnter))
 	r.command(r.key(demoText("v")))
 	r.capture("Initial-file save review", 2600)
-	r.typeAndCapture("SAVE", "Confirm local initial-file save")
 	save := r.key(demoCode(tea.KeyEnter))
 	r.capture("Protected initial-file save", 900)
 	r.command(save)
@@ -86,7 +85,6 @@ func RenderHomeFilesDemo(revision string, width, height int) DemoScenario {
 	// A second synthetic review demonstrates edits to an existing declaration.
 	// It is never applied; the native change rows remain visible before content.
 	r.model.homeFiles.stage = "review"
-	r.model.homeFiles.confirmation = ""
 	r.model.homeFiles.plan = demoHomeFilesPlan()
 	r.model.homeFiles.plan.Changes = []domain.HomeFilesChange{
 		{Destination: "Documents/Lessons/previous.pdf", Kind: "removed", BeforeSize: 4096},

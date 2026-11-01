@@ -98,7 +98,7 @@
               wait("Enter acknowledges")
               send("\r")
               wait("Assistant")
-              send("m")
+              send("a")
               # First access opens the chat itself: no gate, no service call.
               wait("Not activated")
               wait("Try asking, for example:")
@@ -237,6 +237,7 @@
   };
   testScript = ''
     import json
+    import re
     start_all()
     controller.wait_for_unit("multi-user.target")
     controller.wait_for_unit("assistant-fake.service")
@@ -244,7 +245,7 @@
     controller.succeed("install -d -m 0700 -o admin -g users /home/admin/deployment")
     controller.succeed("cp /etc/assistant-test/flake.nix /home/admin/deployment/flake.nix; mkdir /home/admin/deployment/modules; printf '{ course = 1; }\\n' > /home/admin/deployment/modules/course.nix; printf '{}\\n' > /home/admin/deployment/modules/controller.nix")
     settings = json.loads(controller.succeed("cat /etc/assistant-test/settings.json"))
-    settings["lab"].update(masterDhcpIp="192.0.2.10", pcCount=1, ifaceName="eth0", adminPassword="$6$vm$not-the-public-default", teacherPassword="$6$vm$not-the-public-default", studentPassword="$6$vm$not-the-public-default")
+    settings["lab"].update(masterDhcpIp="192.0.2.10", pcCount=1, ifaceName="eth0", adminPassword="$6$vm$notthepublicdefault", teacherPassword="$6$vm$notthepublicdefault", studentPassword="$6$vm$notthepublicdefault")
     controller.succeed("printf %s " + __import__("shlex").quote(json.dumps(settings)) + " > /home/admin/deployment/lab-settings.json; chown -R admin:users /home/admin/deployment")
     controller.succeed("su - admin -c 'cd deployment; git init -q; git add .; git -c user.name=Test -c user.email=test@example.invalid commit -qm initial'")
     original = controller.succeed("su - admin -c 'git -C deployment rev-parse HEAD'").strip()
@@ -257,8 +258,10 @@
       assert controller.succeed("cat /home/admin/deployment/modules/course.nix").strip() == "{ course = 2; }"
       requests = [json.loads(line) for line in controller.succeed("cat /tmp/fake-requests.log").splitlines()]
       step = "/v1/turns/00000000-0000-4000-8000-000000000001/steps"
-      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/turns"] + [step] * 3 + ["/v1/turns", step, "/v1/billing-portal"]
-      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True, False, True, False]
+      # Saving is on by default: each final answer uploads that conversation.
+      posts = [re.sub(r"^/v1/conversations/[0-9a-f-]{36}$", "/v1/conversations", r["path"]) for r in requests if r["method"] == "POST"]
+      assert posts == ["/v1/activate", "/v1/turns"] + [step] * 3 + ["/v1/conversations", "/v1/turns", step, "/v1/conversations", "/v1/billing-portal"], posts
+      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True, True, False, True, True, False]
       assert all(not r["userText"] for r in requests if r["method"] == "GET")
       assert controller.succeed("systemctl list-units 'nixorium-apply*' --state=active --no-legend --no-pager").strip() == ""
     with subtest("Assistant is absent without the controller option"):

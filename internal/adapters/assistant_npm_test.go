@@ -11,6 +11,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -398,4 +399,40 @@ func TestAssistantNpmSavedPiOfflineAndResetFixture(t *testing.T) {
 		}
 	}
 	t.Logf("Offline rebuilt %s; module ordering/ShellCheck, two fresh-home restores, Pi RPC startup, photon WASM and pinned fd/rg passed", artifact)
+}
+
+func TestAssistantNixQuoteEscapesOnlyWhatNixReads(t *testing.T) {
+	for value, expected := range map[string]string{
+		`/srv/a&b<c>d`:       `"/srv/a&b<c>d"`,
+		`say "hi"\now`:       `"say \"hi\"\\now"`,
+		"line\nbreak\r\tend": `"line\nbreak\r\tend"`,
+		`${builtins.abort}`:  `"\${builtins.abort}"`,
+		`$x $ $${y}`:         `"$x $ $\${y}"`,
+		"ünï €":              `"ünï €"`,
+		"":                   `""`,
+	} {
+		if got := assistantNixQuote(value); got != expected {
+			t.Fatalf("assistantNixQuote(%q) = %s, want %s", value, got, expected)
+		}
+	}
+}
+
+func TestAssistantNixQuoteRoundTripsThroughNix(t *testing.T) {
+	evaluator, err := exec.LookPath("nix-instantiate")
+	if err != nil {
+		t.Skip("nix-instantiate is not available")
+	}
+	state := t.TempDir()
+	for _, value := range []string{"/srv/a&b<c>d", `a"b\c`, "tab\tnl\ncr\r", "${x}", "$${x}", "ünï €"} {
+		command := exec.Command(evaluator, "--eval", "--strict", "--json", "--expr", assistantNixQuote(value))
+		command.Env = append(os.Environ(), "NIX_STATE_DIR="+state, "NIX_LOG_DIR="+state, "NIX_STORE_DIR="+state+"/store")
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Skipf("nix-instantiate cannot evaluate here: %v: %s", err, output)
+		}
+		var got string
+		if err := json.Unmarshal(output, &got); err != nil || got != value {
+			t.Fatalf("round trip of %q gave %q (%v)", value, output, err)
+		}
+	}
 }

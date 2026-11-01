@@ -71,6 +71,31 @@ test_exact_profile_and_parent_are_required() (
   ! nixorium_verify_installed_profile "$expected" /dev/sdy "$fixture/root" >/dev/null 2>&1
 )
 
+test_identity_record_and_class_system_name() (
+  fixture=$(mktemp -d)
+  trap 'rm -rf "$fixture"' EXIT
+  sudo() { "$@"; }
+  sync() { :; }
+  test "$(nixorium_expected_system_name pc03)" = pc03
+  test "$(nixorium_expected_system_name pc03 pc03)" = pc03
+  test "$(nixorium_expected_system_name pc03 shared-2)" = nixorium-client-shared-2
+  ! nixorium_expected_system_name pc03 'shared-x' >/dev/null 2>&1
+  ! nixorium_expected_system_name host 'shared-1' >/dev/null 2>&1
+  nixorium_write_identity_record pc07 "$fixture"
+  test "$(cat "$fixture/var/lib/nixorium/identity.json")" = '{"schemaVersion":1,"number":7}'
+  nixorium_write_identity_record pc120 "$fixture"
+  test "$(cat "$fixture/var/lib/nixorium/identity.json")" = '{"schemaVersion":1,"number":120}'
+  ! nixorium_write_identity_record pc00 "$fixture" >/dev/null 2>&1
+  nixorium_write_identity_record pc254 "$fixture"
+  test "$(cat "$fixture/var/lib/nixorium/identity.json")" = '{"schemaVersion":1,"number":254}'
+  # Only the names a laboratory can produce: pc01 to pc254, two digits at least.
+  for name in pc0 pc1 pc001 pc255 pc1000; do
+    ! nixorium_write_identity_record "$name" "$fixture" >/dev/null 2>&1
+    ! nixorium_expected_system_name "$name" >/dev/null 2>&1
+  done
+  test "$(nixorium_expected_system_name pc100 pc100)" = pc100
+)
+
 test_ed25519_key_identity_ignores_only_the_comment() {
   local canonical="ssh-ed25519 YWJjZA=="
   test "$(nixorium_canonical_ed25519_public_key "$canonical root@nixos")" = "$canonical"
@@ -95,10 +120,24 @@ test_install_mount_check_rejects_an_occupied_mountpoint() (
   ! nixorium_require_clean_install_mount >/dev/null 2>&1
 )
 
+test_host_key_is_created_once_and_its_fingerprint_printed() (
+  fixture=$(mktemp -d)
+  trap 'rm -rf "$fixture"' EXIT
+  sudo() { "$@"; }
+  first=$(nixorium_prepare_host_key "$fixture")
+  [[ "$first" =~ ^SHA256:[A-Za-z0-9+/]{43}$ ]]
+  [[ "$(stat -c %a "$fixture/etc/ssh/ssh_host_ed25519_key")" == 600 ]]
+  grep -q '^ssh-ed25519 ' "$fixture/etc/ssh/ssh_host_ed25519_key.pub"
+  # An existing key is kept, never replaced.
+  [[ "$(nixorium_prepare_host_key "$fixture")" == "$first" ]]
+)
+
 test_identity_is_content_bound
+test_host_key_is_created_once_and_its_fingerprint_printed
 test_exclusions_are_additive
 test_safe_disk_has_no_exclusion
 test_exact_profile_and_parent_are_required
+test_identity_record_and_class_system_name
 test_ed25519_key_identity_ignores_only_the_comment
 test_install_mount_check_requires_an_exact_mountpoint
 test_install_mount_check_rejects_an_occupied_mountpoint

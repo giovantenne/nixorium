@@ -59,7 +59,7 @@ different layers; use [student home](student-home.md) for workspace proposals.
 Do not claim offline project installation without evidence.
 
 Inspect documented service effects before recommending packages. The supplied
-Programming exercise MySQL/Apache setup is loopback-only and disposable; data
+Programming exercise MySQL setup is loopback-only and disposable; data
 may be discarded at boot. Explain durable coursework/export needs. Opening
 ports, changing service users or making shared databases persistent is system
 policy work outside this skill, not an ordinary package selection.

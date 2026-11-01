@@ -13,6 +13,7 @@ let
   profile = import ../templates/site/modules/workstation.nix profileArgs;
   roleProfile = hostName: import ../templates/site/modules/workstation.nix (profileArgs // {
     inherit hostName;
+    isController = hostName == "pc99";
     labSettings = profileArgs.labSettings // { masterHostName = "pc99"; };
   });
   controllerScript = (roleProfile "pc99").environment.etc."lab/gnome-user-setup.sh".text;

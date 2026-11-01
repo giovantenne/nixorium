@@ -57,7 +57,9 @@ func TestReadCommandCancellationKillsInheritedPipeOwners(t *testing.T) {
 }
 
 func TestReadCommandBoundsPipesAfterParentExit(t *testing.T) {
-	command := exec.CommandContext(t.Context(), "sh", "-c", "sleep 30 & exit 0")
+	// The child outlives the bound by far, so a loaded machine cannot make
+	// the read look bounded or unbounded by accident.
+	command := exec.CommandContext(t.Context(), "sh", "-c", "sleep 120 & exit 0")
 	configureCommandCancellation(command)
 	command.Stdout, command.Stderr = io.Discard, io.Discard
 	if err := command.Start(); err != nil {
@@ -71,7 +73,7 @@ func TestReadCommandBoundsPipesAfterParentExit(t *testing.T) {
 		if err != exec.ErrWaitDelay {
 			t.Fatalf("inherited output was not bounded: %v", err)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(60 * time.Second):
 		t.Fatal("read waited indefinitely after its parent exited")
 	}
 }

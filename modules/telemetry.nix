@@ -1,4 +1,4 @@
-{ lib, hostName, labSettings, nixoriumPackage, pkgs, ... }:
+{ lib, isController, labSettings, nixoriumPackage, pkgs, ... }:
 let
   count = labSettings.pcCount;
   band = if count == 0 then "0" else if count <= 5 then "1-5"
@@ -6,7 +6,7 @@ let
     else if count <= 60 then "31-60" else "61+";
 in
 {
-  config = lib.mkIf (hostName == labSettings.masterHostName) {
+  config = lib.mkIf isController {
     # This describes the installed controller generation, not an unevaluated
     # checkout. No identity or consent is stored in the Nix store.
     environment.etc."nixorium/telemetry.json".text = builtins.toJSON {

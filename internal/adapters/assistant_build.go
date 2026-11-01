@@ -21,6 +21,16 @@ import (
 type assistantCommandRunner func(ctx context.Context, limit int, name string, args ...string) (stdout string, stderr string, err error)
 
 // Build commands need successful stderr too: Nix writes dry-run plans there.
+// boundedCommandError keeps the original error so callers can read the exit
+// status while the message stays sanitized.
+type boundedCommandError struct {
+	message string
+	cause   error
+}
+
+func (e *boundedCommandError) Error() string { return e.message }
+func (e *boundedCommandError) Unwrap() error { return e.cause }
+
 func runBoundedCommand(ctx context.Context, limit int, name string, args ...string) (string, string, error) {
 	if name == "nix" {
 		args = append([]string{"--extra-experimental-features", "nix-command flakes"}, args...)
@@ -39,7 +49,7 @@ func runBoundedCommand(ctx context.Context, limit int, name string, args ...stri
 		if message == "" {
 			message = err.Error()
 		}
-		err = fmt.Errorf("%s: %s", name, sanitizeOperationLog([]byte(message)))
+		err = &boundedCommandError{message: fmt.Sprintf("%s: %s", name, sanitizeOperationLog([]byte(message))), cause: err}
 	} else if stdout.truncated || stderr.truncated {
 		err = fmt.Errorf("%s output exceeds the safety limit", name)
 	}

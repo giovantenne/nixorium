@@ -131,24 +131,10 @@ func runNetworkCommand(ctx context.Context, repository string, options options, 
 		fmt.Fprintln(stderr, "The change of laboratory network was reviewed in another situation; review it again.")
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintf(stderr, "Error: network migrate %s requires an interactive terminal or explicit --yes\n", options.subcommand)
-			return 2
-		}
-		confirmationOutput := stdout
-		if options.json {
-			confirmationOutput = stderr
-		}
-		approved, err := presentation.ConfirmNetworkMigration(os.Stdin, confirmationOutput, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Nothing was saved.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, confirmationStream(stdout, stderr, options.json), applyConfirmation{noTerminal: fmt.Sprintf("Error: network migrate %s requires an interactive terminal or explicit --yes", options.subcommand), readFailure: "Error: read confirmation:", cancelled: "Nothing was saved."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmNetworkMigration(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	result := manager.Apply(ctx, plan, options.expect)
 	if options.json {

@@ -34,21 +34,9 @@ type workspaceModel struct {
 	selected                      []string
 	inherit                       bool
 	number                        string
-	settings                      workspaceSettingsEditor
-	// Extension search in the pinned package set, beyond the catalog, or an
-	// exact Marketplace identifier ("marketplace" mode).
-	searching   bool
-	searchMode  string
-	query       string
-	choiceNotes map[string]string
-	// Marketplace pins of the draft while the extension field is edited, and
-	// a downloaded proposal waiting for confirmation.
-	marketplace  map[string]domain.WorkspaceMarketplaceExtension
-	pending      *domain.WorkspaceMarketplaceCandidate
-	confirmation string
-	requestID    uint64
-	cancel       context.CancelFunc
-	saving       bool
+	requestID                     uint64
+	cancel                        context.CancelFunc
+	saving                        bool
 }
 
 func (model *workspaceModel) cancelRead() {
@@ -60,28 +48,22 @@ func (model *workspaceModel) cancelRead() {
 }
 
 func (model workspaceModel) textEntry() bool {
-	return model.stage == workspaceReview || (model.stage == workspaceFieldEdit &&
-		(model.field.kind == "number" || model.searching || (model.field.kind == "settings" && model.settings.textEntry())))
+	return model.stage == workspaceReview || (model.stage == workspaceFieldEdit && model.field.kind == "number")
 }
 
 func (model *workspaceModel) startField() {
 	model.field = workspaceGroupFields(model.group)[model.cursor]
 	model.choice = 0
 	model.choices = nil
-	model.choiceNotes = map[string]string{}
-	model.searching, model.searchMode, model.query, model.pending = false, "", "", nil
-	model.marketplace = map[string]domain.WorkspaceMarketplaceExtension{}
 	model.selected = []string{}
 	model.number = ""
 	value := workspaceValue(model.candidate, model.field)
 	model.inherit = value == nil
-	if model.field.kind == "settings" {
-		model.settings = newWorkspaceSettingsEditor(value)
-	} else if model.field.kind == "number" {
+	if model.field.kind == "number" {
 		if value != nil {
 			model.number = fmt.Sprint(value)
 		}
-	} else if model.field.kind == "favorites" || model.field.kind == "extensions" {
+	} else if model.field.kind == "favorites" {
 		if value == nil {
 			value = workspaceValue(model.loaded.Inspection.Resolution.Catalog.Baseline, model.field)
 		}
@@ -90,26 +72,8 @@ func (model *workspaceModel) startField() {
 				model.selected = append(model.selected, fmt.Sprint(entry))
 			}
 		}
-		if model.field.kind == "favorites" {
-			for _, item := range model.loaded.Inspection.Resolution.Catalog.Applications {
-				model.choices = append(model.choices, item.ID)
-			}
-		} else {
-			for _, item := range model.loaded.Inspection.Resolution.Catalog.Extensions {
-				model.choices = append(model.choices, item.ID)
-			}
-			if model.candidate.VSCode != nil && model.candidate.VSCode.Marketplace != nil {
-				for _, entry := range *model.candidate.VSCode.Marketplace {
-					model.marketplace[entry.ID()] = entry
-					model.choiceNotes[entry.ID()] = "Marketplace " + *entry.Version
-				}
-			}
-			// Extensions found by an earlier search stay visible when selected.
-			for _, id := range model.selected {
-				if !slices.Contains(model.choices, id) {
-					model.choices = append(model.choices, id)
-				}
-			}
+		for _, item := range model.loaded.Inspection.Resolution.Catalog.Applications {
+			model.choices = append(model.choices, item.ID)
 		}
 	} else {
 		model.choices = []string{"Inherit"}
@@ -145,12 +109,10 @@ func (model *workspaceModel) acceptField() error {
 			}
 			value = number
 		}
-	case "favorites", "extensions":
+	case "favorites":
 		if !model.inherit {
 			value = append([]string{}, model.selected...)
 		}
-	case "settings":
-		value = model.settings.result()
 	default:
 		if model.choice > 0 {
 			value = model.choices[model.choice]
@@ -163,26 +125,6 @@ func (model *workspaceModel) acceptField() error {
 	if err != nil {
 		return err
 	}
-	if model.field.kind == "extensions" {
-		// Keep exactly the pins of selected extensions: an unselected pin
-		// would be rejected, and inheritance keeps the baseline's pins.
-		var pins any
-		if !model.inherit {
-			entries := []domain.WorkspaceMarketplaceExtension{}
-			for _, id := range model.selected {
-				if entry, ok := model.marketplace[id]; ok {
-					entries = append(entries, entry)
-				}
-			}
-			if len(entries) != 0 {
-				pins = entries
-			}
-		}
-		updated, err = workspaceSetValue(updated, workspaceMarketplaceField, pins)
-		if err != nil {
-			return err
-		}
-	}
 	model.candidate = updated
 	model.plan = domain.WorkspacePlanReport{}
 	model.stage = workspaceFieldList
@@ -190,26 +132,6 @@ func (model *workspaceModel) acceptField() error {
 }
 
 func (model *workspaceModel) editField(key tea.KeyPressMsg) string {
-	if model.field.kind == "settings" {
-		action, message := model.settings.update(key)
-		switch action {
-		case "cancel":
-			model.stage = workspaceFieldList
-			return "Field edit cancelled; the draft is unchanged."
-		case "keep":
-			if err := model.acceptField(); err != nil {
-				return err.Error()
-			}
-			return "Draft updated; nothing has been saved."
-		}
-		return message
-	}
-	if model.searching {
-		return model.editSearch(key)
-	}
-	if model.pending != nil {
-		return model.confirmMarketplace(key)
-	}
 	if key.String() == "esc" {
 		model.stage = workspaceFieldList
 		return "Field edit cancelled; the draft is unchanged."
@@ -241,15 +163,10 @@ func (model *workspaceModel) editField(key tea.KeyPressMsg) string {
 	case "down", "j":
 		model.choice = min(max(0, len(model.choices)-1), model.choice+1)
 	}
-	if model.field.kind != "favorites" && model.field.kind != "extensions" {
+	if model.field.kind != "favorites" {
 		return ""
 	}
 	switch key.String() {
-	case "/", "m":
-		if model.field.kind == "extensions" {
-			model.searching, model.query = true, ""
-			model.searchMode = map[string]string{"/": "packaged", "m": "marketplace"}[key.String()]
-		}
 	case "i":
 		model.inherit = true
 		model.selected = []string{}
@@ -273,7 +190,7 @@ func (model *workspaceModel) editField(key tea.KeyPressMsg) string {
 			model.selected = append(model.selected, id)
 		}
 	case "shift+up", "shift+down":
-		if model.field.kind != "favorites" || len(model.choices) == 0 || model.inherit {
+		if len(model.choices) == 0 || model.inherit {
 			return ""
 		}
 		index := slices.Index(model.selected, model.choices[model.choice])

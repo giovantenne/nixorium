@@ -32,8 +32,8 @@ navigable dashboard demonstrates the same proposal on two of its four PCs.
 ## Workflow guide
 
 The first administrator launch shows the operational disclaimer (Enter accepts,
-q exits), then the optional telemetry invitation (Enter accepts, n declines,
-Esc skips to the menu, q exits). Skipping saves no consent and repeats the
+q exits), then the optional telemetry invitation (e accepts, n declines,
+Enter or Esc skips to the menu, q exits). Skipping saves no consent and repeats the
 invitation next launch. A saved refusal is remembered.
 
 The overview opens Computers, Installation, Software and Maintenance. Startup
@@ -41,10 +41,10 @@ reads saved configuration and local service/Git state; inventory, client probes 
 readiness checks run when the selected task needs them. Deferred checks never
 imply that installation or deployment is ready.
 
-The controller offers Assistant (`m`) unless `lab.assistant` is explicitly false.
+The controller offers Assistant (`a`) unless `lab.assistant` is explicitly false.
 Its account activation, subscription and consent
 checks precede content sharing. Ctrl+R reviews candidate changes and their Nix
-evaluation; SAVE records a local commit with a backup. Controller application
+evaluation; saving records a local commit with a backup. Controller application
 and Update computers remain separate reviews. See [Assistant](assistant.md).
 
 Installation offers network boot (PXE) and USB over SSH. PXE preparation builds
@@ -139,7 +139,7 @@ Full terms: DISCLAIMER.md and LICENSE in the Nixorium repository.
 Enter acknowledges these operational risks and continues.
 The next screen asks separately about optional adoption statistics.
 
-Enter Accept & continue  ·  ↑/↓ Scroll  ·  q Exit
+⏎ Enter Accept & continue  ·  ↑/↓ Scroll  ·  q Exit
 ```
 
 ## Optional adoption statistics
@@ -163,8 +163,8 @@ Disable anytime in Maintenance. See Privacy & retention for details.
 
 Status: Off — no adoption reports are being sent.
 
-e/Enter Share statistics  ·  n No thanks  ·  p Exact report  ·  i Privacy & retention  ·  ↑/↓ Scroll  ·  Esc Menu
-q Exit  ·  F1 Help
+e Share statistics  ·  n No thanks  ·  ⏎ Enter Not now  ·  p Exact report  ·  i Privacy & retention  ·  ↑/↓ Scroll
+Esc Menu  ·  q Exit  ·  F1 Help
 ```
 
 ## Unconfigured clients
@@ -173,7 +173,7 @@ q Exit  ·  F1 Help
 Nixorium  /  Computers
 
 Manage client computers
-Observed state is loaded only by Computer inventory or an operation that needs it.
+Check which computers are on, update them, switch them on or off, and control Internet access.
 
 › [h] Computer inventory
   [d] Update computers
@@ -199,7 +199,7 @@ Choose an area with the arrows or its letter.
 › [c] Computers
   [n] Installation
   [w] Software
-  [a] Maintenance
+  [m] Maintenance
 
 Inventory, updating computers, Internet access and power
 
@@ -221,8 +221,8 @@ Choose an area with the arrows or its letter.
 › [c] Computers
   [n] Installation
   [w] Software
-  [a] Maintenance
-  [m] Assistant
+  [m] Maintenance
+  [a] Assistant
 
 Inventory, updating computers, Internet access and power
 
@@ -240,8 +240,8 @@ Choose an area with the arrows or its letter.
 › [c] Computers
   [n] Installation
   [w] Software
-  [a] Maintenance
-  [m] Assistant
+  [m] Maintenance
+  [a] Assistant
 
 Inventory, updating computers, Internet access and power
 
@@ -254,9 +254,9 @@ Inventory, updating computers, Internet access and power
 Assistant                                                                                              Not activated
 
 Try asking, for example:
-  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
-  pc03 missed the last update: show the evidence and the next check
-  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+  Add Python with pandas and Jupyter for class 4B
+  Students need access to the Arduino boards on pc05–pc12
+  The projector on the teacher's desk is not detected
 
 
 
@@ -330,9 +330,9 @@ Enter activate · Esc back
 Assistant · Example laboratory                                                             Free trial · 3 of 10 left
 
 Try asking, for example:
-  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
-  pc03 missed the last update: show the evidence and the next check
-  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+  Add Python with pandas and Jupyter for class 4B
+  Students need access to the Arduino boards on pc05–pc12
+  The projector on the teacher's desk is not detected
 
 
 
@@ -362,9 +362,9 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 Assistant · Example laboratory                                                                      Free trial ended
 
 Try asking, for example:
-  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
-  pc03 missed the last update: show the evidence and the next check
-  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+  Add Python with pandas and Jupyter for class 4B
+  Students need access to the Arduino boards on pc05–pc12
+  The projector on the teacher's desk is not detected
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ! Your free trial has ended. Subscribe to continue:                                                              │
 │ https://assistant.nixorium.org/u/EjRWeJASNEjRWeJASNEjRWeJASNEjRWeJASNEjRW                                        │
@@ -395,19 +395,18 @@ Assistant                                                                       
 
 Before you send
 
-Your messages, configuration files and saved configuration history read by
-Assistant are sent to the Nixorium Assistant service and its AI provider.
-Assistant may also read system state and limited recent logs from declared
-computers. Known secret patterns and common private identifiers are filtered;
-filtering is best effort and may leave personal or sensitive text.
-Student home files are not read. The service does not keep configuration files.
-It keeps messages and answers for 30 days to detect abuse, then deletes them.
-Whole conversations, including files and diagnostics read, are kept for
-90 days only if you report an answer or turn on sharing below.
-Each message you send uses one request.
+Your messages, configuration files and saved configuration history read by Assistant are sent to the Nixorium
+Assistant service and its AI provider. Assistant may also read system state, recent logs and configuration files
+(never home folders, passwords or keys) from declared computers. Known secret patterns and common private
+identifiers are filtered; filtering is best effort and may leave personal or sensitive text. Student home files are
+not read. The service does not keep configuration files. It keeps messages and answers for 30 days to detect abuse,
+then deletes them.
+Conversations (questions, answers and tool results, after best-effort redaction) are saved on the service for 90
+days to find and fix Assistant's mistakes. Press Space to switch saving off; /share changes it later. Each message
+you send uses one request.
 
-[ ] Share my conversations with Nixorium for 90 days to improve Assistant
-Space toggle sharing · Enter continue · Esc back
+[x] Save conversations on the service: On
+Space switch saving · Enter continue · Esc back
 ```
 
 ## Optional conversation sharing
@@ -415,13 +414,14 @@ Space toggle sharing · Enter continue · Esc back
 ```text
 Nixorium  /  Assistant
 
-Conversation sharing
+Assistant settings
 
-Applies to all future conversations of this lab until you turn it off.
+Saved on the Nixorium Assistant service for 90 days to find and fix Assistant's mistakes. Applies to all future
+conversations of this lab.
 
-[ ] Share my conversations with Nixorium for 90 days to improve Assistant
+[x] Save conversations on the service: On
 
-Enter Toggle sharing  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Switch on/off  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Explicit answer report
@@ -443,7 +443,7 @@ or sensitive text. It is kept for 90 days.
 Comment (optional, max 500 characters)
 › The scope review was helpful.
 
-↑/↓ Rating  ·  Enter Send  ·  Esc Cancel  ·  F1 Help
+↑/↓ Rating  ·  ⏎ Enter Send  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Assistant candidate ready
@@ -451,26 +451,26 @@ Comment (optional, max 500 characters)
 ```text
 Assistant · Your school                                                                            982 requests left
 
- Prepare Node.js on pc01–pc02; open port 3000 only to the lab LAN
+ Add Python with pandas and Jupyter for class 4B
 
-● Reading flake.nix and client scopes
-● Reading the lab network and interface
-● Resolving Node.js from the pinned package set
-● Drafting modules/web-lab.nix
-● Scoping the proposal to pc01–pc02
 ● Preparing the proposal for native review
 
-● Proposal ready: Node.js on pc01–pc02.
-
-  - TCP 3000 accepts only the lab LAN on its declared interface.
-  - The controller and other PCs are unchanged.
+● Proposal ready: 1 file changed.
 
   Ctrl+R reviews and saves the proposal. Deployment needs a separate review; nothing is installed yet.
 
 
 
+
+
+
+
+
+
+
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Proposal ready · 2 files changed                                                                Ctrl+R to review │
+│ Proposal ready · 1 file changed                                                                 Ctrl+R to review │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │
@@ -484,8 +484,7 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 Nixorium  /  Assistant  /  Review the proposal
 
 What changes
-• modules/web-lab.nix added
-• flake.nix changed
+• lab-software.json changed
 
 Computers affected
 pc01–pc02
@@ -506,13 +505,14 @@ choose the computers.
 Nixorium  /  Assistant  /  Review the proposal
 
 What changes
-• modules/web-lab.nix added
-• flake.nix changed
+• lab-software.json changed
 
 Computers affected
 pc01–pc02
 
 ✗ The configuration is not valid
+Saving is not available: the proposal does not evaluate. Return to the chat and ask the assistant to fix it.
+Technical details show the error.
 Saving creates a local commit and a backup. Enter on the first choice also updates this controller; you then
 choose the computers.
   Save and update the controller
@@ -527,14 +527,14 @@ choose the computers.
 ```text
 Assistant · Example laboratory                                                                     982 requests left
 
- pc03 missed the last update: show the evidence and the next check
+ The projector on the teacher's desk is not detected
 
-● Reading pc03 update evidence
+● Reading the devices of pc99
 
-● pc03 is out of date. Its observed revision is 000000000000; desired 0123456789ab. The cause is not established.
+● No display is connected to the HDMI port of pc99. The computer sees the port, so check the cable and the
+  projector's input source. Nothing was changed.
 
-  No failure log was supplied. Next: run the read-only updates diagnostic on pc03; check nix-daemon.service and its
-  current-boot journal before reviewing a retry. Nothing was changed.
+
 
 
 
@@ -554,20 +554,20 @@ Assistant · Example laboratory                                                 
 Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```
 
-## Assistant offline lesson proposal
+## Assistant second proposal
 
 ```text
 Assistant · Example laboratory                                                                     982 requests left
 
- Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+ Students need access to the Arduino boards on pc05–pc12
 
-● Lesson proposal: a pinned Python environment with Jupyter + pandas, plus a notebook and CSV in home-files.json.
+● Proposal ready: 2 files changed.
 
-  Review and save first. Prepare all dependencies and lesson files on the controller before going offline; deploy
-  separately. Lessons then need no downloads.
+  Review and save first. Deployment is a separate review; nothing is installed yet.
 
-  At boot, the student home returns to the lesson baseline. Student edits are lost; save work elsewhere before
-  restarting. No running session was reset.
+
+
+
 
 
 
@@ -578,7 +578,7 @@ Assistant · Example laboratory                                                 
 
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Proposal ready · 3 files changed                                                                Ctrl+R to review │
+│ Proposal ready · 2 files changed                                                                Ctrl+R to review │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │
@@ -595,7 +595,7 @@ Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. Comput
 You can update them later from Computers → Update computers: try one computer first, check it, then update the
 others.
 
-Enter Chat  ·  F1 Help
+⏎ Enter Chat  ·  F1 Help
 ```
 
 ## Pinned package search
@@ -615,7 +615,7 @@ Choose a package, then its computers; you review before saving.
 
 Saved choices reach the client computers with Computers → Update computers.
 
-Type Search  ·  ↑/↓ Results  ·  Enter Choose computers  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
+Type Search  ·  ↑/↓ Results  ·  ⏎ Enter Choose computers  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
 ```
 
 ## Additive software profile review
@@ -639,7 +639,7 @@ Clients      5 included in the added packages
 Now          Save and rebuild pc99 (this controller)
 Later        Review and update the affected client computers
 
-↑/↓ Inspect  ·  Enter Add profile  ·  Esc Computers  ·  F1 Help
+↑/↓ Inspect  ·  ⏎ Enter Add profile  ·  Esc Computers  ·  F1 Help
 ```
 
 ## Contextual client deployment selection
@@ -665,7 +665,7 @@ Not checked in this session · r checks the computers now
 
 ! Software selection saved locally.
 
-Space Select  ·  a All  ·  n Those needing update  ·  r Check computers  ·  Enter Review  ·  Esc Computers
+Space Select  ·  a All  ·  n Those needing update  ·  r Check computers  ·  ⏎ Enter Review  ·  Esc Computers
 F1 Help
 ```
 
@@ -676,7 +676,8 @@ Nixorium  /  Computers  /  Update computers
 
 Update these computers?
 
-Affects  pc01,pc02,pc03,pc04,pc05 · 5 computers
+Affects  pc01, pc02, pc03, pc04, pc05 · 5 computers
+Builds   5 configurations for 5 computers
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
@@ -687,14 +688,13 @@ pc03  10.42.0.13  Reachable at last check
 pc04  10.42.0.14  Reachable at last check
 pc05  10.42.0.15  Reachable at last check
 
-Type DEPLOY to continue:
-> _
+Enter updates these computers.
 
-! Target services may restart; unreachable computers may remain unchanged
-  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
-interrupted apply may require recovery before another operation.
+! Programs on the computers may restart during the update
+  Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
+next one.
 
-Enter Update computers  ·  Esc Selection  ·  F1 Help
+⏎ Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
 
 ## Verified deployment result
@@ -702,28 +702,22 @@ Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```text
 Nixorium  /  Computers  /  Update computers
 
-✓ Deployment completed and verified
-
-State: completed   Phase: complete
-Build complete: true   Apply complete: true
-Authenticated: 5/5   Recorded: 5
-Detailed log: /demo/state/deploy-lab.log
+✓ 5 computers updated
 
 pc01 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc02 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc03 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc04 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
-Shift ↑/↓ scroll · ? help
-
-○ All five clients report the reviewed revision.
+pc05 — Updated
+  Updated and checked: it is running the reviewed version.
 
 n New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
 ```
@@ -735,7 +729,8 @@ Nixorium  /  Computers  /  Update computers
 
 Update these computers?
 
-Affects  pc01,pc02 · 2 computers
+Affects  pc01, pc02 · 2 computers
+Builds   2 configurations for 2 computers
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
@@ -743,14 +738,13 @@ Selected computers — latest availability check:
 pc01  10.42.0.11  Reachable at last check
 pc02  10.42.0.12  Not reached at last check
 
-Type DEPLOY to continue:
-> _
+Enter updates these computers.
 
-! Target services may restart; unreachable computers may remain unchanged
-  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
-interrupted apply may require recovery before another operation.
+! Programs on the computers may restart during the update
+  Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
+next one.
 
-F2 Reachable only  ·  Enter Update computers  ·  Esc Selection  ·  F1 Help
+F2 Reachable only  ·  ⏎ Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
 
 ## A new review for reachable computers only
@@ -761,20 +755,20 @@ Nixorium  /  Computers  /  Update computers
 Update these computers?
 
 Affects  pc01 · 1 computer
+Builds   1 configuration for 1 computer
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
 Selected computers — latest availability check:
 pc01  10.42.0.11  Reachable at last check
 
-Type DEPLOY to continue:
-> _
+Enter updates these computers.
 
-! Target services may restart; unreachable computers may remain unchanged
-  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
-interrupted apply may require recovery before another operation.
+! Programs on the computers may restart during the update
+  Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
+next one.
 
-Enter Update computers  ·  Esc Selection  ·  F1 Help
+⏎ Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
 
 ## Per-computer deployment outcomes
@@ -784,13 +778,10 @@ Nixorium  /  Computers  /  Update computers
 
 ! Some computers were not reached
 
-State: partial   Phase: verify
-Build complete: true   Apply complete: true
-Authenticated: 1/2   Recorded: 1
-Detailed log: /demo/state/deploy-mixed.log
+1 updated, 1 not reached
 
 pc01 — Updated
-  Authenticated at the reviewed revision.
+  Updated and checked: it is running the reviewed version.
 
 pc02 — Not reached
   Check power and networking. The update outcome is not known; this does not prove the computer is off or
@@ -806,10 +797,7 @@ Nixorium  /  Computers  /  Update computers
 
 ! Deployment requires recovery — some computers were not reached
 
-State: failed   Phase: apply
-Build complete: true   Apply complete: false
-Authenticated: 1/2   Recorded: 0
-Detailed log: /demo/state/deploy-mixed.log
+1 not verified, 1 not reached
 
 pc01 — Not verified
   Inspect authenticated computer state and the private log before a fresh review. Activation completion is
@@ -820,7 +808,8 @@ pc02 — Not reached
 unchanged. Activation completion is unconfirmed; use reviewed recovery, not a retry.
 
 ! The computers were not updated: the update was interrupted.
-  Nixorium does not know how it ended on every computer, so the student computers wait until you review it.
+  Nixorium does not know how it ended on every computer, so maintenance waits until you review it; classroom
+controls leave only those computers alone.
   Next: Review the interrupted update (Overview)
 
 l Logs  ·  Enter Computers  ·  F1 Help
@@ -835,14 +824,14 @@ Start network installation?
 
 Affects  enp1s0 · controller network
 
-Type START to continue:
-> _
+Enter starts network installation mode.
 
-! Temporarily remove 10.42.0.99/24; remote connections may be interrupted
-  Serve ProxyDHCP, TFTP, HTTP and cache via 192.168.1.123. Institutional DHCP remains authoritative; stop or
-reboot recovery restores normal addressing.
+! The controller's laboratory address (10.42.0.99/24) is paused until network installation is finished
+  Client computers on this network will be able to start the installer from the network, served by the controller
+at 192.168.1.123. The school's DHCP keeps giving out addresses. Finish installation, or a restart, brings the
+laboratory address back. Remote connections to the controller may be interrupted meanwhile.
 
-Enter Start PXE  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Start PXE  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Saved PXE settings
@@ -852,17 +841,18 @@ Nixorium  /  Installation  /  Network boot  /  Saved settings
 
 Use the saved installation settings?
 
-Laboratory network  10.42.0.0/24
-Controller DHCP     192.168.1.123
-Client interface    automatic (wired network card)
-Client computers    5
-Accounts            admin / teacher / student
+Laboratory network    10.42.0.0/24
+Controller interface  enp1s0
+Controller DHCP       192.168.1.123
+Client interface      automatic (wired network card)
+Client computers      5
+Accounts              admin / teacher / student
 
 Continue the guided preparation using these saved values.
 Keys, configuration, controller and installation files are checked next.
-This summary is not a readiness check. Starting network installation still requires its own review.
+This summary is not a readiness check. The installation still requires its own review.
 
-Enter Continue  ·  e Edit settings  ·  Esc Back  ·  F1 Help
+⏎ Enter Continue  ·  e Edit settings  ·  Esc Back  ·  F1 Help
 ```
 
 ## USB SSH disk review
@@ -893,7 +883,7 @@ Type exactly
 × Everything on this disk will be permanently deleted
   Only this disk is erased. Computer, disk and revision are checked again just before erasing.
 
-Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
+⏎ Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
 ```
 
 ## USB SSH verified result
@@ -909,7 +899,7 @@ Technical details are hidden; press d to show them.
 
 ✓ pc01 is installed and verified.
 
-r Refresh status  ·  d Details  ·  v Verify installed system  ·  Esc Detach  ·  F1 Help
+r Refresh status  ·  d Details  ·  Esc Detach  ·  F1 Help
 ```
 
 ## Shutdown with active sessions
@@ -934,7 +924,7 @@ An accepted request does not prove that a computer is physically off.
 
 Press Enter to shut down 2 computers. 1 session in use will be interrupted.
 
-Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Restricted teacher dashboard
@@ -978,7 +968,7 @@ An accepted request does not prove that the computer completed its restart.
 
 Press Enter to restart 1 computer.
 
-Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Settings accounts menu
@@ -1009,7 +999,7 @@ Teacher account name, distinct from administrator and student.
 
 › teacher█
 
-Enter Continue  ·  Shift+Tab Previous  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Continue  ·  Shift+Tab Previous  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Change account passwords
@@ -1030,7 +1020,7 @@ to this controller and then update the computers.
   [s] Student
   Classroom student account
 
-↑/↓ Select  ·  Enter Change password  ·  Esc Accounts  ·  F1 Help
+↑/↓ Select  ·  ⏎ Enter Change password  ·  Esc Accounts  ·  F1 Help
 ```
 
 ## Student workspace favorites
@@ -1048,7 +1038,7 @@ Explicit selection
 
 Shift ↑/↓ changes the order of the selected favorite.
 
-Space Toggle  ·  i Inherit  ·  c Clear  ·  Enter Keep draft  ·  Esc Cancel field  ·  F1 Help
+Space Toggle  ·  i Inherit  ·  c Clear  ·  ⏎ Enter Keep draft  ·  Esc Cancel field  ·  F1 Help
 ```
 
 ## Initial files at 80x24
@@ -1057,20 +1047,20 @@ Space Toggle  ·  i Inherit  ·  c Clear  ·  Enter Keep draft  ·  Esc Cancel f
 Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
-Captured 2 files · 2 directories · 8.1 KiB
-Captured copies are reviewed below; executability starts off.
+Copied 2 files, 2 folders, 8.1 KiB
+Check the list. Files start as not executable: press Space on programs.
 
-› Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-  Documents/Lessons/run.sh · 96 B · 0600 · not executable
-  Documents/Lessons/ · 0700
-  Documents/Lessons/Empty/ · 0700
-1–4 of 4 captured entries
+› Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+  Documents/Lessons/run.sh · 96 B · not executable
+  Documents/Lessons/
+  Documents/Lessons/Empty/
+1–4 of 4
 
-Student ownership; source owner/group, permissions, ACLs and attributes
-are not inherited. Links and special files are rejected.
+The copies belong to the student. Original owners and permissions
+are not kept; links and special files are refused.
 
-↑/↓ Select  ·  Space Executable  ·  Enter Keep copies in draft
-Esc Cancel  ·  F1 Help
+↑/↓ Select  ·  Space Executable  ·  ⏎ Enter Add to draft  ·  Esc Cancel
+F1 Help
 ```
 
 ## Initial-file path completion
@@ -1079,14 +1069,14 @@ Esc Cancel  ·  F1 Help
 Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
-Choose a local controller file or directory.
-Import only non-secret educational materials.
-Copies are saved in Git, the Nix store, installer and cache.
+Choose a file or a folder on this computer.
+Nixorium keeps a copy in the lab configuration and on every computer:
+add teaching materials only, never passwords or keys.
 
-Source: /demo/materials/Lessons/_
+Path: /demo/materials/Lessons/_
 /demo/materials/Lessons/
 
-Tab Complete path  ·  Enter Continue  ·  Esc Cancel  ·  F1 Help
+Tab Complete path  ·  ⏎ Enter Continue  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file copy and executable review
@@ -1095,19 +1085,19 @@ Tab Complete path  ·  Enter Continue  ·  Esc Cancel  ·  F1 Help
 Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
-Captured 2 files · 2 directories · 8.1 KiB
-Captured copies are reviewed below; executability starts off.
+Copied 2 files, 2 folders, 8.1 KiB
+Check the list. Files start as not executable: press Space on programs.
 
-  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-› Documents/Lessons/run.sh · 96 B · 0700 · executable
-  Documents/Lessons/ · 0700
-  Documents/Lessons/Empty/ · 0700
-1–4 of 4 captured entries
+  Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+› Documents/Lessons/run.sh · 96 B · executable
+  Documents/Lessons/
+  Documents/Lessons/Empty/
+1–4 of 4
 
-Student ownership; source owner/group, permissions, ACLs and attributes
-are not inherited. Links and special files are rejected.
+The copies belong to the student. Original owners and permissions
+are not kept; links and special files are refused.
 
-↑/↓ Select  ·  Space Executable  ·  Enter Keep copies in draft  ·  Esc Cancel  ·  F1 Help
+↑/↓ Select  ·  Space Executable  ·  ⏎ Enter Add to draft  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file declaration review
@@ -1117,25 +1107,25 @@ Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
 Initial files review: READY
-Student: student · controller + 2 clients (shared seed)
-Declaration changes:
-  add Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-  add Documents/Lessons/run.sh · 96 B · 0700 · executable
-  add Documents/Lessons/Empty/ · 0 B · 0700 directory
-Student-owned files 0600; executable files 0700; directories 0700.
-Source owner/group, permissions, ACLs, attributes and links are not inherited.
-Copies enter Git, the Nix store, installer and cache. Never import secrets.
-Save changes local configuration only. Apply systems separately; files restore at next boot.
-Complete draft: 2 files · 2 directories · 8.1 KiB
-  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-  Documents/Lessons/run.sh · 96 B · 0700 · executable
-  Documents/Lessons/ · 0700
+Student: student · the controller and 2 clients
+Changes:
+  add Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+  add Documents/Lessons/run.sh · 96 B · executable
+  add Documents/Lessons/Empty/
+The copies belong to the student; original owners, permissions and links are not kept.
+Copies are kept in the lab configuration and on every computer: never add passwords or keys.
+Saving changes only the configuration. After you update the computers, students get the files at the next
+start.
+All initial files: 2 files, 2 folders, 8.1 KiB
+  Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+  Documents/Lessons/run.sh · 96 B · executable
+  Documents/Lessons/
 Review lines 1–14 of 21
 
-Save and record the manifest and reviewed copies locally.
-Type SAVE: _
+Enter saves the files in the lab configuration. Computers change
+only when you update them.
 
-↑/↓ Scroll  ·  Enter Save copies  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Save  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file removal and mode-change review
@@ -1145,25 +1135,25 @@ Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
 Initial files review: READY
-Student: student · controller + 2 clients (shared seed)
-Declaration changes:
-  remove Documents/Lessons/previous.pdf · 4.0 KiB · 0600 · not executable
-  replace Documents/Lessons/lesson.pdf · 4.0 KiB → 8.0 KiB · 0600 · not executable → 0600 · not executable
-  permissions Documents/Lessons/run.sh · 0600 · not executable → 0700 · executable
-  add Documents/Lessons/Empty/ · 0 B · 0700 directory
-Student-owned files 0600; executable files 0700; directories 0700.
-Source owner/group, permissions, ACLs, attributes and links are not inherited.
-Copies enter Git, the Nix store, installer and cache. Never import secrets.
-Save changes local configuration only. Apply systems separately; files restore at next boot.
-Complete draft: 2 files · 2 directories · 8.1 KiB
-  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
-  Documents/Lessons/run.sh · 96 B · 0700 · executable
+Student: student · the controller and 2 clients
+Changes:
+  remove Documents/Lessons/previous.pdf · 4.0 KiB · not executable
+  replace Documents/Lessons/lesson.pdf · 4.0 KiB → 8.0 KiB
+  change Documents/Lessons/run.sh · not executable → executable
+  add Documents/Lessons/Empty/
+The copies belong to the student; original owners, permissions and links are not kept.
+Copies are kept in the lab configuration and on every computer: never add passwords or keys.
+Saving changes only the configuration. After you update the computers, students get the files at the next
+start.
+All initial files: 2 files, 2 folders, 8.1 KiB
+  Documents/Lessons/lesson.pdf · 8.0 KiB · not executable
+  Documents/Lessons/run.sh · 96 B · executable
 Review lines 1–14 of 22
 
-Save and record the manifest and reviewed copies locally.
-Type SAVE: _
+Enter saves the files in the lab configuration. Computers change
+only when you update them.
 
-↑/↓ Scroll  ·  Enter Save copies  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Save  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Initial-file protected save
@@ -1193,10 +1183,10 @@ Initial-file manifest and reviewed copies saved and recorded locally.
 ! This controller — Needs applying
 ○ Client computers — Not updated here; unknown until checked
 
-Current student sessions stay unchanged. After system application,
-the saved files are restored at the next boot.
+Students who are signed in keep their current files. After you update
+the computers, each one gets the new files at its next start.
 
-Enter Apply to this controller  ·  Esc Workspace  ·  F1 Help
+⏎ Enter Apply to this controller  ·  Esc Workspace  ·  F1 Help
 ```
 
 ## Initial-file partial save
@@ -1211,10 +1201,10 @@ Captured copies saved; the local Git record could not be confirmed. Inspect Git 
 ! Configuration — Save needs recovery
 ○ This controller — Unknown; not checked here
 ○ Client computers — Unknown until checked; none updated here
-Inspect the local record before applying systems; never replay this save.
+Check the saved configuration before updating the computers; do not save again.
 
-Current student sessions stay unchanged. After system application,
-the saved files are restored at the next boot.
+Students who are signed in keep their current files. After you update
+the computers, each one gets the new files at its next start.
 
 g Inspect Git state  ·  Esc Workspace  ·  F1 Help
 ```
@@ -1225,16 +1215,16 @@ g Inspect Git state  ·  Esc Workspace  ·  F1 Help
 Nixorium  /  Settings  /  Student workspace  /  Initial files
 
 Initial files
-Choose a local controller file or directory.
-Import only non-secret educational materials.
-Copies are saved in Git, the Nix store, installer and cache.
+Choose a file or a folder on this computer.
+Nixorium keeps a copy in the lab configuration and on every computer:
+add teaching materials only, never passwords or keys.
 
-Source: /demo/materials_
+Path: /demo/materials_
 
 ! The folder contains a symbolic link. Choose a clean materials folder without links, keys or credentials; no
 copies were added.
 
-Tab Complete path  ·  Enter Continue  ·  Esc Cancel  ·  F1 Help
+Tab Complete path  ·  ⏎ Enter Continue  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Student workspace declaration review
@@ -1258,10 +1248,9 @@ Destinations:
   pc02 (client)
 Review lines 1–13 of 38
 
-Save and record only the profile JSON; no system apply or reset.
-Type SAVE: _
+Enter saves and records only the profile JSON; no system apply or reset.
 
-↑/↓ Scroll  ·  Enter Save JSON  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Save JSON  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Student workspace saved and recorded, not deployed
@@ -1280,7 +1269,7 @@ Profile saved and recorded locally. No computer or student home changed.
 Apply to this controller, then review the computers to update.
 Preferences take effect at the next computer start after system application.
 
-Enter Apply to this controller  ·  Esc Settings  ·  F1 Help
+⏎ Enter Apply to this controller  ·  Esc Settings  ·  F1 Help
 ```
 
 ## Separate controller review after a workspace save
@@ -1304,7 +1293,7 @@ Revision  0123456789abcdef0123456789abcdef01234567
   This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot
 is not normally required.
 
-Enter Apply to controller  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Apply to controller  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Workspace versions in system update review
@@ -1312,28 +1301,19 @@ Enter Apply to controller  ·  Esc Cancel  ·  F1 Help
 ```text
 Nixorium  /  Maintenance  /  Update system and packages  /  Review
 
-Review update and student workspace
-Builds passed; runtime and plugin loading remain unverified.
-Workspace and diff lines 1-14 of 41
-Student workspace: current pin -> proposed pin (not live versions)
-This is a system/package update, not an isolated extension update.
-Builds do not certify plugin loading or the latest vendor release.
-Extension example.extension: 1.0 -> 2.0
-Package nodejs: not selected -> 24.0
-Package vscode: 1.0 -> 2.0
-Current pin: student student
-  controller (controller)
-  pc01 (client)
-  pc02 (client)
-  example.extension requires packages [], extensions []
-Current pin effective preferences:
-{
-  "schemaVersion": 1,
+Review update
+Builds passed; programs are checked when they run on a computer.
+NixOS base: nixos-26.05 (unchanged)
+Applications whose version changes:
+  Extension example.extension: 1.0 -> 2.0
+  Package nodejs: not selected -> 24.0
+  Package vscode: 1.0 -> 2.0
+F4 shows every version and the changes to the deployment files.
 
-Enter saves/records the pin and activates this controller.
-No client deploy or home reset. Verify runtime on one client.
+Enter saves the update and applies it to this controller.
+Computers are updated afterwards, from Computers → Update computers.
 
-↑/↓ Scroll  ·  F4 Details  ·  Enter Apply update  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  F4 Details  ·  ⏎ Enter Apply update  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Cancellable read with elapsed time
@@ -1363,7 +1343,7 @@ Diagnostics
 
 ! Loading cancelled. Nothing was changed.
 
-e Support report  ·  ↑/↓ Select  ·  Enter Evidence  ·  r Check again  ·  Esc Maintenance  ·  F1 Help
+e Support report  ·  ↑/↓ Select  ·  ⏎ Enter Evidence  ·  r Check again  ·  Esc Maintenance  ·  F1 Help
 ```
 
 ## Local support report preview
@@ -1391,7 +1371,7 @@ Minimized, not anonymous. No upload or remediation.
 
 Lines 1–14 / 41 · Versions, revision, time and counts remain visible.
 
-↑/↓ Scroll  ·  Enter Save locally  ·  r Refresh  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Save locally  ·  r Refresh  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Local support report saved without upload
@@ -1407,7 +1387,7 @@ Saved the exact preview locally. Nothing was uploaded.
 Local file: "/demo/state/nixorium/support/support-0123456789abcdef.json"
 SHA-256: e83aa5986a7231de21c579859bdc0b5a0c3f8caa60a1370050f21840bd25a30f
 
-Enter Diagnostics  ·  r New preview  ·  Esc Back  ·  F1 Help
+⏎ Enter Diagnostics  ·  r New preview  ·  Esc Back  ·  F1 Help
 ```
 
 ## Deployment template reset review
@@ -1435,7 +1415,7 @@ Preserved tracked files:
 Lines 1–14 / 21
 Type RESET DEPLOYMENT:
 
-↑/↓ Scroll  ·  Enter Back up and reset  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Back up and reset  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Deployment template reset losses
@@ -1463,7 +1443,7 @@ Changes (local modules and assets may contain policies that will be lost):
 Lines 8–21 / 21
 Type RESET DEPLOYMENT:
 
-↑/↓ Scroll  ·  Enter Back up and reset  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Back up and reset  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Deployment reset saved without activation
@@ -1487,7 +1467,7 @@ Applying the controller is optional here; no client deployment or reboot starts 
 Backup: refs/nixorium/template-backups/demo
 Local commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
-Enter Apply to this controller  ·  Esc Maintenance  ·  F1 Help
+⏎ Enter Apply to this controller  ·  Esc Maintenance  ·  F1 Help
 ```
 
 ## Changed client SSH key
@@ -1505,7 +1485,7 @@ physical-console fingerprint and review this computer's SSH trust.
 
 Address  10.42.0.11
 
-h Review changed SSH key  ·  d Update this computer  ·  i Diagnostics  ·  t Technical  ·  Esc Back  ·  F1 Help
+h Review changed SSH key  ·  i Diagnostics  ·  t Technical  ·  Esc Back  ·  F1 Help
 ```
 
 ## Cancellable SSH trust inspection
@@ -1536,18 +1516,21 @@ preserved.
 
 Type ROTATE HOST KEY: _
 
-Enter Save reviewed trust  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Save reviewed trust  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## SSH trust saved without deployment
 
 ```text
-Nixorium  /  Computers  /  SSH trust
+Nixorium  /  Computers  /  Inventory
 
-Review this computer's changed SSH key
-Reviewed trust saved for pc01 only. Refresh Computers before reviewing deployment.
+⣾  Checking the configured computers
 
-Enter Computer details  ·  Esc Back  ·  F1 Help
+Elapsed: 0s · Read-only; Esc cancels. Limit: 2m0s.
+
+! The reviewed SSH key of pc01 is saved; checking the computers again.
+
+Esc Cancel read  ·  F1 Help
 ```
 
 ## Overview finds an existing managed job
@@ -1563,8 +1546,8 @@ Items in yellow need your attention; press their number to open them.
 › [c] Computers
   [n] Installation
   [w] Software
-  [a] Maintenance
-  [m] Assistant
+  [m] Maintenance
+  [a] Assistant
 
 Inventory, updating computers, Internet access and power
 

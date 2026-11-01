@@ -15,9 +15,10 @@ import (
 )
 
 // classroomViewAction returns the dashboard callback when the classroom
-// service runs on this computer (the controller), or nil.
+// service runs on this computer (the controller) and the classroom view is
+// on, or nil.
 func classroomViewAction() func(context.Context) (string, error) {
-	if _, err := os.Stat(adapters.ClassroomSocketPath); err != nil {
+	if _, err := os.Stat(adapters.ClassroomSocketPath); err != nil || !adapters.ClassroomViewApplied() {
 		return nil
 	}
 	return openClassroomView

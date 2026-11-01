@@ -2,6 +2,8 @@ package adapters
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -30,7 +33,7 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return "", err
 	}
-	credentials, _, err := readCredentials(repository)
+	credentials, credentialsData, err := readCredentials(repository)
 	if errors.Is(err, os.ErrNotExist) {
 		return reference, nil
 	}
@@ -49,6 +52,23 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	if json.Unmarshal([]byte(output), &metadata) != nil || !domain.ValidStorePath(metadata.Path) || (revision != "" && metadata.Revision != revision) {
 		return "", errors.New("Nix returned an invalid deployment source")
 	}
+	sourceRevision := metadata.Revision
+	if sourceRevision == "" {
+		sourceRevision = metadata.DirtyRevision
+	}
+	// metadata.Path is content-addressed, so the same key always produces the
+	// same prepared source. Only the copy, injection and import are skipped;
+	// the metadata call above still detects every tracked change.
+	digest := sha256.Sum256(credentialsData)
+	key := evaluationSourceKey{
+		metadataPath:   metadata.Path,
+		revision:       revision,
+		credentials:    hex.EncodeToString(digest[:]),
+		sourceRevision: sourceRevision,
+	}
+	if storePath, ok := preparedEvaluationSources.lookup(key); ok {
+		return "path:" + storePath, nil
+	}
 	// Newer Nix versions can return a lazy source path from metadata without
 	// materializing it. Archive the pinned source before reading its files.
 	if _, err := os.Stat(metadata.Path); errors.Is(err, os.ErrNotExist) {
@@ -60,25 +80,6 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 			return "", errors.New("cannot materialize the reviewed deployment source; retry after checking pinned inputs")
 		}
 	}
-	public, _, err := readRecoveryFile(filepath.Join(metadata.Path, settingsFileName), 1024*1024)
-	if err != nil {
-		return "", fmt.Errorf("read tracked settings from %s: %w", metadata.Path, err)
-	}
-	settings, issues := domain.DecodeLabSettings(public)
-	if len(issues) != 0 {
-		return "", domain.Blocked("SETTINGS-INVALID", errors.New("deployment settings are invalid; repair them in Change settings"))
-	}
-	if settings.Lab.CredentialsVersion != credentials.Version {
-		return "", errors.New("account credentials do not match this configuration; set all passwords again or restore its complete backup")
-	}
-	if settings.Lab.AdminPassword != "" || settings.Lab.TeacherPassword != "" || settings.Lab.StudentPassword != "" {
-		return "", errors.New("refusing password hashes in tracked settings")
-	}
-	settings.Lab.AdminPassword, settings.Lab.TeacherPassword, settings.Lab.StudentPassword = credentials.Admin, credentials.Teacher, credentials.Student
-	injected, err := domain.MarshalLabSettings(settings)
-	if err != nil {
-		return "", err
-	}
 	stage, err := os.MkdirTemp("", "nixorium-evaluation-*")
 	if err != nil {
 		return "", err
@@ -87,12 +88,8 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	if err := copyEvaluationSource(metadata.Path, stage); err != nil {
 		return "", fmt.Errorf("copy tracked source: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(stage, settingsFileName), injected, 0600); err != nil {
+	if err := injectEvaluationAccounts(stage, metadata.Path, credentials); err != nil {
 		return "", err
-	}
-	sourceRevision := metadata.Revision
-	if sourceRevision == "" {
-		sourceRevision = metadata.DirtyRevision
 	}
 	if sourceRevision != "" {
 		data, _ := json.Marshal(sourceRevision)
@@ -108,7 +105,100 @@ func (Local) EvaluationSource(ctx context.Context, repository, revision string) 
 	if !domain.ValidStorePath(storePath) {
 		return "", errors.New("Nix returned an invalid prepared source path")
 	}
+	preparedEvaluationSources.store(key, storePath)
 	return "path:" + storePath, nil
+}
+
+// evaluationSourceCacheLimit bounds how many prepared sources one process
+// remembers; a review, an update and their phases use the latest one or two.
+const evaluationSourceCacheLimit = 8
+
+// evaluationSourceKey identifies one prepared source. The credentials are
+// represented only by the SHA-256 of the file, never by their content.
+type evaluationSourceKey struct {
+	metadataPath   string
+	revision       string
+	credentials    string
+	sourceRevision string
+}
+
+type evaluationSourceEntry struct {
+	key       evaluationSourceKey
+	storePath string
+}
+
+// evaluationSourceCache remembers, for this process only, the store path made
+// from a key. It is never written to disk. An entry is reused only while its
+// store path still exists, so garbage collection falls back to recomputing.
+type evaluationSourceCache struct {
+	mu      sync.Mutex
+	limit   int
+	entries []evaluationSourceEntry // oldest first
+	exists  func(string) bool
+}
+
+var preparedEvaluationSources = &evaluationSourceCache{
+	limit: evaluationSourceCacheLimit,
+	exists: func(path string) bool {
+		_, err := os.Stat(path)
+		return err == nil
+	},
+}
+
+func (c *evaluationSourceCache) lookup(key evaluationSourceKey) (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for index, entry := range c.entries {
+		if entry.key != key {
+			continue
+		}
+		if !c.exists(entry.storePath) {
+			c.entries = append(c.entries[:index], c.entries[index+1:]...)
+			return "", false
+		}
+		return entry.storePath, true
+	}
+	return "", false
+}
+
+func (c *evaluationSourceCache) store(key evaluationSourceKey, storePath string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for index, entry := range c.entries {
+		if entry.key == key {
+			c.entries = append(c.entries[:index], c.entries[index+1:]...)
+			break
+		}
+	}
+	c.entries = append(c.entries, evaluationSourceEntry{key, storePath})
+	if extra := len(c.entries) - c.limit; extra > 0 {
+		c.entries = append([]evaluationSourceEntry(nil), c.entries[extra:]...)
+	}
+}
+
+// injectEvaluationAccounts reads the tracked settings from source and writes
+// them, with the account hashes of the private credentials file, into stage.
+func injectEvaluationAccounts(stage, source string, credentials domain.LabCredentials) error {
+	public, _, err := readRecoveryFile(filepath.Join(source, settingsFileName), 1024*1024)
+	if err != nil {
+		return fmt.Errorf("read tracked settings from %s: %w", source, err)
+	}
+	settings, issues := domain.DecodeLabSettings(public)
+	if len(issues) != 0 {
+		return domain.Blocked("SETTINGS-INVALID", errors.New("deployment settings are invalid; repair them in Change settings"))
+	}
+	if settings.Lab.CredentialsVersion != credentials.Version {
+		return errors.New("account credentials do not match this configuration; set all passwords again or restore its complete backup")
+	}
+	if settings.Lab.AdminPassword != "" || settings.Lab.TeacherPassword != "" || settings.Lab.StudentPassword != "" {
+		return errors.New("refusing password hashes in tracked settings")
+	}
+	settings.Lab.AdminPassword, settings.Lab.TeacherPassword, settings.Lab.StudentPassword = credentials.Admin, credentials.Teacher, credentials.Student
+	injected, err := domain.MarshalLabSettings(settings)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(stage, settingsFileName), injected, 0600)
 }
 
 func copyEvaluationSource(source, target string) error {

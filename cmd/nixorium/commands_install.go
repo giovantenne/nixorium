@@ -194,14 +194,14 @@ func runInteractiveRemoteInstallAction(ctx context.Context, action, operationID 
 		return 1
 	}
 	presentation.RemoteInstallResponseText(terminal, status)
-	word := "REBOOT"
+	word, question := "", "Reboot this computer now?"
 	operation := domain.RemoteInstallRebootOperation
 	if action == "usb-close" {
 		operation = domain.RemoteInstallCloseOperation
 		fmt.Fprintln(terminal, presentation.RemoteInstallCloseExplanation(status))
 		// A record that never reached the disk closes with yes/no; after a
 		// possible disk change CLOSE is typed (ADR 0026).
-		word = ""
+		question = "Close this record?"
 		if presentation.RemoteInstallCloseNeedsWord(status) {
 			word = "CLOSE"
 		}
@@ -209,7 +209,7 @@ func runInteractiveRemoteInstallAction(ctx context.Context, action, operationID 
 	reader := bufio.NewReaderSize(terminal, 4096)
 	var approved bool
 	if word == "" {
-		approved, err = presentation.ConfirmYesNo(reader, terminal, "Close this record?")
+		approved, err = presentation.ConfirmYesNo(reader, terminal, question)
 	} else {
 		approved, err = confirmRemoteInstall(reader, terminal, word)
 	}
@@ -380,6 +380,98 @@ func requireManagedRemoteInstallClient(repository string) error {
 	homeStat, ok := homeInfo.Sys().(*syscall.Stat_t)
 	if !ok || !homeInfo.IsDir() || homeInfo.Mode()&os.ModeSymlink != 0 || homeStat.Uid != uint32(os.Geteuid()) || os.Geteuid() == 0 {
 		return errors.New("USB SSH installation must run as the controller administrator account")
+	}
+	return nil
+}
+
+// parseInstallFlags reads the install usb flags.
+func parseInstallFlags(result *options, arguments []string, index int) (int, bool, error) {
+	switch arguments[index] {
+	case "--host":
+		index++
+		if index >= len(arguments) || arguments[index] == "" {
+			return index, true, errors.New("--host requires an inventory client name")
+		}
+		result.host = arguments[index]
+	case "--id":
+		index++
+		if index >= len(arguments) || arguments[index] == "" {
+			return index, true, errors.New("--id requires a remote installation operation ID")
+		}
+		result.operationID = arguments[index]
+	default:
+		return index, false, nil
+	}
+	return index, true, nil
+}
+
+// parseInstallWord reads the install usb words.
+func parseInstallWord(result *options, word string) (bool, error) {
+	switch word {
+	case "usb":
+		if result.command != "install" || result.subcommand != "" {
+			return true, errors.New("usb must follow install")
+		}
+		result.subcommand = "usb"
+		return true, nil
+	case "reconcile", "reboot", "cancel", "close":
+		if result.command != "install" || result.subcommand != "usb" {
+			return true, fmt.Errorf("%s must follow install usb", word)
+		}
+		result.subcommand = "usb-" + word
+		return true, nil
+	case "status":
+		if result.command == "install" && result.subcommand == "usb" {
+			result.subcommand = "usb-status"
+			return true, nil
+		}
+	case "prepare":
+		if result.command == "install" && result.subcommand == "usb" {
+			result.subcommand = "usb-prepare"
+			return true, nil
+		}
+	case "start":
+		if result.command == "install" && result.subcommand == "usb" {
+			result.subcommand = "usb-start"
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// validateInstall rejects option combinations that do not belong to the command.
+func validateInstall(result *options) error {
+	if result.command == "install" {
+		valid := map[string]bool{
+			"usb-prepare": true, "usb-start": true, "usb-status": true, "usb-reconcile": true,
+			"usb-reboot": true, "usb-verify": true, "usb-cancel": true, "usb-close": true,
+		}
+		if !valid[result.subcommand] {
+			return errors.New("install requires usb prepare, start, status, reconcile, reboot, verify, cancel, or close")
+		}
+		if (result.subcommand == "usb-prepare" || result.subcommand == "usb-start") != (result.host != "") {
+			return errors.New("install usb prepare/start require --host; other USB operations do not accept it")
+		}
+		if result.host != "" && !domain.ValidHostName(result.host) {
+			return errors.New("--host must be a computer name from pc01 to pc254, such as pc07")
+		}
+		needsID := result.subcommand != "usb-prepare" && result.subcommand != "usb-start"
+		// status without --id shows the unfinished operation, if any.
+		if needsID != (result.operationID != "") && !(result.subcommand == "usb-status" && result.operationID == "") {
+			return errors.New("install usb reconcile/reboot/verify/cancel/close require --id; prepare/start do not accept it")
+		}
+		if result.operationID != "" && !remoteInstallOperationIDPattern.MatchString(result.operationID) {
+			return errors.New("--id must contain exactly 32 lowercase hexadecimal characters")
+		}
+		if result.json && (result.subcommand == "usb-start" || result.subcommand == "usb-reboot" || result.subcommand == "usb-close") {
+			return errors.New("--json is not valid with interactive install usb start, reboot, or close")
+		}
+	}
+	if result.host != "" && result.command != "install" {
+		return errors.New("--host is only valid with install usb prepare or start")
+	}
+	if result.operationID != "" && result.command != "install" {
+		return errors.New("--id is only valid with install usb status, reconcile, reboot, verify, cancel, or close")
 	}
 	return nil
 }

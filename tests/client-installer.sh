@@ -130,18 +130,24 @@ test_guided_success_and_reboot() (
 2
 2
 ERASE
-REBOOT
+y
 EOF
   )
 
   grep -q 'Nixorium guided client enrollment' <<< "$OUTPUT"
-  grep -q 'Selected identity: pc02 (10.0.0.2)' <<< "$OUTPUT"
-  grep -q 'best-effort check, not a reservation' <<< "$OUTPUT"
+  grep -q 'This computer will be pc02 (10.0.0.2)' <<< "$OUTPUT"
+  grep -q 'Step 1 of 3 · Computer' <<< "$OUTPUT"
+  grep -q 'Step 2 of 3 · Disk' <<< "$OUTPUT"
+  grep -q 'Step 3 of 3 · Install' <<< "$OUTPUT"
+  grep -q "Checking the size of pc02's system" <<< "$OUTPUT"
+  grep -q 'System size: 11 GB · disk needed: at least 13 GB' <<< "$OUTPUT"
+  grep -q 'No other computer answers as pc02 (10.0.0.2)' <<< "$OUTPUT"
+  ! grep -q 'best-effort' <<< "$OUTPUT"
   grep -q 'DESTRUCTIVE REVIEW' <<< "$OUTPUT"
-  grep -q '\[1/3\] Partitioning /dev/vdb' <<< "$OUTPUT"
-  grep -q '\[2/3\] Installing pc02' <<< "$OUTPUT"
-  grep -q '\[3/3\] Verifying' <<< "$OUTPUT"
-  grep -q 'SUCCESS: pc02 is installed on /dev/vdb' <<< "$OUTPUT"
+  grep -q 'Partitioning /dev/vdb' <<< "$OUTPUT"
+  grep -q 'Verifying the installed system' <<< "$OUTPUT"
+  grep -q 'All done' <<< "$OUTPUT"
+  grep -q 'pc02 is installed on /dev/vdb' <<< "$OUTPUT"
   test "$(printf '%s\n' partition:/dev/vdb install:pc02 verify reboot)" = "$(cat "$ACTION_LOG")"
 )
 
@@ -164,7 +170,7 @@ EOF
   grep -q "Disk number '9' is not in the list; choose again" <<< "$OUTPUT"
   grep -q "'/dev/nothing' is not an available writable disk; choose again" <<< "$OUTPUT"
   grep -q 'That was not ERASE' <<< "$OUTPUT"
-  grep -q 'SUCCESS: pc02 is installed on /dev/vdb' <<< "$OUTPUT"
+  grep -q 'pc02 is installed on /dev/vdb' <<< "$OUTPUT"
 )
 
 test_empty_confirmation_cancels() (
@@ -315,7 +321,7 @@ test_too_small_disk_is_refused_before_mutation() (
 
   test "$STATUS" -eq 1
   grep -q "is too small for pc01" <<< "$OUTPUT"
-  grep -q "Required: 12GiB; available: 10GiB" <<< "$OUTPUT"
+  grep -q "Required: 13 GB; available: 11 GB" <<< "$OUTPUT"
   test ! -e "$ACTION_LOG"
 )
 
@@ -326,6 +332,7 @@ test_offline_system_resolution_precedes_system_install() (
   # Reload the real command after the common fixture installs behavior mocks.
   source "${REPO_ROOT}/setup.sh"
   SELECTED_HOST=pc01
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","class":"pc01"}]'
   LAB_CONTROLLER_DHCP_IP=192.0.2.10
   LAB_CACHE_PORT=5000
   CACHE_KEY=cache.example:test-key
@@ -341,9 +348,14 @@ test_offline_system_resolution_precedes_system_install() (
     fi
   }
   sudo() { printf '%s\n' "$@" > "$ACTION_LOG"; }
+  nixorium_write_identity_record() { printf '%s\n' "$1" > "${FIXTURE_DIR}/identity-record"; }
+  nixorium_with_udev_in_target() { printf '%s\n' "$1" > "${FIXTURE_DIR}/udev-target"; shift; "$@"; }
 
   resolve_system
-  install_system
+  INSTALL_LOG="${FIXTURE_DIR}/install.log"
+  install_system >/dev/null
+  # The record exists before the installation activates the system.
+  test "$(cat "${FIXTURE_DIR}/identity-record")" = pc01
   grep -Fxq 'eval' "${FIXTURE_DIR}/nix-eval-arguments"
   grep -Fxq "${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel.outPath" "${FIXTURE_DIR}/nix-eval-arguments"
   grep -Fxq -- '--offline' "${FIXTURE_DIR}/nix-eval-arguments"
@@ -357,6 +369,8 @@ test_offline_system_resolution_precedes_system_install() (
   test "$SYSTEM_CLOSURE_BYTES" -eq 10737418240
   test "$REQUIRED_DISK_BYTES" -eq 12884901888
   test "$(printf '%s\n' nixos-install --system /nix/store/00000000000000000000000000000000-nixos-system-pc01-test --option substituters http://192.0.2.10:5000 --option trusted-public-keys "$CACHE_KEY" --option fallback false --no-channel-copy --no-root-passwd)" = "$(cat "$ACTION_LOG")"
+  # The boot loader step sees the live udev database, so os-prober finds Windows.
+  test "$(cat "${FIXTURE_DIR}/udev-target")" = /mnt
   ! grep -q -- '--flake' "$ACTION_LOG"
 )
 
@@ -366,6 +380,7 @@ test_system_resolution_reports_cache_failures() (
   load_test_installer
   source "${REPO_ROOT}/setup.sh"
   SELECTED_HOST=pc01
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1"}]'
   LAB_CONTROLLER_DHCP_IP=192.0.2.10
   LAB_CACHE_PORT=5000
   CACHE_KEY=cache.example:test-key
@@ -391,6 +406,33 @@ test_system_resolution_reports_cache_failures() (
   grep -Fq "Installation -> Prepare clients again, then restart this installer." "${FIXTURE_DIR}/missing.log"
 )
 
+test_shared_class_installs_the_class_system() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+  source "${REPO_ROOT}/setup.sh"
+  SELECTED_HOST=pc02
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","class":"shared-1"},{"name":"pc02","ip":"10.0.0.2","class":"shared-1"}]'
+  LAB_CONTROLLER_DHCP_IP=192.0.2.10
+  LAB_CACHE_PORT=5000
+  CACHE_KEY=cache.example:test-key
+  local answer
+  nix() {
+    if [[ " $* " == *" eval "* ]]; then
+      printf '%s' "$answer"
+    elif [[ " $* " == *" store info "* ]]; then
+      return 0
+    else
+      printf '%s\t%s\n' "$answer" 10737418240
+    fi
+  }
+  answer=/nix/store/00000000000000000000000000000000-nixos-system-nixorium-client-shared-1-test
+  resolve_system
+  answer=/nix/store/00000000000000000000000000000000-nixos-system-pc02-test
+  if resolve_system 2> "${FIXTURE_DIR}/per-host.log"; then return 1; fi
+  grep -Fq "invalid system path for pc02" "${FIXTURE_DIR}/per-host.log"
+)
+
 test_precompiled_disko_receives_validated_basename() (
   new_fixture
   trap 'rm -rf "$FIXTURE_DIR"' EXIT
@@ -400,11 +442,59 @@ test_precompiled_disko_receives_validated_basename() (
   SELECTED_DISK=/dev/nvme0n1
   sudo() { printf '%s\n' "$@" > "$ACTION_LOG"; }
 
+  INSTALL_LOG="${FIXTURE_DIR}/install.log"
   partition_disk
   test "$(printf '%s\n' env NIXORIUM_INSTALL_DISK=nvme0n1 "${FIXTURE_DIR}/disko-install" --yes-wipe-all-disks)" = "$(cat "$ACTION_LOG")"
 )
 
+test_install_output_goes_to_the_log() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+  source "${REPO_ROOT}/setup.sh"
+  INSTALL_LOG="${FIXTURE_DIR}/install.log"
+  SELECTED_HOST=pc01
+  SELECTED_SYSTEM_PATH=/nix/store/00000000000000000000000000000000-nixos-system-pc01-test
+  LAB_CONTROLLER_DHCP_IP=192.0.2.10
+  LAB_CACHE_PORT=5000
+  CACHE_KEY=cache.example:test-key
+  nixorium_write_identity_record() { :; }
+  nixorium_with_udev_in_target() { shift; "$@"; }
+  local mode=ok
+  sudo() {
+    echo "these 2 paths will be fetched (1.0 MiB download, 2.0 MiB unpacked):"
+    echo "  /nix/store/11111111111111111111111111111111-a"
+    echo "copying path '/nix/store/11111111111111111111111111111111-a' from 'http://x'..."
+    echo "copying path '/nix/store/22222222222222222222222222222222-b' from 'http://x'..."
+    echo "ERROR: mkdir /var/lock/dmraid"
+    [[ "$mode" == ok ]]
+  }
+
+  OUTPUT=$(install_system 2>&1)
+  grep -q 'Boot loader installed' <<< "$OUTPUT"
+  grep -q 'these 2 paths will be fetched' <<< "$OUTPUT"
+  grep -q '2 store paths copied' <<< "$OUTPUT"
+  ! grep -q '/nix/store/1111' <<< "$OUTPUT"
+  ! grep -q 'dmraid' <<< "$OUTPUT"
+  grep -q 'dmraid' "$INSTALL_LOG"
+
+  mode=fail
+  if OUTPUT=$(install_system 2>&1); then return 1; fi
+  grep -q 'dmraid' <<< "$OUTPUT"
+  grep -q "Full log: ${INSTALL_LOG}" <<< "$OUTPUT"
+  ! grep -q 'Boot loader installed' <<< "$OUTPUT"
+)
+
+test_format_bytes_uses_decimal_units() (
+  # shellcheck source=../setup.sh
+  source "${REPO_ROOT}/setup.sh"
+  test "$(format_bytes 18253611008)" = "19 GB"
+  test "$(format_bytes 512)" = "512 B"
+)
+
 test_guided_success_and_reboot
+test_install_output_goes_to_the_log
+test_format_bytes_uses_decimal_units
 test_reachable_identity_is_refused
 test_client_interface_mismatch_stops_before_erase
 test_client_interface_uses_host_override
@@ -419,6 +509,7 @@ test_embedded_metadata_avoids_nix_evaluation
 test_runtime_controller_address_overrides_embedded_hint
 test_offline_system_resolution_precedes_system_install
 test_system_resolution_reports_cache_failures
+test_shared_class_installs_the_class_system
 test_precompiled_disko_receives_validated_basename
 
 echo "Client installer tests passed."

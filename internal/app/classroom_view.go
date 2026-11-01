@@ -31,10 +31,13 @@ type ClassroomComputer struct {
 }
 
 // Enlarged view: a computer opened in full is refreshed often and larger.
+// The agent sends at most fifteen pictures a second (capture.go), and the
+// page waits for the next one instead of asking again after a pause.
 const (
 	classroomFocusWidth    = classroomview.MaxThumbnailWidth
-	classroomFocusInterval = 100 * time.Millisecond
+	classroomFocusInterval = 30 * time.Millisecond
 	classroomFocusTimeout  = 3 * time.Second
+	classroomFrameWait     = time.Second
 )
 
 // ErrClassroomNotViewed means input arrived for a computer nobody is viewing.
@@ -80,8 +83,13 @@ type ClassroomViewHub struct {
 	running    map[string]bool
 	sessions   map[string]classroomview.Session
 	focus      map[string]time.Time
+	controlled map[string]bool
 	lastViewed time.Time
-	now        func() time.Time
+	// frameWait bounds how long Frame waits for a new picture; newFrame is
+	// closed (and replaced) when one arrives.
+	frameWait time.Duration
+	newFrame  chan struct{}
+	now       func() time.Time
 	// Answered, when set, hears of every computer that answered over the
 	// lab network, whether or not someone is signed in; Switch on learns
 	// its hardware address then.
@@ -91,9 +99,9 @@ type ClassroomViewHub struct {
 func NewClassroomViewHub(hosts func(ctx context.Context) ([]domain.HostMeta, error), connector ClassroomAgentConnector) *ClassroomViewHub {
 	return &ClassroomViewHub{
 		hosts: hosts, connector: connector, width: 320,
-		interval: 1500 * time.Millisecond, idle: 15 * time.Second,
+		interval: 1500 * time.Millisecond, idle: 15 * time.Second, frameWait: classroomFrameWait, newFrame: make(chan struct{}),
 		computers: map[string]*ClassroomComputer{}, running: map[string]bool{},
-		sessions: map[string]classroomview.Session{}, focus: map[string]time.Time{}, now: time.Now,
+		sessions: map[string]classroomview.Session{}, focus: map[string]time.Time{}, controlled: map[string]bool{}, now: time.Now,
 	}
 }
 
@@ -139,19 +147,31 @@ func (hub *ClassroomViewHub) Thumbnail(name string) ([]byte, bool) {
 
 // Frame returns the latest image of a computer opened in full when it is newer
 // than since, and keeps that computer on the fast refresh.
+// Frame waits up to frameWait for a picture newer than since.
 func (hub *ClassroomViewHub) Frame(name string, since int64) ([]byte, int64, bool) {
-	hub.mutex.Lock()
-	defer hub.mutex.Unlock()
-	computer, found := hub.computers[name]
-	if !found {
-		return nil, 0, false
+	deadline := time.After(hub.frameWait)
+	for {
+		hub.mutex.Lock()
+		computer, found := hub.computers[name]
+		if !found {
+			hub.mutex.Unlock()
+			return nil, 0, false
+		}
+		hub.focus[name] = hub.now()
+		hub.lastViewed = hub.now()
+		if computer.Frame != since && len(computer.imageBytes) > 0 {
+			image, frame := computer.imageBytes, computer.Frame
+			hub.mutex.Unlock()
+			return image, frame, true
+		}
+		frame, changed := computer.Frame, hub.newFrame
+		hub.mutex.Unlock()
+		select {
+		case <-changed:
+		case <-deadline:
+			return nil, frame, true
+		}
 	}
-	hub.focus[name] = hub.now()
-	hub.lastViewed = hub.now()
-	if computer.Frame == since || len(computer.imageBytes) == 0 {
-		return nil, computer.Frame, true
-	}
-	return computer.imageBytes, computer.Frame, true
 }
 
 // Input sends mouse and keyboard events to a computer open in full.
@@ -167,6 +187,90 @@ func (hub *ClassroomViewHub) Input(name string, events []classroomview.InputEven
 		return ErrClassroomNotViewed
 	}
 	return session.Input(events, release)
+}
+
+// Errors of the shared clipboard, which works only while the teacher controls
+// a computer that is open in full and not locked.
+var (
+	ErrClassroomNotControlled = errors.New("this computer is not under control")
+	ErrClassroomLockedScreen  = errors.New("this computer is locked")
+)
+
+// Control starts or ends the teacher's control of a computer open in full,
+// which turns its shared clipboard on or off. It fails when the computer is
+// not open, is locked or cannot share a clipboard; control of the keyboard
+// and mouse does not depend on it.
+func (hub *ClassroomViewHub) Control(name string, on bool) error {
+	hub.mutex.Lock()
+	session, found := hub.sessions[name]
+	computer := hub.computers[name]
+	focused := hub.now().Sub(hub.focus[name]) < classroomFocusTimeout
+	wasOn := hub.controlled[name]
+	if !on {
+		delete(hub.controlled, name)
+	}
+	hub.mutex.Unlock()
+	if !on {
+		if found && wasOn {
+			return session.ClipboardEnd()
+		}
+		return nil
+	}
+	if !found || !focused {
+		return ErrClassroomNotViewed
+	}
+	if computer == nil || computer.State != ClassroomViewing || computer.Locked {
+		return ErrClassroomLockedScreen
+	}
+	if err := session.ClipboardBegin(); err != nil {
+		return err
+	}
+	hub.mutex.Lock()
+	hub.controlled[name] = true
+	hub.mutex.Unlock()
+	return nil
+}
+
+// clipboardSession returns the session of a computer under control.
+func (hub *ClassroomViewHub) clipboardSession(name string) (classroomview.Session, error) {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	session, found := hub.sessions[name]
+	if !found || !hub.controlled[name] || hub.now().Sub(hub.focus[name]) >= classroomFocusTimeout {
+		return nil, ErrClassroomNotControlled
+	}
+	if computer := hub.computers[name]; computer == nil || computer.State != ClassroomViewing || computer.Locked {
+		return nil, ErrClassroomLockedScreen
+	}
+	return session, nil
+}
+
+// ClipboardSet puts the teacher's text on the clipboard of a controlled
+// computer. The text is never logged or kept.
+func (hub *ClassroomViewHub) ClipboardSet(name, text string) error {
+	text, err := classroomview.ValidateClipboardText(text)
+	if err != nil {
+		return err
+	}
+	session, err := hub.clipboardSession(name)
+	if err != nil {
+		return err
+	}
+	return session.ClipboardSet(text)
+}
+
+// ClipboardGet returns the text copied on a controlled computer since the
+// last call, or "" when there is none.
+func (hub *ClassroomViewHub) ClipboardGet(name string) (string, error) {
+	session, err := hub.clipboardSession(name)
+	if err != nil {
+		return "", err
+	}
+	text, err := session.ClipboardGet()
+	if err != nil {
+		return "", err
+	}
+	return classroomview.ValidateClipboardText(text)
 }
 
 func (hub *ClassroomViewHub) watched() bool {
@@ -186,6 +290,7 @@ func (hub *ClassroomViewHub) setSession(name string, session classroomview.Sessi
 	defer hub.mutex.Unlock()
 	if session == nil {
 		delete(hub.sessions, name)
+		delete(hub.controlled, name)
 	} else {
 		hub.sessions[name] = session
 	}
@@ -260,6 +365,9 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 					computer.ImageAt, computer.ScreenAt, computer.Frame = at, reply.CapturedAt, reply.Frame
 				}
 			})
+			if len(reply.Image) > 0 {
+				hub.frameArrived()
+			}
 		case reply.Code == classroomview.CodeNotReady:
 		default:
 			state, detail := classroomFailureState(classroomview.AgentError{Code: reply.Code})
@@ -271,6 +379,14 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 		}
 		hub.sleep(interval)
 	}
+}
+
+// frameArrived wakes every Frame waiting for a new picture.
+func (hub *ClassroomViewHub) frameArrived() {
+	hub.mutex.Lock()
+	close(hub.newFrame)
+	hub.newFrame = make(chan struct{})
+	hub.mutex.Unlock()
 }
 
 func (hub *ClassroomViewHub) sleep(duration time.Duration) {

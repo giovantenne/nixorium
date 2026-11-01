@@ -27,7 +27,6 @@ in
     firmware = packages.pxeFirmware.drvPath;
     command = packages.nixorium.drvPath;
     commandApp = apps.nixorium.program;
-    colmenaTarget = flake.colmena.pc01.deployment.targetHost;
     status = flake.deploymentStatus;
     updates = flake.nixoriumUpdateTargets;
     offline = flake.nixoriumOfflineCheck.drvPath;

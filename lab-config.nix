@@ -16,7 +16,7 @@
   #   2. PXE service (nixorium-pxe.service) -- the iPXE boot script
   #      fetches kernel and initrd over HTTP from this address.
   #
-  # After all clients are installed, day-to-day Colmena deploys use the
+  # After all clients are installed, day-to-day updates use the
   # static IP derived from networkBase + masterHostNumber instead, so a DHCP address
   # change does NOT affect ongoing updates -- only new PXE installs.
   #

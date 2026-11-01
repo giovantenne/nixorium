@@ -17,7 +17,7 @@ func RemoteInstallCloseNeedsWord(response domain.RemoteInstallResponse) bool {
 // RemoteInstallCloseExplanation says in one sentence what closing means.
 func RemoteInstallCloseExplanation(response domain.RemoteInstallResponse) string {
 	if remoteInstallCloseNeedsWord(response) {
-		return "CLOSE stops following this installation: the system stays on the disk, but Nixorium does not check that the computer starts correctly. Uncertain or unfinished installations stay blocked."
+		return "CLOSE stops following this installation and frees the controller. The disk may have been written, and Nixorium does not check that the computer starts correctly: check it, or install it again."
 	}
 	return "The disk was not touched: closing discards this installation's local access and frees the computer, without confirming that the temporary access was removed from the computer started from the USB stick. A new installation needs a new review."
 }
@@ -54,7 +54,7 @@ func RemoteInstallResponseText(writer io.Writer, response domain.RemoteInstallRe
 				if !disk.Eligible {
 					status = "excluded"
 				}
-				fmt.Fprintf(writer, "  %s  %d bytes  %s  %s  [%s]\n", disk.Path, disk.SizeBytes, disk.Model, disk.Serial, status)
+				fmt.Fprintf(writer, "  %s  %d bytes  %s  %s  [%s]\n", disk.Path, disk.SizeBytes, unescapeUdev(disk.Model), disk.Serial, status)
 				for _, reason := range disk.ExclusionReasons {
 					fmt.Fprintf(writer, "    - %s\n", reason)
 				}

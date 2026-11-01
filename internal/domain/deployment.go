@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 type DeploymentPhase string
 
@@ -18,6 +22,96 @@ type DeploymentTarget struct {
 	// PreviousIP is set during a change of laboratory network: a computer
 	// that answers only there is updated over it and checked on both.
 	PreviousIP string `json:"previousIp,omitempty"`
+	// Class is the computer's class (HostMeta.Class).
+	Class string `json:"class,omitempty"`
+}
+
+// SharedSystem reports a computer whose system is shared by its class
+// (ADR 0033): it takes name and address from its identity record, which the
+// deployment writes before switching it.
+func (target DeploymentTarget) SharedSystem() bool {
+	return target.Class != "" && target.Class != target.Name
+}
+
+// DeploymentConfigurations counts the systems an update builds: one per
+// shared class and one per computer with its own system (ADR 0033).
+func DeploymentConfigurations(targets []DeploymentTarget) int {
+	seen := map[string]bool{}
+	for _, target := range targets {
+		seen[ClientSystemName(target.Name, target.Class)] = true
+	}
+	return len(seen)
+}
+
+// ClientSystemName is the name inside a client's system store path: its own
+// name, or `nixorium-client-<class>` when it shares its class's system
+// (ADR 0033). An empty class is a per-host system.
+func ClientSystemName(host, class string) string {
+	if class == "" || class == host {
+		return host
+	}
+	return "nixorium-client-" + class
+}
+
+// ValidClientClass accepts the class of a client: none (metadata before
+// classes), its own name, or a shared class.
+func ValidClientClass(host, class string) bool {
+	if class == "" || class == host {
+		return true
+	}
+	digits, found := strings.CutPrefix(class, "shared-")
+	if !found || digits == "" || len(digits) > 4 {
+		return false
+	}
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// MaxHostNumber is the highest computer number a laboratory can use.
+const MaxHostNumber = 254
+
+// HostName is the name of computer number n: pc01 to pc99, then pc100 and up.
+// lib/mk-lab.nix and setup.sh build the same name.
+func HostName(number int) string {
+	return fmt.Sprintf("pc%02d", number)
+}
+
+// ValidHostName reports whether value is a name a laboratory can produce: the
+// name of a computer number from 1 to MaxHostNumber. It is the one rule for
+// every computer name the controller reads, stores or passes to a script.
+func ValidHostName(value string) bool {
+	digits, found := strings.CutPrefix(value, "pc")
+	if !found || len(digits) < 2 || len(digits) > 3 {
+		return false
+	}
+	number := 0
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+		number = number*10 + int(digit-'0')
+	}
+	return number >= 1 && number <= MaxHostNumber && HostName(number) == value
+}
+
+// ClientNumber is the number in a client name such as pc07.
+func ClientNumber(name string) (int, bool) {
+	digits, found := strings.CutPrefix(name, "pc")
+	if !found || digits == "" || len(digits) > 4 {
+		return 0, false
+	}
+	number := 0
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return 0, false
+		}
+		number = number*10 + int(digit-'0')
+	}
+	return number, number > 0
 }
 
 // DeploymentProgress is an in-process, bounded update authored by the
@@ -91,6 +185,9 @@ type DeploymentExecutionReport struct {
 	// Queued names reviewed computers that were off: they get this revision
 	// when they answer again (deferred updates).
 	Queued []string `json:"queued,omitempty"`
+	// Skipped names reviewed computers that stopped answering after the
+	// build. Nothing was started on them, so they are never pending.
+	Skipped []string `json:"skipped,omitempty"`
 }
 
 type LastSuccessfulDeployment struct {

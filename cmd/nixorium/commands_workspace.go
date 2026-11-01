@@ -19,20 +19,6 @@ type workspaceCommandManager interface {
 }
 
 func runWorkspaceCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
-	if options.subcommand == "marketplace" {
-		report := app.NewWorkspaceMarketplace(adapters.Local{}).Resolve(ctx, repository, options.extension)
-		if options.json {
-			if err := presentation.JSON(stdout, report); err != nil {
-				return commandOutputError(err, stderr)
-			}
-		} else {
-			presentation.WorkspaceMarketplaceText(stdout, report)
-		}
-		if report.HasErrors() {
-			return 1
-		}
-		return 0
-	}
 	candidate, err := adapters.ReadWorkspaceCandidate(options.file)
 	if err != nil {
 		fmt.Fprintln(stderr, "Error: read workspace candidate:", err)
@@ -117,4 +103,20 @@ func outputWorkspaceApply(stdout, stderr io.Writer, report domain.WorkspaceApply
 		return 1
 	}
 	return 0
+}
+
+// validateWorkspaceOptions rejects option combinations that do not belong to the command.
+func validateWorkspaceOptions(result *options) error {
+	if result.command == "workspace" {
+		if result.subcommand != "plan" && result.subcommand != "apply" {
+			return errors.New("workspace requires plan or apply")
+		}
+		if result.file == "" {
+			return errors.New("workspace plan/apply requires --file")
+		}
+		if result.subcommand == "apply" && result.expect == "" {
+			return errors.New("workspace apply requires --expect from workspace plan")
+		}
+	}
+	return nil
 }

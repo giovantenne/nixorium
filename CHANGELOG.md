@@ -6,6 +6,835 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.12.0] - 2026-10-30
+
+From 3.11.0, Update Nixorium, then Apply to controller and Update computers as
+usual; the deployment migrations below run during the update. From 3.10.0 or
+older, first follow the notes of those releases.
+
+### Added
+
+- Every user has a **Caffeine** toggle in GNOME's quick settings (top right):
+  while it is on, the screen does not blank and the lab screensaver does not
+  start. It is off at every sign-in and can also run for 15, 30 or 60
+  minutes. The student computers and the controller get it with the usual
+  update. The deployment migration `2026-10-screensaver-idle-inhibitors`
+  makes the lab screensaver respect it, and any application that asks GNOME
+  to keep the screen on (if you edited `scripts/screensaver-monitor.sh`, the
+  review shows a manual change).
+
+### Fixed
+
+- Remote control in the classroom view types characters that need AltGr and
+  Shift together, such as `{` and `}` on an Italian keyboard (AltGr+Shift+è).
+  Before, the student's computer received the teacher's AltGr and Shift on top
+  of the character and typed something else.
+- Send files no longer refuses with "other files are being prepared" for half
+  an hour after three reviews that were not confirmed (or three uses of
+  `nixorium send` from the command line): a new sending takes the place of the
+  files unused the longest.
+- Changing the laboratory network: confirming a step now checks the
+  computers again before saving. Before, a computer restarted into its
+  previous address after the review of "finish" could be left without the
+  controller; now the step stops and asks for a new review.
+- A schedule set for a time that does not exist on the night the clocks go
+  forward (for example 02:30) now runs in the first minute after the jump and
+  appears in the history, instead of being skipped for that day. On the night
+  the clocks go back, a time in the repeated hour still runs once.
+- Stopping or recovering the network installation no longer says the normal
+  controller address is restored when the laboratory settings could not be
+  read to check it. It now says the address could not be verified and asks
+  you to check the laboratory again and run Apply to controller if the
+  address is missing.
+- Discarding changes, committing selected files and carrying an Assistant
+  proposal to a new chat now treat file names literally: a file named with
+  `*`, `[` or `:(` no longer affects other files.
+- Nixorium services now stop promptly when asked to, even if a program
+  connected to their local socket is not responding, instead of waiting until
+  the system forces them to stop.
+- Stopping Update computers, or reaching its time limit, no longer marks the
+  computers still waiting for their turn as "activation result unknown". They
+  keep their current system and are listed as not updated, so the update does
+  not need a reviewed recovery for computers it never touched.
+- A USB installation over SSH that lost the live computer right after its
+  temporary key was added no longer blocks the controller: Apply to controller
+  and network installation refused until a file was deleted by hand, and the
+  installation service failed at every start. The reservation is now released
+  (the controller has already deleted the key's private half); restart the
+  live USB computer before trying again.
+- Deployment migrations that replace several files (such as the screensaver
+  one) now put every file back as it was if writing one of them fails, instead
+  of leaving the deployment half migrated. The review also no longer reports
+  a migration that only deletes text as a manual change when the text is
+  already gone.
+- A confirmation could expire seconds after it was shown: a review made just
+  before a clock boundary (every 5 or 10 minutes) was valid for only a few
+  seconds, so Enter was answered with "review expired", and a command-line
+  plan followed by an apply on either side of the boundary said the computers
+  had changed. Every review for update recovery, cleanup, shutdown and restart,
+  Internet and lock control, file sending and collecting, and host-key changes
+  now stays valid for at least its full time (5 or 10 minutes, as before), the
+  command-line apply accepts the earlier review until it expires, and an
+  expired review is reported as expired.
+- Computers numbered 100 and above (pc100 to pc254) are now accepted
+  everywhere a computer name is checked. Before, a laboratory with more than
+  99 computers could not review a changed SSH host key (one three-digit name
+  made every review refuse), start a USB installation for them, or run the
+  installer scripts for them. One rule now decides which names are valid
+  (pc01 to pc254), and the network interface name is limited to the 15
+  characters Linux allows in the USB installation too.
+- The time zone and the two locales in lab-settings.json are now checked when
+  you plan or save: a malformed value such as `Europe/ Rome` or `italian` is
+  refused with a message, instead of failing hours later when the controller
+  applies the change. Every zone and locale NixOS accepts keeps working (for
+  example `CET` or `ca_ES.UTF-8@valencia`). Password hashes must use the
+  characters a real hash has, so a hash with a space or a line break inside is
+  refused. A value refused after the update is shown in Settings, where you
+  can correct it.
+- Security: the controller and the computers write editor, browser and
+  bookmark defaults (and, on the controller, the screen layout) into the
+  administrator's and teacher's homes as those users, not as root. Before, a
+  teacher could leave a link in their own home that made the controller or a
+  computer overwrite a system file at the next start or update. The deployment migration
+  `2026-10-staff-home-writes-as-owner` updates `modules/home-profile.nix`. If
+  you edited that file, the review shows a manual change and the old,
+  vulnerable version stays until you copy the new one from `templates/site`.
+- Git names and emails and the keyboard layout from lab-settings.json are now
+  checked (one line, no control characters, at most 256 bytes; layouts made of
+  letters, digits and `_-+,()`) and are quoted wherever they reach a script
+  that runs as root, so a crafted value (for example one proposed to the
+  Assistant) can no longer run commands on the computers.
+- The first adoption statistics invitation no longer turns sharing on when you
+  press Enter. Only `e` accepts; Enter now means "Not now" and leaves the choice
+  undecided, so the invitation returns at the next launch, and the screen says
+  so. In Maintenance, Enter no longer enables sharing either. The privacy
+  notice now names the operator as HardyPress SRL, which maintains Nixorium,
+  instead of a person.
+- A new installation (controller, or computer from USB or the network) now
+  lists Windows on another disk in its first boot menu. Before, the boot
+  loader was set up without the disk information os-prober needs, and Windows
+  appeared only after the first update.
+- In the administrator interface, the file path in **Send files** now accepts
+  the letters `q` and `?` instead of closing Nixorium or opening help, and
+  pasting text works in that field, in the computer and software searches, in
+  the key import path and in the network address.
+- Background work from the Overview keeps being checked every two seconds after
+  you leave and return to it, so a finished job no longer shows as running and
+  no longer blocks Apply to controller. In Background work, the Up key moves up.
+- Cancelling a computer check no longer sends the next Computer inventory back
+  to the screen you left. Ctrl+C now closes Nixorium in the Assistant chat and
+  review, as on the other screens (while a request runs it still stops that
+  request first).
+- The Assistant review of a proposal that does not evaluate opens on "Technical
+  details" instead of a disabled save, explains on the main screen that saving
+  is not available and what to do next, and Enter on a disabled choice says why.
+- Reviews say what they change: Update computers lists the computers it affects
+  (or "all N computers") instead of the internal selector `@lab`; the restart
+  review says "will restart" for computers in use; Update system and packages
+  labels the line "NixOS base", uses an arrow and says "unchanged" when the
+  channel does not change. The help for the update review no longer mentions a
+  DEPLOY confirmation: Enter confirms. The demonstration of an interrupted
+  background job now shows it as interrupted.
+- While you control a student's computer, a message, a lock, a file sent or
+  collected, or a busy refusal no longer turns off the shared clipboard and
+  the "controlled" notice on the student's screen. Only the end of the control
+  does.
+- A student computer whose screen manager is slow to answer is no longer
+  shown to the teacher as "agent stopped" when the teacher opens the
+  classroom view: the computer answers the first greeting in time and is
+  reported as unlocked until the screen manager replies.
+- A student screen that produces a very large picture (a big, detailed screen
+  at the enlarged view) no longer makes the classroom view lose that computer:
+  the picture is made smaller to fit, or skipped, instead of closing the
+  connection.
+
+## [3.11.0] - 2026-10-28
+
+From 3.10.0, Update Nixorium, then Apply to controller and Update computers as
+usual; the deployment migrations below run during the update. From 3.9.0 or
+older, first follow the 3.10.0 notes below, with `v3.11.0` in the commands.
+Before updating, a laboratory whose settings name a Wi-Fi card (`wl…`) changes
+it to the wired card (see Changed). The new classroom notices and labels on the
+student computers appear after each student's next login.
+
+### Added
+
+- Computer diagnostics gain a read-only hardware area (USB, PCI, displays, audio cards, printer queues, related kernel messages; no serial numbers, printer credentials removed), available to the Assistant; computers need the usual update.
+- `docs/menu-map.md` is generated from the TUI menu definitions and checked for staleness.
+- Assistant proposals may now change the classroom view, the number of computers and the account names in lab-settings.json, with the same review and warnings as the menu (settings_v2); the network, interfaces, controller number and passwords stay in the menu.
+- The classroom view can be turned on or off from **Maintenance → Change
+  settings → Classroom view**, instead of editing `lab-settings.json` by hand.
+  The review says what stops (the classroom view page, locking screens,
+  messages, sending and collecting files) and what keeps working (Internet
+  pause, switching computers on and off, the schedule). The change reaches the
+  controller with Apply to controller and the student computers with Update
+  computers. With the view off, the teacher's dock icon stays and opens the
+  Nixorium menu, and the menu and the commands no longer offer the classroom
+  view: they answer that it is turned off in the settings. The teacher's dock
+  pin is now always the classroom launcher; the deployment migration
+  `2026-10-teacher-dock-classroom-launcher` changes it in existing
+  laboratories (if you edited that line, the review shows a manual change:
+  pin `nixorium-classroom.desktop` for the teacher).
+
+### Changed
+
+- After an Assistant proposal is saved and applied to the controller, the
+  client review selects only the computers whose system the change alters,
+  instead of every computer. When the change alters no client computer, the
+  flow stops at the controller and says the computers need no update.
+- The laboratory network is wired, and the documentation now says so: every
+  computer needs an Ethernet cable. The settings refuse a Wi-Fi card name
+  (`wl…`) for the controller, the clients and single computers, and the review
+  refuses a client whose named card turns out to be wireless, because the
+  laboratory profile is an Ethernet profile and a Wi-Fi card never carried the
+  laboratory address (the earlier documentation said it did). A laboratory
+  with such a name must change it to the wired card before updating.
+- The classroom view stops asking for the screens while its page is hidden
+  (minimized window or background tab): the student computers stop being
+  captured about 15 seconds later (the controller closes its channels when the page stops asking and each computer stops at once; a broken channel is noticed within 30 seconds more), and capture resumes when the page is shown
+  again. The enlarged window and take control follow the same rule.
+- While the teacher controls a computer with the keyboard and mouse, the
+  student's screen shows a small "Teacher in control" label under the top bar,
+  from the first input until the control ends (the sharing icon alone told
+  students nothing about it). The label is drawn by the classroom
+  Shell extension, so it appears after the student's next login.
+- While the classroom view captures a screen and a window is full screen (a
+  video, a game), GNOME hides the top bar and its sharing icon. The classroom
+  extension now shows a small "Classroom view open" label in the corner of the
+  screen in that case only. It takes no clicks and appears after the student's
+  next login.
+- When the teacher saves a screenshot of a computer, its screen shows "Your
+  teacher saved a picture of this screen" in a small notice that fades after
+  a few seconds; when the teacher
+  collects the files on its desktop, it shows "Your teacher collected the
+  files on your desktop". Before, the student saw nothing. The notices are
+  drawn by the classroom Shell extension (they appear after the student's next
+  login) and are asked for with a new classroom view message, so a computer
+  not yet updated just shows no notice.
+
+### Security
+
+These changes need nothing from the administrator: Update Nixorium, then Apply
+to controller and Update computers as usual.
+
+- The controller no longer accepts the administrator's SSH key for `root`;
+  only the student computers do, because the controller manages them as root.
+  A service running as `admin` on the controller can therefore no longer
+  become root through SSH. `admin` keeps its own SSH access.
+- Apply to controller and PXE preparation read the deployment repository with
+  Git as `admin`, with Git hooks, `core.fsmonitor` and system or global Git
+  configuration turned off, so a setting in the repository's `.git/config`
+  can no longer run a command as root. The check of the installed keys also
+  parses the key files as `admin`.
+- Assistant's `prefetch` downloads the file itself and connects only to
+  addresses it has just checked, also after each redirect, so a host name that
+  resolves to a local address on the second lookup no longer reaches the
+  laboratory network. Multicast, reserved, documentation and benchmarking
+  address ranges are refused too. The result for Assistant is unchanged.
+- Assistant evaluates a proposal without network, so a download written into
+  the proposal cannot make the controller send requests while you review it.
+- Assistant hides more secrets from what it sends to the model: yescrypt,
+  SHA-256 and bcrypt password hashes, age secret keys, Nix cache signing keys
+  and Wi-Fi passphrases (`psk`, `pskRaw`, `wpa_passphrase`).
+- The classroom view applies only the review it issued itself: an apply that
+  sends back a changed review with a matching token is refused, and a review
+  applies once. A review left open while Nixorium restarts its classroom
+  service (for example after Update Nixorium) must be made again.
+- The classroom agent on a student computer checks the student's session
+  socket and connects to that same socket, so swapping it for a link between
+  the check and the connection no longer sends the root process elsewhere.
+- Restoring an offline backup refuses links that point outside the restored
+  deployment, also through other links, or that sit inside another link, and
+  creates links only after every file, so a crafted backup cannot write
+  outside the target folder.
+- The system path that starts an update on a student computer must be a
+  well-formed Nix store path and is quoted in the command.
+
+### Fixed
+
+- Update computers works without Internet on the controller when the change needs nothing new from the Internet. Before, the build stopped at "Could not resolve host: cache.nixos.org", even for a system the controller could build by itself. The controller now builds such systems locally (Nix `fallback`). A change that adds software the controller does not have still needs Internet. The fix reaches the controller with Apply to controller.
+- Update Nixorium now brings the ttfx screensaver to laboratories created with 3.5.0 or older too. The migration `2026-10-ttfx-screensaver` knew only the screensaver files of 3.6.0 and later, so in those laboratories the review showed "Manual change" and kept the old tte screensaver. The unused `scripts/launch-screensaver.sh` of those laboratories stays; it can be deleted.
+- Assistant no longer shows a green "Proposal ready" when a request ended without its final answer (an error, Esc or a limit): the box turns yellow, "Proposal incomplete", and the review warns that the proposal may be half done before you save it. Conversations that end this way are now also shared with the Assistant service, when sharing is on; a request you stop with Esc is not.
+- Preparing npm packages works behind a school proxy: the controller reads the
+  npm registry through the system proxy settings (`http_proxy`, `https_proxy`,
+  `no_proxy`), like its other Internet requests.
+- A laboratory created with 3.10.0 or later no longer sees "Manual change:
+  The lab screensaver uses ttfx…" at every update. Its screensaver already
+  had both changes, but the first screensaver migration knew only the older
+  forms and read the newer one as changed by hand.
+- USB installation of a computer with a configured network card that is
+  connected through another card now reaches the screen that offers to save
+  the observed card, instead of failing with "declared NIC changed", also when
+  a prepared installation is reopened. When the
+  observed card is a Wi-Fi card it asks for the cable instead, and after an
+  installation over Wi-Fi the review says to connect the cable before the
+  restart.
+
+## [3.10.0] - 2026-10-25
+
+The stable release of the 3.10.0 betas: it brings the changes below and those
+of 3.10.0-beta.1 to 3.10.0-beta.4. How to update depends on the release the
+controller runs:
+
+- **3.9.0 or older.** This release changes four things in your own deployment
+  files: the workstation profile finds the controller with `isController`, jq
+  joins the software of every laboratory, and the screensaver uses ttfx at 60
+  frames per second. A release before 3.10 cannot make these changes during
+  the update, so once, in the deployment folder, run `nix run
+  github:giovantenne/nixorium/v3.10.0#nixorium -- deployment migrate --root .`,
+  review the result with `git diff`, save it in **Maintenance → Review Git
+  changes**, then run **Update Nixorium**. See
+  [Updating](docs/updates.md#changes-to-your-own-files).
+- **3.10.0-beta.1.** Update once with the new release's program, in the
+  deployment folder: `nix run github:giovantenne/nixorium/v3.10.0 -- update
+  plan --target v3.10.0`, then `update apply` with the review token it prints
+  (see the large-file fix in 3.10.0-beta.2).
+- **3.10.0-beta.2 or later.** Update Nixorium is enough.
+
+### Changed
+
+- Installing a controller and **Update system and packages** no longer compile
+  Go on the computer. While the package set has a Go older than the one
+  Nixorium requires for security fixes, Nixorium uses the official build from
+  go.dev instead of building it from source, which took several minutes after
+  each package update. The required Go is now 1.26.10 (was 1.26.9), which
+  fixes GO-2026-6809. The programs still use the system's own
+  loader, as with the Go of the package set.
+- The working indicator turns four times a second instead of ten. Without a
+  graphics card the terminal redraws the whole window on the processor for
+  each step: on a test controller it took 1.2 of 4 processors away from the
+  builds of an update.
+- **Settings → Student workspace** no longer offers VS Code preferences (font
+  size, tab size, other settings and the rest): VS Code may not be installed.
+  Ask the Assistant to change students' VS Code settings and extensions; the
+  ones already in the profile are kept when you save, and a review still names
+  their changes.
+- **Initial files** explains itself in plain words: files and folders every
+  student finds in their home, on every computer, back at each start. The
+  screens say "folder" and "executable" instead of permission numbers, and
+  "add", "replace" and "save" instead of import, capture and declaration.
+- Sharing the teacher's screen follows changes sooner: the page sends each
+  new picture as soon as the previous one has left, up to fifteen a second
+  instead of at most five with a pause after each. Each computer still gets
+  only the latest picture, so a slow one skips pictures instead of falling
+  behind.
+- A student's computer opened in full in the classroom view follows changes
+  sooner: the controller asks for the next picture after 30 ms instead of
+  100 ms and the page waits for it instead of pausing. Student computers
+  compress at most fifteen pictures a second for the enlarged view and two
+  for the thumbnails, instead of one for every screen change (37 a second
+  while the pointer moves).
+- A USB installation whose computer does not come back from the restart (a
+  broken disk, a computer that starts from the USB stick again) or whose
+  outcome cannot be proved can be closed with **Close this record** and the
+  typed `CLOSE`. Before, only Verify was offered after the restart, so the
+  notices stayed and every controller and client operation waited until the
+  computer answered. The record stays as closed without verification; check
+  the computer or install it again.
+- The Terminal icon, Super+Enter and GNOME's default terminal open GNOME
+  Console when Ghostty cannot draw (Ghostty needs OpenGL 4.3, which Intel
+  integrated graphics of 2011-2012 and virtual machines with 3D acceleration
+  do not reach). Before, nothing opened. It works on the controller and on
+  every computer that has Ghostty; the screensaver is left out. Console closes
+  when the program it opened ends (q in Nixorium), as Ghostty does, instead of
+  keeping a read-only window.
+- The overview no longer lists "Replacing a controller? Restore its lab" on a
+  laboratory with no backup and no computers: it stayed there until the first
+  backup or computer. Restore lab is in Maintenance, and the installer's last
+  screen points there.
+- The Nixorium icon opens GNOME Console when Ghostty cannot draw on the
+  controller (Ghostty needs OpenGL 4.3: an old graphics card, or a virtual
+  machine with 3D acceleration on). Ghostty then closed at once or kept an
+  empty window, both with exit status 0, so the dashboard did not open at
+  all. GNOME Console comes with the launcher, also where the desktop leaves
+  it out.
+- The bootstrap installer offers three versions: the latest stable release
+  (the default), the latest prerelease when it is newer than that release, and
+  master. Before, it listed every stable release and preselected the
+  prerelease when it ran from one.
+- New laboratories open https://nixorium.org as the browser homepage instead
+  of https://example.org; existing laboratories keep theirs (Maintenance →
+  Change settings → Browser).
+- The controller installer says when it builds on the computer after the
+  downloads, and names the long builds (Nixorium, the screensaver effects).
+  Before, that phase printed nothing for several minutes after the last
+  "packages downloaded" line. Each build now uses every processor; builds
+  still run one at a time, which keeps the USB system's memory bounded.
+
+### Fixed
+
+- Showing the teacher's screen no longer fills a student computer's memory.
+  The classroom extension decoded every picture into a new buffer that GNOME
+  Shell freed only much later (3.1 GB after a short showing on a 4 GB
+  computer, which then stopped answering); it now reuses one picture and
+  frees decoded pictures every 64 MB (about 600 MB after 450 pictures).
+
+## [3.10.0-beta.4] - 2026-10-23
+
+A controller still on 3.10.0-beta.1 follows the update note of 3.10.0-beta.2
+below, with `v3.10.0-beta.4` in both places. From 3.10.0-beta.2 or later,
+Update Nixorium is enough: the review shows the changes it makes to the
+screensaver files as migrations.
+
+### Changed
+
+- The classroom view wakes a blank screen only when the session is not
+  locked. GNOME's screensaver call that wakes a screen also lifts a lock that
+  asks for a password, so a locked session (logind's LockedHint, or an
+  unreadable state) is left locked and shown as locked, as before.
+- Reviews for Internet access, locked screens, messages, sending files and
+  collecting work stay valid between 5 and 10 minutes. Before, a review made at
+  the end of a 5-minute block expired seconds later, and `nixorium internet
+  apply` could refuse a review made just before the boundary with "Internet
+  state or review changed".
+- A successful save in Review Git changes shows its note ("no remote push was
+  attempted") as information, not as a warning.
+- Saving the laboratory network profile in GNOME Settings (to change DNS, for
+  example) wrote the whole profile without the laboratory address, and the
+  next controller update stopped with "controller static address is absent
+  after activation". Nixorium now removes such a copy of `nixorium-lab` and
+  restores its own profile at start-up and during controller activation; DNS
+  and other network choices belong in the deployment. When the controller
+  apply fails, the result shows the apply unit's own reason instead of the
+  generic systemctl message.
+- Applying an update to the controller is about half a minute shorter: the
+  controller configuration is no longer evaluated a second time right after
+  the review, and the final check reads the record the apply unit writes once
+  the reviewed system is active instead of evaluating the configuration
+  again.
+- Update screens on master name the revision (`master · 3f2387e0aabb`), since
+  the version number stays the same between master revisions; the review
+  indents wrapped migration sentences; the review progress says that the
+  network-installation files are only checked; a successful result no longer
+  repeats itself in a yellow or blue notice.
+- The Nixorium window opens maximized, so the dashboard has room for its
+  bordered next-step buttons; a default-size window is too short for them.
+- After Update Nixorium the result stays on screen until you choose: Enter
+  reopens the interface with the new version, Esc keeps this one. Before, it
+  reopened by itself after 3 seconds, before the result could be read. The
+  reopened interface shows the outcome on the overview as a green notice
+  until you leave the overview.
+- The Update Nixorium review fits on one screen: the release change, the
+  applications whose version changes and, for each change to the deployment's
+  own files, one sentence with the files under it. The line-by-line diff of
+  `flake.nix`, `flake.lock` and the migrated files moved to F4 Details; it is
+  still saved in the Git history with the update, and the text plan
+  (`nixorium update plan`) still prints it.
+- Update Nixorium reviews faster: the network-installation outputs (netboot
+  image, PXE firmware, installer) are now only evaluated during the review and
+  built when network installation is prepared. On a test controller with four
+  processors this removed about two and a half minutes from each review.
+- The lab screensaver uses much less processor: its effects now come from
+  `ttfx`, a Rust port of the previous Python effects, at 60 frames per second
+  instead of 120 (the effects advance once per frame, so fewer frames would
+  slow them down). After 30 idle minutes the screen goes black and switches off,
+  and the screensaver stops; a key or the mouse brings the desktop back without
+  a password, and the computer stays on and reachable. Update Nixorium brings
+  the new screensaver to existing laboratories with the deployment migrations
+  `2026-10-ttfx-screensaver`, which replaces `modules/screensaver.nix`,
+  `scripts/cmd-screensaver.sh` and `scripts/screensaver-monitor.sh` when they
+  are still as released (3.6.0 or later), and `2026-10-screensaver-60-fps`.
+  If one of them was changed by hand, the review shows a manual change and
+  nothing is touched: copy the three files from `templates/site` of this
+  release.
+
+## [3.10.0-beta.3] - 2026-10-23
+
+A controller still on 3.10.0-beta.1 follows the update note of 3.10.0-beta.2
+below, with `v3.10.0-beta.3` in both places.
+
+### Changed
+
+- Students' VS Code extensions are no longer edited in the TUI or with
+  `nixorium workspace marketplace`; ask Assistant to add or remove them.
+  Existing selections keep working and are kept when other student settings
+  are saved.
+- The Programming profile no longer includes the local Apache web server that
+  served the student's `~/public_html`; PHP and MySQL stay. Existing
+  laboratories keep it until they reset the deployment template or remove
+  `apacheHttpd` in Software. To serve PHP pages, ask Assistant to add a local
+  web server.
+- The Assistant now saves every conversation on the Nixorium Assistant service
+  for 90 days, so that its mistakes can be found and fixed. Nothing more is
+  sent than before, and the usual filtering of passwords, keys and Wi-Fi
+  details still applies. The administrator can switch it off at any time in
+  the Assistant settings ("Save conversations on the service: On/Off"). A
+  controller that accepted the earlier text sees the updated consent once,
+  with saving already selected, and can refuse it.
+- The next step on each screen is now drawn as a button with a rounded border
+  (red when the action erases or replaces data) instead of a highlighted bar,
+  so it no longer looks like a selected row. On short terminals it stays a
+  single bold line in the key footer.
+
+### Added
+
+- While you control a student computer from the classroom view, copy and
+  paste now work between your computer and theirs, as plain text in both
+  directions: Ctrl+V pastes your text into the student's application, and
+  Ctrl+C or Ctrl+X brings back what they copied, with a short note in the
+  window bar. It works only while you control that computer, up to 64 KiB, and
+  the text is never recorded.
+
+## [3.10.0-beta.2] - 2026-10-20
+
+### Added
+
+- Every screen shows its next step: the Enter action that does more than
+  navigate is drawn above the key footer with an arrow and the selection
+  colour (red when it erases or replaces data), and the footer lists the
+  other keys. After finishing a network installation, Enter checks the
+  installed computers, as the screen says.
+- jq is now part of the software every laboratory starts with, on the
+  controller and all clients, in every software profile. **Update Nixorium**
+  adds it to existing laboratories; a laboratory that already declares jq,
+  for some computers only, keeps its choice.
+- Replacing a controller no longer needs the terminal. After **Restore lab**,
+  **Use this lab on this controller** keeps the lab created by the installer
+  aside, puts the restored lab in its place and installs its keys; **Review
+  controller** then applies it. A newly installed controller shows **Replacing
+  a controller? Restore its lab** on the Overview, Restore lab proposes the
+  newest backup file found on a connected drive and a folder to restore into,
+  and the restored backup counts as the lab's last backup.
+
+### Fixed
+
+- Esc on the computer selection opened after a saved change returns to the
+  screen that opened it (for example the Update Nixorium result), not always
+  to Software, and otherwise to Computers, as its label says.
+- In Internet access and Lock screens, **New review** starts with no computer
+  selected, so the first **a All** selects them all instead of clearing the
+  previous selection.
+- USB over SSH no longer asks to remove the USB stick before restarting the
+  installed PC: removing it under the running live system broke the restart.
+  The installer now makes the next start use the new disk's boot entry, and
+  the stick is removed after the restart.
+- Back up lab proposes a connected USB drive for the encrypted file, or the
+  home folder when none is connected, instead of asking to mount the drive
+  and type its folder.
+- The installation summary no longer shows a saved controller DHCP address
+  the controller does not have any more (a changed lease, a restored lab): it
+  shows the current one, which preparation uses, and names the old one. Before
+  preparation the network installation screen marks the address as saved.
+- The client installer started by network boot or USB looks like the controller
+  bootstrap: three numbered steps, colours, aligned details and a final "Next"
+  block with the computer's SSH key. The list of copied files, boot loader
+  warnings and disk tool traces go to `/tmp/nixorium-install.log`; on a
+  failure the screen shows the last lines and the log path. Sizes are in GB,
+  and the duplicate-name check says plainly what to watch for.
+- The controller bootstrap shows the keyboard by name ("Italian (it)"), keeps
+  disk tool traces and Nix warnings in its log, and its final steps mention
+  Restore lab for a technician replacing a controller.
+- Plainer wording across the TUI: diagnostics titles, the Internet block
+  message (the block lasts until it is lifted or the computer restarts), a
+  cancelled USB installation shown as success, disk models without escape
+  codes, the settings review, help, and "SSH key changed" in Update computers
+  as in the inventory. Backup results show the local time.
+- After applying the controller, the result appears as soon as the controller
+  is verified instead of 1-2 minutes later; the status refresh continues in the
+  background. A short gap in the progress is no longer reported as "could not
+  be refreshed", and "update saved locally" no longer shows while the
+  controller is being updated. When the interface reopens on the updated
+  Nixorium, the Overview says that the update succeeded and what comes next.
+- The Update Nixorium review now shows what changes: the release, the
+  deployment file migrations, the applications whose version changes and the
+  file changes. Unchanged versions, extension requirements and preferences
+  are under F4 Details.
+- A reinstalled computer could keep showing "SSH key changed" after its new
+  key was reviewed: OpenSSH had replaced the controller's link to the
+  Nixorium copy of the known computers with a stale file. OpenSSH no longer
+  rewrites it, and reviewing a key puts the link back.
+- Network installation on a controller whose laboratory address comes from
+  its network profile: starting, stopping or recovering it could fail
+  because the address change takes a moment to appear; it now waits for it.
+  After a recovery the installation screen no longer keeps saying that the
+  network installation was interrupted.
+- MySQL Workbench could not connect in laboratories created before 3.8.0:
+  the setting that lets it work without a desktop keyring was only in the
+  development module copied at creation. Every laboratory desktop now gets
+  it from Nixorium itself.
+- Installation from a USB stick refused every computer with 4 GB of memory
+  ("live installer needs at least … bytes free"): the check counted the
+  installer twice, once already in the live system's memory and once more as
+  free room. It now asks for room to run it once, and when it refuses it says
+  why on the screen, in megabytes or gigabytes.
+- **Update Nixorium** refused every update with deployment migrations when
+  the deployment had a file larger than 1 MiB (a wallpaper, for example),
+  saying the migrations had changed it. Unchanged large files are now
+  compared by content. A controller on 3.10.0-beta.1 runs that comparison
+  with its own release, so it updates once with the new release's program:
+  `nix run github:giovantenne/nixorium/v3.10.0-beta.2 -- update plan --target
+  v3.10.0-beta.2` in the deployment folder, then `update apply` with the review
+  token it prints.
+- A computer still starts from its disk when its firmware forgets the boot
+  entry (after a CMOS reset, a firmware update, or on firmware that drops
+  entries it did not create): GRUB is also copied to the standard fallback
+  path on Nixorium's own EFI partition each time the boot loader is
+  installed.
+- The controller, and a client that has its network card named and is the
+  only computer of its kind, now get their laboratory address from the same
+  single network profile as the other computers. Before, two programs managed
+  the same card and at start-up one could remove the laboratory address while
+  the school network kept working: the computer was then unreachable from the
+  controller until it was restarted. **After this update the controller may
+  receive a different address from the school network**: if the installation
+  files say so, prepare them again (Installation → Network boot).
+- Laboratory settings during installation: choosing the controller's current
+  address on another network card now moves the laboratory network to that
+  card, and the summary names the controller's card. Before, a controller with
+  two cards could keep the laboratory on the wrong one, so network
+  installation served the wrong cable.
+- The client network card hint said the controller's card name; an empty
+  value means any wired card.
+- A new laboratory shows "This laboratory has no backup yet" instead of a
+  backup being due.
+- The network installation screen shows the address it serves after the
+  controller's DHCP address changed.
+- A computer installed by network boot shows its SSH key fingerprint at the
+  end of the installation, so the key review the controller asks for after a
+  reinstallation can be compared with it.
+- Client installers no longer fill the screen with Nix lock file messages,
+  and no longer report a missing identity record while installing a computer
+  that shares its class system.
+- A failed controller installation releases the new disk, so running the
+  setup command again finds it.
+- Diagnostics reports a failed last apply to the controller with its cause,
+  and Operation history shows why an operation failed, with plain names and
+  local times.
+- When applying to the controller or preparing installation files fails,
+  the message names the cause from the service's own log (no Internet or
+  DNS, a full disk, or the error Nix reported) instead of only saying that a
+  systemd job failed.
+- Controllers build Nixorium without running its test suite, which only
+  added minutes and once failed an installation on a busy computer.
+
+## [3.10.0-beta.1] - 2026-10-19
+
+### Added
+
+- Assistant can read system configuration files of the controller and the
+  computers, such as the boot menu or the settings in `/etc`. It never reads home folders, passwords, keys or Wi-Fi
+  credentials. Assistant asks once more for consent because of this.
+- **Update Nixorium** can now change your own deployment files when a release
+  needs it, instead of asking you to edit them by hand. The new release brings
+  the program that makes the change and runs it on a copy of your saved
+  deployment in a closed sandbox (no network, no passwords, no keys); the update
+  checks what changed and refuses anything unexpected. The review shows each
+  change with a one-line reason, and a "Manual change" saying what to replace
+  when you have edited that place yourself. Saving the update writes and
+  commits the changed files with it, you can undo it with Git like any update,
+  and the new file `nixorium-migrations.json` records which changes were made so
+  each is made only once. `nixorium deployment migrate --root <folder>` runs the
+  same program by hand. See
+  [Updating](docs/updates.md#changes-to-your-own-files).
+
+### Changed
+
+- **Update computers** no longer uses Colmena. Nixorium builds each selected
+  computer's system once (instead of twice), copies it, and activates it in a
+  service on the computer that keeps running if the connection drops. A
+  computer that fails or is off no longer blocks the others: only a computer
+  whose result is truly unknown still needs a review, and that review closes
+  itself as soon as the computer reports how its update ended. The log shows
+  each computer's progress and its activation messages.
+- Identical computers now share one configuration. An update, and network
+  installation, builds it once instead of once for every computer. Each
+  computer keeps its own name and laboratory address from a small identity
+  record, `/var/lib/nixorium/identity.json`, that the update or the installer
+  writes before the computer starts its new system. An update writes a
+  damaged record again and never overwrites a valid record that names
+  another computer. A computer without a valid record has no laboratory
+  address and shows "This computer has no Nixorium identity": the fix starts
+  at that computer (see the troubleshooting guide).
+- A private module that uses a computer's name or address (`hostName` or
+  `hostIp`) now needs that computer listed in `hostModules` or
+  `updateValidationHosts`; otherwise the evaluation stops with a message that
+  says so. The flake no longer has a `colmena` output, because Nixorium has
+  its own update engine.
+- The `l` key for progress details appears only when there are details to
+  show, instead of on every progress screen.
+- The readiness check of the laboratory configuration, which takes about 20
+  seconds, is done once per saved configuration and then reused: updating
+  computers no longer repeats it when it reviews and again after the build.
+
+### Fixed
+
+- The check after an update now tries up to three times, a few seconds apart,
+  before reporting a computer as unverified, because a computer that has just
+  switched to its new system can take a moment to answer. When the answer is
+  still unexpected, the report says what the computer replied.
+- An update that changes NetworkManager's settings on computers configured
+  by network card type no longer can fail to write their laboratory network
+  profile: the profile writer waits for NetworkManager to answer.
+- In the classroom view the **Power** menu opens towards the left, so it
+  stays readable when the window is maximised.
+- While an update of the student computers is still running, the Overview
+  shows it as a running operation instead of also listing it as an
+  interrupted update.
+- When a queued update needs a new review, because the configuration changed
+  after it was queued or it kept failing, the Overview now says so and points
+  to **Computers → Queued updates**, instead of saying that nothing needs to
+  be done. Update plans, the troubleshooting guide and the interrupted-update
+  message also use plainer words and no longer mention the old deployment tool.
+
+### Upgrade notes
+
+- Deployments created before 3.9.0 have a `modules/workstation.nix` that
+  finds the controller by comparing `hostName`. Computers that share a
+  configuration have no single name, so that test now stops the evaluation
+  with a message that says what to do. From this release on, Update Nixorium
+  makes this change for you: the review shows it as a change to
+  `modules/workstation.nix`, or as a "Manual change" if you edited that line.
+  A controller that runs 3.9.0 or older cannot do it during the update to this
+  release. Once, in your deployment folder, run
+  `nix run github:giovantenne/nixorium/v3.10.0-beta.1#nixorium -- deployment migrate --root .`,
+  review the result with `git diff`, save it in **Maintenance → Review Git
+  changes**, then run Update Nixorium. If you prefer to edit by hand, replace
+  the line
+  `isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);`
+  with `isController = args.isController or false;`, save, then update
+  Nixorium.
+
+## [3.9.0] - 2026-10-19
+
+### Added
+
+- A [trademark policy](TRADEMARKS.md) says how the Nixorium name and logo can
+  be used: freely to talk about and share Nixorium, with permission for forks,
+  services and products that carry the name.
+- The keyboard help (F1 or `?`) now shows the address for questions and
+  feedback, hello@nixorium.org.
+
+### Changed
+
+- Reviews and updates prepare the configuration for evaluation once instead
+  of several times, which shortens every update a little.
+- Blocking Internet, switching computers off or restarting them, and the
+  scheduled shut-down no longer wait while the administrator updates
+  computers. Only the computers being updated, or whose last update was
+  interrupted, are left alone, and the review says so.
+- Most reviews are now confirmed with Enter on the review screen, or with a
+  `Continue? [y/N]` question on the command line. A word still has to be typed
+  only before something that cannot be undone: erasing a disk, resetting the
+  configuration template, discarding unsaved changes, trusting a new computer
+  key, removing old versions, or, on the command line, switching off or
+  restarting computers someone is using. The network installer asks
+  `Reboot now? [y/N]` at the end. Every review still shows what will
+  happen and can be cancelled with Esc, and `--yes` and `--expect` work as
+  before. Reviews that no longer need a word leave `confirmation` out of their
+  JSON output.
+- The log of **Update computers** shows when each step started and how long it
+  took, with the total time at the end, so it is clear where an update spends
+  its time.
+- Computers waiting for a queued update are updated together when they come
+  back, instead of one after the other, and a computer already up to date
+  leaves the queue without a second update. While another operation is
+  running the queue waits for the next minute instead of counting a failure.
+- **Update computers** selects the computers whose queued update is out of
+  date, so the new review includes them; the selection can still be changed.
+- Modules of a deployment can test the computer's role with the `isController`
+  and `nixoriumRole` arguments instead of comparing host names.
+
+### Fixed
+
+- Reviewing an interrupted update of the student computers no longer waits
+  forever for a program that only reused the number of the one that started
+  the update.
+- During a change of laboratory network, that review also checks computers
+  still on their previous address.
+- Preparing the review of **Update computers** no longer stops with "Loading
+  took too long" right after Nixorium was updated.
+- A computer switched off while **Update computers** was building is left
+  unchanged and reported as not updated (or queued, if the review chose
+  that), instead of ending the whole update as interrupted and blocking every
+  other operation until a recovery review.
+- **Computers → Queued updates** opens again; selecting it did nothing.
+- Trusting a reinstalled computer's new SSH key no longer fails with "review
+  changed" when the review was made just before the clock passed a
+  five-minute mark. A host-key review now stays valid for four to five
+  minutes, from the command line and from the computer's details.
+- **Update computers** keeps each student computer on its own network
+  interface. When `clientIfaceName`, `controllerIfaceName` or
+  `hostIfaceNames` differed from `ifaceName`, the update configured the
+  `ifaceName` interface instead: the computers lost their laboratory address,
+  DHCP and Internet and could no longer be reached. Start an affected computer
+  from the previous entry in its boot menu, then update the computers again.
+- Student computers with the Programming web server no longer stop at boot
+  with "Failed to start Restore the configured student workspace before
+  login". The daily log rotation, which briefly acts as the student account
+  for the web server's logs, could run during the first boot of the day and
+  interrupt the home restore; the restore now finishes first.
+- A student computer that stops before the login screen because its home
+  restore was interrupted now repairs itself at the next boot. A refusal
+  before the home changes no longer blocks later boots. After a power loss,
+  the restore starts again if the old home was untouched, or completes from
+  the read-only snapshot of the old home, which is kept in the teacher's
+  snapshots. Computers already stopped this way, with an older Nixorium,
+  recover at their first boot after the update. If that single automatic
+  attempt also fails, the computer stays closed for the administrator, as
+  before; see [Troubleshooting](docs/troubleshooting.md#a-student-computer-stops-before-the-login-screen).
+  The journal now names the process that blocked a restore.
+- Student computers no longer try `cache.nixos.org` while they are updated;
+  they use only the controller's cache. On school networks that filter HTTPS
+  this removes the `SSL peer certificate … was not OK` warnings during
+  **Update computers** and the time spent on them. The controller still
+  downloads from the public cache. A deployment that adds its own client
+  caches must now set them with `lib.mkForce`.
+- **Installation → USB over SSH** no longer asks again for the network,
+  interface and number of computers when they are already saved: like network
+  boot, it shows the saved values with **Continue** and **Edit settings**.
+- A USB installation is no longer refused with "remote disk is below the
+  minimum capacity" because of a small extra disk, such as a card reader, a
+  second USB stick or the live USB itself. Such disks are listed as excluded;
+  only the disk chosen for installation must hold at least 8 GiB.
+
+## [3.8.2] - 2026-10-16
+
+### Fixed
+
+- 3.8.1 was tagged but never published: its release checks found an
+  automated test still pressing the old letter for **Assistant** after the
+  Overview letters were swapped. 3.8.2 is 3.8.1 with that test corrected;
+  update straight from 3.8.0 to 3.8.2. The changes listed under 3.8.1 arrive
+  with this release.
+
+## [3.8.1] - 2026-10-16
+
+### Changed
+
+- In the classroom view, **Send/Collect files** is now **Share files**, and its
+  **Collect from desktop** is now **Collect from students' desktops**.
+- The classroom view toolbar is simpler: **Share files** holds **Send a
+  folder…**, **Send a file…** and **Collect from students' desktops**, and the
+  **Refresh** button is gone, since the page refreshes by itself.
+- On the Overview, **Maintenance** now opens with `m` and **Assistant** with
+  `a`; the letters were swapped so each matches its name.
+
+### Removed
+
+- **Exam mode** is removed from the classroom view. Use **Internet → Block
+  Internet**, **Lock** and **Message** one by one.
+
+### Fixed
+
+- **Update computers** no longer fails after **Update Nixorium**. Until 3.8.0,
+  updating Nixorium from the menu saved the new release correctly but left the
+  previous release recorded inside `flake.lock`. Applying the controller still
+  worked, but updating the student computers then stopped before changing any
+  computer, with `flake.lock: Read-only file system` and
+  `colmena build: exit status 1`. Every laboratory that updated Nixorium from
+  the menu is affected. Updates now record the selected release correctly and
+  refuse any candidate whose two files disagree. To repair a laboratory, run
+  this release on the controller (updating from 3.8.0 leaves the problem once
+  more), then open **Maintenance → Update Nixorium**, select the configured
+  version, now marked "Current · select to repair", and confirm. Until then
+  **Update computers** and `nixorium doctor` say so with the code
+  `PIN-OUTDATED` instead of the build error. See "Updating the computers fails
+  with a read-only flake.lock" in the troubleshooting guide. The same defect
+  made every change of NixOS channel in **Update system and packages** fail
+  its own check; that works now too.
+
+## [3.8.0] - 2026-10-16
+
 ### Added
 
 - **Switch on** starts student computers that are off, with Wake-on-LAN. It is
@@ -34,7 +863,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   live: a computer that is off, idle behind its own screen lock or without
   anyone signed in has no picture to save. When the page was not opened from
   Nixorium, the browser downloads the picture instead.
-- **Collect from desktop** copies the files on the desktops of the selected
+- **Collect from students' desktops** copies the files on the desktops of the selected
   students' computers into your home folder, in
   `Nixorium/Collected/<date and time>/<computer>/`, after the usual review
   with one confirmation button. It sits beside **Send files** in the classroom
@@ -68,7 +897,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   each step optional and each computer's result listing the three steps. The
   same button reads **End exam mode** on computers it was started on from the
   open page: it removes the message, unlocks the screens, allows Internet
-  again, and then offers **Collect from desktop** for the same computers
+  again, and then offers **Collect from students' desktops** for the same computers
   (nothing is collected unless you confirm). The classroom service remembers
   which computers are in exam mode, so a reopened page, or another user's,
   shows the same; the computers keep no exam state, and restarting the
@@ -167,7 +996,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   again by itself a second later, however many times. While it is down, the
   computer's card says "Monitoring stopped on this PC" instead of just
   dimming, and the same words explain why Lock, Send files, Share screen,
-  Collect from desktop and Save screenshot skipped that computer; the result
+  Collect from students' desktops and Save screenshot skipped that computer; the result
   notice counts it apart. A computer waiting at the login screen still says
   "Nobody is signed in". A classroom view that is frozen rather than stopped
   is reported the same way, and a frozen one no longer keeps its connection
@@ -2220,7 +3049,17 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.7.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.11.0...HEAD
+[3.11.0]: https://github.com/giovantenne/nixorium/compare/v3.10.0...v3.11.0
+[3.10.0]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.4...v3.10.0
+[3.10.0-beta.4]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.3...v3.10.0-beta.4
+[3.10.0-beta.3]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.2...v3.10.0-beta.3
+[3.10.0-beta.2]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.1...v3.10.0-beta.2
+[3.10.0-beta.1]: https://github.com/giovantenne/nixorium/compare/v3.9.0...v3.10.0-beta.1
+[3.9.0]: https://github.com/giovantenne/nixorium/compare/v3.8.2...v3.9.0
+[3.8.2]: https://github.com/giovantenne/nixorium/compare/v3.8.1...v3.8.2
+[3.8.1]: https://github.com/giovantenne/nixorium/compare/v3.8.0...v3.8.1
+[3.8.0]: https://github.com/giovantenne/nixorium/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/giovantenne/nixorium/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/giovantenne/nixorium/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/giovantenne/nixorium/compare/v3.5.0...v3.6.0

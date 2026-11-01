@@ -22,7 +22,22 @@ const (
 var (
 	interfaceNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}$`)
 	userNamePattern      = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,30}$`)
-	passwordHashPattern  = regexp.MustCompile(`^\$6\$[^$]+\$[^$]+$`)
+	// SHA-512 crypt as mkpasswd -m sha-512 prints it: $6$salt$hash, with an
+	// optional rounds=N field before the salt. Salt and hash use the crypt
+	// alphabet only, so a space or a newline can never hide in a stored hash.
+	passwordHashPattern = regexp.MustCompile(`^\$6\$(rounds=[0-9]+\$)?[./0-9A-Za-z]+\$[./0-9A-Za-z]+$`)
+	// The shape of a time zone and of a locale. A typo reaches the controller
+	// build only at apply time, so the shape is checked here and in
+	// lib/eval-lab-config.nix. Both stay shape checks: neither side carries
+	// a list of zones or locales.
+	// Zones include single names NixOS accepts (CET, Japan, GMT0); locales
+	// put the modifier after the codeset, as glibc names them
+	// (ca_ES.UTF-8@valencia).
+	timeZonePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+){0,2}$`)
+	localePattern   = regexp.MustCompile(`^([a-z]{2,3}_[A-Z]{2}\.UTF-8(@[a-z]+)?|C\.UTF-8)$`)
+	// Git identities and the keyboard layout reach shell scripts and
+	// configuration files. lib/eval-lab-config.nix holds the same rules.
+	keyboardLayoutPattern = regexp.MustCompile(`^[A-Za-z0-9_,()+-]+$`)
 )
 
 type LabSettingsFile struct {
@@ -35,6 +50,11 @@ type LabSettingsFile struct {
 func (settings LabSettings) ClassroomViewOn() bool {
 	return settings.ClassroomView == nil || *settings.ClassroomView
 }
+
+// ClassroomViewOffMessage is the one sentence every entry point to the
+// classroom view answers when the laboratory has it turned off (situation
+// CLASSROOM-VIEW-OFF).
+const ClassroomViewOffMessage = "The classroom view is turned off in this laboratory's settings (Maintenance → Change settings). Code: CLASSROOM-VIEW-OFF."
 
 // AssistantOn tells whether the controller offers Assistant: it is on unless
 // the settings turn it off. Account activation and consent remain separate.
@@ -248,8 +268,12 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 			}
 		}
 	}
+	// The laboratory profile is an Ethernet profile: a Wi-Fi card never
+	// carries the laboratory address (modules/networking.nix).
 	if !interfaceNamePattern.MatchString(lab.InterfaceName) {
 		add("lab.ifaceName", "must be a valid Linux interface name of at most 15 characters")
+	} else if WirelessInterfaceName(lab.InterfaceName) {
+		add("lab.ifaceName", "is a Wi-Fi card name; the laboratory network is wired, so choose a wired card")
 	}
 	for _, networkInterface := range []struct {
 		field string
@@ -260,6 +284,8 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	} {
 		if networkInterface.value != "" && !interfaceNamePattern.MatchString(networkInterface.value) {
 			add(networkInterface.field, "must be a valid Linux interface name of at most 15 characters")
+		} else if WirelessInterfaceName(networkInterface.value) {
+			add(networkInterface.field, "is a Wi-Fi card name; the laboratory network is wired, so choose a wired card")
 		}
 	}
 	validateUser := func(field, value string) {
@@ -307,18 +333,80 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 			add(required.field, "must not be empty")
 		}
 	}
-	validHosts := map[string]bool{fmt.Sprintf("pc%02d", lab.MasterHostNumber): true}
+	for _, name := range []struct {
+		field string
+		value string
+	}{
+		{"lab.studentGitName", lab.StudentGitName},
+		{"lab.adminGitName", lab.AdminGitName},
+	} {
+		if strings.TrimSpace(name.value) != "" && !validGitText(name.value) {
+			add(name.field, "must be at most 256 bytes without control characters")
+		}
+	}
+	for _, email := range []struct {
+		field string
+		value string
+	}{
+		{"lab.studentGitEmail", lab.StudentGitEmail},
+		{"lab.adminGitEmail", lab.AdminGitEmail},
+	} {
+		// Not checked for shape: a laboratory may already use any text Git
+		// accepts; quoting keeps it safe.
+		if strings.TrimSpace(email.value) != "" && !validGitText(email.value) {
+			add(email.field, "must be at most 256 bytes without control characters")
+		}
+	}
+	if strings.TrimSpace(lab.TimeZone) != "" && !timeZonePattern.MatchString(lab.TimeZone) {
+		add("lab.timeZone", "must be UTC or a zone such as Europe/Rome or America/New_York")
+	}
+	for _, locale := range []struct {
+		field string
+		value string
+	}{
+		{"lab.defaultLocale", lab.DefaultLocale},
+		{"lab.extraLocale", lab.ExtraLocale},
+	} {
+		if strings.TrimSpace(locale.value) != "" && !localePattern.MatchString(locale.value) {
+			add(locale.field, "must be a UTF-8 locale such as en_US.UTF-8 or it_IT.UTF-8")
+		}
+	}
+	if strings.TrimSpace(lab.KeyboardLayout) != "" && (len(lab.KeyboardLayout) > maxKeyboardLayoutBytes || !keyboardLayoutPattern.MatchString(lab.KeyboardLayout)) {
+		add("lab.keyboardLayout", "must be an XKB layout name: letters, digits and _ - + , ( ) only, at most 128 bytes")
+	}
+	validHosts := map[string]bool{HostName(lab.MasterHostNumber): true}
 	for number := 1; number <= lab.PCCount; number++ {
-		validHosts[fmt.Sprintf("pc%02d", number)] = true
+		validHosts[HostName(number)] = true
 	}
 	for host, interfaceName := range lab.HostInterfaceNames {
 		if !validHosts[host] {
 			add("lab.hostIfaceNames."+host, "must name a configured client or controller")
 		} else if !interfaceNamePattern.MatchString(interfaceName) {
 			add("lab.hostIfaceNames."+host, "must be a valid Linux interface name of at most 15 characters")
+		} else if WirelessInterfaceName(interfaceName) {
+			add("lab.hostIfaceNames."+host, "is a Wi-Fi card name; the laboratory network is wired, so choose a wired card")
 		}
 	}
 	return issues
+}
+
+const (
+	maxGitTextBytes        = 256
+	maxKeyboardLayoutBytes = 128
+)
+
+// validGitText reports whether a Git author name is short and free of ASCII
+// control characters (newline and tab included).
+func validGitText(value string) bool {
+	if len(value) > maxGitTextBytes {
+		return false
+	}
+	for index := 0; index < len(value); index++ {
+		if value[index] < 0x20 || value[index] == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 func MarshalLabSettings(settings LabSettingsFile) ([]byte, error) {

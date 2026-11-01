@@ -1,4 +1,4 @@
-{ hostName, labSettings, lib, nixoriumPackage, pkgs, ... }:
+{ isController, labSettings, lib, nixoriumPackage, pkgs, ... }:
 # Experimental classroom view agent (off by default). The agent runs in the
 # graphical session of whoever uses a client; the controller reaches it only
 # through its existing SSH access, with the fixed command below. No network
@@ -18,7 +18,7 @@
 let
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   enabled = (labSettings.classroomView or true) && laboratoryEnabled
-    && hostName != labSettings.masterHostName;
+    && !isController;
   extensionUuid = "nixorium-classroom@nixorium.org";
   extension = pkgs.runCommand "gnome-shell-extension-nixorium-classroom" {} ''
     install -Dm0644 ${../pkgs/gnome-shell-extension-classroom/metadata.json} \

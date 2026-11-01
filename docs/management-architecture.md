@@ -9,8 +9,9 @@ execution plans are not specifications.
 
 Nixorium already has a sound declarative core:
 
-- `lib.mkLab` turns a typed site configuration into NixOS hosts, Colmena
-  metadata, netboot outputs, helper applications, and an offline installer.
+- `lib.mkLab` turns a typed site configuration into NixOS hosts (one system
+  per class of identical client computers, [ADR 0033](adr/0033-client-classes.md)),
+  netboot outputs, helper applications, and an offline installer.
 - `labMeta` is a versioned, non-secret operational interface. Shell helpers
   consume it through Nix evaluation instead of parsing Nix source.
 - `deploymentStatus` reports configuration blockers without making the
@@ -118,7 +119,7 @@ terminal UI and human-readable CLI rendering
                     |
 typed application/domain operations
                     |
-Nix, Git, systemd, networking, Colmena, and filesystem adapters
+Nix, Git, systemd, networking, SSH, and filesystem adapters
 ```
 
 The TUI never owns operational logic and never scrapes the human-readable CLI.
@@ -271,7 +272,7 @@ The parser in `cmd/nixorium/main.go` and `nixorium --help` list the complete
 subcommands and options. Deployment template reset itself is TUI-only.
 
 Advanced output names and raw tool commands remain documented and usable. The
-management layer wraps rather than replaces Nix and Colmena.
+management layer wraps rather than replaces Nix.
 
 `status` is deliberately cheap and read-only. It reports configuration
 readiness, Git state, controller identity, configured clients, Harmonia/PXE
@@ -282,13 +283,13 @@ are opt-in or belong to `doctor`, so opening the dashboard is predictable.
 layer preserves configured ordering and emits typed reachability and SSH
 availability rather than a boolean that conflates connection refusal, timeout,
 and probe failure. The local adapter limits concurrent TCP/22 probes to eight.
-For reachable SSH services, it then uses the existing non-interactive Colmena
-root identity to execute one fixed `nixorium-host-state` command, again with at
+For reachable SSH services, it then uses the existing non-interactive root
+SSH identity to execute one fixed `nixorium-host-state` command, again with at
 most eight workers and a per-host timeout. The helper is installed in every
 managed generation and returns only the canonical active system path and the
 embedded private-deployment revision. The application compares that observed
 revision with the repository HEAD and preserves `current`, `outdated`, and
-`unknown` as distinct states. It never treats an open port or aggregate Colmena
+`unknown` as distinct states. It never treats an open port or a reported update
 success as proof of convergence, and an older generation without the helper is
 explicitly unknown. Both the CLI/JSON frontend and the TUI **Computers** screen
 consume the same report; `doctor` retains the cheaper TCP classification for
@@ -298,17 +299,23 @@ the reviewed revision with a concrete system path. Inventory renders that
 timestamp and revision, but live observation remains authoritative.
 
 `deploy plan --on` accepts one client, a comma-separated set, or `@lab`, then
-resolves only configured client identities into a canonical Colmena selector.
+resolves only configured client identities into a canonical selector.
 A plan is ready only when `deploymentStatus` is ready, Git is clean, and HEAD
 is available; it records that revision and requires build-before-deploy.
-Unknown, empty, or duplicate targets fail closed, and planning never invokes
-Colmena.
+Unknown, empty, or duplicate targets fail closed, and planning never changes a
+computer.
 
 `deploy apply --on ... --expect <revision>` is the corresponding unprivileged
 execution boundary. It repeats the plan checks before execution and after the
-build, requires the exact one-word `DEPLOY` confirmation (or explicit
-automation-only `--yes`), and constructs fixed argument arrays for verbose
-`colmena build` followed by `colmena apply switch`. A per-administrator
+build, asks `Continue? [y/N]` (or takes the explicit
+automation-only `--yes`), and constructs fixed argument arrays that build each selected
+computer's system once with `nix build` (computers of one class share one
+system, so it is built once for the class), copy it with `nix-copy-closure`, and
+start its activation in a service on the computer. Before a computer is
+switched to a shared system, the engine writes its identity record
+(`/var/lib/nixorium/identity.json`, only its number) over SSH; a record that
+names another computer leaves the computer unchanged, and verification of a
+shared system requires the number the computer reports. A per-administrator
 non-blocking lock prevents overlapping Nixorium deploys. Output is streamed and
 duplicated to a no-follow, mode-0600 operation log under the XDG state
 directory. After every apply attempt, the application reuses the bounded
@@ -318,8 +325,8 @@ revision. Reports distinguish preflight, build, apply, verify, and complete
 phases. Apply success is partial until all targets are verified and recorded;
 an apply failure remains failed while still preserving independently verified
 hosts. Retrying is convergent: it requires a fresh valid review and rebuilds
-before applying again. Direct Colmena remains an advanced compatibility
-surface.
+before applying again. The flake has no `colmena` output; Nixorium builds and
+applies the systems itself (ADR 0031).
 
 `shutdown plan --on` and `restart plan --on` accept the same explicit client selector grammar as
 deployment but never permits the controller. It observes TCP reachability,
@@ -336,8 +343,8 @@ plan.
 
 The ready plan binds action, repository, normalized targets, evaluated addresses,
 observations, policy, and an expiry window to a review token and the matching
-one-word `SHUTDOWN` or `RESTART` confirmation. If active sessions are present, the review states
-explicitly that this word authorizes their interruption. `shutdown apply`
+(only when a computer's session is active or unknown) one-word `SHUTDOWN` or `RESTART` confirmation. If such sessions are present, the review states
+explicitly that this word authorizes their interruption; when every computer is idle, logged in without use, or off, the CLI asks `Continue? [y/N]` and the plan has no confirmation word. `shutdown apply`
 or `restart apply` validates that reviewed plan, takes the
 same non-blocking client-operation lock used by deployment, rejects active or
 degraded PXE networking, reevaluates inventory, and repeats session checks
@@ -415,7 +422,7 @@ Overview
   [c] Computers     inventory, update computers, Internet access, power
   [n] Installation  network boot (PXE) or USB over SSH
   [w] Software      configured choices and pinned package search
-  [a] Maintenance   settings, updates, logs, diagnostics, backup;
+  [m] Maintenance   settings, updates, logs, diagnostics, backup;
                     advanced: free disk space, controller apply, services,
                     Git review, deployment template reset
 ```
@@ -444,28 +451,28 @@ runs host probes only when the inventory is opened/refreshed, and shows exact
 PXE/deployment/update reviews. Typed phrases remain reserved for destructive or
 especially easy-to-mistarget actions; controller and framework update reviews
 use Enter after a separate visible review. Long-lived PXE services remain under systemd when the view exits;
-foreground Colmena deployment and update apply instead block accidental TUI
+foreground computer update and update apply instead block accidental TUI
 exit until their typed final result is available.
-Colmena intentionally remains an unprivileged child of the administrator
-rather than a system service: it uses that account's SSH authority and streams
-direct output into the private operation log. Application-authored phase events
+The build and copy intentionally remain unprivileged children of the
+administrator rather than a system service: they use that account's SSH
+authority and stream direct output into the private operation log, while the
+activation itself runs in a service on each computer. Application-authored phase events
 cross a separate typed in-process callback so the TUI can show elapsed time, a
 four-stage progress bar, up to five bounded activities, and authenticated-host
-counts without parsing or rendering raw Colmena output. Terminal or process
+counts without parsing or rendering raw tool output. Terminal or process
 loss may interrupt it, so recovery is `logs` plus fresh authenticated `hosts`
 state and a new revision-bound plan. A user-systemd executor is deferred because reliable
 logout survival would also require linger policy and a durable job/result
 protocol; it is not introduced merely to move the same process out of view.
 The controller screen follows the same boundary: Bubble Tea renders the typed
 revision/current-state plan and invokes the application callback only after a
-second Enter on the review. The CLI retains its exact one-word `REBUILD`
-confirmation. The systemd-owned rebuild may outlive the
+second Enter on the review. The CLI asks `Continue? [y/N]`. The systemd-owned rebuild may outlive the
 dashboard and retains its build/activation journal. Completion refreshes the
 ordinary typed dashboard status, presents a compact result, and leaves bounded
 activity available on demand with explicit dashboard, log, and review routes.
 The services screen likewise receives typed component status and one cache
 restart callback. It renders the persistent cache and composite on-demand PXE
-lifecycle, requires the exact one-word `RESTART` confirmation, and cannot issue raw
+lifecycle, is confirmed with Enter, and cannot issue raw
 systemd actions. PXE remains linked to its dedicated transactional workflow.
 The operation-log screen receives typed bounded list/detail callbacks. Bubble
 Tea owns recent-outcome rendering, log selection, and viewport scrolling only;
@@ -662,7 +669,7 @@ profile hooks, autostart, or automatic root execution.
 
 The TUI and most of the CLI run as the administrator account. They may read
 public Flake outputs, inspect Git, edit the administrator-owned deployment,
-build in the Nix store, probe hosts, and invoke Colmena as that account.
+build in the Nix store, probe hosts, and copy systems to the computers as that account.
 
 Root operations are exposed as fixed controller services/actions:
 
@@ -680,7 +687,8 @@ the controller and validated as a local, administrator-owned Git worktree.
 
 The administrator is already a wheel user, but the narrow interface still
 reduces accidental misuse and makes every disruptive operation auditable.
-Deployment to clients continues through SSH/Colmena with the existing keys and
+Deployment to clients continues through SSH (`nix-copy-closure` and an
+activation service) with the existing keys and
 host-key policy. Read-only current-generation reconciliation reuses that exact
 root trust path and a fixed installed helper; it neither adds a controller
 daemon nor grants new client privileges. A future enrollment API, if justified,
@@ -912,10 +920,12 @@ soon as the live boot is verified; neither secret is stored in Git, a Nix
 derivation, process arguments, durable session JSON, or the operation log.
 
 The live IPv4 address must belong to the declared client interface; its wired
-or wireless type is not an eligibility condition. Network policy must allow
-controller-to-client SSH and client-to-controller signed-cache traffic. Live
-Wi-Fi profiles are not imported into the installed system, so connectivity
-after reboot remains an explicit deployment/operator responsibility.
+or wireless type is not an eligibility condition for the live session. Network
+policy must allow controller-to-client SSH and client-to-controller signed-cache
+traffic. The installed system takes its laboratory address only on a wired
+card (the laboratory profile is Ethernet), so a client installed over Wi-Fi
+needs its cable before the restart, and the TUI never saves a Wi-Fi card as
+the computer's interface. Live Wi-Fi profiles are not imported.
 
 `packages.x86_64-linux.remoteInstallerBundle` is target-independent. It
 contains the fixed remote helper, strict metadata, and precompiled Disko
@@ -1082,13 +1092,24 @@ site template. New templates use the canonical fully qualified assignment, so
 the compatibility path can update those deployments without requiring a
 manual bootstrap edit.
 
-The plan renders candidate `flake.nix` bytes in memory and asks Nix to write a
-candidate lock outside the checkout with `flake lock --override-input nixorium
-... --output-lock-file ...`. It validates that other top-level inputs remain
-owned by the deployment while allowing the selected upstream's transitive lock
-closure to change. All subsequent evaluation and builds use the explicit
-override plus `--reference-lock-file` and `--no-write-lock-file`; they never
-write the deployment lock during review.
+The plan renders candidate `flake.nix` bytes in memory, stages a private
+immutable copy of the committed deployment with that proposed `flake.nix` and
+the current `flake.lock`, and asks Nix to write a candidate lock outside the
+checkout with `flake lock <copy> --override-input nixorium ...
+--output-lock-file ...`. Nix records each input's `original` reference from
+the `flake.nix` it locks, so locking the proposed file keeps the saved pair
+consistent (3.8.0 and earlier locked the current file, which left the old
+reference as `original`; Colmena then failed on the read-only store copy). It
+validates that other top-level inputs remain owned by the deployment while
+allowing the selected upstream's transitive lock closure to change. A second
+immutable copy holds the proposed `flake.nix` and `flake.lock`; `nix flake lock
+--no-update-lock-file` on it must succeed before anything is evaluated, and all
+evaluation and builds use that copy with `--no-update-lock-file` (never
+`--no-write-lock-file`, which would let Nix relock in memory). Review never
+writes the deployment lock. When an existing `flake.lock` records another
+`nixorium` reference than `flake.nix`, the update check reports it, the
+configured release can be planned again to repair the pair, and `deploy plan`
+and `doctor` report `PIN-OUTDATED` instead of building.
 
 Before a plan becomes ready, evaluate `labMeta` and `deploymentStatus`, then
 build one configured client, the controller, netboot ramdisk, PXE firmware, and
@@ -1158,7 +1179,7 @@ Testing is layered:
 - NixOS VM tests cover first-run discovery, systemd ordering, Harmonia health,
   PXE start/stop/recovery, the remote worker's unit/socket/ownership and orphan
   recovery boundaries, mutual PXE/USB exclusion, permission boundaries, CLI
-  status, fake-Colmena success/failure/retry, a forced-command SSH shutdown
+  status, fake-engine success/failure/retry, a forced-command SSH shutdown
   boundary, the group-private classroom worker with student exclusion, and real
   PTY traversals of reviewed installation, deployment, and power flows;
 - the remote-client VM test uses a real signed Harmonia closure and exercises
@@ -1229,3 +1250,5 @@ The following decisions are recorded separately:
 - [ADR-0023: reviewed recovery of interrupted operations](adr/0023-reviewed-recovery-of-interrupted-operations.md)
 - [ADR-0024: encrypted controller backups](adr/0024-encrypted-controller-backups.md)
 - [ADR-0026: proportionate confirmation for recovery](adr/0026-proportionate-confirmation-for-recovery.md)
+- [ADR-0033: one system per class of identical client computers](adr/0033-client-classes.md)
+- [ADR-0034: deployment migrations](adr/0034-deployment-migrations.md)

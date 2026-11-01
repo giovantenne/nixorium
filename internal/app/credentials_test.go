@@ -32,12 +32,12 @@ func (h *recordingHasher) HashPassword(_ context.Context, password []byte) (stri
 	return "$6$salt$hash", nil
 }
 
-func TestCollectPasswordHashConfirmsHashesAndWipesInputs(t *testing.T) {
+func TestCollectNamedPasswordHashConfirmsHashesAndWipesInputs(t *testing.T) {
 	password := []byte("correct horse battery staple")
 	confirmation := append([]byte(nil), password...)
 	reader := &queuedSecretReader{values: [][]byte{password, confirmation}}
 	hasher := &recordingHasher{}
-	hash, err := CollectPasswordHash(context.Background(), reader, hasher)
+	hash, err := CollectNamedPasswordHash(context.Background(), reader, hasher, "Password")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestCollectPasswordHashConfirmsHashesAndWipesInputs(t *testing.T) {
 	}
 }
 
-func TestCollectPasswordHashRejectsMismatchAndPublicDefault(t *testing.T) {
+func TestCollectNamedPasswordHashRejectsMismatchAndPublicDefault(t *testing.T) {
 	for name, values := range map[string][][]byte{
 		"mismatch": {[]byte("long-enough-one"), []byte("long-enough-two")},
 		"default":  {[]byte("nixos")},
@@ -62,7 +62,7 @@ func TestCollectPasswordHashRejectsMismatchAndPublicDefault(t *testing.T) {
 			inputs := append([][]byte(nil), values...)
 			reader := &queuedSecretReader{values: inputs}
 			hasher := &recordingHasher{}
-			if _, err := CollectPasswordHash(context.Background(), reader, hasher); err == nil || !IsPasswordInputError(err) {
+			if _, err := CollectNamedPasswordHash(context.Background(), reader, hasher, "Password"); err == nil || !IsPasswordInputError(err) {
 				t.Fatal("unsafe password was accepted")
 			}
 			if hasher.calls != 0 {
@@ -82,11 +82,11 @@ func TestCollectPasswordHashRejectsMismatchAndPublicDefault(t *testing.T) {
 	}
 }
 
-func TestCollectPasswordHashRejectsShortInputBeforeConfirmation(t *testing.T) {
+func TestCollectNamedPasswordHashRejectsShortInputBeforeConfirmation(t *testing.T) {
 	password := []byte("short")
 	reader := &queuedSecretReader{values: [][]byte{password}}
 	hasher := &recordingHasher{}
-	_, err := CollectPasswordHash(context.Background(), reader, hasher)
+	_, err := CollectNamedPasswordHash(context.Background(), reader, hasher, "Password")
 	if err == nil || !IsPasswordInputError(err) {
 		t.Fatalf("error = %v", err)
 	}
@@ -100,9 +100,9 @@ func TestCollectPasswordHashRejectsShortInputBeforeConfirmation(t *testing.T) {
 	}
 }
 
-func TestCollectPasswordHashDoesNotClassifyBackendFailureAsInputError(t *testing.T) {
+func TestCollectNamedPasswordHashDoesNotClassifyBackendFailureAsInputError(t *testing.T) {
 	reader := &queuedSecretReader{values: [][]byte{[]byte("long-enough")}}
-	_, err := CollectPasswordHash(context.Background(), reader, &recordingHasher{})
+	_, err := CollectNamedPasswordHash(context.Background(), reader, &recordingHasher{}, "Password")
 	if err == nil || IsPasswordInputError(err) {
 		t.Fatalf("terminal failure classification = %v", err)
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
@@ -21,7 +23,7 @@ type fakeWorkerState struct {
 func (state *fakeWorkerState) Load(id string) (domain.RemoteInstallSession, error) {
 	session, ok := state.sessions[id]
 	if !ok {
-		return domain.RemoteInstallSession{}, errors.New("missing")
+		return domain.RemoteInstallSession{}, fmt.Errorf("missing: %w", fs.ErrNotExist)
 	}
 	return session, nil
 }
@@ -173,8 +175,11 @@ func TestCompletedDiskReceiptSurvivesOfflineStatusRefresh(t *testing.T) {
 	}
 }
 
-func TestRemoteWorkerCloseRejectsAnyPossibleDispatch(t *testing.T) {
-	for _, field := range []string{"consumed", "uncertain", "receipt", "reboot", "verified", "dispatching", "unknown"} {
+func TestRemoteWorkerClosesAPossiblyWrittenSessionUnverified(t *testing.T) {
+	// A computer that did not come back from the restart (a broken disk, a
+	// computer started from the USB stick again) or whose outcome is unknown
+	// must not hold the controller forever: CLOSE ends the record, unverified.
+	for _, field := range []string{"consumed", "uncertain", "receipt", "reboot", "dispatching", "unknown"} {
 		t.Run(field, func(t *testing.T) {
 			id := "0123456789abcdef0123456789abcdef"
 			session := domain.RemoteInstallSession{OperationID: id, State: "reconciliation-required"}
@@ -186,9 +191,8 @@ func TestRemoteWorkerCloseRejectsAnyPossibleDispatch(t *testing.T) {
 			case "receipt":
 				session.Receipt = &domain.RemoteInstallReceipt{OperationID: id}
 			case "reboot":
+				session.State = "reboot-requested"
 				session.RebootRequested = true
-			case "verified":
-				session.BootVerified = true
 			default:
 				session.State = field
 			}
@@ -197,10 +201,35 @@ func TestRemoteWorkerCloseRejectsAnyPossibleDispatch(t *testing.T) {
 			reservation := &fakeWorkerReservation{}
 			worker := &remoteWorker{state: state, bootstrap: bootstrap, operationID: id, reservation: reservation}
 			response := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: id}, nil)
-			if response.State != "reconciliation-required" || bootstrap.discarded || reservation.released {
-				t.Fatalf("unsafe closure: %+v", response)
+			if response.State != "closed-unverified" || !bootstrap.discarded || !reservation.released || worker.reservation != nil {
+				t.Fatalf("not closed: %+v", response)
+			}
+			if saved := state.sessions[id]; saved.State != "closed-unverified" || len(saved.Events) == 0 {
+				t.Fatalf("closure not recorded: %+v", saved)
 			}
 		})
+	}
+}
+
+func TestRemoteWorkerDoesNotCloseAVerifiedSession(t *testing.T) {
+	id := "0123456789abcdef0123456789abcdef"
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: {OperationID: id, State: "verified", BootVerified: true, RebootRequested: true}}}
+	reservation := &fakeWorkerReservation{}
+	worker := &remoteWorker{state: state, bootstrap: &fakeWorkerBootstrap{}, operationID: id, reservation: reservation}
+	response := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: id}, nil)
+	if response.State == "closed-unverified" || reservation.released {
+		t.Fatalf("verified session closed: %+v", response)
+	}
+}
+
+func TestRemoteWorkerFinishesAnUnverifiedClosureAfterRestart(t *testing.T) {
+	id := "0123456789abcdef0123456789abcdef"
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: {OperationID: id, State: "closed-unverified", RebootRequested: true}}}
+	reservation := &fakeWorkerReservation{}
+	worker := &remoteWorker{state: state, bootstrap: &fakeWorkerBootstrap{}, operationID: id, reservation: reservation}
+	response := worker.closeUnverifiedLocked(context.Background(), state.sessions[id])
+	if response.State != "closed-unverified" || !reservation.released {
+		t.Fatalf("cleanup not finished: %+v", response)
 	}
 }
 
@@ -801,4 +830,74 @@ func validWorkerArtifacts() domain.RemoteInstallArtifacts {
 		HostInterface: "enp0s2", HostStaticIP: "192.0.2.101", CachePublicKey: "cache.example:YWJjZA==",
 		AdminPublicKey: "ssh-ed25519 YWJjZA== admin@test", PreparedAt: time.Unix(1, 0).UTC(), Issues: []domain.ValidationIssue{},
 	}
+}
+
+func TestRemoteWorkerUnconfirmedKeyCleanupOnANewSessionReleasesTheReservation(t *testing.T) {
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{}}
+	bootstrap := &fakeWorkerBootstrap{err: adapters.BootstrapCleanupUnconfirmedError(errors.New("connection lost"))}
+	reservations := &fakeWorkerReservations{}
+	worker := &remoteWorker{state: state, bootstrap: bootstrap, reservations: reservations}
+	secret, _ := adapters.NewLivePassword([]byte("temporary-secret"))
+	response := worker.handle(context.Background(), domain.RemoteInstallRequest{
+		Operation: domain.RemoteInstallBootstrapOperation, Host: "pc01", Address: "192.0.2.20",
+		Fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	}, secret)
+	if !reservations.reservation.released || worker.operationID != "" || worker.reservation != nil {
+		t.Fatalf("response=%+v reservation=%+v worker=%+v", response, reservations.reservation, worker)
+	}
+	if !strings.Contains(response.Message, "restart the live USB computer") {
+		t.Fatalf("message = %q", response.Message)
+	}
+}
+
+func TestRemoteWorkerRecoveryReleasesAReservationWithoutASessionRecord(t *testing.T) {
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{}}
+	bootstrap := &fakeWorkerBootstrap{}
+	reservations := &fakeWorkerReservations{recoverID: "0123456789abcdef0123456789abcdef"}
+	worker := &remoteWorker{state: state, bootstrap: bootstrap, reservations: reservations}
+	if err := worker.recover(); err != nil {
+		t.Fatalf("recover = %v", err)
+	}
+	if !bootstrap.discarded || !reservations.reservation.released || worker.operationID != "" || worker.reservation != nil {
+		t.Fatalf("discarded=%v released=%v worker=%+v", bootstrap.discarded, reservations.reservation.released, worker)
+	}
+}
+
+func TestRemoteWorkerStatusLoadsTheSessionUnderTheWorkerMutex(t *testing.T) {
+	// A status request that arrives while apply holds the mutex must refresh
+	// the session apply leaves behind, not a copy read before apply started.
+	id := "0123456789abcdef0123456789abcdef"
+	session := domain.RemoteInstallSession{OperationID: id, State: "applying", TokenConsumed: true,
+		Preparation: &domain.RemoteInstallPreparation{BundlePath: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bundle"}}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: session}}
+	worker := &remoteWorker{state: state, operationID: id, liveSession: &adapters.VerifiedLiveSession{}}
+	worker.statusConnection = func(adapters.VerifiedLiveSession) (remoteStatusConnection, error) {
+		return fakeStatusConnection{receipt: domain.RemoteInstallReceipt{OperationID: id, State: "applying"}}, nil
+	}
+	worker.mutex.Lock()
+	done := make(chan domain.RemoteInstallResponse, 1)
+	go func() {
+		done <- worker.handleStatus(context.Background(), domain.RemoteInstallRequest{OperationID: id})
+	}()
+	time.Sleep(100 * time.Millisecond)
+	current := state.sessions[id]
+	current.Events = append(current.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseReconciliationRequired, Detail: "written by apply"})
+	state.sessions[id] = current
+	worker.mutex.Unlock()
+	response := <-done
+	if len(state.sessions[id].Events) != 1 || response.Session == nil || len(response.Session.Events) != 1 {
+		t.Fatalf("status saved a stale session: %+v", state.sessions[id])
+	}
+}
+
+type fakeStatusConnection struct {
+	receipt domain.RemoteInstallReceipt
+}
+
+func (connection fakeStatusConnection) Status(context.Context, string, string) (domain.RemoteInstallReceipt, error) {
+	return connection.receipt, nil
+}
+
+func (connection fakeStatusConnection) OperationLog(context.Context, string, string) ([]byte, error) {
+	return nil, errors.New("no log")
 }

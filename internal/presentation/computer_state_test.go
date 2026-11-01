@@ -10,8 +10,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func stateFixture() dashboardModel {
-	m := experienceFixture(3)
+func stateFixture(t testing.TB) dashboardModel {
+	m := experienceFixture(t, 3)
 	now := time.Date(2026, 9, 30, 10, 15, 0, 0, time.Local)
 	m.computers.hosts = domain.HostsReport{GeneratedAt: now, Deployment: domain.HostDeploymentSummary{Outdated: 1}, Hosts: []domain.HostStatus{
 		{Name: "pc01", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentOutdated},
@@ -22,7 +22,7 @@ func stateFixture() dashboardModel {
 }
 
 func TestDeploySelectionShowsStateAndSelectsThoseNeedingUpdate(t *testing.T) {
-	m := stateFixture()
+	m := stateFixture(t)
 	m.screen = dashboardDeploy
 	m.deployment.chosen = map[string]bool{"pc02": true}
 	view := m.View().Content
@@ -39,7 +39,7 @@ func TestDeploySelectionShowsStateAndSelectsThoseNeedingUpdate(t *testing.T) {
 	loads := 0
 	m.actions.LoadHosts = func(context.Context) (domain.HostsReport, error) {
 		loads++
-		report := stateFixture().computers.hosts
+		report := stateFixture(t).computers.hosts
 		report.Hosts[1].Deployment = domain.DeploymentOutdated
 		return report, nil
 	}
@@ -56,7 +56,7 @@ func TestDeploySelectionShowsStateAndSelectsThoseNeedingUpdate(t *testing.T) {
 	if chosen := next.(dashboardModel).deployment.chosen; len(chosen) != 2 {
 		t.Fatalf("fresh observation not used: %v", chosen)
 	}
-	empty := experienceFixture(2)
+	empty := experienceFixture(t, 2)
 	empty.computers.hosts = domain.HostsReport{}
 	empty.screen = dashboardDeploy
 	next, _ = empty.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
@@ -66,7 +66,7 @@ func TestDeploySelectionShowsStateAndSelectsThoseNeedingUpdate(t *testing.T) {
 }
 
 func TestPowerSelectionShowsStateAndSelectsThoseOn(t *testing.T) {
-	m := stateFixture()
+	m := stateFixture(t)
 	m.screen = dashboardShutdown
 	view := m.View().Content
 	if !strings.Contains(view, "On at last check") || !strings.Contains(view, "Off or not reachable at last check") || !strings.Contains(view, "Those that are on") {
@@ -80,7 +80,7 @@ func TestPowerSelectionShowsStateAndSelectsThoseOn(t *testing.T) {
 }
 
 func TestInternetSelectionChecksStateAndSelectsThoseToChange(t *testing.T) {
-	m := experienceFixture(3)
+	m := experienceFixture(t, 3)
 	m.computers.hosts = domain.HostsReport{}
 	m.screen = dashboardInternet
 	m.internet.chosen = map[string]bool{}
@@ -125,7 +125,7 @@ func TestInternetSelectionChecksStateAndSelectsThoseToChange(t *testing.T) {
 }
 
 func TestInventoryUpdatesComputersThatNeedIt(t *testing.T) {
-	m := stateFixture()
+	m := stateFixture(t)
 	m.screen = dashboardHosts
 	if !strings.Contains(m.View().Content, "Update those that need it") {
 		t.Fatalf("inventory lacks the update action:\n%s", m.View().Content)
@@ -143,5 +143,43 @@ func TestInventoryUpdatesComputersThatNeedIt(t *testing.T) {
 	}
 	if !strings.Contains(requested, "pc01") || strings.Contains(requested, "pc02") || m.screen != dashboardDeployReview {
 		t.Fatalf("update opened %q on screen %d", requested, m.screen)
+	}
+}
+
+func TestCheckingComputersAgainReplacesTheLastReviewsAvailability(t *testing.T) {
+	report := testDashboardReport("ready")
+	report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}}
+	model := dashboardModel{report: report, screen: dashboardDeploy, width: 120, height: 40}
+	model.deployment.plan.Availability = []domain.DeploymentTargetAvailability{{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityUnreachable}}
+	model.actions.LoadHosts = func(context.Context) (domain.HostsReport, error) { return domain.HostsReport{}, nil }
+	next, _ := model.updateDeployment(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	if updated := next.(dashboardModel); len(updated.deployment.plan.Availability) != 0 {
+		t.Fatalf("the earlier review's availability is still shown: %+v", updated.deployment.plan.Availability)
+	}
+}
+
+func TestCancelledComputerCheckDoesNotRedirectTheNextInventory(t *testing.T) {
+	model := newTestModel(t, withReadyLab(), withActions(DashboardActions{
+		LoadHosts: func(context.Context) (domain.HostsReport, error) {
+			return domain.HostsReport{GeneratedAt: time.Now()}, nil
+		},
+	}))
+	model.screen = dashboardDeploy
+	model.deployment.chosen = map[string]bool{}
+	updated, _ := model.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	model = updated.(dashboardModel)
+	if model.read.cancel == nil || model.computers.refreshReturn != dashboardDeploy {
+		t.Fatalf("no check started from the selection (cancel set %v, return %d)", model.read.cancel != nil, model.computers.refreshReturn)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if model.computers.refreshReturn != 0 {
+		t.Fatalf("cancelling kept the return screen %d", model.computers.refreshReturn)
+	}
+	model.screen = dashboardComputersArea
+	opened, command := model.openComputerTask("h")
+	updated, _ = opened.Update(command())
+	if screen := updated.(dashboardModel).screen; screen != dashboardHosts {
+		t.Fatalf("Computer inventory opened screen %d, want %d", screen, dashboardHosts)
 	}
 }

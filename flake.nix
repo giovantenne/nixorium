@@ -114,8 +114,13 @@
           };
         } pkgs;
       });
+      bootFallbackVmTest = pkgs.testers.runNixOSTest ./tests/boot-fallback-vm.nix;
       clientNetworkUpgradeVmTest = pkgs.testers.runNixOSTest (import ./tests/client-network-upgrade-vm.nix {
         networkingModule = ./modules/networking.nix;
+      });
+      classNetworkVmTest = pkgs.testers.runNixOSTest (import ./tests/class-network-vm.nix {
+        networkingModule = ./modules/networking.nix;
+        identityModule = ./modules/identity.nix;
       });
       networkTransitionVmTest = pkgs.testers.runNixOSTest (import ./tests/network-transition-vm.nix {
         transitionLab = mkLab {
@@ -219,6 +224,8 @@
         programming-profile-vm = import ./tests/programming-profile-vm.nix { inherit pkgs; };
         mysql-workbench-vm = import ./tests/mysql-workbench-vm.nix { inherit pkgs; };
         session-state-vm = import ./tests/session-state-vm.nix { inherit pkgs; };
+        stay-active-vm = import ./tests/stay-active-vm.nix { inherit pkgs; };
+        staff-home-writes-vm = import ./tests/staff-home-writes-vm.nix { inherit pkgs; };
         classroom-view-vm = import ./tests/classroom-view-vm.nix { inherit pkgs; };
         onboarding-vm = import ./tests/onboarding-vm.nix { inherit pkgs; };
         console-keyboard-vm = import ./tests/console-keyboard-vm.nix { inherit pkgs; };
@@ -274,7 +281,7 @@
           touch "$out"
         '';
         client-installer = pkgs.runCommand "nixorium-client-installer-test" {
-          nativeBuildInputs = [ pkgs.bash pkgs.coreutils pkgs.gnugrep pkgs.jq ];
+          nativeBuildInputs = [ pkgs.bash pkgs.coreutils pkgs.gnugrep pkgs.jq pkgs.openssh ];
         } ''
           NIXORIUM_TEST_REPO_ROOT=${self} bash ${./tests/client-installer.sh}
           NIXORIUM_TEST_REPO_ROOT=${self} bash ${./tests/client-installer-library.sh}
@@ -285,7 +292,9 @@
         '';
         client-installer-vm = clientInstallerVmTest;
         remote-client-installer-vm = remoteClientInstallerVmTest;
+        boot-fallback-vm = bootFallbackVmTest;
         client-network-upgrade-vm = clientNetworkUpgradeVmTest;
+        class-network-vm = classNetworkVmTest;
         network-transition-vm = networkTransitionVmTest;
         network-migration-vm = networkMigrationVmTest;
         management-vm = managementVmTest;

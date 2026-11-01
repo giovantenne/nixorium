@@ -66,6 +66,9 @@ in
       in !cfg.systemd.services.home-reset.restartIfChanged
         && cfg.systemd.services.home-reset.unitConfig.RefuseManualStart
         && builtins.elem "systemd-user-sessions.service" cfg.systemd.services.home-reset.requiredBy
+        # Services acting as the student must not overlap the boot reset.
+        && builtins.all (unit: builtins.elem unit cfg.systemd.services.home-reset.before)
+          [ "httpd.service" "logrotate.service" ]
         && cfg.environment.etc ? "nixorium-workspace-reset.json"
         && !(lib.hasInfix "/var/lib/home-template/${labConfig.studentUser}" cfg.system.activationScripts.createHomeTemplates.text)
         && !(lib.hasInfix "/home/${labConfig.studentUser}" cfg.system.activationScripts.nixoriumUserHomeOwnership.text)
@@ -125,7 +128,7 @@ in
     assert builtins.deepSeq (discoveryLab.nixoriumSearchSoftwarePackages { query = "hello"; limit = 1; }) true;
     assert builtins.deepSeq discoveryLab.nixoriumUpdateTargets true;
     assert builtins.all (name: !(builtins.tryEval discoveryLab.${name}).success) [
-      "deploymentStatus" "nixosConfigurations" "colmena"
+      "deploymentStatus" "nixosConfigurations"
       "nixoriumWorkspace" "nixoriumOfflineCheck"
       "nixoriumValidateWorkspaceCandidate" "nixoriumResolveWorkspaceCandidate"
       "nixoriumValidateControllerSoftwareCandidate"

@@ -63,7 +63,7 @@ func TestSoftwareModelRendersItsOwnWorkflowStage(t *testing.T) {
 	if !strings.Contains(shell.body, "Available in this laboratory’s software versions") {
 		t.Fatalf("review body = %q", shell.body)
 	}
-	if len(shell.actions) < 2 || shell.actions[0].label != "Save" || shell.actions[1].label != "Computers" {
+	if len(shell.actions) < 2 || shell.actions[0].label != "Save" || shell.actions[1].label != "Choose computers" {
 		t.Fatalf("review actions = %#v", shell.actions)
 	}
 }

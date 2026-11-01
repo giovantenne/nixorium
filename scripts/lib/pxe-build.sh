@@ -61,8 +61,9 @@ build_pxe_outputs() {
   local CLIENT_NAMES=("$@")
   local BATCH_SIZE="${NIXORIUM_PXE_EVAL_BATCH-$PXE_EVAL_BATCH_DEFAULT}"
   local NAME DESCRIPTION DECLARED_NAMES STORE_PATH BATCH_NAMES BATCH_JSON BATCH_DESCRIPTION
-  local START END TOTAL ARTIFACTS CLIENTS
-  local BUILD_TARGETS=() OUTPUTS=()
+  local START END TOTAL ARTIFACTS CLIENTS INDEX KEY REPRESENTATIVES
+  local BUILD_TARGETS=() OUTPUTS=() EVAL_NAMES=()
+  local -A FIRST_OF=() REPRESENTATIVE_OF=()
 
   if ! [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]]; then
     fail "NIXORIUM_PXE_EVAL_BATCH must be an integer from 1 to 64"
@@ -72,20 +73,35 @@ build_pxe_outputs() {
   BATCH_SIZE=$((10#$BATCH_SIZE))
   ((${#CLIENT_NAMES[@]} > 0)) || fail "labMeta contains no client hosts"
   for NAME in "${CLIENT_NAMES[@]}"; do
-    [[ "$NAME" =~ ^pc[0-9]+$ ]] || fail "labMeta contains invalid client name"
+    [[ "$NAME" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ ]] || fail "labMeta contains invalid client name"
   done
   DECLARED_NAMES="$(printf '%s\n' "${CLIENT_NAMES[@]}" | jq -Rn '[inputs]')"
-  TOTAL=${#CLIENT_NAMES[@]}
+  # Computers of a class share one system (ADR 0033): the caller may set
+  # CLIENT_CLASSES, parallel to the names; one member of each class is
+  # evaluated and its system is given to the others.
+  for INDEX in "${!CLIENT_NAMES[@]}"; do
+    NAME=${CLIENT_NAMES[$INDEX]}
+    KEY=${CLIENT_CLASSES[$INDEX]:-$NAME}
+    [[ "$KEY" == "$NAME" || "$KEY" =~ ^shared-[0-9]+$ ]] || fail "labMeta contains an invalid class of $NAME"
+    if [[ -z "${FIRST_OF[$KEY]:-}" ]]; then
+      FIRST_OF[$KEY]=$NAME
+      EVAL_NAMES+=("$NAME")
+    fi
+    REPRESENTATIVE_OF[$NAME]=${FIRST_OF[$KEY]}
+  done
+  REPRESENTATIVES="$(for NAME in "${CLIENT_NAMES[@]}"; do printf '%s\t%s\n' "$NAME" "${REPRESENTATIVE_OF[$NAME]}"; done \
+    | jq -Rn '[inputs | split("\t") | {key: .[0], value: .[1]}] | from_entries')"
+  TOTAL=${#EVAL_NAMES[@]}
 
   ARTIFACTS="$(pxe_eval_description "$FLAKE_REFERENCE" artifacts '[]')" \
     || fail "could not evaluate the required PXE artifacts"
   CLIENTS='[]'
   for ((START = 0; START < TOTAL; START += BATCH_SIZE)); do
-    BATCH_NAMES=("${CLIENT_NAMES[@]:START:BATCH_SIZE}")
+    BATCH_NAMES=("${EVAL_NAMES[@]:START:BATCH_SIZE}")
     END=$((START + ${#BATCH_NAMES[@]}))
     if declare -F publish_progress >/dev/null; then
       publish_progress running clients \
-        "Evaluating clients $((START + 1))–$END of $TOTAL" "$START" "$TOTAL"
+        "Evaluating client configurations $((START + 1))–$END of $TOTAL" "$START" "$TOTAL"
     fi
     BATCH_JSON="$(printf '%s\n' "${BATCH_NAMES[@]}" | jq -Rn '[inputs]')"
     BATCH_DESCRIPTION="$(pxe_eval_description "$FLAKE_REFERENCE" clients "$BATCH_JSON")" \
@@ -94,7 +110,9 @@ build_pxe_outputs() {
       || fail "Nix returned an invalid PXE build description"
   done
   DESCRIPTION="$(jq -n --argjson artifacts "$ARTIFACTS" --argjson clients "$CLIENTS" \
-    '{artifacts: $artifacts.artifacts, clients: $clients}')" \
+    --argjson names "$DECLARED_NAMES" --argjson representatives "$REPRESENTATIVES" '
+      {artifacts: $artifacts.artifacts,
+       clients: [$names[] as $name | ($clients[] | select(.name == $representatives[$name])) | .name = $name]}')" \
     || fail "Nix returned an invalid PXE build description"
   jq -e --argjson names "$DECLARED_NAMES" '
     (.artifacts | length) == 4 and (.clients | map(.name)) == $names and

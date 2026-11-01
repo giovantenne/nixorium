@@ -29,14 +29,14 @@ func TestWorkspaceMarketplaceResolve(t *testing.T) {
 	source := &fakeMarketplace{candidate: domain.WorkspaceMarketplaceCandidate{Entry: marketplacePin("Arduino", "Vscode-Arduino")}}
 	manager := NewWorkspaceMarketplace(source)
 	report := manager.Resolve(t.Context(), ".", "arduino.VSCODE-arduino")
-	if report.HasErrors() || report.ID != "arduino.vscode-arduino" || strings.Join(source.ids, ",") != "arduino.vscode-arduino" {
+	if report.State != "ready" || report.ID != "arduino.vscode-arduino" || strings.Join(source.ids, ",") != "arduino.vscode-arduino" {
 		t.Fatalf("unexpected report %+v", report)
 	}
-	if report := manager.Resolve(t.Context(), ".", "not an id"); !report.HasErrors() || len(source.ids) != 1 {
+	if report := manager.Resolve(t.Context(), ".", "not an id"); report.State == "ready" || len(source.ids) != 1 {
 		t.Fatal("invalid identifier reached the Marketplace")
 	}
 	source.candidate.Entry = marketplacePin("other", "extension")
-	if report := manager.Resolve(t.Context(), ".", "arduino.vscode-arduino"); !report.HasErrors() {
+	if report := manager.Resolve(t.Context(), ".", "arduino.vscode-arduino"); report.State == "ready" {
 		t.Fatal("accepted a result for another extension")
 	}
 	source.err = errors.New("offline")

@@ -72,7 +72,7 @@ func DecodeRemoteInstallRequest(data []byte) (RemoteInstallRequest, error) {
 	if request.OperationID != "" && !remoteOperationIDPattern.MatchString(request.OperationID) {
 		return request, errors.New("remote installation operation ID is invalid")
 	}
-	if request.Host != "" && !remoteHostPattern.MatchString(request.Host) {
+	if request.Host != "" && !ValidHostName(request.Host) {
 		return request, errors.New("remote installation host is invalid")
 	}
 	if request.Operation == RemoteInstallPrepareOperation && request.Host == "" {
@@ -159,7 +159,7 @@ func DecodeRemoteInstallSession(data []byte) (RemoteInstallSession, error) {
 		return session, errors.New("remote installation session review state is invalid")
 	}
 	if session.Bootstrap != nil {
-		if !remoteHostPattern.MatchString(session.Bootstrap.Host) || validateRemoteIPv4(session.Bootstrap.Address) != nil ||
+		if !ValidHostName(session.Bootstrap.Host) || validateRemoteIPv4(session.Bootstrap.Address) != nil ||
 			!remotePublicKeyPattern.MatchString(session.Bootstrap.HostPublicKey) || !remoteFingerprintPattern.MatchString(session.Bootstrap.HostFingerprint) ||
 			!strings.HasPrefix(session.Bootstrap.AuthorizedKeyLine, "restrict ") || !remotePublicKeyPattern.MatchString(strings.TrimPrefix(session.Bootstrap.AuthorizedKeyLine, "restrict ")) {
 			return session, errors.New("remote installation bootstrap record is invalid")

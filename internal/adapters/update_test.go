@@ -10,6 +10,20 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// fakeCandidateStoreCases lets a fake nix import candidate sources: each
+// staged directory is kept under $NIXORIUM_TEST_STAGES/<n> when set, and the
+// candidate lock check fails when NIXORIUM_TEST_LOCK_CHECK=stale.
+const fakeCandidateStoreCases = `  *" store add-path "*)
+    for last; do :; done
+    count=0
+    if [ -n "${NIXORIUM_TEST_STAGES:-}" ]; then
+      count=$(ls "$NIXORIUM_TEST_STAGES" | wc -l)
+      cp -R "$last" "$NIXORIUM_TEST_STAGES/$count"
+    fi
+    printf '/nix/store/%032d-source\n' "$count" ;;
+  *" flake lock --no-update-lock-file "*)
+    if [ "${NIXORIUM_TEST_LOCK_CHECK:-}" = stale ]; then echo "error: flake 'path:/nix/store/x-source' requires lock file changes but they're not allowed due to '--no-update-lock-file'" >&2; exit 1; fi ;;`
+
 func TestInspectUpdateInputAndRenderTarget(t *testing.T) {
 	repository := t.TempDir()
 	write := func(name, content string) {
@@ -204,6 +218,7 @@ func TestPrepareUpdateUsesExternalCandidateLockAndRepresentativeBuilds(t *testin
 set -eu
 printf '%s\n' "$*" >> "$NIXORIUM_TEST_NIX_LOG"
 case " $* " in
+` + fakeCandidateStoreCases + `
   *" flake lock "*)
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --output-lock-file ]; then
@@ -222,6 +237,7 @@ case " $* " in
     ;;
   *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
   *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
+  *" path-info "*) printf '/nix/store/%032d-output.drv\n' 0 ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac
@@ -231,6 +247,8 @@ esac
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("NIXORIUM_TEST_NIX_LOG", logPath)
+	stages := t.TempDir()
+	t.Setenv("NIXORIUM_TEST_STAGES", stages)
 	progress := []domain.UpdatePlanProgress{}
 	proposal, err := (Local{}).PrepareUpdateWithProgress(context.Background(), repository, "v1.1.0", func(item domain.UpdatePlanProgress) {
 		progress = append(progress, item)
@@ -246,19 +264,128 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 7 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 5 || strings.Count(string(log), "--no-write-lock-file") != 6 {
+	// Two candidate sources, the candidate lock, the lock check, two
+	// evaluations, two workspace reads, the validator, one evaluation of the
+	// installation outputs and one grouped build.
+	if len(lines) != 11 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 0 || strings.Count(string(log), "--no-write-lock-file") != 1 || strings.Count(string(log), "store add-path") != 2 {
 		t.Fatalf("unexpected Nix invocations (%d):\n%s", len(lines), log)
 	}
-	for _, output := range []string{"nixosConfigurations.pc01.config.system.build.toplevel", "nixosConfigurations.pc99.config.system.build.toplevel", "nixosConfigurations.netboot.config.system.build.netbootRamdisk", "pxeFirmware", "installerBundle"} {
-		if !strings.Contains(lines[6], "#"+output) {
-			t.Fatalf("required output %s missing from grouped build: %s", output, lines[6])
+	if !strings.HasPrefix(lines[1], "--extra-experimental-features nix-command flakes flake lock path:/nix/store/") || !strings.Contains(lines[1], "--override-input nixorium github:owner/project/v1.1.0") || !strings.Contains(lines[3], "flake lock --no-update-lock-file path:/nix/store/") {
+		t.Fatalf("candidate lock was not computed and checked from the proposed source:\n%s", log)
+	}
+	for _, output := range []string{"nixosConfigurations.pc01.config.system.build.toplevel", "nixosConfigurations.pc99.config.system.build.toplevel"} {
+		if !strings.Contains(lines[10], "#"+output) {
+			t.Fatalf("required system %s missing from grouped build: %s", output, lines[10])
 		}
+	}
+	// The network-installation outputs are evaluated, not built.
+	for _, output := range []string{"nixosConfigurations.netboot.config.system.build.netbootRamdisk", "pxeFirmware", "installerBundle"} {
+		if !strings.Contains(lines[9], "path-info --derivation") || !strings.Contains(lines[9], "#"+output) || strings.Contains(lines[10], "#"+output) {
+			t.Fatalf("installation output %s was not evaluated only:\n%s\n%s", output, lines[9], lines[10])
+		}
+	}
+	// The lock was computed from the proposed flake.nix with the current lock,
+	// and validation used the proposed pair.
+	lockSource := readGitReviewFile(t, filepath.Join(stages, "0"), "flake.nix")
+	candidateLock := readGitReviewFile(t, filepath.Join(stages, "1"), "flake.lock")
+	if !strings.Contains(lockSource, "github:owner/project/v1.1.0") || readGitReviewFile(t, filepath.Join(stages, "0"), "flake.lock") != readGitReviewFile(t, repository, "flake.lock") || candidateLock != string(proposal.LockContent) {
+		t.Fatalf("candidate sources: flake.nix=%q lock=%q", lockSource, candidateLock)
 	}
 	if strings.Contains(string(log), repository+"/secret-key") {
 		t.Fatalf("private path entered Nix arguments:\n%s", log)
 	}
-	if len(progress) != 6 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Phase != domain.UpdatePlanPhaseEvaluate || progress[2].Detail != "Evaluating candidate deployment readiness" || progress[3].Detail != "Comparing pinned student workspace dependencies" || progress[4].Phase != domain.UpdatePlanPhaseBuild || progress[4].Current != 0 || progress[4].Total != 5 || progress[5].Phase != domain.UpdatePlanPhaseReview {
+	if len(progress) != 8 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Detail != "Running the target release's changes to deployment files" || progress[2].Detail != "Checking that the candidate flake.lock matches flake.nix" || progress[3].Phase != domain.UpdatePlanPhaseEvaluate || progress[4].Detail != "Evaluating candidate deployment readiness" || progress[5].Detail != "Comparing pinned student workspace dependencies" || progress[6].Phase != domain.UpdatePlanPhaseBuild || progress[6].Current != 0 || progress[6].Total != 5 || progress[7].Phase != domain.UpdatePlanPhaseReview {
 		t.Fatalf("candidate progress = %+v", progress)
+	}
+}
+
+func gitRevisionOf(t *testing.T, repository string) string {
+	t.Helper()
+	revision, err := run(context.Background(), "git", "-C", repository, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return revision
+}
+
+// The target release migrates a copy of the deployment; the candidate is
+// evaluated and built with the result, the review shows it and saving the
+// update writes it (ADR 0034).
+func TestUpdateRunsTheTargetReleaseMigrations(t *testing.T) {
+	repository := newGitReviewRepository(t)
+	writeGitReviewFile(t, repository, "flake.nix", "{\n  inputs.nixorium.url = \"github:owner/project/v1.0.0\";\n}\n")
+	writeGitReviewFile(t, repository, "flake.lock", `{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`+"\n")
+	writeGitReviewFile(t, repository, "modules/workstation.nix", "args@{ ... }:\nlet\n"+oldControllerTest+"in { }\n")
+	if _, err := run(context.Background(), "git", "-C", repository, "add", "flake.nix", "flake.lock", "modules/workstation.nix"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", repository, "commit", "-qm", "deployment"); err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "nix.log")
+	script := `#!/bin/sh
+set -eu
+printf '%s\n' "$*" >> "$NIXORIUM_TEST_NIX_LOG"
+case " $* " in
+` + fakeCandidateStoreCases + `
+  *" flake lock "*)
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = --output-lock-file ]; then
+        printf '%s\n' '{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"2222222222222222222222222222222222222222"}}}}' > "$2"
+        exit 0
+      fi
+      shift
+    done
+    exit 2
+    ;;
+  *"#labMeta "*)
+    printf '%s\n' '{"schemaVersion":2,"deploymentMode":"controller","controller":{"name":"pc99"},"clients":{"count":0,"hosts":[]}}'
+    ;;
+  *"#deploymentStatus "*)
+    printf '%s\n' '{"ready":false,"issues":["Client installation is not configured"],"controller":{"ready":true,"issues":[],"requiresKeys":false}}'
+    ;;
+  *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
+  *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
+  *" path-info "*) printf '/nix/store/%032d-output.drv\n' 0 ;;
+  *" build "*) exit 0 ;;
+  *) exit 3 ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(bin, "nix"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("NIXORIUM_TEST_NIX_LOG", logPath)
+	stages := t.TempDir()
+	t.Setenv("NIXORIUM_TEST_STAGES", stages)
+	useMigrator(t, workstationMigration, nil)
+	snapshot, err := (Local{}).InspectUpdateInput(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := (Local{}).PrepareUpdate(context.Background(), repository, "v1.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(proposal.Migrations) != 1 || proposal.Migrations[0].State != domain.MigrationApplied || len(proposal.MigratedFiles) != 2 || proposal.Migrator == "" || len(proposal.MigrationReport) == 0 {
+		t.Fatalf("migrations = %+v, files = %d", proposal.Migrations, len(proposal.MigratedFiles))
+	}
+	// The second candidate source, evaluated and built, carries the change.
+	if candidate := readGitReviewFile(t, filepath.Join(stages, "2"), "modules/workstation.nix"); !strings.Contains(candidate, "args.isController or false") {
+		t.Fatalf("candidate workstation.nix = %q", candidate)
+	}
+	if !strings.Contains(proposal.Diff.Content, "a/modules/workstation.nix") || !strings.Contains(proposal.Diff.Content, "+  isController = args.isController or false;") || !strings.Contains(proposal.Diff.Content, "b/nixorium-migrations.json") {
+		t.Fatalf("diff:\n%s", proposal.Diff.Content)
+	}
+	if _, err := (Local{}).ApplyPreparedUpdate(context.Background(), repository, strings.TrimSpace(gitRevisionOf(t, repository)), snapshot, proposal); err != nil {
+		t.Fatal(err)
+	}
+	if content := readGitReviewFile(t, repository, "modules/workstation.nix"); !strings.Contains(content, "args.isController or false") {
+		t.Fatalf("saved workstation.nix = %q", content)
+	}
+	if content := readGitReviewFile(t, repository, "nixorium-migrations.json"); !strings.Contains(content, "2026-10-workstation-is-controller") {
+		t.Fatalf("saved record = %q", content)
 	}
 }
 
@@ -278,6 +405,7 @@ func TestPrepareUpdateBuildsOnlyControllerForControllerMode(t *testing.T) {
 set -eu
 printf '%s\n' "$*" >> "$NIXORIUM_TEST_NIX_LOG"
 case " $* " in
+` + fakeCandidateStoreCases + `
   *" flake lock "*)
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --output-lock-file ]; then
@@ -296,6 +424,7 @@ case " $* " in
     ;;
   *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
   *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
+  *" path-info "*) printf '/nix/store/%032d-output.drv\n' 0 ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac
@@ -317,7 +446,7 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 7 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
+	if len(lines) != 10 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
 		t.Fatalf("unexpected controller-only Nix invocations (%d):\n%s", len(lines), log)
 	}
 	for _, excluded := range []string{"nixosConfigurations.pc01", "nixosConfigurations.netboot", "#pxeFirmware", "#installerBundle"} {

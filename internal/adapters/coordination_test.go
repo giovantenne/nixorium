@@ -31,7 +31,7 @@ func TestCoordinationReservationSurvivesLockOwnerExit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reservation, err := reserveRemoteInstallAt(directory, false, validRemoteReservationPlan(), "sha256:"+strings.Repeat("a", 64))
+	reservation, err := createRemoteReservationAt(directory, false, validRemoteReservationPlan().OperationID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestRemoteReservationRequiresMatchingOperationToRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	value, err := reserveRemoteInstallAt(directory, false, validRemoteReservationPlan(), "sha256:"+strings.Repeat("b", 64))
+	value, err := createRemoteReservationAt(directory, false, validRemoteReservationPlan().OperationID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,4 +151,32 @@ func validRemoteReservationPlan() domain.RemoteInstallPlan {
 		AdminPublicKey:     "ssh-ed25519 YWJjZA== admin@test",
 		HostKeyPublic:      "ssh-ed25519 YWJjZA== root@test",
 	}
+}
+
+func ensureTestCoordinationDirectory(stateRoot string) (string, error) {
+	directory := filepath.Join(stateRoot, "nixorium", "coordination")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		return "", err
+	}
+	lockPath := filepath.Join(directory, coordinationLockName)
+	file, err := os.OpenFile(lockPath, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return "", err
+	}
+	if err := file.Chmod(0600); err != nil {
+		file.Close()
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		return "", err
+	}
+	classroom, err := os.OpenFile(filepath.Join(directory, classroomLockName), os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return "", err
+	}
+	if err := classroom.Chmod(0600); err != nil {
+		classroom.Close()
+		return "", err
+	}
+	return directory, classroom.Close()
 }

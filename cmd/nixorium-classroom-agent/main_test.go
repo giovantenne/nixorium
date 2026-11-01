@@ -11,10 +11,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
+	"github.com/godbus/dbus/v5"
 )
 
 func fakeLoginctl(values map[string]string) commandRunner {
@@ -123,7 +125,8 @@ func TestAgentSocketRefusesLinksAndOtherFiles(t *testing.T) {
 	if err := os.Symlink(target, filepath.Join(runtime, SocketName)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := agentSocket(base, uid); err == nil {
+	if _, release, err := agentSocket(base, uid); err == nil {
+		release()
 		t.Fatal("a symbolic link was accepted as the agent socket")
 	}
 	if err := os.Remove(filepath.Join(runtime, SocketName)); err != nil {
@@ -132,11 +135,98 @@ func TestAgentSocketRefusesLinksAndOtherFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(runtime, SocketName), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := agentSocket(base, uid); err == nil {
+	if _, release, err := agentSocket(base, uid); err == nil {
+		release()
 		t.Fatal("a regular file was accepted as the agent socket")
 	}
 	if err := serve(runtime); err == nil {
 		t.Fatal("serve replaced a file that is not its socket")
+	}
+}
+
+func TestAgentSocketRefusesALinkedRuntimeDirectory(t *testing.T) {
+	base := t.TempDir()
+	uid := os.Getuid()
+	real := filepath.Join(base, "real")
+	if err := os.Mkdir(real, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(real, SocketName), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, filepath.Join(base, strconv.Itoa(uid))); err != nil {
+		t.Fatal(err)
+	}
+	if _, release, err := agentSocket(base, uid); err == nil {
+		release()
+		t.Fatal("a symbolic link was accepted as the runtime directory")
+	}
+	// A session user other than the directory's owner is refused too.
+	other := t.TempDir()
+	if err := os.Mkdir(filepath.Join(other, strconv.Itoa(uid+1)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, release, err := agentSocket(other, uid+1); err == nil {
+		release()
+		t.Fatal("a runtime directory of another owner was accepted")
+	}
+}
+
+func TestAgentSocketPinsTheCheckedSocket(t *testing.T) {
+	// Unix socket paths are short: a name from t.TempDir would not fit.
+	base, err := os.MkdirTemp("", "pin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(base)
+	uid := os.Getuid()
+	runtime := filepath.Join(base, strconv.Itoa(uid))
+	if err := os.Mkdir(runtime, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", filepath.Join(runtime, SocketName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	other, err := net.Listen("unix", filepath.Join(base, "other.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	path, release, err := agentSocket(base, uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	// Swapping the name for a link after the check changes nothing.
+	if err := os.Remove(filepath.Join(runtime, SocketName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(base, "other.sock"), filepath.Join(runtime, SocketName)); err != nil {
+		t.Fatal(err)
+	}
+	accepted := make(chan string, 2)
+	for name, socket := range map[string]net.Listener{"agent": listener, "other": other} {
+		go func() {
+			if connection, err := socket.Accept(); err == nil {
+				connection.Close()
+				accepted <- name
+			}
+		}()
+	}
+	connection, err := net.Dial("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection.Close()
+	select {
+	case name := <-accepted:
+		if name != "agent" {
+			t.Fatalf("connected to the %s socket", name)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("nothing accepted the connection")
 	}
 }
 
@@ -439,7 +529,7 @@ func TestProbeEndsWhenItsContextEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, run := range map[string]func(context.Context) error{
-		"hello": func(ctx context.Context) error { return probe(ctx, []string{"sleep", "30"}, "", false, io.Discard) },
+		"hello": func(ctx context.Context) error { return probe(ctx, []string{"sleep", "30"}, "", false, 0, io.Discard) },
 		"lock":  func(ctx context.Context) error { return probeLock(ctx, []string{"sleep", "30"}, true, io.Discard) },
 		"collect": func(ctx context.Context) error {
 			return probeCollect(ctx, []string{"sleep", "30"}, t.TempDir(), io.Discard)
@@ -621,5 +711,182 @@ func TestConnectKeepsRelayingToAHealthyAgent(t *testing.T) {
 		if reply, err := classroomview.Read(output); err != nil || reply.Type != classroomview.TypeHello {
 			t.Fatalf("reply = %+v, %v", reply, err)
 		}
+	}
+}
+
+type stoppingCapture struct {
+	fakeCapture
+	stopped chan struct{}
+}
+
+func (capture stoppingCapture) StopCapture() { capture.stopped <- struct{}{} }
+
+func TestLastConnectionClosingStopsCapture(t *testing.T) {
+	listener, err := net.Listen("unix", filepath.Join(t.TempDir(), SocketName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	capture := stoppingCapture{stopped: make(chan struct{}, 4)}
+	go func() {
+		_ = serveConnections(listener, agentContext{userName: "student", capture: capture, lock: &fakeLocker{}})
+	}()
+	dial := func() net.Conn {
+		connection, err := net.Dial("unix", listener.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion})
+		_ = connection.SetDeadline(time.Now().Add(2 * time.Second))
+		if _, err := classroomview.Read(connection); err != nil {
+			t.Fatal(err)
+		}
+		return connection
+	}
+	first, second := dial(), dial()
+	first.Close()
+	select {
+	case <-capture.stopped:
+		t.Fatal("capture stopped while a channel was still open")
+	case <-time.After(300 * time.Millisecond):
+	}
+	second.Close()
+	select {
+	case <-capture.stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("capture kept running after the last channel closed")
+	}
+}
+
+func TestHandleEndsWhenThePeerStopsReading(t *testing.T) {
+	previous := replyWriteTimeout
+	replyWriteTimeout = 100 * time.Millisecond
+	defer func() { replyWriteTimeout = previous }()
+	server, client := net.Pipe()
+	defer client.Close()
+	finished := make(chan struct{})
+	go func() {
+		handle(server, agentContext{userName: "student", capture: fakeCapture{}, lock: &fakeLocker{}})
+		close(finished)
+	}()
+	// The peer asks and never reads the answer (a pipe holds no bytes).
+	if err := classroomview.Write(client, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-finished:
+	case <-time.After(3 * time.Second):
+		t.Fatal("a peer that stopped reading pinned the handler")
+	}
+}
+
+// stalledObject answers a call only when its context ends, like a
+// gnome-shell that stopped responding.
+type stalledObject struct{ dbus.BusObject }
+
+func (stalledObject) CallWithContext(ctx context.Context, method string, flags dbus.Flags, args ...any) *dbus.Call {
+	<-ctx.Done()
+	return &dbus.Call{Err: ctx.Err()}
+}
+
+func TestBusCallsGiveUpOnAStalledCompositor(t *testing.T) {
+	previous := busTimeout
+	busTimeout = 50 * time.Millisecond
+	defer func() { busTimeout = previous }()
+	started := time.Now()
+	if err := callBus(stalledObject{}, "org.example.Method").Err; !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("call error = %v", err)
+	}
+	if _, err := busProperty(stalledObject{}, "org.example", "Property"); err == nil {
+		t.Fatal("a stalled property read succeeded")
+	}
+	if time.Since(started) > 2*time.Second {
+		t.Fatal("a stalled call was not bounded")
+	}
+}
+
+// slowLocker answers Locked only after release is closed.
+type slowLocker struct {
+	fakeLocker
+	release chan struct{}
+}
+
+func (locker *slowLocker) Locked() bool {
+	<-locker.release
+	return true
+}
+
+func TestHelloDoesNotWaitLongerThanTheRelayAllows(t *testing.T) {
+	previous := helloLockedWait
+	helloLockedWait = 50 * time.Millisecond
+	defer func() { helloLockedWait = previous }()
+	slow := &slowLocker{release: make(chan struct{})}
+	started := time.Now()
+	if lockedForHello(slow) {
+		t.Fatal("an extension that did not answer counted as locked")
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("the hello waited for a slow extension")
+	}
+	close(slow.release)
+	if !lockedForHello(&fakeLocker{locked: true}) {
+		t.Fatal("a prompt answer was ignored")
+	}
+}
+
+func TestHelloWaitIsShorterThanTheRelaysHelloTimeout(t *testing.T) {
+	if helloLockedWait >= helloTimeout {
+		t.Fatalf("hello waits %v for the lock state but the relay allows %v", helloLockedWait, helloTimeout)
+	}
+}
+
+// flakyListener fails the first accepts with the given errors, then serves
+// the connections in order and ends with a permanent error.
+type flakyListener struct {
+	errs        []error
+	connections []net.Conn
+}
+
+func (listener *flakyListener) Accept() (net.Conn, error) {
+	if len(listener.errs) > 0 {
+		err := listener.errs[0]
+		listener.errs = listener.errs[1:]
+		return nil, err
+	}
+	if len(listener.connections) > 0 {
+		connection := listener.connections[0]
+		listener.connections = listener.connections[1:]
+		return connection, nil
+	}
+	return nil, net.ErrClosed
+}
+func (listener *flakyListener) Close() error   { return nil }
+func (listener *flakyListener) Addr() net.Addr { return &net.UnixAddr{Name: "test", Net: "unix"} }
+
+func TestServeConnectionsSurvivesTemporaryAcceptErrors(t *testing.T) {
+	server, client := net.Pipe()
+	defer client.Close()
+	listener := &flakyListener{
+		errs:        []error{&net.OpError{Op: "accept", Err: os.NewSyscallError("accept", syscall.EMFILE)}, syscall.ECONNABORTED},
+		connections: []net.Conn{server},
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- serveConnections(listener, agentContext{userName: "student", capture: fakeCapture{}, lock: &fakeLocker{}})
+	}()
+	_ = client.SetDeadline(time.Now().Add(2 * time.Second))
+	if err := classroomview.Write(client, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+		t.Fatal(err)
+	}
+	if reply, err := classroomview.Read(client); err != nil || reply.Type != classroomview.TypeHello {
+		t.Fatalf("hello after temporary errors = %+v, %v", reply, err)
+	}
+	select {
+	case err := <-done:
+		if !errors.Is(err, net.ErrClosed) {
+			t.Fatalf("serve ended with %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a permanent accept error did not end serving")
 	}
 }

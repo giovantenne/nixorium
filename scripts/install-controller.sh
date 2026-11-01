@@ -22,6 +22,7 @@ BOOTSTRAP_SWAP=""
 DISK_STEP_TITLE="${NIXORIUM_DISK_STEP_TITLE:-Choose the disk}"
 DISK_CHANGE_STARTED=0
 CURRENT_STEP=""
+INSTALL_LOG="${NIXORIUM_INSTALL_LOG:-/tmp/nixorium-install.log}"
 UI_RULE="--------------------------------------------------------"
 UI_RESET=""
 UI_BOLD=""
@@ -74,10 +75,44 @@ ui_error() {
   done
 }
 
+# The tools behind the installation print shell traces, Nix warnings and boot
+# loader noise. The complete output goes to INSTALL_LOG; the screen shows the
+# end of it only when a step fails.
+fail_with_log() {
+  local LINE
+  printf '\n  %sx%s %s%s%s\n' "$UI_ERROR" "$UI_RESET" "$UI_BOLD" "$1" "$UI_RESET" >&2
+  printf '    %sLast lines of the log:%s\n' "$UI_MUTED" "$UI_RESET" >&2
+  while IFS= read -r LINE; do
+    printf '      %s\n' "$LINE" >&2
+  done < <(tail -n 15 -- "$INSTALL_LOG" 2>/dev/null || true)
+  printf '    Full log: %s\n' "$INSTALL_LOG" >&2
+  exit 1
+}
+
+# Quiet progress for the longest step: a running count of the packages that
+# were downloaded, instead of one line for each.
+install_progress() {
+  awk '
+    /^copying path / { n++; if (n % 100 == 0) { print "        " n " packages downloaded so far..."; fflush() }; next }
+    /^(these|this) [0-9]+ paths? will be (fetched|built)/ { print "        " $0; fflush(); next }
+    # What is not in the public cache (Nixorium itself, its screensaver
+    # effects, the system configuration) is built here after the downloads,
+    # with no download count: say so, and name the long builds.
+    /^these [0-9]+ derivations will be built/ { print "        " $2 " components are built on this computer after the downloads; this can take several minutes."; fflush(); next }
+    /^this derivation will be built/ { print "        1 component is built on this computer after the downloads."; fflush(); next }
+    /^building \047\/nix\/store\/[a-z0-9]+-(nixorium|ttfx|go)-[0-9]/ {
+      name = $2; sub(/^\047\/nix\/store\/[a-z0-9]+-/, "", name); sub(/\.drv\047.*$/, "", name)
+      print "        Building " name "..."; fflush(); next
+    }
+  '
+}
+
 # Force the bootstrap install to use the official NixOS cache only.
 # This avoids inheriting substituters from a preconfigured live/netboot
 # environment, which may point at an unavailable or unsigned local cache.
-export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=\nmax-jobs = 1\ncores = 1'
+# One build or download at a time bounds the live system's memory; each build
+# may use every processor (the swap file on the new disk absorbs peaks).
+export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=\nmax-jobs = 1\ncores = 0'
 
 INSTALLER_INPUT_FD=""
 
@@ -135,6 +170,28 @@ disk_has_mounted_filesystem() {
   lsblk -nrpo MOUNTPOINT "$CANDIDATE" | awk 'NF { found = 1 } END { exit(found ? 0 : 1) }'
 }
 
+# nixos-install installs GRUB inside a chroot of the target that lacks the live
+# system's /run/udev, so os-prober skips Windows on another disk until the
+# first update. Same as nixorium_with_udev_in_target in the client installers.
+with_udev_in_target() {
+  local STATUS=0
+  if [[ -d /run/udev ]] && {
+    sudo mkdir -p "$TARGET_ROOT/run" &&
+      sudo mount -t tmpfs -o mode=0755 nixorium-run "$TARGET_ROOT/run" &&
+      sudo mkdir "$TARGET_ROOT/run/udev" &&
+      sudo mount --bind /run/udev "$TARGET_ROOT/run/udev" &&
+      sudo mount -o remount,bind,ro "$TARGET_ROOT/run/udev"
+  } 2>> "$INSTALL_LOG"; then
+    "$@" || STATUS=$?
+    sudo umount -R "$TARGET_ROOT/run" >/dev/null 2>&1 || true
+    return "$STATUS"
+  fi
+  if findmnt -rn --mountpoint "$TARGET_ROOT/run" >/dev/null 2>&1; then
+    sudo umount -R "$TARGET_ROOT/run" || return 1
+  fi
+  "$@"
+}
+
 EVALUATION_SOURCE=""
 TEMP_DISKO_LAYOUT=$(mktemp)
 TEMP_DISKO_FILE=$(mktemp)
@@ -149,6 +206,11 @@ cleanup() {
   if [[ -n "$BOOTSTRAP_SWAP" ]]; then
     sudo swapoff "$BOOTSTRAP_SWAP" >/dev/null 2>&1 || true
     sudo rm -f -- "$BOOTSTRAP_SWAP" >/dev/null 2>&1 || true
+  fi
+  # A failed run releases the new disk, or the next run finds it mounted and
+  # offers no disk to install on.
+  if (( STATUS != 0 && DISK_CHANGE_STARTED == 1 )) && findmnt -rn --mountpoint "$TARGET_ROOT" >/dev/null 2>&1; then
+    sudo umount -R "$TARGET_ROOT" >/dev/null 2>&1 || true
   fi
   rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"
   if [[ -n "$EVALUATION_SOURCE" ]]; then rm -rf -- "$EVALUATION_SOURCE"; fi
@@ -265,10 +327,14 @@ ui_note "installing can take a while, depending on the Internet connection."
 echo
 DISK_CHANGE_STARTED=1
 CURRENT_STEP="preparing the disk"
+: > "$INSTALL_LOG"
 ui_log "[1/3] Preparing the disk (the partitioning tool is downloaded first)..."
+# shellcheck disable=SC2024 # The log belongs to the invoking user on purpose.
 sudo env NIX_CONFIG="$NIX_CONFIG" \
   nix --extra-experimental-features "nix-command flakes" \
-  run "${UPSTREAM_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE"
+  run "${UPSTREAM_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE" >> "$INSTALL_LOG" 2>&1 ||
+  fail_with_log "The disk could not be prepared."
+ui_success "Disk prepared."
 
 BOOTSTRAP_CACHE="${TARGET_ROOT}/var/cache/nixorium-bootstrap"
 sudo install -d -o "$(id -u)" -g "$(id -g)" "$BOOTSTRAP_CACHE"
@@ -289,7 +355,8 @@ ui_log "[2/3] Fixing the exact versions of the lab configuration..."
 # newest commit of its channel. The lock still declares the channel, so later
 # package-base updates move it forward through the reviewed workflow.
 PACKAGE_BASE_REVISION="$(nix --extra-experimental-features "nix-command flakes" \
-  eval --raw "${UPSTREAM_REF}#lib.packageBase.referenceRevision")"
+  eval --raw "${UPSTREAM_REF}#lib.packageBase.referenceRevision" 2>> "$INSTALL_LOG")" ||
+  fail_with_log "The exact versions of the lab software could not be looked up."
 if [[ ! "$PACKAGE_BASE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
   echo "Error: the release does not name a validated nixpkgs revision." >&2
   exit 1
@@ -298,8 +365,8 @@ fi
   cd "$DEPLOYMENT_PATH"
   nix --extra-experimental-features "nix-command flakes" \
     flake lock --override-input nixorium "$UPSTREAM_REF" \
-    --override-input nixpkgs "github:NixOS/nixpkgs/${PACKAGE_BASE_REVISION}"
-)
+    --override-input nixpkgs "github:NixOS/nixpkgs/${PACKAGE_BASE_REVISION}" >> "$INSTALL_LOG" 2>&1
+) || fail_with_log "The exact versions of the lab configuration could not be fixed."
 if [[ ! -f "${DEPLOYMENT_PATH}/flake.lock" ]]; then
   echo "Error: the private deployment lock was not created." >&2
   exit 1
@@ -322,21 +389,26 @@ if [[ -f "$DEPLOYMENT_PATH/lab-credentials.json" ]]; then
         teacherPassword = credentials.teacher;
         studentPassword = credentials.student;
       }; })
-    ' > "$EVALUATION_SOURCE/lab-settings.json"
+    ' > "$EVALUATION_SOURCE/lab-settings.json" 2>> "$INSTALL_LOG" ||
+    fail_with_log "The lab configuration could not be checked."
   FLAKE_REF="path:$EVALUATION_SOURCE"
 fi
+ui_success "Lab configuration fixed."
 
 CURRENT_STEP="downloading and installing the controller system"
 ui_log "[3/3] Downloading and installing the controller system. This is the longest step."
-ui_note "${UI_MUTED}Files go to the new disk, not into the memory of the USB system.${UI_RESET}"
-sudo env \
+ui_note "${UI_MUTED}The system is downloaded and written to the chosen disk; on a slow connection this takes a while.${UI_RESET}"
+ui_note "${UI_MUTED}Technical details are saved in ${INSTALL_LOG}.${UI_RESET}"
+if ! with_udev_in_target sudo env \
   NIX_CONFIG="$NIX_CONFIG" \
   XDG_CACHE_HOME="$BOOTSTRAP_CACHE" \
   nixos-install \
   --root "$TARGET_ROOT" \
   --flake "${FLAKE_REF}#pc${MASTER_HOST_NUMBER}" \
   --no-write-lock-file \
-  --no-root-passwd
+  --no-root-passwd 2>&1 | tee -a "$INSTALL_LOG" | install_progress; then
+  fail_with_log "The controller system could not be installed."
+fi
 
 DISK_CHANGE_STARTED=0
 ui_success "Controller system installed."

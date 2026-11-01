@@ -16,8 +16,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func homeFilesFixture() dashboardModel {
-	m := experienceFixture(2)
+func homeFilesFixture(t testing.TB) dashboardModel {
+	m := experienceFixture(t, 2)
 	m.screen = dashboardHomeFiles
 	loaded := demoHomeFilesPlan()
 	loaded.Candidate = &domain.HomeFilesDraft{Profile: domain.HomeFilesProfile{SchemaVersion: 1}, BaseFingerprint: "base"}
@@ -42,7 +42,7 @@ func homeFilesFixture() dashboardModel {
 }
 
 func TestHomeFilesNavigationRemainsAvailableAfterPreferenceFailure(t *testing.T) {
-	m := homeFilesFixture()
+	m := homeFilesFixture(t)
 	m.screen = dashboardWorkspace
 	m.workspace.loaded = domain.WorkspacePlanReport{State: "invalid"}
 	if !strings.Contains(m.View().Content, "Initial files") {
@@ -67,7 +67,7 @@ func TestHomeFilesNavigationRemainsAvailableAfterPreferenceFailure(t *testing.T)
 	if cmd != nil || !strings.Contains(m.message, "Update Nixorium") {
 		t.Fatal("older feature lacks actionable update guidance")
 	}
-	m = homeFilesFixture()
+	m = homeFilesFixture(t)
 	m.homeFiles.loaded = domain.HomeFilesPlanReport{State: "invalid"}
 	if !strings.Contains(m.View().Content, "Maintenance → Update Nixorium") {
 		t.Fatal("unsupported pin view names the package-base update instead of the core update")
@@ -75,7 +75,7 @@ func TestHomeFilesNavigationRemainsAvailableAfterPreferenceFailure(t *testing.T)
 }
 
 func TestHomeFilesCapturedDraftExecutableSaveAndFollowup(t *testing.T) {
-	m := homeFilesFixture()
+	m := homeFilesFixture(t)
 	captures, saves, controller := 0, 0, 0
 	m.actions.CaptureHomeFiles = func(_ context.Context, source, dest string) domain.HomeFilesCaptureReport {
 		captures++
@@ -124,11 +124,10 @@ func TestHomeFilesCapturedDraftExecutableSaveAndFollowup(t *testing.T) {
 	}
 	m, cmd = workspaceKey(m, demoText("v"))
 	m = workspaceComplete(t, m, cmd)
-	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
-	if cmd != nil || saves != 0 {
-		t.Fatal("saved without confirmation")
+	if saves != 0 {
+		t.Fatal("review saved before it was confirmed")
 	}
-	m, _ = workspaceKey(m, demoText("SAVE"))
+	// Enter on the review is the confirmation; no word is typed.
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 	// A local mutation stays protected from exit, and F1 cannot save again.
 	m, _ = workspaceKey(m, demoText("q"))
@@ -150,7 +149,7 @@ func TestHomeFilesCapturedDraftExecutableSaveAndFollowup(t *testing.T) {
 }
 
 func TestHomeFilesCancelLateReadsAndSourceCompletionPreserveDraft(t *testing.T) {
-	m := homeFilesFixture()
+	m := homeFilesFixture(t)
 	m, _ = workspaceKey(m, demoText("a"))
 	m, _ = workspaceKey(m, demoText("/loc"))
 	m, cmd := workspaceKey(m, demoCode(tea.KeyTab))
@@ -173,8 +172,7 @@ func TestHomeFilesCancelLateReadsAndSourceCompletionPreserveDraft(t *testing.T) 
 		t.Fatal("late direct message accepted")
 	}
 	m.homeFiles.stage = "review"
-	m.homeFiles.confirmation = "SAVE"
-	m.helpOpen = true
+	m.navigation.helpOpen = true
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
 	if cmd != nil || m.homeFiles.saving {
 		t.Fatal("help triggered save")
@@ -182,7 +180,7 @@ func TestHomeFilesCancelLateReadsAndSourceCompletionPreserveDraft(t *testing.T) 
 }
 
 func TestHomeFilesReplacementRemovalAndDriftDoNotMutateReviewedObjects(t *testing.T) {
-	m := homeFilesFixture()
+	m := homeFilesFixture(t)
 	profile := demoHomeFilesPlan().Candidate.Profile
 	m.homeFiles.draft.Profile = profile
 	reviewed := cloneHomeFilesDraft(m.homeFiles.draft)
@@ -219,7 +217,7 @@ func TestHomeFilesReplacementRemovalAndDriftDoNotMutateReviewedObjects(t *testin
 }
 
 func TestHomeFilesPartialSaveRequiresGitInspection(t *testing.T) {
-	m := homeFilesFixture()
+	m := homeFilesFixture(t)
 	m.homeFiles.stage = "result"
 	m.homeFiles.result = domain.HomeFilesApplyReport{State: "partial", RecoveryRequired: true, Message: "Copies saved; local record incomplete."}
 	if !strings.Contains(m.View().Content, "Inspect Git state") || strings.Contains(m.View().Content, "Enter Apply to this controller") {
@@ -259,7 +257,7 @@ func TestHomeFilesRenderGallery(t *testing.T) {
 						t.Fatalf("%s overflows %dx%d", frame.Label, size[0], size[1])
 					}
 				}
-				m := homeFilesFixture()
+				m := homeFilesFixture(t)
 				m.width, m.height, m.isDark = size[0], size[1], dark
 				m.homeFiles.draft = cloneHomeFilesDraft(*demoHomeFilesPlan().Candidate)
 				for i := 0; i < 30; i++ {
@@ -293,18 +291,18 @@ func TestHomeFilesReviewNamesRemovalsAndPermissionChangesFirst(t *testing.T) {
 	var text bytes.Buffer
 	HomeFilesPlanText(&text, p)
 	review := text.String()
-	for _, want := range []string{"remove Documents/removed.txt", "permissions bin/lesson · 0600 · not executable → 0700 · executable", "replace Documents/lesson.txt · 3 B → 8 B"} {
-		if !strings.Contains(review, want) || strings.Index(review, want) > strings.Index(review, "Complete draft:") {
+	for _, want := range []string{"remove Documents/removed.txt", "change bin/lesson · not executable → executable", "replace Documents/lesson.txt · 3 B → 8 B"} {
+		if !strings.Contains(review, want) || strings.Index(review, want) > strings.Index(review, "All initial files:") {
 			t.Fatalf("change hidden behind candidate: %s", review)
 		}
 	}
-	if !strings.Contains(review, "Declaration metadata changed; file bytes and permissions stay the same.") || strings.Contains(review, "replace home-files.json") {
+	if !strings.Contains(review, "Only the list was rewritten; the files stay the same.") || strings.Contains(review, "replace home-files.json") {
 		t.Fatal("provenance change presented as a byte replacement")
 	}
 	if strings.Index(review, "Declaration changes:") > strings.Index(review, "Target computers:") {
 		t.Fatal("target detail hides change review")
 	}
-	m := homeFilesFixture()
+	m := homeFilesFixture(t)
 	m.homeFiles.stage = "result"
 	m.homeFiles.result = domain.HomeFilesApplyReport{State: "unchanged"}
 	if strings.Contains(demoANSI.ReplaceAllString(m.View().Content, ""), "✓ UNCHANGED") {
@@ -316,7 +314,7 @@ func TestHomeFilesReviewNamesRemovalsAndPermissionChangesFirst(t *testing.T) {
 }
 
 func TestHomeFilesDiscardOnlyCancelledCopiesAndRefuseClassroomAccess(t *testing.T) {
-	m := homeFilesFixture()
+	m := homeFilesFixture(t)
 	discarded := []string{}
 	m.actions.DiscardHomeFilesCapture = func(_ context.Context, id string) error { discarded = append(discarded, id); return nil }
 	m.homeFiles.stage = "capture"

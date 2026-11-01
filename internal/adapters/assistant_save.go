@@ -28,9 +28,9 @@ var assistantCommit = configurationCommit{
 }
 
 func PlanAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conversationID string) domain.AssistantSavePlan {
-	return planAssistantSave(ctx, store, conversationID, runBoundedNix)
+	return planAssistantSave(ctx, store, conversationID, runBoundedNix, runIsolatedNix)
 }
-func planAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conversationID string, run assistantNixRunner) domain.AssistantSavePlan {
+func planAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conversationID string, run, isolated assistantNixRunner) domain.AssistantSavePlan {
 	plan := domain.AssistantSavePlan{State: "blocked", ConversationID: conversationID, Added: []string{}, Changed: []string{}, Removed: []string{}, ChangedHosts: []string{}, SettingsImpacts: []domain.SettingImpact{}}
 	fail := func(message string) domain.AssistantSavePlan {
 		plan.State = "blocked"
@@ -110,7 +110,7 @@ func planAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conve
 		plan.Evaluation = receipt.Evaluation
 		plan.EvaluationReused, plan.EvaluationVerifiedAt = true, receipt.VerifiedAt
 	} else {
-		plan.Evaluation, _ = evaluateAssistantCandidate(ctx, w, run)
+		plan.Evaluation, _ = evaluateAssistantCandidate(ctx, w, run, isolated)
 	}
 	plan.ChangedHosts = plan.Evaluation.ChangedHosts
 	// Bind the evaluation and review to the same overlay bytes and modes.

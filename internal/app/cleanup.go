@@ -15,7 +15,7 @@ const cleanupObservationTimeout = 5 * time.Second
 
 // A cleanup collects garbage, which can take minutes on a large store.
 const cleanupDispatchTimeout = 30 * time.Minute
-const cleanupReviewWindow = 10 * time.Minute
+const cleanupReviewLifetime = 10 * time.Minute
 
 // CleanupSource observes and removes old system generations (ADR 0022).
 type CleanupSource interface {
@@ -96,7 +96,7 @@ func (m *CleanupManager) Plan(ctx context.Context, repository, requested string)
 		return report
 	}
 	report.State = "ready"
-	report.ExpiresAt = m.now().UTC().Truncate(cleanupReviewWindow).Add(cleanupReviewWindow)
+	report.ExpiresAt = reviewExpiry(m.now(), cleanupReviewLifetime)
 	report.ReviewToken = domain.CleanupReviewToken(report)
 	report.Confirmation = domain.CleanupConfirmation
 	report.Message = fmt.Sprintf("Old system versions can be removed on %d of %d selected computer(s). The space freed is known only afterwards.", report.Eligible, len(report.Targets))
@@ -362,4 +362,19 @@ func cleanupPlanIssue(report domain.CleanupPlanReport, field, message string) do
 		report.Message = message
 	}
 	return report
+}
+
+// Reviewed tells whether token confirms a review of the plan fresh, a plan
+// built now. A match returns fresh carrying that review's expiry and token, so
+// an apply in a later process, or in a later grid step, still matches until
+// the review expires.
+func (m *CleanupManager) Reviewed(fresh domain.CleanupPlanReport, token string) (domain.CleanupPlanReport, ReviewMatch) {
+	if fresh.HasErrors() || fresh.State != "ready" {
+		return fresh, ReviewChanged
+	}
+	return matchReview(m.now(), cleanupReviewLifetime, fresh, token, func(p domain.CleanupPlanReport, expiry time.Time) domain.CleanupPlanReport {
+		p.ExpiresAt = expiry
+		p.ReviewToken = domain.CleanupReviewToken(p)
+		return p
+	}, func(p domain.CleanupPlanReport) string { return p.ReviewToken })
 }

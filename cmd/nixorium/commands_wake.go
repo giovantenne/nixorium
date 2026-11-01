@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
@@ -69,4 +70,12 @@ func classroomWakeApply(ctx context.Context, plan domain.WakePlan) domain.WakeRe
 		return domain.WakeReport{SchemaVersion: domain.SchemaVersion, Operation: "wake-apply", State: "blocked", Targets: []domain.WakeOutcome{}, Message: classroomMessage(response, err, "The packets could not be sent.")}
 	}
 	return *response.WakeReport
+}
+
+// validateWake rejects option combinations that do not belong to the command.
+func validateWake(result *options) error {
+	if result.command == "wake" && (result.subcommand != "" || result.on == "") {
+		return errors.New("wake requires --on <clients|@lab> and no subcommand")
+	}
+	return nil
 }

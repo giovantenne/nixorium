@@ -71,7 +71,7 @@ esac
 			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 			t.Setenv("NIXORIUM_WORKSPACE_TEST_BIN", bin)
 			t.Setenv("NIXORIUM_WORKSPACE_TEST_MODE", mode)
-			impact, err := inspectWorkspaceUpdate(context.Background(), "git+file:///fixture", []string{"--reference-lock-file", "/candidate-lock", "--no-write-lock-file"})
+			impact, err := inspectWorkspaceUpdate(context.Background(), "git+file:///fixture", "git+file:///fixture", []string{"--reference-lock-file", "/candidate-lock", "--no-write-lock-file"})
 			valid := mode == "versions"
 			if (err == nil) != valid {
 				t.Fatalf("impact=%+v err=%v", impact, err)
@@ -146,7 +146,7 @@ func TestWorkspaceUpdateRealNixProjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	lock := readGitReviewFile(t, repo, "flake.lock")
-	impact, err := inspectWorkspaceUpdate(t.Context(), flake, []string{"--override-input", "version", candidateInput, "--reference-lock-file", candidateLock, "--no-write-lock-file"})
+	impact, err := inspectWorkspaceUpdate(t.Context(), flake, flake, []string{"--override-input", "version", candidateInput, "--reference-lock-file", candidateLock, "--no-write-lock-file"})
 	if err != nil || impact == nil || impact.Current.Packages[0].Version != "1.0" || impact.Proposed.Packages[0].Version != "2.0" {
 		t.Fatalf("impact=%+v err=%v", impact, err)
 	}

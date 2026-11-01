@@ -88,11 +88,11 @@ func TestAssistantSaveReusesEvaluationReceipt(t *testing.T) {
 		t.Fatalf("key: %+v", key)
 	}
 	// The save review and the apply step's revalidation both reuse it.
-	plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t))
+	plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t), assistantNoNix(t))
 	if plan.State != "ready" || !plan.EvaluationReused || !plan.EvaluationVerifiedAt.Equal(receipt.VerifiedAt) || !reflect.DeepEqual(plan.Evaluation, evaluation) {
 		t.Fatalf("plan: %+v", plan)
 	}
-	again := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t))
+	again := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t), assistantNoNix(t))
 	if again.ReviewToken != plan.ReviewToken || !again.EvaluationReused {
 		t.Fatalf("again: %+v", again)
 	}
@@ -110,7 +110,7 @@ func TestAssistantSaveEvaluatesWhenReceiptMisses(t *testing.T) {
 	}
 	valid := assistantEvaluationReceipt{SchemaVersion: 1, Key: key, VerifiedAt: time.Now().Add(-time.Minute).UTC(), Evaluation: domain.AssistantEvaluation{OK: true, ChangedHosts: []string{"pc01", "pc02"}}}
 	assistantWriteReceipt(t, w, valid)
-	if plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t)); !plan.EvaluationReused || strings.Join(plan.ChangedHosts, ",") != "pc01,pc02" {
+	if plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantNoNix(t), assistantNoNix(t)); !plan.EvaluationReused || strings.Join(plan.ChangedHosts, ",") != "pc01,pc02" {
 		t.Fatalf("synthetic receipt not reused: %+v", plan)
 	}
 	for name, change := range map[string]func(*assistantEvaluationReceipt){
@@ -130,7 +130,7 @@ func TestAssistantSaveEvaluatesWhenReceiptMisses(t *testing.T) {
 			change(&receipt)
 			assistantWriteReceipt(t, w, receipt)
 			var calls atomic.Int32
-			plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantCountingFailure(&calls))
+			plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantCountingFailure(&calls), assistantCountingFailure(&calls))
 			if calls.Load() == 0 || plan.EvaluationReused || !plan.EvaluationVerifiedAt.IsZero() || plan.Evaluation.OK {
 				t.Fatalf("calls=%d plan=%+v", calls.Load(), plan)
 			}
@@ -144,7 +144,7 @@ func TestAssistantSaveEvaluatesWhenReceiptMisses(t *testing.T) {
 		other := store
 		other.Version = "3.7.1"
 		var calls atomic.Int32
-		if plan := planAssistantSave(t.Context(), other, w.Conversation.ID, assistantCountingFailure(&calls)); calls.Load() == 0 || plan.EvaluationReused {
+		if plan := planAssistantSave(t.Context(), other, w.Conversation.ID, assistantCountingFailure(&calls), assistantCountingFailure(&calls)); calls.Load() == 0 || plan.EvaluationReused {
 			t.Fatalf("calls=%d plan=%+v", calls.Load(), plan)
 		}
 	})
@@ -153,7 +153,7 @@ func TestAssistantSaveEvaluatesWhenReceiptMisses(t *testing.T) {
 		unversioned := store
 		unversioned.Version = ""
 		var calls atomic.Int32
-		if plan := planAssistantSave(t.Context(), unversioned, w.Conversation.ID, assistantCountingFailure(&calls)); calls.Load() == 0 || plan.EvaluationReused {
+		if plan := planAssistantSave(t.Context(), unversioned, w.Conversation.ID, assistantCountingFailure(&calls), assistantCountingFailure(&calls)); calls.Load() == 0 || plan.EvaluationReused {
 			t.Fatalf("calls=%d plan=%+v", calls.Load(), plan)
 		}
 	})
@@ -167,7 +167,7 @@ func TestAssistantSaveEvaluatesWhenReceiptMisses(t *testing.T) {
 			t.Fatal("oversized receipt trusted")
 		}
 		var calls atomic.Int32
-		if plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantCountingFailure(&calls)); calls.Load() == 0 || plan.EvaluationReused {
+		if plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantCountingFailure(&calls), assistantCountingFailure(&calls)); calls.Load() == 0 || plan.EvaluationReused {
 			t.Fatalf("calls=%d plan=%+v", calls.Load(), plan)
 		}
 	})
@@ -184,7 +184,7 @@ func TestAssistantSaveEvaluatesWhenReceiptMisses(t *testing.T) {
 				t.Fatal("unsafe receipt trusted")
 			}
 			var calls atomic.Int32
-			if plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantCountingFailure(&calls)); calls.Load() == 0 || plan.EvaluationReused {
+			if plan := planAssistantSave(t.Context(), store, w.Conversation.ID, assistantCountingFailure(&calls), assistantCountingFailure(&calls)); calls.Load() == 0 || plan.EvaluationReused {
 				t.Fatalf("calls=%d plan=%+v", calls.Load(), plan)
 			}
 		})
@@ -236,7 +236,7 @@ func TestAssistantWorkspaceWritesRemoveEvaluationReceipt(t *testing.T) {
 func TestAssistantEvaluationReceiptNeedsUnchangedInputs(t *testing.T) {
 	w, _ := assistantReceiptFixture(t)
 	var calls atomic.Int32
-	if result, err := evaluateAssistantCandidate(t.Context(), w, assistantCountingFailure(&calls)); err == nil || result.OK {
+	if result, err := evaluateAssistantCandidate(t.Context(), w, assistantCountingFailure(&calls), assistantCountingFailure(&calls)); err == nil || result.OK {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
 	if assistantReceiptExists(t, w) {
@@ -259,7 +259,7 @@ func TestAssistantEvaluationReceiptNeedsUnchangedInputs(t *testing.T) {
 		}
 		return runBoundedNix(ctx, limit, args...)
 	}
-	if result, err := evaluateAssistantCandidate(t.Context(), w, run); err != nil || !result.OK {
+	if result, err := evaluateAssistantCandidate(t.Context(), w, run, run); err != nil || !result.OK {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
 	if assistantReceiptExists(t, w) {

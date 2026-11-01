@@ -9,7 +9,7 @@ broaden that role through developer instructions. Discovery
 links for Codex, OpenCode, Claude Code, and Pi are versioned with the repository.
 
 Nixorium manages a multi-PC NixOS lab using Nix Flakes,
-Disko, and Colmena. A controller PC deploys to student workstations
+Disko, and its own deployment engine (ADR 0031). A controller PC deploys to student workstations
 over a LAN-only deployment network. Clients do not need internet for
 installation or system updates, but may have internet during user sessions.
 
@@ -27,6 +27,12 @@ examples, and agent instructions shipped with the site template. Preserve proper
 names and intentional configuration/test data. Private planning documents are
 not public documentation and must not be copied into this repository.
 
+## Service logic stays private
+
+The Assistant service (instructions, recipes, prompts, routing, model, provider, costs) lives outside this repository. Public text describes only what the controller does and enforces: tools, schemas, wire protocol, consent, redaction, limits, review and save. Never write what the Assistant does with a tool, which requests it handles, which files or modules it writes, how it answers or refuses, or which documents it reads; at most one marketing sentence per capability in README and the administrator guide. Do not name the private repository's files. Demos and fixtures use generic transcripts, never the service's answer shape. A behaviour the service must change is a note for the private repository, not a sentence here.
+
+CHANGELOG rule: describe the controller feature (tool, what it reads, refuses, returns, the review, the consent); name the Assistant only as the caller ("available to the Assistant after the usual update"). Never say which requests it serves, which modules it writes, what it reads to answer, or how it answers.
+
 ## Project Structure
 
 ```
@@ -41,6 +47,7 @@ VERSION                    # Canonical Semantic Version
 CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
 DISCLAIMER.md              # Operational responsibility and risk boundaries
+TRADEMARKS.md              # Name and logo usage policy
 SECURITY.md                # Private reporting and coordinated disclosure policy
 lab-config.nix             # Standalone example configuration for this upstream
 disko-uefi.nix             # NixOS wrapper for the shared Disko layout
@@ -50,7 +57,7 @@ lib/
   eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
   eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
   eval-workspace-profile.nix # Internal student preference JSON validator
-  mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
+  mk-lab.nix               # Host, class, netboot, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
 pkgs/
@@ -59,6 +66,7 @@ cmd/nixorium/              # Management CLI entrypoint
 cmd/nixorium-remote-worker/ # Controller-owned USB/SSH operation worker
 cmd/nixorium-demo/         # Developer-only deterministic website demo exporter
 internal/                  # Domain, application, adapter, and presentation layers
+  deploymigrate/           # Changes a release makes to deployment files: registry.go (ADR 0034)
 modules/
   common.nix               # Composition point and shared system defaults
   firewall.nix             # Interface-scoped SSH, cache, PXE, and time policy
@@ -68,7 +76,8 @@ modules/
   nix-ld.nix               # nix-ld loader and common libraries for downloaded Linux binaries
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
-  networking.nix           # Hostname + static IP with shared iface name
+  networking.nix           # Hostname + NetworkManager profile nixorium-lab (DHCP + static IP)
+  identity.nix             # Client identity record (/var/lib/nixorium/identity.json)
   management.nix           # Controller-only management command installation
   pxe.nix                  # Transactional PXE address state and boot recovery
   users.nix                # User accounts (admin + teacher + student, nixorium-staff group)
@@ -80,10 +89,13 @@ scripts/
   release.sh               # Validates, tags, and publishes a release
   install-controller.sh    # Live USB bootstrap installer for controller with disk selection
   lib/lab-meta.sh          # Shared helper: loads labMeta from the flake for shell scripts
+  lib/ui.sh                # Terminal presentation helpers for setup.sh (install scripts carry guarded copies)
   create-home-template.sh  # Builds clean home directory template
   validate.sh              # Tiered upstream validation entry point
   security-check.sh        # Pinned staticcheck and govulncheck entry point
-  lint.sh                  # Pinned ShellCheck and errcheck entry point
+  lint.sh                  # Pinned ShellCheck, gofmt and errcheck entry point
+  apply-controller.sh      # Body of nixorium-apply-controller (filled in by modules/management.nix)
+  prepare-pxe.sh           # Body of nixorium-prepare-pxe (filled in by modules/management.nix)
 assets/
   empty-*                  # Neutral fallbacks for optional deployment assets
 templates/site/            # Private deployment repository template
@@ -149,12 +161,18 @@ representative client and the controller when needed; add another client only
 for materially different host-specific modules. See
 [development validation](docs/development-validation.md) for the complete policy.
 
-The packaged Go check must run `go test ./...`; `subPackages` selects installed
-commands and must not restrict tests to `cmd/`.
+The packaged Go check must run `go test ./...` in CI (tests/source-checks.nix
+builds the package with its tests); `subPackages` selects installed commands and
+must not restrict tests to `cmd/`. Laboratories build the controller's Nixorium
+without the tests (`doCheck = false` in lib/mk-lab.nix): on a busy controller
+they only add minutes, and a timing-sensitive test once failed an installation.
 
 Validation reuses a persistent evaluation cache, creates no persistent result
 roots, and must never garbage-collect the shared Nix store automatically.
 Run `git diff --check`; there is no automatic repository-wide formatter.
+
+Generated docs (`docs/tui-gallery.md`, `docs/menu-map.md`): after any TUI menu change run
+`scripts/generate-docs.sh --write`; it also refreshes `docs/menu-map.md`.
 
 Lab operation commands belong in the
 [administrator guide](templates/site/README.md) and the
@@ -175,6 +193,84 @@ examples using the real argument parser, relative instruction links, and skill
 discovery/distribution. They do not prove that prose describes runtime effects:
 review CLI versus TUI behavior and existing workflow tests explicitly.
 
+## Deployment migrations
+
+A deployment owns the files copied from `templates/site/`, so a change there
+does not reach existing deployments by itself. The changes a release makes to
+them are Go code in `internal/deploymigrate/registry.go` (`Registry`, a list of
+`Migration{ID, Description, Apply(Tree) Outcome}`; ADR 0034). The release
+being installed runs them: Update Nixorium builds the target's `nixorium`
+package, runs `nixorium deployment migrate --root … --contract 1 --json` in a
+bubblewrap sandbox on a copy of the saved deployment, compares the copy with
+the original under fixed rules (`internal/adapters/deployment_migrations.go`),
+shows the difference in the review and saves it with the update. Each
+migration is applied once and recorded by the migrator in the deployment's
+`nixorium-migrations.json`. Whenever a change to `templates/site/**`, or to
+anything else a deployment owns, must reach existing deployments, add a
+migration in the same change:
+
+- Append to `Registry`; never remove a released entry or change what it
+  writes. Its id is already recorded in deployments, and deployments that skip
+  releases still need it. To correct what it writes, add a new entry. A
+  released entry may only be widened to recognise more released forms of the
+  files it replaces (`Released`, `Later`): deployments that recorded it never
+  run it again, and those where it was a "Manual change" did not record it, so
+  the next update applies it.
+- `TestEveryStableReleaseMigratesToThisTemplate` runs every migration on the
+  template of each stable release from 3.0.0 and of each later beta, and
+  expects the current template, apart from the files listed in `releasedDrift`.
+  A template change without a migration, or a migration that misses an old
+  form, fails it. `TestTheTemplateOfThisReleaseNeedsNoMigration` runs the
+  registry on the current template and expects every migration `done`: when a
+  migrated whole file changes again, add the new form's hash to `Later` of
+  each earlier `ReplaceWholeFiles` migration of that path, or it reads as a
+  "Manual change" at every update. Forms of commits that were never tagged
+  (a beta or master template between two edits) are not covered by any test:
+  keep their hashes in `Later` too when a laboratory may have been created
+  from them.
+- `ID` starts with the year and month: `2026-10-short-slug`. `Description` is
+  one sentence an administrator understands.
+- For a text replacement use `ReplaceExact`. Its `from` is the exact text of
+  the previous template: copy it from the file's history in version control
+  (`git log -p -- templates/site/<file>`), not from memory. Every released form
+  of the text that differs needs its own entry; a form with no entry becomes a
+  "Manual change" in the review, so say so in the changelog. Prefer whole-line
+  replacements that end with a newline, and keep each text short. A migration
+  may also create or change regular files through `Tree.Read` and
+  `Tree.Write`; there is no `Tree.Remove` yet (replacing a text with the empty
+  string deletes it).
+- To replace whole template files the administrator never changed, use
+  `ReplaceWholeFiles`: freeze the new content under
+  `internal/deploymigrate/files/<migration id>/` and list the SHA-256 of every
+  released form it replaces (from `git show <tag>:templates/site/<file>`). The
+  files are replaced together or, when one was edited or a write fails (the
+  files already written are restored), not at all (manual).
+- To give existing laboratories a package the template now declares for
+  every computer, use `AddSharedPackage`: it adds the package to
+  `lab-software.json` for the controller and all clients, and leaves it
+  alone when the deployment already names it with any scope.
+- `Outcome.Files` must list every file an applied migration changed, created
+  or removed. The installed release refuses the update if a changed file is
+  not declared or a declared file did not change. Only regular files are
+  accepted; never `flake.nix`, `flake.lock`, `keys/`, `admin-ssh/`,
+  `lab-credentials.json`, `secret-key`, hidden paths or symbolic links; at most
+  1 MiB per file, 256 files and 16 MiB in all; the record may be changed but
+  not removed.
+- Add a unit test in `internal/deploymigrate`: the old text is migrated and
+  recorded, an edited file becomes a manual change, a deployment that already
+  has the change is `done`, and the template's own mkLab and template checks
+  still pass with the new text.
+- The contract between the installed release and the migrator (exit status,
+  JSON report, marker file `share/nixorium/deployment-migrate-contract`) is
+  stable. Change it only by adding a contract version, and keep the old
+  version supported for a year of releases. Never change what version 1 means.
+- Mention the change in `CHANGELOG.md`, and review the administrator update
+  guide (`docs/updates.md`, with its template copy) if what the review shows
+  changes. A controller whose installed release has no migrations (3.9.0 or
+  older) cannot run them during the update: for that step the upgrade note
+  gives `nix run github:giovantenne/nixorium/<new tag>#nixorium -- deployment
+  migrate --root .` in the deployment folder.
+
 ## Releases
 
 Releases follow Semantic Versioning. `VERSION`, the release tag (`v<version>`),
@@ -188,6 +284,10 @@ the GitHub Release from the matching changelog section. The same workflow runs
 nightly on `master` and on demand, so failures surface before a tag; ordinary
 pushes do not run it. Each job has a 240-minute limit; failure or timeout of
 any shard must block publication.
+
+Before the release commit, check that every change to `templates/site/**` made
+since the previous tag that existing deployments need has its entry in
+`Registry` in `internal/deploymigrate/registry.go`.
 
 Before tagging, the website branch `release/<version>` of `nixorium-website`
 must exist, be built against the commit to release and be green on `staging`.
@@ -239,7 +339,8 @@ that release's notes, so a release is not finished until the site follows it.
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `groupModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
-- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
+- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`, with the controller defined separately.
+- Clients of one class (`nixoriumHostClasses`: same module groups, managed software and interface; the controller, `hostModules` hosts and `updateValidationHosts` are classes of one) share one system (ADR 0033). A class of one keeps the per-host system and is named after its computer; a class with several members is `shared-<n>` (`classIdFor`), and `nixosConfigurations.pcNN` is an alias of it. `labSettings.clientIdentities` carries number, name, address and previous address of every client; `labMeta.clients.hosts[].class` and `labMeta.clients.classes` list the classes; modules receive `nixoriumClass`. In a shared system `hostName` and `hostIp` throw: a private module that needs them must be listed in `hostModules` or `updateValidationHosts`. A computer takes its name and laboratory address from `/var/lib/nixorium/identity.json` (`{"schemaVersion":1,"number":N}`, `modules/identity.nix`); the update and the installers write it, a record naming another computer is never overwritten, and the flake has no `colmena` output.
 - Hostname, static IP, and effective network interface are centralized in
   `lib/mk-lab.nix`. `ifaceName` is the compatibility fallback;
   `controllerIfaceName`, `clientIfaceName`, and `hostIfaceNames` resolve in
@@ -247,21 +348,32 @@ that release's notes, so a release is not finished until the site follows it.
   is a full IPv4 network address and `networkPrefixLength` its CIDR prefix;
   host numbers are validated offsets. Each PC gets DHCP plus its static address
   on its resolved interface.
-  The controller always uses its resolved name. A client uses it only when
+  Every laboratory host, the controller included, gets DHCP plus its static
+  address from one NetworkManager profile, `nixorium-lab`; never add
+  `networking.interfaces` addresses or dhcpcd for a laboratory card (they raced
+  NetworkManager at boot and dropped the static address). The controller always
+  binds the profile to its resolved name. A client binds it only when
   `clientIfaceName` or a `hostIfaceNames` entry is set (`ifaceExplicit`);
-  otherwise it gets DHCP plus the static address on the wired Ethernet card by
-  type (a NetworkManager profile), its Internet-block and SSH nftables rules
-  omit interface names, and installers skip the name check. Keep these paths
-  consistent (ADR 0017).
-- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
+  otherwise its profile matches the wired Ethernet card by type, its
+  Internet-block and SSH nftables rules omit interface names, and installers
+  skip the name check. PXE changes the controller's laboratory address only in
+  the connection applied to the card (`nmcli device modify`). Keep these paths
+  consistent (ADR 0017 amendment).
+- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by the deployment engine and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
+- Clients substitute only from the controller's Harmonia cache: `modules/cache.nix`
+  replaces the NixOS `cache.nixos.org` default on clients (override priority 90),
+  so updates never contact the Internet. The controller keeps the public cache.
 - USB/SSH installation supports the official NixOS 26.05 Minimal or Graphical (GNOME) ISO on
   `x86_64-linux`, UEFI, and reachable Ethernet or Wi-Fi networking (prefer
   Minimal on computers with 4 GB of RAM or less: the live system keeps the
   installer files in memory). Bind the
-  reviewed live address to the declared interface, not its wired/wireless type.
-  Wi-Fi credentials are not imported from the live ISO; arrange installed-system
-  connectivity separately without putting secrets in Git or the Nix store.
-  PXE compatibility over Wi-Fi depends on hardware, firmware and networking.
+  reviewed live address to the declared interface. The laboratory network is
+  wired: the lab profile is Ethernet, settings validation refuses Wi-Fi card
+  names (`wl…`) for every interface field, the settings review also refuses a
+  reachable client whose named device is wireless, and the USB flow never
+  offers to save a Wi-Fi card; Wi-Fi in the live ISO serves only the installation of a computer without
+  an explicit interface name. Wi-Fi credentials are not imported from the live
+  ISO.
   Preserve physical-console
   credential-free host-key observation, physical-console fingerprint
   confirmation and pinning before password use, terminal-only masked secret
@@ -286,7 +398,9 @@ that release's notes, so a release is not finished until the site follows it.
   key revocation as unconfirmed. Consumed review tokens, any remote receipt,
   uncertain dispatch, and reboot evidence forbid this path; never reuse the
   old authorization or accept a replacement identity for recovery.
-- Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
+- Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`, `nixoriumClass`) to modules that need them.
+  Never put host-resolved values (interface, address, software) in global
+  arguments; `specialArgsForHost` and `specialArgsForClass` resolve them per system.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - Guided software changes use `software catalog`, `software plan`, and
@@ -357,7 +471,7 @@ that release's notes, so a release is not finished until the site follows it.
   starts once local account credentials or laboratory private keys exist.
 - Inventory/package discovery must remain independent of host module evaluation.
   Keep workspace prerequisite guards on readiness, validators, configurations,
-  Colmena and individual app/package entries; Nix probes package namespaces even
+  and individual app/package entries; Nix probes package namespaces even
   when reading top-level metadata. Group a controller preflight into one fresh
   evaluation, never a cached authorization. Repeat live revision, activation
   receipt and system checks before/after apply. Update candidate builds share
@@ -367,6 +481,19 @@ that release's notes, so a release is not finished until the site follows it.
   resolution within that evaluator only; always parse/validate candidate JSON
   and retain downstream hooks and fresh evaluation after source or pin changes.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
+- Confirmation is proportionate to what the action destroys (ADR 0026, amended
+  2026-10-19). A review is confirmed with Enter in the TUI and a `Continue?
+  [y/N]` question in the CLI interactive prompt (`presentation.ConfirmYesNo`);
+  `--yes` and `--expect <token>` are unchanged, and every review token, expiry,
+  recheck and refusal stays. A typed word is kept only where something is
+  destroyed or cannot be undone: `ERASE` (disk erase, in `setup.sh`, the
+  remote installer and USB installation), `RESET DEPLOYMENT` and `RESTORE`
+  (template reset and its recovery), `DISCARD`, `ROTATE HOST KEY`, `CLEAN`,
+  `CLOSE` after a possible disk change, `MATCH` (comparing the physical
+  fingerprint), and `SHUTDOWN`/`RESTART` in the CLI only when the review
+  includes a computer whose session is active or unknown. Plans leave
+  `confirmation` empty (the JSON field is omitted) for every Enter review; never
+  add a new typed word for a reversible change.
 - Never leave the administrator or teacher stuck: every refusal names the next
   step, persistent blockers appear on the Overview, and recovery is a reviewed
   command, not a manual file edit. See the "Never leave the operator stuck"
@@ -380,86 +507,59 @@ that release's notes, so a release is not finished until the site follows it.
   is never unattended. Both installers use `ERASE` and ask again after a
   mistyped answer; an empty confirmation cancels.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
-- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist fleet-wide pending evidence before apply. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new operations except controller activation (ADR 0027) and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
+- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with the fixed commands of ADR 0031 (one `nix build` of the systems, `nix-copy-closure --use-substitutes`, one SSH command starting the `nixorium-activate` transient unit, read-only polling), and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. The apply only uses store paths built for that revision in the same update. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist pending evidence before apply, with each computer marked started durably before its activation command. A record whose every computer is known from the engine's own evidence (never started, finished in the record, or this activation's `last.json` on the computer) closes itself (ADR 0031, D7); anything inferred, or older records, still need the reviewed recovery. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new maintenance operations except controller activation (ADR 0027), makes classroom controls leave the computers it names alone (ADR 0030) and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
 - Deployment availability is advisory: probe only selected identities with the
   bounded inventory probe; an open SSH port is not authenticated identity or
   proof of power state. A reachable-only choice creates a fresh explicit-target
   plan and confirmation, never edits or silently shrinks an approved execution.
+  The one exception happens at apply time: a computer that no longer answers
+  after the build is left out of the apply, named in `Skipped`, reported as
+  not updated and never written into the pending record; it is queued only
+  when the review chose queueing. Nothing is ever added to an approved set.
 - Queued client updates (`internal/app/deferred_updates.go`) hold only reviewed
   computers at the reviewed revision in the coordination directory, changed
-  under the operation gate. The controller timer applies one computer at a time
-  through the ordinary deploy, verify and record path, never holds the gate
-  while waiting, backs off failures, and never applies a stale entry (the
-  repository moved on). Queueing is a visible review choice, never implicit.
+  under the operation gate. Each timer pass first checks the gate and the
+  pending record without taking them (a busy or blocked controller is not a
+  failure of the waiting computers), skips computers already at the queued
+  revision, then updates all answering current entries of that revision
+  together through the ordinary deploy, verify and record path. It never holds
+  the gate while waiting, backs off failures per computer, and never applies a
+  stale entry (the repository moved on). A verified Update computers removes
+  the queue entries of the computers it updated. Queueing is a visible review
+  choice, never implicit; Update computers preselects computers whose queued
+  update became stale, and the administrator can change that selection.
 - Every client update that replaces the running system writes
   `/run/nixorium/update-notice.json` during activation; the classroom extension
   notifies the user and offers GNOME's restart dialog when kernel, initrd,
   modules or systemd changed. Never restart automatically.
   Per-computer outcomes must retain uncertainty and recovery requirements;
   never infer individual activation success from an aggregate batch result.
-- Client shutdown expands only evaluated client identities and never the controller. The session helper (`scripts/session-state.sh`) is a versioned one-word contract: `idle`, `unused` (local graphical session without input for ten minutes or since login, read from the user's GNOME Shell) or `active`, which it must keep for anything it cannot observe; older clients print only `active`/`idle`. Active sessions remain eligible after an explicit data-loss warning; when any are present, the review must state that the one-word `SHUTDOWN` confirmation authorizes their interruption. Preserve explicit acknowledgement for unknown sessions, expiring content-bound review, PXE/recovery conflict check, immediate inventory/session recheck, and the same non-blocking lock used by deployment. Adapters may issue only the fixed `nixorium-session-state` and `systemctl poweroff --no-block` SSH commands. Report accepted/not-sent/unconfirmed requests without inferring physical power state or retrying unconfirmed dispatches.
+- Client shutdown expands only evaluated client identities and never the controller. The session helper (`scripts/session-state.sh`) is a versioned one-word contract: `idle`, `unused` (local graphical session without input for ten minutes or since login, read from the user's GNOME Shell) or `active`, which it must keep for anything it cannot observe; older clients print only `active`/`idle`. Active sessions remain eligible after an explicit data-loss warning; when any are present, the review must state that the one-word `SHUTDOWN` confirmation authorizes their interruption. The CLI asks for the typed `SHUTDOWN` (or `RESTART`) only when the review includes at least one eligible computer whose session is active or unknown; when every computer is idle, logged in without use, or off, it asks `Continue? [y/N]` and the plan carries no `confirmation`. The administrator TUI confirms the review with Enter (the earlier decision for power actions). Preserve explicit acknowledgement for unknown sessions, expiring content-bound review, PXE/recovery conflict check, immediate inventory/session recheck, and the classroom lease of ADR 0030: shutdown and restart never wait for maintenance, take `classroom.lock` shared while they recheck and send, and leave alone every computer named in `deployment-pending.json` (an unreadable record or a USB installation still refuses them all). Adapters may issue only the fixed `nixorium-session-state` and `systemctl poweroff --no-block` SSH commands. Report accepted/not-sent/unconfirmed requests without inferring physical power state or retrying unconfirmed dispatches.
 - Client restart shares the shutdown review and safety boundary but binds the
-  distinct action and `RESTART` confirmation; its adapter may additionally
+  distinct action and the `RESTART` word under the same rule; its adapter may additionally
   issue only `systemctl reboot --no-block`. Never infer completion from network
   loss. The teacher dashboard reaches inventory, Internet and client power only
   through the group-private classroom worker running as `admin`; keep the
   deployment mode 0700, exclude the student, reject repository/address/command
   selection over IPC, and never expose administrative TUI callbacks there.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
-- `lab.assistant` is on unless explicitly false and preserved by settings saves.
-  New installations and upgraded deployments with an omitted setting offer the
-  administrator menu after controller application. Only an enabled controller
-  installs `/etc/nixorium/assistant.json` and its private state directory;
-  account activation and consent remain explicit and separate. Service and
-  subscription URL overrides are for staging/tests.
-  Account checks send no draft or files. Conversation sharing defaults to false
-  and requires explicit saved consent; reports require their own whole-chat
-  disclosure and confirmation. Upload only redacted saved transcripts through
-  typed callbacks, never the laboratory token; sharing failures stay silent and
-  never block a turn. Report/share contents are kept by the service for 90 days.
-  Trial size, length, quota and purchase links come from the service; never
-  hard-code them in the client, which sends `X-Nixorium-Client-Version` so the
-  service keeps older controllers on their fixed ten-request offer. Conversion
-  preserves activation, and annual quota exhaustion
-  requires renewal or a manual agreement rather than a second subscription.
-- Assistant tools write only the private candidate, never the deployment.
-  Preserve relative-path confinement, hidden credentials/untracked files and
-  read-only locks/instructions, plus filtering of model-facing
-  content and separation of the laboratory token. Fixed typed tools only:
-  no arbitrary shell, service control, activation or student-home file access.
-  Capability-gated diagnostics use fresh declared inventory, strict existing
-  SSH trust, fixed core units, bounded current-boot journal excerpts, numeric
-  disk state and typed reset/update evidence. Never read arbitrary app logs,
-  environment or command-line fields; keep missing evidence explicit. Journal
-  filtering is best effort and the renewed version-2 consent must disclose that
-  personal or sensitive text can remain. Read-only Git history stays within
-  ancestors of the conversation base, visible safe paths and bounded sanitized
-  diffs; it never changes Git or contacts a remote. New observations require
-  renewed consent before entering the model transcript.
-  Consent- and capability-gated `prefetch` downloads one public https file into
-  the controller store: keep public-host and per-redirect checks, the 1 GiB,
-  15-minute and one-at-a-time bounds, and return only hash, size and store path.
-  Settings are read-only except the `settings_v1` fields (homepage, time zone,
-  locales, keyboard layout, Git identities): `write_file` of `lab-settings.json`
-  merges only those fields onto the saved file (`domain.MergeAssistantSettings`),
-  refuses any other changed field by name, and the save review repeats the
-  native transition rules and impacts (`domain.ReviewAssistantSettings`).
-  Evaluate a temporary clone with IFD disabled and bounded time/output; compare
-  `nixoriumHostClasses` representatives. `groupModules` assigns common module
-  paths to existing clientGroups; compose overlaps deterministically, preserve
-  controller exclusion and offline serialization, and include applicable module
-  groups in Assistant/update/workspace class keys. Host-name-dependent exceptions must
-  declare hostModules or updateValidationHosts. Only the native reviewed save
-  can commit, after evaluation/token checks, under the operation gate,
-  with a durable backup and shared recovery journal. The review may reuse only
-  the conversation's mode-0600 evaluation receipt of a successful check whose
-  overlay digest, base, flake.lock digest and Nixorium version all still match;
-  every overlay write removes it first. Keep startup free of Nix
-  evaluation and keep controller/client application separately reviewed.
-  See docs/assistant.md; the external maintainer skill remains proposal-only.
+- `lab.assistant` is on unless explicitly `false`; settings saves preserve it; only an enabled controller installs `/etc/nixorium/assistant.json` and the private state directory; service/subscription URL overrides are staging/test only.
+- Activation, consent (text version 4) and conversation saving are explicit, separate, local choices; saving is on by default but still needs saved consent; an older consent text is asked once more; account checks send no draft or files; reports need their own whole-chat disclosure and confirmation.
+- The laboratory token authenticates requests and never enters bodies, transcripts or uploads; uploads carry only redacted saved transcripts through typed callbacks, fail silently and never block a turn.
+- Trial size, quota and purchase links are data announced by the service, never hard-coded; the client sends `X-Nixorium-Client-Version` and `X-Nixorium-Capabilities` and nothing else about itself.
+- The wire contract is `docs/assistant-protocol-v25.md` and `docs/assistant-tools-v1.json`: fixed typed tools, arguments validated locally, `read_core` never executed by the client.
+- Tools write only the private candidate, never the deployment: relative-path confinement, hidden credentials/untracked/ignored files, read-only locks and instruction files, imported home-file payloads withheld across Git ancestry.
+- No tool runs a shell, controls services, activates, deploys, reads student homes or changes Git.
+- Model-facing output is redacted (secrets, hashes, keys, MAC addresses, URI credentials); redaction is best effort and the consent text says so. New observations need renewed consent before entering the transcript.
+- Diagnostics and `read_system_file` use fresh declared inventory, existing strict SSH trust, fixed helpers, the `internal/systemfiles` allowlist, bounded sizes and timeouts; they never read arbitrary app logs, environment or command-line fields, and missing evidence stays explicit; the hardware area never reads a `serial` attribute; widening an allowlist needs a new consent version and an ADR amendment (ADR 0032).
+- `git_history` reads only ancestors of the conversation base with sanitized bounded diffs and never contacts a remote; `prefetch` and the Marketplace resolver contact only public hosts or the fixed gallery, only when invoked, write only the Nix store and return only hash, size and store path (prefetch keeps its 1 GiB, 15-minute, one-at-a-time bounds and per-redirect checks, downloads in Go and connects only to addresses checked at dial time; the candidate evaluation runs without network).
+- `write_file` of `lab-settings.json` merges only the `settings_v1`/`settings_v2` fields (`domain.MergeAssistantSettings`), refuses every other field by name, and the save review repeats the native settings rules (`domain.ReviewAssistantSettings`).
+- Evaluation runs in a temporary clone with IFD disabled and bounded time/output, comparing `nixoriumHostClasses` representatives. `groupModules` assigns common module paths to existing clientGroups; compose overlaps deterministically, preserve controller exclusion and offline serialization, and include applicable module groups in Assistant/update/workspace class keys. Host-name-dependent exceptions must declare hostModules or updateValidationHosts. A review may reuse only a matching mode-0600 receipt (overlay digest, base, flake.lock digest, Nixorium version); every overlay write removes it first.
+- Only the native reviewed save commits, under the operation gate, with a durable backup and the shared recovery journal; controller and client application stay separate reviews; TUI startup never evaluates Nix. The external maintainer skill remains proposal-only. See docs/assistant.md.
+- The core documents what the controller does and enforces; the service's instructions, recipes and routing are private (see "Service logic stays private").
 - Adoption telemetry is controller-only and off without explicit administrator
   consent. The first administrator launch acknowledges the operational disclaimer before
-  offering telemetry. Enter/e accepts, n declines, Esc skips to the menu and q
+  offering telemetry. Only e accepts (Enter is "Not now"), n declines, Esc skips to the menu and q
   exits. Skipping saves no decision and reoffers at the next launch; a saved
   refusal is remembered;
   preview and privacy views never save a choice. Keep its allowlisted payload and monthly identity separate from support
@@ -516,6 +616,15 @@ that release's notes, so a release is not finished until the site follows it.
   Restore fetches into a new private directory, disables Git hooks/filters and never evaluates or applies the fetched configuration.
   Preserve original key pairs, trusted hosts and the encrypted recovery file
   across template reset. See docs/troubleshooting.md and ADR 0025.
+  After a TUI restore, **Use this lab on this controller** (for a new or
+  replaced controller) takes the managed operation lock, keeps the current
+  deployment folder as `<deployment>-before-restore-DATE` (never deletes it),
+  moves the restored folder into the configured deployment path only after its
+  keys verify, and then installs its keys with `nixorium-install-secrets`
+  (outside the lock, which that unit takes); it refuses a controller whose
+  installed SSH key differs (a lab already prepared there) and a `--repo`
+  other than the configured deployment. Nothing is built or activated: the
+  next step is the reviewed controller apply.
 - Git review is read-only and typed: preserve the staged/unstaged/untracked
   distinction, managed-versus-unexpected classification, bounded patch output,
   password-hash redaction, no automatic untracked-file reads, and refusal before
@@ -534,17 +643,19 @@ that release's notes, so a release is not finished until the site follows it.
   paths, links, submodules, Git attribute rules, a change of the laboratory
   network (guided change only), a managed file whose earlier version is not
   valid, and files that cannot go back safely. Reuse the commit boundary:
-  fixed Git commands, content-bound token, typed `UNDO`, compare-and-update of
+  fixed Git commands, content-bound token, an Enter / `[y/N]` confirmation, compare-and-update of
   HEAD, two-tree `read-tree` for the files, no hook, signing, remote or push.
   It never applies to the controller or computers; its review names those
   steps. The Git review screen offers it with `u` through the typed
   `PlanGitUndo`/`ApplyGitUndo` callbacks: presentation shows the review, the
-  refusal with its catalogued next step and the typed word, and never decides
+  refusal with its catalogued next step and what Enter does, and never decides
   what can be undone. Enter on a saved undo chains to the ordinary controller
   review through `continueSavedConfiguration`, like a settings save.
 - Upstream update planning must preserve the configured source identity, accept
   only the exact `master` branch or an explicit SemVer tag, generate the
-  candidate lock outside the checkout,
+  candidate lock outside the checkout from the proposed `flake.nix` (Nix
+  records `original` from the file it locks), refuse a pair that
+  `nix flake lock --no-update-lock-file` would change,
   and validate representative outputs against that exact lock. Explicit
   controller mode requires zero clients, explicit controller readiness, and a
   candidate controller build; it must not require or build client/PXE outputs.
@@ -597,9 +708,9 @@ that release's notes, so a release is not finished until the site follows it.
   on the new network with the saved configuration, and keeps undo possible
   until then (ADR 0028). During a change labMeta decoding copies each
   client's previous address into `HostMeta.PreviousIP`: every per-computer
-  probe tries the new address first, then the previous one, and Colmena
-  reaches a computer on the previous network through `HostName` entries in
-  its SSH configuration. Trusted host keys are copied from the previous to
+  probe tries the new address first, then the previous one, and the
+  deployment engine copies to and activates a computer at the address that
+  answered. Trusted host keys are copied from the previous to
   the new address in the managed known-hosts file before any contact there;
   never replace a different key or relax checking. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first
@@ -655,10 +766,12 @@ that release's notes, so a release is not finished until the site follows it.
   `vscode.marketplace` pins (publisher, name, stable version, SRI hash,
   optional linux-x64) join the package set through
   `lib/workspace-marketplace.nix`; keep the URL derived by the nixpkgs fetcher
-  and never accept one in the profile. `workspace marketplace` and the TUI
-  `m`/`u` actions are the only gallery clients: fixed endpoint, no redirects,
-  bounded answers, prefetch under the fetcher's name so builds stay offline,
-  and no deployment write. Every pin must be selected.
+  and never accept one in the profile. The Assistant's Marketplace tool (the
+  resolver in `internal/app/workspace_marketplace.go`) is the only gallery
+  client: fixed endpoint, no redirects, bounded answers, prefetch under the
+  fetcher's name so builds stay offline, and no deployment write. The TUI and
+  CLI no longer edit the extension list; saving a draft keeps existing
+  `vscode.extensions` and `vscode.marketplace`. Every pin must be selected.
   `nixoriumResolveWorkspaceCandidate` returns the same metadata for raw candidate
   JSON without writing it. Review consumers must also compose the deployment's
   `nixoriumValidateWorkspaceCandidate` hook and bind/recheck source, pin and base
@@ -724,13 +837,22 @@ that release's notes, so a release is not finished until the site follows it.
   boot-reset engine. Preserve complete preflight, no-follow traversal,
   mount/subvolume checks, immutable seed validation, account/process checks,
   and a held login barrier. The private recovery snapshot is sanitized before
-  publication; five read-only managed snapshots are kept. Durable pending evidence must block retries after failure and
-  reboot. Never delete it automatically or treat a previous success receipt as
-  completion of a pending attempt. The fixed root-only `nixorium-home-reset`
+  publication; five read-only managed snapshots are kept. The durable pending
+  record carries a phase (ADR 0029): a failure before the restore phase
+  discards that attempt's own work; at the next boot an interrupted prepare
+  phase restarts, and a restore/published phase completes from the read-only
+  retained snapshot at most once (`recovery.json`). Unknown, malformed,
+  writable-snapshot or already-recovered states still block login until an
+  administrator inspects them. Never overwrite or rotate away the retained
+  snapshot, repeat a verified publication, or treat a previous success
+  receipt as completion of a pending attempt. The fixed root-only `nixorium-home-reset`
   helper accepts no target arguments and reads only its store-backed system
   configuration. The isolated `modules/workspace-reset.nix` service retains
   the `home-reset` unit name, never restarts on switch, and gates both the
-  display manager and normal user sessions. Preserve manual-start refusal,
+  display manager and normal user sessions. Order it before every boot
+  service that runs as, or switches to, the student (an added httpd, logrotate):
+  the process guard after the pending record otherwise fails closed.
+  Preserve manual-start refusal,
   no automatic retry, and `X-OnlyManualStart` so first-time installation during
   a rebuild also waits for boot. Keep student ownership repair, template writes
   and login preference changes out of this path; staff homes keep theirs.
@@ -754,6 +876,13 @@ that release's notes, so a release is not finished until the site follows it.
   both controller addresses are used during a change of laboratory network.
   Controller-only mode keeps the NixOS defaults. Never list an Internet pool
   on a client: it has none of its own.
+- The controller learns whether the classroom view is on from
+  `/etc/nixorium/classroom-view.json`, written by `modules/management.nix`
+  (read with `adapters.ClassroomViewApplied`, which fails closed), never from
+  `lab-settings.json`: the TUI, `nixorium lock`, the classroom worker and the
+  open page all follow what was applied. With it off the teacher's dock icon
+  (same desktop file) opens the Nixorium menu, which offers no view, lock or
+  send; Internet, power, switch on and the schedule do not depend on it.
 - The classroom view (`lab.classroomView`, on unless set to false) adds
   only a client user-session agent on a private Unix socket. The controller
   reaches it solely through its existing SSH access with the fixed
@@ -772,7 +901,9 @@ that release's notes, so a release is not finished until the site follows it.
   when the page stops polling. Remote input is accepted only as bounded,
   validated JSON from the page's own Origin for a computer open in the large
   view, and every path that ends control must release pressed keys and
-  buttons. Page actions on selected computers (Internet, power) call the
+  buttons. The shared clipboard is plain text only, on only while the teacher
+  controls that unlocked computer (the worker rejects anything else), at most
+  64 KiB, and its text is never logged or kept. Page actions on selected computers (Internet, power) call the
   worker's own typed plan/apply handling in process: the review token never
   reaches the page, and each review is applied at most once. By owner
   decision the page confirms with one explicit button, without a typed word,
@@ -794,7 +925,7 @@ that release's notes, so a release is not finished until the site follows it.
   nothing behind. The classroom worker prepares files in its private
   temporary folder under position-based names only, hashes each file, and
   binds the share review to paths, sizes and digests rather than to the
-  transfer identifier. The page never uploads files: its Send files asks
+  transfer identifier. The page never uploads files: its Share files menu asks
   the service, which hands a file or folder choice to the desktop helper of
   the page's own
   user (the browser launcher, running as that user, long-polling
@@ -840,16 +971,7 @@ that release's notes, so a release is not finished until the site follows it.
   keyboard nor mouse, and it is not tied to the controller's connection.
   The review keeps the controller's own sentences free of the text, which the
   page prints itself; its token binds the text and the duration, and it takes
-  no operation lock. Exam mode is a page-side chain of the existing Internet,
-  lock and message reviews (message.js): each review still applies once, and
-  the page makes the reviews again when one is about to expire so an expired
-  review cannot leave an exam half started; ending reverses the steps in order
-  and only offers the collect review. The computers keep no exam state. The
-  worker keeps, in memory only (`examBook`), which steps it applied for exam
-  mode per computer and since when, from the exam tag of a plan and the done
-  rows of its apply (never from what a page claims), shares it between pages
-  through `/api/computers`, and drops what it sees end (no session, Internet
-  allowed again, restart or shutdown); a restart of the worker forgets it.
+  no operation lock.
   Switch on (Wake-on-LAN, `wake-plan`/`wake-apply`, `nixorium wake`) takes
   no review token or operation lock, validates names like every classroom
   operation and never targets the controller. Hardware addresses come only
@@ -871,8 +993,10 @@ that release's notes, so a release is not finished until the site follows it.
   every minute for ten minutes, then given up with one history record; never
   retry after a request was sent.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
-  client-only evaluated identities, an expiring review and the shared fleet
-  lock. Recheck authenticated boot ID and state before every fixed helper
+  client-only evaluated identities, an expiring review and the classroom
+  lease of ADR 0030 (computers named in an unfinished client update are left
+  alone; the update writes its record under the exclusive side of the same
+  lock). Recheck authenticated boot ID and state before every fixed helper
   request; verify afterward and report partial/unconfirmed outcomes honestly.
   Never queue offline targets or reuse authorization across reboot. The
   root-only helper controls only `nixorium-internet-block.service` and its
@@ -886,7 +1010,8 @@ that release's notes, so a release is not finished until the site follows it.
   screensaver behavior, and application policy belong in the deployment.
   The one exception, by owner decision, is base software:
   `internal/domain/base-software.json` (Chromium, Ghostty, Git, the
-  screensaver's terminaltexteffects) is installed on every host by
+  screensaver's terminaltexteffects, whose presence switches the screensaver on;
+  its effects run with the core's `pkgs/ttfx.nix`) is installed on every host by
   `lib/mk-lab.nix` whatever `lab-software.json` declares, counts as effective
   software for the template, and the software review refuses to remove or
   narrow it. Keep that file the single list for Nix and Go.
@@ -966,7 +1091,7 @@ Use only the arguments the module actually needs:
 | File names       | kebab-case       | `home-reset.nix`, `install-controller.sh`   |
 | Shell variables  | UPPER_SNAKE_CASE | `PC_NUMBER`, `TEMPLATE_DIR`                 |
 | NixOS options    | Standard dotted  | `services.openssh.enable`                   |
-| Helper functions | `mk` prefix      | `mkHost`, `mkColmenaHost`                   |
+| Helper functions | `mk` prefix      | `mkHost`, `mkLab`                           |
 
 ### Imports
 - Flake uses root-relative: `./modules/networking.nix`, `./modules/cache.nix`
@@ -1003,9 +1128,9 @@ set -euo pipefail
 - `nixorium git commit apply` must never invoke broad `git add`, normal commit
   hooks, signing helpers, a remote, or push; commit only the exact reviewed tree
   and reconcile only selected index paths
-- `nixorium workspace marketplace` (and the TUI Marketplace actions) may
-  contact only the fixed public gallery and the pinned download URL, only
-  when invoked, and write only to the Nix store
+- The Assistant's Marketplace tool may contact only the fixed public gallery
+  and the pinned download URL, only when invoked, and write only to the Nix
+  store
 - `nixorium update` may use controller internet when explicitly invoked; the
   administrator TUI may also run its bounded, cached advisory discovery;
   it must never accept an arbitrary replacement source URL, expose ignored
@@ -1052,7 +1177,9 @@ set -euo pipefail
 ## Host Configuration
 
 Hostname + static IP are generated in `lib/mk-lab.nix` from the IPv4 network,
-CIDR prefix, and host offset. Interface resolution uses host, role, then shared
+CIDR prefix, and host offset. In a shared class system they are not evaluated
+into the system: they come from the computer's identity record at activation
+(ADR 0033). Interface resolution uses host, role, then shared
 fallback settings in `lib/mk-lab.nix`; `modules/networking.nix` applies the
 resolved interface.
 

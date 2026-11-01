@@ -36,13 +36,35 @@ func withDetectedDHCPChoices(fields []settingsField, addresses domain.Controller
 	}
 	updated := append([]settingsField(nil), fields...)
 	for index, field := range updated {
+		if field.id == "lab.controllerIfaceName" && len(addresses.Wired) > 0 {
+			// The controller's wired cards, with what they carry now.
+			field.choices = []settingsChoice{}
+			field.detected = []string{}
+			for _, device := range addresses.Wired {
+				carried := []string{}
+				for _, address := range device.Addresses {
+					if !strings.HasPrefix(address.Address, "fe80:") {
+						carried = append(carried, address.Address)
+					}
+				}
+				description := "Wired card without an address now"
+				if len(carried) > 0 {
+					description = "Wired card · " + strings.Join(carried, ", ")
+				}
+				field.choices = append(field.choices, settingsChoice{value: device.Name, label: device.Name, description: description})
+				field.detected = append(field.detected, device.Name)
+			}
+			field.other = "Other…"
+			updated[index] = field
+			continue
+		}
 		if field.id != "lab.masterDhcpIp" {
 			continue
 		}
 		field.choices = []settingsChoice{}
 		field.detected = []string{}
 		for _, choice := range addresses.Choices {
-			field.choices = append(field.choices, settingsChoice{value: choice.Address, label: choice.Address, description: "Current address on " + choice.Device})
+			field.choices = append(field.choices, settingsChoice{value: choice.Address, label: choice.Address, description: "Current address on " + choice.Device, device: choice.Device})
 			field.detected = append(field.detected, choice.Address)
 		}
 		field.other = "Other…"
@@ -89,16 +111,22 @@ func (model dashboardModel) settingsNetworkCheckLines() []string {
 				kind = tuiStatusAttention
 			}
 			lines = append(lines, "  "+tuiStatus(fmt.Sprintf("%s  device missing: no %s (its devices: %s)", client.Name, client.Interface, devices), kind, model.isDark))
+		case domain.DeviceNotWired:
+			lines = append(lines, "  "+tuiStatus(fmt.Sprintf("%s  %s is a Wi-Fi card: the laboratory needs a wired one (its devices: %s)", client.Name, client.Interface, strings.Join(client.Devices, ", ")), tuiStatusFailure, model.isDark))
 		default:
 			lines = append(lines, "  "+tuiStatus(client.Name+"  not reachable: check it at its screen before updating it", tuiStatusNeutral, model.isDark))
 		}
 	}
-	if missing := preflight.Missing(); len(missing) > 0 {
+	if missing := preflight.Missing(); len(missing) > 0 && len(preflight.Wireless()) == 0 {
 		if model.settings.saveAnyway {
 			lines = append(lines, "  "+tuiStatus("Saving anyway for "+strings.Join(missing, ", ")+": updated with this name, a computer without the device loses the laboratory network.", tuiStatusAttention, model.isDark))
 		} else {
 			lines = append(lines, "  Correct the name, or press c to save anyway for the computers listed.")
 		}
+	}
+	if len(lines) == 2 {
+		// Only the heading: nothing to report, so no heading either.
+		return nil
 	}
 	return lines
 }

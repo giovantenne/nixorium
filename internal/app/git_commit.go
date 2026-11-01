@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -133,7 +134,6 @@ func (m *GitCommitManager) Plan(ctx context.Context, repository, requestedPaths 
 	report.Diff = proposal.Diff
 	report.CommitMessage = generatedGitCommitMessage(paths)
 	report.ReviewToken = gitCommitReviewToken(report.Revision, report.TreeID, report.Paths, report.CommitMessage)
-	report.Confirmation = "COMMIT"
 	report.State = "ready"
 	return report
 }
@@ -214,6 +214,9 @@ func parseGitCommitPaths(requested string) ([]string, error) {
 func generatedGitCommitMessage(paths []string) string {
 	if len(paths) == 2 && paths[0] == "flake.lock" && paths[1] == "flake.nix" {
 		return "chore: update Nixorium"
+	}
+	if slices.Contains(paths, "flake.lock") && slices.Contains(paths, "flake.nix") && slices.Contains(paths, domain.DeploymentMigrationsFile) {
+		return "chore: update Nixorium and migrate deployment files"
 	}
 	if len(paths) == 1 && paths[0] == "lab-settings.json" {
 		return "chore: update laboratory settings"

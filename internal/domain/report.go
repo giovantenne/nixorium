@@ -64,6 +64,10 @@ type HostMeta struct {
 	// its name, and Interface is only the template fallback. Metadata that
 	// predates the field omits it, which means the name is required.
 	InterfaceExplicit *bool `json:"ifaceExplicit,omitempty"`
+	// Class is the computer's class of identical computers (ADR 0033): its
+	// own name when it has its own system, `shared-<n>` when it shares one.
+	// Metadata that predates classes omits it.
+	Class string `json:"class,omitempty"`
 }
 
 // InterfaceNameRequired reports whether the installed computer is configured
@@ -109,7 +113,10 @@ type HostSystemProbe struct {
 	HostKeyCondition HostKeyCondition `json:"hostKeyCondition,omitempty"`
 	SystemPath       string           `json:"systemPath,omitempty"`
 	Revision         string           `json:"revision,omitempty"`
-	Detail           string           `json:"detail,omitempty"`
+	// Number is the computer number in its identity record, 0 when the
+	// computer reports none (older systems, or no valid record).
+	Number int    `json:"number,omitempty"`
+	Detail string `json:"detail,omitempty"`
 	// Network says which address answered during a change of laboratory
 	// network; it is empty otherwise.
 	Network HostNetwork `json:"network,omitempty"`

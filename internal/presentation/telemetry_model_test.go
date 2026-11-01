@@ -3,13 +3,14 @@ package presentation
 import (
 	tea "charm.land/bubbletea/v2"
 	"context"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/giovantenne/nixorium/internal/domain"
 	"strings"
 	"testing"
 )
 
 func TestTelemetryUIRequiresExplicitChoice(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardAdministration
 	enabled := 0
 	m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
@@ -24,12 +25,16 @@ func TestTelemetryUIRequiresExplicitChoice(t *testing.T) {
 		t.Fatal("implicit consent")
 	}
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
+	if cmd != nil || enabled != 0 {
+		t.Fatal("Enter must not enable sharing")
+	}
+	m, cmd = workspaceKey(m, demoText("e"))
 	if cmd == nil || enabled != 0 {
-		t.Fatal("Enter must request explicit acceptance")
+		t.Fatal("e must request explicit acceptance")
 	}
 	m = workspaceComplete(t, m, cmd)
 	if enabled != 1 {
-		t.Fatal("Enter did not enable sharing")
+		t.Fatal("e did not enable sharing")
 	}
 	m, _ = workspaceKey(m, demoText("?"))
 	m, cmd = workspaceKey(m, demoText("e"))
@@ -59,7 +64,7 @@ func TestTelemetryUIRequiresExplicitChoice(t *testing.T) {
 func TestTelemetryFirstInvitationChoices(t *testing.T) {
 	for _, key := range []string{"e", "enter", "n", "d", "esc"} {
 		t.Run(key, func(t *testing.T) {
-			m := experienceFixture(2)
+			m := experienceFixture(t, 2)
 			m.screen = dashboardHome
 			calls := []string{}
 			m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
@@ -100,7 +105,13 @@ func TestTelemetryFirstInvitationChoices(t *testing.T) {
 			if key == "esc" && len(calls) != 0 {
 				t.Fatal("escape saved consent")
 			}
-			if (key == "e" || key == "enter") && (len(calls) != 1 || calls[0] != "enable") {
+			if key == "enter" && (len(calls) != 0 || m.telemetry.firstOffer) {
+				t.Fatal("Enter must skip without saving consent", calls)
+			}
+			if key == "enter" && !strings.Contains(m.message, "asked again") {
+				t.Fatal("skip message does not say the invitation returns", m.message)
+			}
+			if key == "e" && (len(calls) != 1 || calls[0] != "enable") {
 				t.Fatal(calls)
 			}
 			if (key == "d" || key == "n") && (len(calls) != 1 || calls[0] != "disable") {
@@ -110,10 +121,36 @@ func TestTelemetryFirstInvitationChoices(t *testing.T) {
 	}
 }
 
+func TestTelemetryFirstInvitationFooterShowsBothKeys(t *testing.T) {
+	m := experienceFixture(t, 2)
+	m.screen = dashboardTelemetry
+	m.width, m.height = 160, 40
+	m.telemetry.firstOffer = true
+	m.telemetry.report = domain.TelemetryReport{Consent: "undecided", Payload: domain.TelemetryPayload{Version: "3.0.0"}}
+	v := ansi.Strip(m.View().Content)
+	if !strings.Contains(v, "e Share statistics") || !strings.Contains(v, "Enter  Not now") || strings.Contains(v, "e/Enter") {
+		t.Fatal(v)
+	}
+}
+
+func TestTelemetryNoticeNamesCompanyNotPerson(t *testing.T) {
+	if !strings.Contains(domain.TelemetryNotice, "HardyPress SRL") || strings.Contains(domain.TelemetryNotice, "Benvenuti") || strings.Contains(domain.TelemetryNotice, "Claudio") {
+		t.Fatal(domain.TelemetryNotice)
+	}
+	m := experienceFixture(t, 2)
+	m.screen = dashboardTelemetry
+	m.width, m.height = 160, 80
+	m.telemetry.detail = "i"
+	m.telemetry.report = domain.TelemetryReport{Consent: "undecided"}
+	if v := m.View().Content; !strings.Contains(v, "HardyPress SRL") || strings.Contains(v, "Benvenuti") {
+		t.Fatal("privacy view does not name the company only")
+	}
+}
+
 func TestTelemetryInvitationRenderGallery(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {160, 40}} {
 		for _, dark := range []bool{false, true} {
-			m := experienceFixture(2)
+			m := experienceFixture(t, 2)
 			m.screen = dashboardTelemetry
 			m.width, m.height, m.isDark = size[0], size[1], dark
 			m.telemetry.report = domain.TelemetryReport{Consent: "undecided", Payload: domain.TelemetryPayload{Version: "3.0.0", DeploymentMode: "laboratory", ConfiguredClients: "16-30"}}
@@ -134,7 +171,7 @@ func TestTelemetryInvitationRenderGallery(t *testing.T) {
 }
 
 func TestTelemetryDetailsRemainLocalAndReturnToChoice(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardTelemetry
 	m.telemetry.firstOffer = true
 	m.telemetry.report = domain.TelemetryReport{Consent: "undecided", Payload: domain.TelemetryPayload{Version: "3.0.0"}}
@@ -159,7 +196,7 @@ func TestTelemetryDetailsRemainLocalAndReturnToChoice(t *testing.T) {
 }
 func TestTelemetryOfferDoesNotRememberUndecidedAsRefused(t *testing.T) {
 	for _, consent := range []string{"undecided", "enabled", "disabled"} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.screen = dashboardHome
 		m.actions.Telemetry = func(_ context.Context, action string) (domain.TelemetryReport, error) {
 			if action != "status" {
@@ -182,7 +219,7 @@ func TestTelemetryDetailGalleryAndInvitationExitLegend(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {160, 40}} {
 		for _, dark := range []bool{false, true} {
 			for _, detail := range []string{"", "p", "i"} {
-				m := experienceFixture(2)
+				m := experienceFixture(t, 2)
 				m.screen = dashboardTelemetry
 				m.width, m.height, m.isDark = size[0], size[1], dark
 				m.telemetry.firstOffer = true

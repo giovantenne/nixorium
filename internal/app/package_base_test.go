@@ -36,8 +36,8 @@ func TestPackageBaseChannelPolicy(t *testing.T) {
 				if source.prepared != 1 || plan.Kind != "package-base" || plan.ReviewToken == "" {
 					t.Fatalf("%+v", plan)
 				}
-				if test.target == "nixos-26.11" && plan.Confirmation != "MIGRATE" {
-					t.Fatal("missing migration acknowledgement")
+				if plan.Confirmation != "" {
+					t.Fatalf("a package base update asks for a word: %q", plan.Confirmation)
 				}
 			} else if source.prepared != 0 {
 				t.Fatal("blocked plan built a candidate")

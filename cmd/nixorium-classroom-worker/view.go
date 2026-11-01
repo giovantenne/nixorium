@@ -18,6 +18,7 @@ import (
 
 	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/classroomview"
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 //go:embed view/index.html view/app.js view/message.js view/style.css
@@ -32,7 +33,7 @@ const (
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
-var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/choose": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
+var postPaths = map[string]bool{"/api/input": true, "/api/control": true, "/api/clipboard/set": true, "/api/clipboard/get": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/choose": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
 
 // viewSource lists computers, their images, and forwards input.
 type viewSource interface {
@@ -40,6 +41,11 @@ type viewSource interface {
 	Thumbnail(name string) ([]byte, bool)
 	Frame(name string, since int64) ([]byte, int64, bool)
 	Input(name string, events []classroomview.InputEvent, release bool) error
+	// Control starts or ends the teacher's control of a computer, which is
+	// what turns its shared clipboard on or off.
+	Control(name string, on bool) error
+	ClipboardSet(name, text string) error
+	ClipboardGet(name string) (string, error)
 }
 
 // viewServer serves the teacher's classroom view on the controller's
@@ -62,12 +68,13 @@ type viewServer struct {
 	// downloads keeps screenshots no helper saved until the page downloads
 	// them (screenshot.go).
 	downloads *screenshotDownloads
-	// exams remembers the computers in exam mode (exam.go).
-	exams examBook
 	// internet reads the computers' real Internet state while the page is
 	// open; nil keeps only the page's own changes.
 	internet *internetWatcher
 	now      func() time.Time
+	// enabled is nil, or says whether the classroom view is still on; a page
+	// opened before it was turned off stops answering.
+	enabled func() bool
 }
 
 func newViewServer(source viewSource) *viewServer {
@@ -142,6 +149,10 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		http.Error(writer, "Open the classroom view again from Nixorium.", http.StatusForbidden)
 		return
 	}
+	if server.enabled != nil && !server.enabled() {
+		http.Error(writer, domain.ClassroomViewOffMessage, http.StatusForbidden)
+		return
+	}
 	switch request.URL.Path {
 	case "/":
 		server.asset(writer, "view/index.html", "text/html; charset=utf-8")
@@ -164,8 +175,6 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			Internet string `json:"internet,omitempty"`
 			Power    string `json:"power,omitempty"`
 			Showing  bool   `json:"showing,omitempty"`
-			// Exam is set while exam mode runs on the computer.
-			Exam *examView `json:"exam,omitempty"`
 		}
 		if server.internet != nil {
 			server.internet.Touch()
@@ -177,7 +186,7 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		list := make([]pageComputer, 0, len(computers))
 		for _, computer := range computers {
 			internet, power := server.labelsFor(computer.Name, computer.State)
-			list = append(list, pageComputer{ClassroomComputer: computer, Internet: internet, Power: power, Showing: showing[computer.Name], Exam: server.exams.view(computer.Name, computer.State, internet)})
+			list = append(list, pageComputer{ClassroomComputer: computer, Internet: internet, Power: power, Showing: showing[computer.Name]})
 		}
 		header.Set("Content-Type", "application/json")
 		_ = json.NewEncoder(writer).Encode(map[string]any{"computers": list})
@@ -280,6 +289,8 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			return
 		}
 		writer.WriteHeader(http.StatusNoContent)
+	case "/api/control", "/api/clipboard/set", "/api/clipboard/get":
+		server.clipboard(writer, request)
 	default:
 		http.NotFound(writer, request)
 	}
@@ -334,4 +345,4 @@ func (server *viewServer) asset(writer http.ResponseWriter, name, contentType st
 	_, _ = writer.Write(content)
 }
 
-var errViewDisabled = errors.New("The classroom view is not turned on for this laboratory. Ask the administrator. Code: CLASSROOM-VIEW-OFF.")
+var errViewDisabled = errors.New(domain.ClassroomViewOffMessage)

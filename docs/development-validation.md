@@ -340,8 +340,11 @@ subvolumes on a disposable VM disk. It also exercises immutable-seed validation,
 account ownership, a held login barrier, active student-process rejection,
 whole-home preflight, private snapshot sanitization, five-snapshot rotation,
 restore ownership, editable preferences and dconf/wallpaper composition.
-Injected failures before deletion and during restoration retain durable
-evidence, prevent blind retries and preserve recovery data across a VM reboot.
+A failure before deletion discards its own work. Simulated interruptions
+before and after the read-only snapshot, and after publication, recover at
+the next attempt without losing the retained snapshot or repeating its
+publication; a recovery that fails again records `recovery.json` and blocks
+further attempts across a VM reboot.
 Negative lifecycle cases assert the rejection reason, not just any error.
 These are internal engine tests, not proof of systemd ordering, deployment
 activation. Mount/lifecycle tests are explicitly disabled
@@ -402,7 +405,20 @@ VM:
 ```sh
 nix --extra-experimental-features 'nix-command flakes' \
   build --file tests/source-checks.nix session-state-vm --no-link
-``` Existing lower-level seed/resolution tests retain fast
+```
+
+`stay-active-vm` boots the same kind of GNOME login with the Caffeine
+extension: it is enabled and off at sign-in, turning it on holds a session idle
+inhibitor, and the lab screensaver's own check (taken from the template
+script) sees it; turning it off releases it.
+
+`staff-home-writes-vm` runs the root activation steps that write into the
+administrator's and teacher's homes (core users, home-reset and desktop
+modules, and the template's home profile) twice: once on clean homes, where the
+files land owned by their users, and once after the teacher has replaced each
+target with a symbolic link to a system file, which must stay unchanged.
+
+Existing lower-level seed/resolution tests retain fast
 failure coverage without launching the graphical application.
 
 After the automated milestone, follow the documented VirtualBox recipe with

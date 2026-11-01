@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -155,18 +156,20 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 			"This view refreshes by itself every few seconds. You can leave it; the job continues on the computer."
 	case response.State == "ready-to-reboot":
 		return "The system is installed on " + host + " and is waiting to restart.",
-			"Remove the USB stick (or make the disk boot first), then restart it."
+			"Keep the USB stick in until it has restarted: the PC restarts from its disk."
 	case response.State == "reboot-requested" || response.State == "reboot-dispatching":
 		return "Restart of " + host + " was requested.",
 			"The controller checks the installed identity automatically every few seconds."
 	case response.State == "verified":
 		return host + " is installed and verified.", "It now appears among the configured computers."
 	case response.State == "cancelled":
-		return "The installation was cancelled; no disk was changed.", "Start again from Installation when the computer is ready."
+		return "The USB installation was cancelled. Nothing was changed on that computer.", "Start again from Installation when the computer is ready."
 	case response.State == "closed-before-apply":
 		return "The record was closed; the disk was not touched.", "Restart the computer started from the USB stick before using it, then start again from Installation."
 	case response.State == "closed-installed":
 		return "The session was closed without restarting; the system is installed.", "Restart the computer locally when ready."
+	case response.State == "closed-unverified":
+		return "The record was closed without checking " + host + "; the controller is free.", "Its disk may have been written: check the computer, or install it again from Installation."
 	case remoteInstallCanConnect(response):
 		return "The installation files for " + host + " are ready.", "Start the computer from the USB stick, then connect to it."
 	case remoteInstallResponseFailed(response):
@@ -174,8 +177,12 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 		if remoteInstallDiskMayBeChanged(response) {
 			disk = "The disk may have been changed."
 		}
-		return "The installation of " + host + " did not complete. " + disk,
-			"Read the reason in the details (d) and fix the cause, then check again."
+		next := "Read the reason in the details (d) and fix the cause, then check again."
+		// A preparation that Nixorium refused says why in plain words.
+		if reason := sanitizeRemoteInstallText(response.Message); response.State == "blocked" && reason != "" {
+			next = "Reason: " + strings.TrimSuffix(reason, ".") + ". Fix the cause, then check again."
+		}
+		return "The installation of " + host + " did not complete. " + disk, next
 	}
 	if neverDispatched && response.State != "closed-before-apply" {
 		return "The installation of " + host + " was prepared but not started.",

@@ -16,7 +16,7 @@ import (
 
 func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 	for _, profile := range []colorprofile.Profile{colorprofile.ASCII, colorprofile.ANSI, colorprofile.ANSI256} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		var output bytes.Buffer
 		writer := colorprofile.Writer{Forward: &output, Profile: profile}
 		if _, err := writer.Write([]byte(m.View().Content)); err != nil {
@@ -34,7 +34,7 @@ func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 
 func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.width = size[0]
 		m.height = size[1]
 		view := m.View().Content
@@ -59,7 +59,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 		}
 	}
 
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.report.PXE.Mode = "recovery-required"
 	view := m.View().Content
 	if !strings.Contains(view, "Network installation is still active") || !strings.Contains(view, "Enter") {
@@ -103,7 +103,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 					screen:       dashboardPXEStartReview,
 					installation: installationModel{startPlan: domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}},
 				},
-				expected: []string{"Type START to continue", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
+				expected: []string{"Enter starts network installation mode", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
 			},
 			{
 				name:     "recovery",
@@ -180,7 +180,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 						},
 					},
 				},
-				expected: []string{"Software  /  Review", "Available in this laboratory’s software versions", "Enter", "Save", "Esc", "Computers", "Help"},
+				expected: []string{"Software  /  Review", "Available in this laboratory’s software versions", "Enter", "Save", "Esc", "Choose computers", "Help"},
 			},
 			{
 				name: "partial result",
@@ -284,7 +284,7 @@ func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 					screen: dashboardController, busy: "Activating controller",
 					controller: controllerModel{
 						applying: true, started: time.Now(),
-						progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "activate", Current: 2, Total: 4},
+						progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "activate", Current: 2, Total: 4, Recent: []string{"Built the controller system", "Activating the controller system"}},
 					},
 				},
 				expected: []string{"Controller update is running", "Progress details", "Help"},
@@ -339,8 +339,8 @@ func TestEvidenceScreensKeepNavigationVisible(t *testing.T) {
 			{
 				name: "diagnostics",
 				model: dashboardModel{
-					screen: dashboardDiagnostics,
-					doctor: domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}},
+					screen:      dashboardDiagnostics,
+					diagnostics: diagnosticsModel{report: domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}}},
 				},
 				expected: []string{"Maintenance  /  Diagnostics", "Check connection", "Enter", "Evidence", "Check again", "Esc", "Maintenance", "Help"},
 			},
@@ -397,7 +397,7 @@ func TestConfigurationReviewHelpCannotApply(t *testing.T) {
 	}
 }
 
-func experienceFixture(count int) dashboardModel {
+func experienceFixture(t testing.TB, count int) dashboardModel {
 	now := time.Now()
 	status := testDashboardReport("ready")
 	status.GeneratedAt = now
@@ -412,7 +412,7 @@ func experienceFixture(count int) dashboardModel {
 		status.Meta.Clients.Hosts = append(status.Meta.Clients.Hosts, domain.HostMeta{Name: name, IP: ip})
 		hosts.Hosts = append(hosts.Hosts, domain.HostStatus{Name: name, IP: ip, SSH: domain.SSHAvailable, Reachability: domain.ReachabilityReachable, Deployment: domain.DeploymentCurrent})
 	}
-	m := newDashboardModel(status, domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	m := newTestModel(t, withReport(status), withSetup(domain.SetupReport{State: "ready"}))
 	m.computers.hosts = hosts
 	m.width = 120
 	m.height = 30
@@ -433,7 +433,7 @@ func hostMetaNames(hosts []domain.HostMeta) []string {
 }
 
 func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
-	m := experienceFixture(200)
+	m := experienceFixture(t, 200)
 	m.screen = dashboardHosts
 	m = press(m, "/")
 	m = press(m, "pc17")
@@ -463,7 +463,7 @@ func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
 
 func TestComputerInventoryShellKeepsActionsVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		m := experienceFixture(200)
+		m := experienceFixture(t, 200)
 		m.width = size[0]
 		m.height = size[1]
 		m.screen = dashboardHosts
@@ -480,7 +480,7 @@ func TestComputerInventoryShellKeepsActionsVisible(t *testing.T) {
 }
 
 func TestInterventionEntryDoesNotScanTheFleet(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m = press(m, "c")
 	updated, command := m.Update(tea.KeyPressMsg{Text: "d"})
 	next := updated.(dashboardModel)
@@ -493,13 +493,12 @@ func TestInterventionEntryDoesNotScanTheFleet(t *testing.T) {
 }
 
 func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardDeployReview
 	m.deployment.plan = domain.DeploymentPlanReport{ColmenaSelector: "@lab"}
-	m.deployment.confirmation = "DEPLOY"
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	m = updated.(dashboardModel)
-	if !m.helpOpen {
+	if !m.navigation.helpOpen {
 		t.Fatal("F1 help not opened")
 	}
 	updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -509,7 +508,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 	}
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = updated.(dashboardModel)
-	if m.helpOpen || m.screen != dashboardDeployReview {
+	if m.navigation.helpOpen || m.screen != dashboardDeployReview {
 		t.Fatal("help back lost review")
 	}
 	updated, command = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
@@ -522,7 +521,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardSoftware, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardSetupKeys, dashboardUpdate, dashboardAdministration} {
-			m := experienceFixture(200)
+			m := experienceFixture(t, 200)
 			m.width = size[0]
 			m.height = size[1]
 			m.screen = screen
@@ -537,13 +536,13 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.software.selected = "gimp"
 			m.software.scopeCursor = len(m.software.scopeOptions()) - 1
 			m.software.clientCursor = 199
-			m.software.plan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.software.catalog.Clients, Confirmation: "SAVE"}
+			m.software.plan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.software.catalog.Clients}
 			m.software.result = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 			m.shutdown.cursor = 199
 			m.shutdown.chosen = map[string]bool{"pc200": true}
 			m.shutdown.plan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
 			m.shutdown.result = domain.ShutdownApplyReport{State: "completed", Accepted: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc200", State: "accepted", Detail: "request accepted"}}}
-			m.controller.plan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD"}
+			m.controller.plan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40)}
 			m.installation.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
 			if screen == dashboardPXELeaveReview {
 				m.setupMode = true
@@ -563,7 +562,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
 			}
 			if screen == dashboardDeployReview {
-				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Selection") {
+				if !strings.Contains(view, "Enter updates these computers.") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Selection") {
 					t.Fatalf("deployment confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardShutdownReview {
@@ -571,11 +570,11 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 					t.Fatalf("shutdown confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
-				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+				if !strings.Contains(view, "Enter ") || !strings.Contains(view, "Cancel") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("PXE confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardServicesRestartReview {
-				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+				if !strings.Contains(view, "Enter restarts the software cache.") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardControllerReview {
@@ -589,7 +588,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 
 func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		model := experienceFixture(2)
+		model := experienceFixture(t, 2)
 		model.width = size[0]
 		model.height = size[1]
 		model.screen = dashboardUpdate
@@ -635,8 +634,8 @@ func TestUpdateProgressExplainsSystemChecksInOperatorLanguage(t *testing.T) {
 }
 
 func TestAdministrationBackAndDiagnosticsUseTypedCallback(t *testing.T) {
-	m := experienceFixture(2)
-	m = press(m, "a")
+	m := experienceFixture(t, 2)
+	m = press(m, "m")
 	m.actions.LoadDoctor = func(ctx context.Context) (domain.DoctorReport, error) {
 		return domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}}, nil
 	}
@@ -658,7 +657,7 @@ func TestAdministrationBackAndDiagnosticsUseTypedCallback(t *testing.T) {
 }
 
 func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.setup.State = "incomplete"
 	m = press(m, "enter")
 	m = press(m, "down")
@@ -674,7 +673,7 @@ func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
 }
 
 func TestPrimaryAreasPreserveContext(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return wizardSettings(), nil }
 	m = press(m, "enter")
 	if m.screen != dashboardComputersArea {
@@ -682,16 +681,16 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 	}
 	m = press(m, "down")
 	m = press(m, "enter")
-	if m.screen != dashboardDeploy || m.areaReturn != dashboardComputersArea {
-		t.Fatalf("computer task lost its area: screen=%d return=%d", m.screen, m.areaReturn)
+	if m.screen != dashboardDeploy || m.navigation.areaReturn != dashboardComputersArea {
+		t.Fatalf("computer task lost its area: screen=%d return=%d", m.screen, m.navigation.areaReturn)
 	}
 	m = press(m, "esc")
 	if m.screen != dashboardComputersArea {
 		t.Fatalf("computer task returned to %d", m.screen)
 	}
 	m = press(m, "esc")
-	if m.screen != dashboardHome || m.areaReturn != dashboardHome {
-		t.Fatalf("computers area did not return to overview: screen=%d return=%d", m.screen, m.areaReturn)
+	if m.screen != dashboardHome || m.navigation.areaReturn != dashboardHome {
+		t.Fatalf("computers area did not return to overview: screen=%d return=%d", m.screen, m.navigation.areaReturn)
 	}
 
 	m = press(m, "down")
@@ -705,8 +704,8 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 	}
 	updated, command := m.Update(tea.KeyPressMsg{Text: "p"})
 	m = updated.(dashboardModel)
-	if command == nil || m.screen != dashboardSettings || m.areaReturn != dashboardInstallationArea {
-		t.Fatalf("PXE method did not start the common settings flow: screen=%d return=%d", m.screen, m.areaReturn)
+	if command == nil || m.screen != dashboardSettings || m.navigation.areaReturn != dashboardInstallationArea {
+		t.Fatalf("PXE method did not start the common settings flow: screen=%d return=%d", m.screen, m.navigation.areaReturn)
 	}
 	updated, command = m.Update(command())
 	m = updated.(dashboardModel)
@@ -721,7 +720,7 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 
 func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.width = size[0]
 		m.height = size[1]
 		m.screen = dashboardSetup
@@ -733,7 +732,7 @@ func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 		}
 
 		m.screen = dashboardSetupKeys
-		m.setupKeys = domain.KeyReconcileReport{State: "action-required"}
+		m.keys.report = domain.KeyReconcileReport{State: "action-required"}
 		view = m.View().Content
 		for _, expected := range []string{"Controller keys", "Create missing", "Esc", "Help"} {
 			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
@@ -746,29 +745,20 @@ func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 	}
 }
 
-func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
+func TestEnterReviewsIgnoreTypedTextAndEscCancelsSafely(t *testing.T) {
 	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview} {
-		m := experienceFixture(2)
+		m := experienceFixture(t, 2)
 		m.screen = screen
-		if screen == dashboardDeployReview {
-			m.deployment.confirmation = "wrong"
-		} else {
-			m.confirmation = "wrong"
-		}
-		m.controller.plan.Confirmation = "REBUILD"
-		m.maintenance.gitCommitPlan.Confirmation = "COMMIT"
-		m.updates.plan.Confirmation = "UPDATE"
 		m.deployment.plan.ColmenaSelector = "@lab"
-		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-		m = updated.(dashboardModel)
-		confirmation := m.confirmation
-		if screen == dashboardDeployReview {
-			confirmation = m.deployment.confirmation
+		for _, key := range []tea.KeyPressMsg{{Text: "wrong"}, {Text: "DEPLOY"}} {
+			updated, command := m.Update(key)
+			m = updated.(dashboardModel)
+			confirmation := m.confirmation + m.deployment.confirmation
+			if command != nil || confirmation != "" || m.screen != screen || m.busy != "" {
+				t.Fatalf("screen %d kept or acted on typed text", screen)
+			}
 		}
-		if command != nil || confirmation != "" || m.screen != screen || m.busy != "" {
-			t.Fatalf("screen %d accepted incorrect input", screen)
-		}
-		updated, command = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 		m = updated.(dashboardModel)
 		if command != nil || m.screen == screen || m.busy != "" {
 			t.Fatalf("screen %d did not cancel safely", screen)
@@ -777,7 +767,7 @@ func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
 }
 
 func TestExperienceStatesAndDisclosure(t *testing.T) {
-	m := experienceFixture(24)
+	m := experienceFixture(t, 24)
 	if !strings.Contains(m.View().Content, "Laboratory overview") || !strings.Contains(m.View().Content, "Computers") || strings.Contains(m.View().Content, "24 computers") {
 		t.Fatal("entry is not intervention-oriented")
 	}
@@ -785,16 +775,16 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 	if !strings.Contains(m.View().Content, m.busy) {
 		t.Fatal("loading not visible")
 	}
-	m = experienceFixture(0)
+	m = experienceFixture(t, 0)
 	if strings.Contains(m.View().Content, "No computers configured") || strings.Contains(m.View().Content, "0 / 0") {
 		t.Fatal("empty inventory leaked into intervention entry")
 	}
-	m = experienceFixture(2)
+	m = experienceFixture(t, 2)
 	m.report.PXE.Mode = "recovery-required"
 	if !strings.Contains(m.View().Content, "Network installation is still active") {
 		t.Fatal("error not prominent")
 	}
-	m = experienceFixture(2)
+	m = experienceFixture(t, 2)
 	m.screen = dashboardHosts
 	m.computers.hosts.Hosts[0].CurrentSystem = "/nix/store/technical-system"
 	if strings.Contains(m.View().Content, "/nix/store/") {
@@ -809,7 +799,7 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 // These are actual View() outputs from deterministic synthetic lab scenarios,
 // useful for review without connecting to or changing a real laboratory.
 func TestExperienceRenderGallery(t *testing.T) {
-	m := experienceFixture(24)
+	m := experienceFixture(t, 24)
 	m.computers.hosts.GeneratedAt = time.Now().Truncate(time.Minute)
 	for _, name := range []string{"interventions", "setup", "installation", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "shutdown", "shutdown-confirmation", "shutdown-result", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
 		m.screen = dashboardHome
@@ -844,7 +834,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.software.plan = domain.SoftwareChangePlanReport{
 				State: "ready", ManagedFile: "lab-software.json",
 				Request:         domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
-				AffectedClients: []string{"pc01", "pc02", "pc03"}, Confirmation: "SAVE",
+				AffectedClients: []string{"pc01", "pc02", "pc03"},
 			}
 		case "software-result":
 			m.screen = dashboardSoftware
@@ -890,7 +880,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 }
 
 func TestShutdownResultDisclosesTechnicalDetailOnlyOnRequest(t *testing.T) {
-	m := experienceFixture(2)
+	m := experienceFixture(t, 2)
 	m.screen = dashboardShutdownResult
 	m.shutdown.result = domain.ShutdownApplyReport{
 		State:       "partial",

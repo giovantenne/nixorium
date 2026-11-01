@@ -26,10 +26,10 @@ var dashboardTasks = []dashboardTask{
 	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, updating computers, Internet access and power"},
 	{id: "installation", shortcut: "n", title: "Installation", description: "Configure the lab and install computers by PXE or the official USB ISO over SSH"},
 	{id: "software", shortcut: "w", title: "Software", description: "Manage configured software or find packages to add"},
-	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
+	{id: "admin", shortcut: "m", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
 }
 
-var assistantTask = dashboardTask{id: "assistant", shortcut: "m", title: "Assistant", description: "Describe a lab customization; review the proposal before saving"}
+var assistantTask = dashboardTask{id: "assistant", shortcut: "a", title: "Assistant", description: "Describe a lab customization; review the proposal before saving"}
 
 func (model dashboardModel) homeAreas() []dashboardTask {
 	tasks := append([]dashboardTask(nil), dashboardTasks...)
@@ -184,7 +184,7 @@ func (model dashboardModel) homeView() string {
 			actions: []tuiAction{{key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
 		})
 	}
-	if model.menuRows == 0 {
+	if model.navigation.menuRows == 0 {
 		return model.fitMenu(len(model.overviewTasks()), func(fitted dashboardModel) string { return fitted.homeView() })
 	}
 	subtitle := "Choose an area with the arrows or its letter."
@@ -197,6 +197,9 @@ func (model dashboardModel) homeView() string {
 		lines = append(lines, model.busyView(), "")
 	}
 	lines = append(lines, model.taskMenu(model.overviewTasks(), menu.list.Index()))
+	if model.reopenOutcome != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusSuccess, title: model.reopenOutcome})
+	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
@@ -245,7 +248,7 @@ func setupOverviewNotice(setup domain.SetupReport) (tuiNotice, bool) {
 }
 
 func (model dashboardModel) areaView(path, title, description string, tasks []dashboardTask, cursor int) string {
-	if model.menuRows == 0 {
+	if model.navigation.menuRows == 0 {
 		return model.fitMenu(len(tasks), func(fitted dashboardModel) string {
 			return fitted.areaView(path, title, description, tasks, cursor)
 		})
@@ -278,7 +281,7 @@ func (model dashboardModel) areaView(path, title, description string, tasks []da
 
 func (model dashboardModel) computersAreaView() string {
 	title := "Manage client computers"
-	description := "Observed state is loaded only by Computer inventory or an operation that needs it."
+	description := "Check which computers are on, update them, switch them on or off, and control Internet access."
 	if model.actions.ClassroomMode {
 		title = "Classroom controls"
 		description = "Check computers, watch and lock students' screens, send files, control temporary Internet access, or switch computers on, shut them down or restart them after a review. Administrative configuration is not available here."

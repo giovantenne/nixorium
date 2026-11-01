@@ -23,12 +23,21 @@ type settingsField struct {
 	// detected lists observed values; a typed value outside it gets a
 	// warning (the controller DHCP address).
 	detected []string
+	// closed lists only the choices above: no entry for a typed value.
+	closed bool
+}
+
+var classroomViewChoices = []settingsChoice{
+	{value: "on", label: "On", description: "See, control and lock the students' screens, show yours, send and collect files"},
+	{value: "off", label: "Off", description: "No classroom view; Internet pause, switch on and off and the schedule keep working"},
 }
 
 type settingsChoice struct {
 	value       string
 	label       string
 	description string
+	// device is the network device carrying a detected controller address.
+	device string
 }
 
 type settingsChoiceItem settingsChoice
@@ -104,7 +113,9 @@ type settingsWizardModel struct {
 	replace   bool
 	custom    bool
 	// warning is a non-blocking notice about the previous answer.
-	warning  string
+	warning string
+	// note reports a setting the previous answer changed too.
+	note     string
 	selector list.Model
 	width    int
 	height   int
@@ -150,6 +161,11 @@ func (model *settingsWizardModel) prepareCurrentField() {
 	}
 	items := make([]list.Item, 0, len(field.choices)+2)
 	current := model.drafts[model.index]
+	inherited := false
+	if field.id == "lab.controllerIfaceName" && current == "" && field.detected != nil {
+		// An empty value uses the shared name; preselect the card it names.
+		current, inherited = model.settings.Lab.ControllerInterface(), true
+	}
 	selected := 0
 	found := false
 	for index, choice := range field.choices {
@@ -159,7 +175,7 @@ func (model *settingsWizardModel) prepareCurrentField() {
 			found = true
 		}
 	}
-	if current != "" && !found {
+	if current != "" && !found && !inherited {
 		description := "Current custom value"
 		if field.detected != nil {
 			description = "Saved value; the controller does not have it now"
@@ -174,8 +190,13 @@ func (model *settingsWizardModel) prepareCurrentField() {
 	other := settingsChoiceItem{value: customSettingsChoice, label: "Custom…", description: "Enter another validated value"}
 	if field.other != "" {
 		other.label, other.description = field.other, "Type an address that is not listed"
+		if field.id == "lab.controllerIfaceName" {
+			other.description = "Type a device name that is not listed"
+		}
 	}
-	items = append(items, other)
+	if !field.closed {
+		items = append(items, other)
+	}
 	delegate := tuiListDelegate(model.isDark)
 	model.selector = list.New(items, delegate, model.choiceWidth(), model.choiceHeight())
 	model.selector.Title = field.label
@@ -194,7 +215,7 @@ func (model settingsWizardModel) choiceWidth() int {
 }
 
 func (model settingsWizardModel) choiceHeight() int {
-	height := model.height - 14
+	height := model.height - ctaRows(model.height) - 14
 	if height < 4 {
 		return 4
 	}
@@ -207,7 +228,7 @@ func (model settingsWizardModel) choiceHeight() int {
 func (model settingsWizardModel) moveToField(index int) settingsWizardModel {
 	model.index = index
 	model.err = ""
-	model.warning = ""
+	model.warning, model.note = "", ""
 	model.prepareCurrentField()
 	return model
 }
@@ -349,7 +370,11 @@ func (model settingsWizardModel) updateChoiceField(key tea.KeyPressMsg) (tea.Mod
 			model.err = ""
 			return model, nil
 		}
-		model.drafts[model.index] = selected.value
+		// Confirming the card the controller already uses through the shared
+		// name keeps the field empty, so the review shows no change.
+		if field := model.fields[model.index]; !(field.id == "lab.controllerIfaceName" && model.drafts[model.index] == "" && selected.value == model.settings.Lab.ControllerInterface()) {
+			model.drafts[model.index] = selected.value
+		}
 		return model.acceptCurrentField()
 	default:
 		updated, command := model.selector.Update(key)
@@ -365,6 +390,7 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 		model.err = err.Error()
 		return model, nil
 	}
+	candidate, note := model.followDHCPDevice(candidate, field)
 	model.settings = candidate
 	model.err = ""
 	warning := undetectedValueWarning(field, model.drafts[model.index])
@@ -377,8 +403,29 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 		return model, tea.Quit
 	}
 	model = model.moveToField(model.index + 1)
-	model.warning = warning
+	model.warning, model.note = warning, note
 	return model, nil
+}
+
+// followDHCPDevice moves the controller to the device carrying the chosen
+// detected DHCP address when the form does not ask for the controller's
+// device: the laboratory network and the DHCP address share one cable.
+func (model settingsWizardModel) followDHCPDevice(settings domain.LabSettingsFile, field settingsField) (domain.LabSettingsFile, string) {
+	if field.id != "lab.masterDhcpIp" {
+		return settings, ""
+	}
+	for _, other := range model.fields {
+		if other.id == "lab.controllerIfaceName" || other.id == "lab.ifaceName" {
+			return settings, ""
+		}
+	}
+	for _, choice := range field.choices {
+		if choice.value == settings.Lab.MasterDHCPIP && choice.device != "" && choice.device != settings.Lab.ControllerInterface() {
+			settings.Lab.ControllerInterfaceName = choice.device
+			return settings, fmt.Sprintf("The controller will use %s for the laboratory network: it carries %s.", choice.device, choice.value)
+		}
+	}
+	return settings, ""
 }
 
 // undetectedValueWarning warns when a typed controller DHCP address is not one
@@ -397,7 +444,20 @@ func undetectedValueWarning(field settingsField, value string) string {
 	if len(field.detected) > 0 {
 		found = strings.Join(field.detected, ", ")
 	}
+	if field.id == "lab.controllerIfaceName" {
+		return fmt.Sprintf("The controller has no wired card called %s (found: %s). The review checks it again before saving.", value, found)
+	}
 	return fmt.Sprintf("%s is not one of the controller's current addresses (found: %s). Check it before preparing network installation.", value, found)
+}
+
+// emptyInterfaceMeaning says what an empty interface field uses: clients
+// match their wired card whatever its name (ADR 0017), the controller the
+// shared fallback name.
+func (model settingsWizardModel) emptyInterfaceMeaning() string {
+	if model.fields[model.index].id == "lab.clientIfaceName" {
+		return "any wired network card"
+	}
+	return model.settings.Lab.InterfaceName
 }
 
 func (model settingsWizardModel) optionalInterface() bool {
@@ -412,7 +472,7 @@ func (model settingsWizardModel) View() tea.View {
 		lines := []string{tuiTitle(field.label, model.isDark), "", info.description,
 			tuiFieldDetail("Example", info.example, model.isDark)}
 		if model.optionalInterface() {
-			lines = append(lines, "", tuiFieldDetail("Default when empty", model.settings.Lab.InterfaceName, model.isDark),
+			lines = append(lines, "", tuiFieldDetail("Default when empty", model.emptyInterfaceMeaning(), model.isDark),
 				tuiFieldDetail("Controller network interface", model.settings.Lab.ControllerInterface(), model.isDark),
 				"Use the controller's device name only if the client hardware matches.")
 		}
@@ -422,7 +482,9 @@ func (model settingsWizardModel) View() tea.View {
 			"/ searches suggested values.", "", "Esc / F1 closes help.")
 		return tea.NewView(lipgloss.NewStyle().Width(max(20, model.width-4)).Render(strings.Join(lines, "\n")))
 	}
-	view := tea.NewView(renderTUIShell(model.shell(), model.width, model.isDark))
+	shell := model.shell()
+	shell.compactPrimary = compactTerminal(model.height)
+	view := tea.NewView(renderTUIShell(shell, model.width, model.isDark))
 	view.AltScreen = true
 	return view
 }
@@ -444,8 +506,14 @@ func (model settingsWizardModel) shell() tuiShell {
 	actions := []tuiAction{}
 	if len(field.choices) > 0 && !model.custom {
 		prompt := "Choose a suggested value, or press / to search."
+		if field.closed {
+			prompt = "Choose one."
+		}
 		if field.detected != nil {
 			prompt = "Choose one of the controller's current addresses, or " + strings.TrimSuffix(field.other, "…") + " to type one."
+			if field.id == "lab.controllerIfaceName" {
+				prompt = "Choose the controller's card on the laboratory network, or " + strings.TrimSuffix(field.other, "…") + " to type a name."
+			}
 		}
 		lines = append(lines, "", prompt, "", trimBlankLines(model.selector.View()))
 		actions = append(actions, tuiAction{key: "↑/↓", label: "Choose"}, tuiAction{key: "Enter", label: "Continue"}, tuiAction{key: "/", label: "Search"}, tuiAction{key: "Esc", label: "Cancel"})
@@ -457,7 +525,7 @@ func (model settingsWizardModel) shell() tuiShell {
 		if model.drafts[model.index] == "" {
 			hint := "e.g. " + info.example
 			if model.optionalInterface() {
-				hint = model.settings.Lab.InterfaceName + " (default)"
+				hint = model.emptyInterfaceMeaning() + " (default)"
 			}
 			input += tuiMuted(hint, model.isDark)
 		}
@@ -477,6 +545,9 @@ func (model settingsWizardModel) shell() tuiShell {
 		lines = append(lines, preview...)
 	}
 	notices := []tuiNotice{}
+	if model.note != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusSuccess, title: model.note})
+	}
 	if model.warning != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.warning})
 	}
@@ -639,6 +710,11 @@ func settingFieldValue(settings domain.LabSettingsFile, field string) string {
 		return settings.Lab.KeyboardLayout
 	case "lab.consoleKeyMap":
 		return settings.Lab.ConsoleKeyMap
+	case "lab.classroomView":
+		if settings.Lab.ClassroomViewOn() {
+			return "on"
+		}
+		return "off"
 	default:
 		return ""
 	}
@@ -708,6 +784,20 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		// An existing value is kept in step so older releases still evaluate.
 		if settings.Lab.ConsoleKeyMap != "" {
 			settings.Lab.ConsoleKeyMap = value
+		}
+	case "lab.classroomView":
+		switch value {
+		case "on":
+			// Back to the default: the key is left out of the file, as
+			// ClassroomViewOn reads a missing key as on. An explicit true stays.
+			if !settings.Lab.ClassroomViewOn() {
+				settings.Lab.ClassroomView = nil
+			}
+		case "off":
+			off := false
+			settings.Lab.ClassroomView = &off
+		default:
+			return settings, errors.New("must be on or off")
 		}
 	default:
 		return settings, errors.New("unsupported setting")

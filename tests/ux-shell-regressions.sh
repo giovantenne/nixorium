@@ -135,4 +135,37 @@ while IFS= read -r CODE; do
 done < <(sed -n 's/^\t"\([A-Z-]*\)": {$/\1/p' "$REPO_ROOT/internal/domain/next_steps.go")
 [[ "$(sed -n 's/^\t"\([A-Z-]*\)": {$/\1/p' "$REPO_ROOT/internal/domain/next_steps.go" | wc -l)" -ge 10 ]]
 
+# install.sh and install-controller.sh are fetched with curl and cannot source
+# scripts/lib/ui.sh, so they carry copies of the helpers they share with it.
+# These bodies must stay identical; the others differ on purpose (stderr,
+# step counts, labels).
+ui_function() {
+  awk -v name="$2" '$0 == name "() {" { p = 1 } p { print } p && $0 == "}" { exit }' "$1"
+}
+for SCRIPT in install.sh scripts/install-controller.sh; do
+  for NAME in ui_note ui_log ui_success ui_error; do
+    EXPECTED="$(ui_function "$REPO_ROOT/scripts/lib/ui.sh" "$NAME")"
+    [[ -n "$EXPECTED" ]] || { echo "scripts/lib/ui.sh has no ${NAME}" >&2; exit 1; }
+    [[ "$(ui_function "$REPO_ROOT/$SCRIPT" "$NAME")" == "$EXPECTED" ]] \
+      || { echo "${NAME} in ${SCRIPT} differs from scripts/lib/ui.sh" >&2; exit 1; }
+  done
+done
+
+# Repository checks run as admin: no command in apply-controller.sh may run
+# the repository's git as root, because .git/config (fsmonitor, hooks) is
+# admin-controlled. The only `git` word is inside the repo_git helper.
+APPLY_SCRIPT="$REPO_ROOT/scripts/apply-controller.sh"
+[[ "$(grep -cE '(^|[^_a-z-])git ' "$APPLY_SCRIPT")" == 1 ]] \
+  || { echo "apply-controller.sh runs git outside repo_git" >&2; exit 1; }
+grep -F 'as_admin env GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null' "$APPLY_SCRIPT" >/dev/null
+grep -F -- '-c core.fsmonitor=false -c core.hooksPath=/dev/null' "$APPLY_SCRIPT" >/dev/null
+[[ "$(grep -n '^as_admin()' "$APPLY_SCRIPT" | cut -d: -f1)" -lt \
+   "$(grep -n 'repo_git status' "$APPLY_SCRIPT" | head -1 | cut -d: -f1)" ]]
+PXE_SCRIPT="$REPO_ROOT/scripts/prepare-pxe.sh"
+[[ "$(grep -cE '(^|[^_a-z-])git ' "$PXE_SCRIPT")" == 1 ]] \
+  || { echo "prepare-pxe.sh runs git outside repo_git" >&2; exit 1; }
+grep -F -- '-c core.fsmonitor=false -c core.hooksPath=/dev/null' "$PXE_SCRIPT" >/dev/null
+grep -F 'runuser -u admin -- env HOME=/tmp XDG_CACHE_HOME=/tmp' "$REPO_ROOT/modules/management.nix" >/dev/null \
+  || { echo "install-secrets must verify keys as admin" >&2; exit 1; }
+
 echo 'UX shell regression tests passed.'

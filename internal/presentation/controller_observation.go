@@ -63,7 +63,7 @@ func (model *dashboardModel) observeSetupController(setup domain.SetupReport) {
 }
 
 func (model *dashboardModel) observeRecoveryController(recovery domain.RecoveryReport) {
-	model.recovery = recovery
+	model.recovery.report = recovery
 	for _, condition := range recovery.Conditions {
 		if condition.Kind == domain.RecoveryControllerChanged {
 			// Recovery checks the last activation, not the desired Git HEAD.
@@ -81,14 +81,14 @@ func (model *dashboardModel) noteControllerCurrent() {
 	model.controllerObservation = controllerOverviewCurrent
 	// Only this cached condition is superseded by the fresh verification.
 	// Persistent client/reset recovery records and all other conditions remain.
-	conditions := make([]domain.BlockingCondition, 0, len(model.recovery.Conditions))
-	for _, condition := range model.recovery.Conditions {
+	conditions := make([]domain.BlockingCondition, 0, len(model.recovery.report.Conditions))
+	for _, condition := range model.recovery.report.Conditions {
 		if condition.Kind != domain.RecoveryControllerChanged {
 			conditions = append(conditions, condition)
 		}
 	}
-	model.recovery.Conditions = conditions
-	if len(conditions) == 0 && model.recovery.State == "attention" {
-		model.recovery.State = "clear"
+	model.recovery.report.Conditions = conditions
+	if len(conditions) == 0 && model.recovery.report.State == "attention" {
+		model.recovery.report.State = "clear"
 	}
 }

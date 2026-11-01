@@ -21,7 +21,7 @@ func TestOverviewDistinguishesConfigurationFromPendingApplication(t *testing.T) 
 		{domain.SetupStageReview, "The configuration has unsaved changes", false},
 	} {
 		t.Run(test.stage, func(t *testing.T) {
-			model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: test.stage}, DashboardActions{}, false)
+			model := newTestModel(t, withReport(testDashboardReport("stopped")), withSetup(domain.SetupReport{State: "action-required", CurrentStage: test.stage}))
 			model.screen = dashboardHome
 			view := model.View().Content
 			if !strings.Contains(view, test.want) || strings.Contains(view, "Computer installation is not configured yet") != test.incomplete {
@@ -32,7 +32,7 @@ func TestOverviewDistinguishesConfigurationFromPendingApplication(t *testing.T) 
 }
 
 func TestOverviewDoesNotAskForNetworkBootFilesAfterUSBInstallation(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageArtifacts}, DashboardActions{}, false)
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withSetup(domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageArtifacts}))
 	model.screen = dashboardHome
 	if view := model.View().Content; strings.Contains(view, "Installation files need preparing") {
 		t.Fatalf("missing network boot files raised an alert: %s", view)
@@ -40,7 +40,7 @@ func TestOverviewDoesNotAskForNetworkBootFilesAfterUSBInstallation(t *testing.T)
 }
 
 func TestOverviewClearsSavedRevisionThatTheControllerAlreadyRuns(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withSetup(domain.SetupReport{State: "ready"}))
 	model.screen = dashboardHome
 	revision := "222c026dcb9046c902363ee5120d7c03e4854ea2"
 	model.noteControllerSave(revision)

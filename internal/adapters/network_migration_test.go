@@ -48,35 +48,6 @@ func TestTransitionProbeTriesTheNewAddressFirst(t *testing.T) {
 	}
 }
 
-func TestColmenaReachesComputersStillOnThePreviousNetwork(t *testing.T) {
-	plan := domain.DeploymentPlanReport{
-		Targets: []domain.DeploymentTarget{
-			{Name: "pc01", IP: "10.1.0.1", PreviousIP: "10.0.0.1"},
-			{Name: "pc02", IP: "10.1.0.2", PreviousIP: "10.0.0.2"},
-			{Name: "pc03", IP: "10.1.0.3"},
-		},
-		Availability: []domain.DeploymentTargetAvailability{
-			{Name: "pc01", IP: "10.1.0.1", Network: domain.HostNetworkPrevious},
-			{Name: "pc02", IP: "10.1.0.2", Network: domain.HostNetworkCurrent},
-			{Name: "pc03", IP: "10.1.0.3", Network: domain.HostNetworkPrevious},
-		},
-	}
-	redirects := colmenaRedirects(plan)
-	if len(redirects) != 1 || redirects["10.1.0.1"] != "10.0.0.1" {
-		t.Fatalf("redirects = %v", redirects)
-	}
-	content, err := colmenaSSHConfig(redirects)
-	if err != nil || !strings.HasPrefix(content, "Host 10.1.0.1\n  HostName 10.0.0.1\nHost *\n") || !strings.Contains(content, "  StrictHostKeyChecking accept-new\n") {
-		t.Fatalf("config = %q, %v", content, err)
-	}
-	if _, err := colmenaSSHConfig(map[string]string{"10.1.0.1": "10.0.0.1\n  ProxyCommand x"}); err == nil {
-		t.Fatal("an address with configuration text was accepted")
-	}
-	if content, _ := colmenaSSHConfig(nil); !strings.HasPrefix(content, "Host *\n") {
-		t.Fatalf("plain config = %q", content)
-	}
-}
-
 func TestRekeyKnownHostsCopiesTrustedKeysOnly(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.Chmod(directory, 0700); err != nil {

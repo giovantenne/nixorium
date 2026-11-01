@@ -12,6 +12,16 @@ import (
 // entry: what was not done and why, the reason Nixorium stops, and the way
 // forward. The technical text stays available as a details line.
 
+// messageNotice shows the current message, as a success when it only reports
+// the verified controller apply that just finished.
+func (model dashboardModel) messageNotice() tuiNotice {
+	result := model.controller.result
+	if result.Operation != "" && !result.HasErrors() && result.Applied && result.Verified && result.Message == model.message {
+		return tuiNotice{kind: tuiStatusSuccess, title: model.message}
+	}
+	return tuiNotice{kind: tuiStatusAttention, title: model.message}
+}
+
 // failureNotice reports a failed attempt; prefix says what was tried.
 func failureNotice(prefix, message string) tuiNotice {
 	return tuiNotice{kind: tuiStatusAttention, title: message, prefix: prefix}
@@ -77,7 +87,7 @@ func noticeNextStep(notice tuiNotice) string {
 // resultSituation is the situation reported on a result screen that offers
 // the direct way out: Enter opens its screen and d shows the technical text.
 func (model dashboardModel) resultSituation() (domain.NextStep, bool) {
-	if model.busy != "" || model.helpOpen {
+	if model.busy != "" || model.navigation.helpOpen {
 		return domain.NextStep{}, false
 	}
 	switch {
@@ -136,7 +146,7 @@ func (model dashboardModel) heldRecordCodes() []string {
 		{domain.RecoveryDeploymentPending, "DEPLOY-PENDING"},
 		{domain.RecoveryUSBReserved, "USB-RESERVED"},
 	} {
-		for _, condition := range model.recovery.Conditions {
+		for _, condition := range model.recovery.report.Conditions {
 			if condition.Kind == held.kind {
 				codes = append(codes, held.code)
 				break
@@ -211,7 +221,7 @@ func (model dashboardModel) updateResultSituation(key string) (tea.Model, tea.Cm
 			return model, nil, false
 		}
 		if opened, ok := next.(dashboardModel); ok && opened.screen == dashboardRecoveryReview {
-			opened.recoveryReview.returnTo, opened.recoveryReview.returnMessage, opened.recoveryReview.returnSet = origin, message, true
+			opened.recovery.review.returnTo, opened.recovery.review.returnMessage, opened.recovery.review.returnSet = origin, message, true
 			opened.noticeDetails = false
 			return opened, command, true
 		}

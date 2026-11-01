@@ -1,6 +1,5 @@
-{ config, hostName, labSettings, lib, pkgs, ... }:
+{ config, isController, labSettings, lib, pkgs, ... }:
 let
-  isController = hostName == labSettings.masterHostName;
   preparationFile = "/var/lib/nixorium/prepared/prepared.json";
   sessionFile = "/var/lib/nixorium/pxe/session.json";
   lastSessionFile = "/var/lib/nixorium/pxe/last-session.json";
@@ -9,7 +8,7 @@ let
   # interface untouched. Network installation is prepared again afterwards.
   networkAction = pkgs.writeShellApplication {
     name = "nixorium-pxe-network-action";
-    runtimeInputs = [ pkgs.coreutils pkgs.gawk pkgs.iproute2 pkgs.jq pkgs.util-linux ];
+    runtimeInputs = [ pkgs.coreutils pkgs.gawk pkgs.gnugrep pkgs.iproute2 pkgs.jq pkgs.networkmanager pkgs.util-linux ];
     text = ''
       ACTION="''${1:-}"
       [[ $# -eq 1 && "$ACTION" =~ ^(start|stop|recover)$ ]] \
@@ -53,6 +52,47 @@ let
         [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
           || fail "a USB installation remains reserved; PXE start is blocked"
       fi
+
+      # The laboratory card is NetworkManager's profile nixorium-lab. Change
+      # only the connection applied to the card, never the profile: a DHCP
+      # renewal then keeps the static address away, and a restart brings it
+      # back. Without NetworkManager on the card, change the address itself.
+      lab_profile_active() {
+        command -v nmcli >/dev/null 2>&1 || return 1
+        nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null \
+          | grep -Fxq "nixorium-lab:$1"
+      }
+
+      remove_static_address() {
+        local iface="$1" cidr="$2"
+        if lab_profile_active "$iface"; then
+          nmcli device modify "$iface" -ipv4.addresses "$cidr" >/dev/null
+        else
+          ip addr del "$cidr" dev "$iface"
+        fi
+      }
+
+      restore_static_address() {
+        local iface="$1" cidr="$2"
+        if lab_profile_active "$iface" \
+            && nmcli device modify "$iface" +ipv4.addresses "$cidr" >/dev/null; then
+          return 0
+        fi
+        # At boot NetworkManager may still be activating the card and adds the
+        # profile's address itself; replace is harmless when it does.
+        ip addr replace "$cidr" dev "$iface"
+      }
+
+      # NetworkManager applies a modified connection asynchronously: the
+      # address appears or disappears shortly after nmcli returns.
+      wait_until() {
+        local deadline=$((SECONDS + $1))
+        shift
+        until "$@"; do
+          ((SECONDS < deadline)) || return 1
+          sleep 0.2
+        done
+      }
 
       address_present() {
         local iface="$1"
@@ -127,13 +167,18 @@ let
         ip link show dev "$iface" >/dev/null \
           || fail "recorded PXE interface $iface does not exist"
         if ! address_present "$iface" "$static_cidr"; then
-          ip addr add "$static_cidr" dev "$iface" \
+          restore_static_address "$iface" "$static_cidr" \
             || fail "could not restore $static_cidr on $iface"
         fi
-        address_present "$iface" "$static_cidr" \
+        wait_until 15 address_present "$iface" "$static_cidr" \
           || fail "restored static address $static_cidr is not observable on $iface"
         archive_session "$final_state" "$reason"
         echo "Restored $static_cidr on $iface ($reason)"
+      }
+
+      transition_observed() {
+        ! address_present "$CONFIGURED_IFACE" "$CONFIGURED_STATIC_CIDR" \
+          && ip_present "$CONFIGURED_IFACE" "$PREPARED_DHCP_IP"
       }
 
       validate_preparation() {
@@ -183,7 +228,7 @@ let
           || fail "managed PXE preparation contains no client closures"
         for row in "''${client_rows[@]}"; do
           IFS=$'\t' read -r name store_path <<<"$row"
-          [[ "$name" =~ ^pc[0-9]+$ && "$store_path" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ && -d "$store_path" ]] \
+          [[ "$name" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ && "$store_path" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ && -d "$store_path" ]] \
             || fail "managed PXE preparation contains an invalid client closure"
         done
         PREPARATION_REVISION="$revision"
@@ -234,12 +279,11 @@ let
         mv -T "$temporary" "$SESSION_FILE"
         sync -f "$STATE_DIRECTORY"
 
-        if ! ip addr del "$CONFIGURED_STATIC_CIDR" dev "$CONFIGURED_IFACE"; then
+        if ! remove_static_address "$CONFIGURED_IFACE" "$CONFIGURED_STATIC_CIDR"; then
           restore_session start-failed remove-static-failed
           fail "could not remove $CONFIGURED_STATIC_CIDR from $CONFIGURED_IFACE"
         fi
-        if address_present "$CONFIGURED_IFACE" "$CONFIGURED_STATIC_CIDR" \
-            || ! ip_present "$CONFIGURED_IFACE" "$PREPARED_DHCP_IP"; then
+        if ! wait_until 15 transition_observed; then
           restore_session start-failed transition-verification-failed
           fail "PXE address transition verification failed and was rolled back"
         fi
@@ -465,7 +509,8 @@ in
     systemd.services.nixorium-pxe-network = {
       description = "Apply and restore the Nixorium PXE address transition";
       wants = [ "network-online.target" ];
-      after = [ "network-online.target" "nixorium-pxe-recover.service" ];
+      # NetworkManager writes the laboratory profile after it starts.
+      after = [ "network-online.target" "NetworkManager-ensure-profiles.service" "nixorium-pxe-recover.service" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
@@ -492,7 +537,7 @@ in
       description = "Recover an unfinished Nixorium PXE network session";
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" ];
-      after = [ "network-online.target" ];
+      after = [ "network-online.target" "NetworkManager-ensure-profiles.service" ];
       before = [ "nixorium-pxe-network.service" ];
       unitConfig.ConditionPathExists = sessionFile;
       serviceConfig = {

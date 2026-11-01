@@ -167,7 +167,8 @@
             "updates",
             "network",
             "cache",
-            "pxe"
+            "pxe",
+            "hardware"
           ],
           "type": "string"
         },
@@ -214,6 +215,40 @@
       },
       "required": [
         "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "read_system_file",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "vscode_marketplace",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "extension": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "extension"
       ],
       "type": "object"
     }

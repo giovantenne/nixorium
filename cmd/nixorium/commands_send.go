@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -29,19 +30,10 @@ func runSendCommand(ctx context.Context, options options, stdout, stderr io.Writ
 		fmt.Fprintln(stderr, "The files or the computers changed since the review; create a fresh plan.")
 		return 1
 	}
-	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Send apply requires an interactive terminal or --yes.")
-			return 2
-		}
-		approved, err := presentation.ConfirmShare(os.Stdin, stderr, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		if !approved {
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(options.yes, stderr, stderr, applyConfirmation{noTerminal: "Send apply requires an interactive terminal or --yes."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmShare(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := applyShare(ctx, plan)
 	if options.json {
@@ -53,4 +45,17 @@ func runSendCommand(ctx context.Context, options options, stdout, stderr io.Writ
 		return 1
 	}
 	return 0
+}
+
+// validateSend rejects option combinations that do not belong to the command.
+func validateSend(result *options) error {
+	if result.command == "send" {
+		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" || result.file == "" {
+			return errors.New("send requires plan/apply, --file and --on")
+		}
+		if result.subcommand == "apply" && result.expect == "" {
+			return errors.New("send apply requires --expect from send plan")
+		}
+	}
+	return nil
 }

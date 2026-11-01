@@ -7,10 +7,6 @@ import (
 	"time"
 )
 
-// DeploymentRecoveryConfirmation acknowledges an interrupted client update
-// after its computers were checked. It never declares that update successful.
-const DeploymentRecoveryConfirmation = "RECOVERED"
-
 // DeploymentActivity is one computer's read-only answer after an interrupted
 // update: the running revision and whether activation is still in progress.
 type DeploymentActivity struct {
@@ -18,6 +14,10 @@ type DeploymentActivity struct {
 	Revision   string
 	Activating bool
 	Detail     string
+	// The last activation result written on the computer by the deployment
+	// engine (ADR 0031), if any.
+	LastActivationID string
+	LastExitCode     *int
 }
 
 // Recovery target states.
@@ -26,6 +26,8 @@ const (
 	RecoveryTargetOther       = "finished-other"
 	RecoveryTargetActivating  = "activating"
 	RecoveryTargetUnreachable = "unreachable"
+	// RecoveryTargetNotStarted: the engine never started anything on it.
+	RecoveryTargetNotStarted = "not-started"
 )
 
 type DeploymentRecoveryTarget struct {
@@ -48,7 +50,10 @@ type DeploymentRecoveryPlan struct {
 	// PXEMode is the network installation mode when a session is still open
 	// (active, degraded or recovery-required): a computer installed through
 	// it may never have finished. It is advisory and not bound by the token.
-	PXEMode      string            `json:"pxeMode,omitempty"`
+	PXEMode string `json:"pxeMode,omitempty"`
+	// Automatic: every computer's outcome is known from the engine's own
+	// records (ADR 0031), so the record may be archived without asking.
+	Automatic    bool              `json:"automatic,omitempty"`
 	ExpiresAt    time.Time         `json:"expiresAt,omitempty"`
 	ReviewToken  string            `json:"reviewToken,omitempty"`
 	Confirmation string            `json:"confirmation,omitempty"`

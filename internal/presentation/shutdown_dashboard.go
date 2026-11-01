@@ -13,8 +13,7 @@ import (
 // shutdownModel owns the transient selection, review and result state for
 // client shutdown. Navigation and application callbacks remain in the root.
 type shutdownModel struct {
-	cursor       int
-	chosen       map[string]bool
+	hostPicker
 	policy       domain.ShutdownSessionPolicy
 	action       domain.ClientPowerAction
 	plan         domain.ShutdownPlanReport
@@ -32,9 +31,9 @@ type shutdownModel struct {
 
 func newShutdownModel() shutdownModel {
 	return shutdownModel{
-		chosen: map[string]bool{},
-		policy: domain.ShutdownProtectUnknown,
-		action: domain.ClientPowerOff,
+		hostPicker: newHostPicker(),
+		policy:     domain.ShutdownProtectUnknown,
+		action:     domain.ClientPowerOff,
 	}
 }
 
@@ -63,26 +62,8 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 		switch key.String() {
 		case "esc", "left":
 			return model, shutdownIntent{kind: shutdownCloseIntent}
-		case "up", "k":
-			model.cursor = max(0, model.cursor-1)
-		case "down", "j":
-			model.cursor = min(max(0, len(hosts)-1), model.cursor+1)
-		case "space":
-			if len(hosts) > 0 {
-				name := hosts[model.cursor].Name
-				model.chosen[name] = !model.chosen[name]
-			}
-		case "a":
-			selectAll := false
-			for _, host := range hosts {
-				if !model.chosen[host.Name] {
-					selectAll = true
-					break
-				}
-			}
-			for _, host := range hosts {
-				model.chosen[host.Name] = selectAll
-			}
+		case "up", "k", "down", "j", "space", "a":
+			model.pick(key.String(), hosts)
 		case "tab":
 			model = model.nextAction()
 		case "enter":
@@ -330,7 +311,7 @@ func (model shutdownModel) selectionView(hosts []domain.HostMeta, context shutdo
 		heading, note = "Which client computers should be switched on?", "Computers already on are found again when you continue. The controller is never included."
 	}
 	lines := []string{tuiSection(heading, context.dark), tuiMuted(note, context.dark), tuiMuted(observationHeading(context.observedAt), context.dark), "", "Action  " + actionLabel, fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
-	start, end := listWindow(len(hosts), model.cursor, max(3, context.height-20))
+	start, end := listWindow(len(hosts), model.cursor, max(3, context.height-ctaRows(context.height)-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
 		checked := " "
@@ -372,9 +353,9 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 		[2]string{"Session safety", shutdownPolicyLabel(plan.Policy)},
 	)...)
 	lines = append(lines, "")
-	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-20))
+	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-ctaRows(context.height)-20))
 	for _, target := range plan.Targets[start:end] {
-		lines = append(lines, shutdownTargetStatus(target, context.dark))
+		lines = append(lines, shutdownTargetStatus(target, plan.Action, context.dark))
 	}
 	if end < len(plan.Targets) {
 		lines = append(lines, tuiMuted(fmt.Sprintf("Showing %d of %d reviewed targets", end, len(plan.Targets)), context.dark))
@@ -463,12 +444,16 @@ func shutdownHasTechnicalDetail(report domain.ShutdownApplyReport) bool {
 	return false
 }
 
-func shutdownTargetStatus(target domain.ShutdownTargetPlan, dark bool) string {
+func shutdownTargetStatus(target domain.ShutdownTargetPlan, action domain.ClientPowerAction, dark bool) string {
+	verb := "will shut down"
+	if action == domain.ClientRestart {
+		verb = "will restart"
+	}
 	switch {
 	case target.Eligible && target.Session == domain.ShutdownSessionIdle:
 		return tuiStatus(target.Name+" · Ready", tuiStatusSuccess, dark)
 	case target.Eligible && target.Session == domain.ShutdownSessionActive:
-		return tuiStatus(target.Name+" · In use · will shut down", tuiStatusAttention, dark)
+		return tuiStatus(target.Name+" · In use · "+verb, tuiStatusAttention, dark)
 	case target.Eligible && target.Session == domain.ShutdownSessionUnused:
 		return tuiStatus(target.Name+" · Logged in, not in use · Ready", tuiStatusSuccess, dark)
 	case target.Eligible:
@@ -500,6 +485,16 @@ func shutdownActiveCount(plan domain.ShutdownPlanReport) int {
 	return count
 }
 
+func shutdownUnknownCount(plan domain.ShutdownPlanReport) int {
+	count := 0
+	for _, target := range plan.Targets {
+		if target.Eligible && target.Session == domain.ShutdownSessionUnknown {
+			count++
+		}
+	}
+	return count
+}
+
 func shutdownPolicyLabel(policy domain.ShutdownSessionPolicy) string {
 	if policy == domain.ShutdownAcknowledgeUnknown {
 		return "unknown states acknowledged"
@@ -516,15 +511,14 @@ func shutdownHasUnknown(plan domain.ShutdownPlanReport) bool {
 	return false
 }
 
+// requested names the whole laboratory as @lab when every client is chosen.
 func (model shutdownModel) requested(hosts []domain.HostMeta) string {
-	names := []string{}
+	all := len(hosts) > 0
 	for _, host := range hosts {
-		if model.chosen[host.Name] {
-			names = append(names, host.Name)
-		}
+		all = all && model.chosen[host.Name]
 	}
-	if len(names) == len(hosts) && len(hosts) > 0 {
+	if all {
 		return "@lab"
 	}
-	return strings.Join(names, ",")
+	return model.hostPicker.requested(hosts)
 }

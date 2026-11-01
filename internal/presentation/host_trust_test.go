@@ -13,6 +13,7 @@ import (
 func trustPresentationPlan() domain.HostTrustPlan {
 	return domain.HostTrustPlan{State: "ready", Host: domain.HostMeta{Name: "pc01", IP: "10.0.0.1"}, Inspection: domain.HostTrustInspection{Recorded: []string{"SHA256:old"}, Offered: "SHA256:new"}, Confirmation: "ROTATE HOST KEY"}
 }
+
 func TestHostTrustConfirmationIsExact(t *testing.T) {
 	for _, input := range []string{"ROTATE HOST KEY\n", "rotate host key\n", "yes\n", "ROTATE HOST\n"} {
 		var output bytes.Buffer
@@ -22,15 +23,16 @@ func TestHostTrustConfirmationIsExact(t *testing.T) {
 		}
 	}
 }
+
 func TestHostTrustReadCancellationIgnoresLateResult(t *testing.T) {
 	var readContext context.Context
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{PlanHostTrust: func(ctx context.Context, _ string) domain.HostTrustPlan {
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withActions(DashboardActions{PlanHostTrust: func(ctx context.Context, _ string) domain.HostTrustPlan {
 		readContext = ctx
 		return trustPresentationPlan()
 	}, ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
 		t.Fatal("cancel triggered write")
 		return domain.HostTrustResult{}
-	}}, false)
+	}}))
 	model.screen = dashboardHosts
 	opened, read := model.openHostTrust("pc01")
 	model = opened.(dashboardModel)
@@ -46,12 +48,13 @@ func TestHostTrustReadCancellationIgnoresLateResult(t *testing.T) {
 		t.Fatal("late reply resumed cancelled action")
 	}
 }
+
 func TestHostTrustTUIRequiresConfirmationAndProtectsMutation(t *testing.T) {
 	writes := 0
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{}, DashboardActions{PlanHostTrust: func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() }, ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withActions(DashboardActions{PlanHostTrust: func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() }, ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
 		writes++
 		return domain.HostTrustResult{Operation: "host-key-apply", State: "saved", Message: "Reviewed trust saved"}
-	}}, false)
+	}}))
 	opened, read := model.openHostTrust("pc01")
 	model = opened.(dashboardModel)
 	updated, _ := model.Update(read())
@@ -61,7 +64,7 @@ func TestHostTrustTUIRequiresConfirmationAndProtectsMutation(t *testing.T) {
 	}
 	updated, help := model.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	model = updated.(dashboardModel)
-	if help != nil || !model.helpOpen {
+	if help != nil || !model.navigation.helpOpen {
 		t.Fatal("help invoked work")
 	}
 	updated, help = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -98,6 +101,7 @@ func TestHostTrustTUIRequiresConfirmationAndProtectsMutation(t *testing.T) {
 		t.Fatal("successful write described as cancelled")
 	}
 }
+
 func TestClassroomCannotOpenHostTrust(t *testing.T) {
 	model := dashboardModel{actions: DashboardActions{ClassroomMode: true, PlanHostTrust: func(context.Context, string) domain.HostTrustPlan {
 		t.Fatal("classroom observed key")
@@ -109,5 +113,58 @@ func TestClassroomCannotOpenHostTrust(t *testing.T) {
 	opened, cmd := model.openHostTrust("pc01")
 	if cmd != nil || opened.(dashboardModel).screen == dashboardHostTrust {
 		t.Fatal("classroom gained administrative action")
+	}
+}
+
+func TestSavedHostTrustChecksTheComputersAgain(t *testing.T) {
+	checks := 0
+	model := newTestModel(t, withReport(testDashboardReport("stopped")), withActions(DashboardActions{
+		PlanHostTrust: func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() },
+		ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult {
+			return domain.HostTrustResult{Operation: "host-key-apply", State: "saved", Host: "pc01", Message: "Reviewed trust saved"}
+		},
+		LoadHosts: func(context.Context) (domain.HostsReport, error) {
+			checks++
+			return domain.HostsReport{}, nil
+		},
+	}))
+	opened, read := model.openHostTrust("pc01")
+	model = opened.(dashboardModel)
+	updated, _ := model.Update(read())
+	model = updated.(dashboardModel)
+	model.hostTrust.confirmation = "ROTATE HOST KEY"
+	updated, write := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, check := model.Update(write())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHosts || check == nil || !strings.Contains(model.message, "pc01 is saved; checking the computers again") {
+		t.Fatalf("screen = %v, message = %q, check started = %v", model.screen, model.message, check != nil)
+	}
+}
+
+func TestAComputerWithAChangedKeyIsNotOfferedForUpdate(t *testing.T) {
+	report := testDashboardReport("stopped")
+	model := newTestModel(t, withReport(report), withActions(DashboardActions{
+		PlanHostTrust:  func(context.Context, string) domain.HostTrustPlan { return trustPresentationPlan() },
+		ApplyHostTrust: func(domain.HostTrustPlan) domain.HostTrustResult { return domain.HostTrustResult{} },
+	}))
+	model.screen = dashboardHosts
+	model.computers.hosts = domain.HostsReport{Hosts: []domain.HostStatus{{Name: "pc01", IP: "10.0.0.1", HostKeyCondition: domain.HostKeyChanged}}}
+	model.computers.hostDetail = true
+	view := model.View().Content
+	if strings.Contains(view, "Update this computer") || !strings.Contains(view, "Review changed SSH key") {
+		t.Fatalf("detail actions:\n%s", view)
+	}
+	updated, _ := model.Update(demoText("d"))
+	if next := updated.(dashboardModel); next.screen != dashboardHosts || !strings.Contains(next.message, "Review it first") {
+		t.Fatalf("d opened %v with %q", next.screen, next.message)
+	}
+}
+
+func TestChangedHostKeyHasTheSameWordsInUpdateComputersAndInventory(t *testing.T) {
+	host := domain.HostStatus{HostKeyCondition: domain.HostKeyChanged, Reachability: domain.ReachabilityReachable}
+	_, inventory, _ := domain.ComputerCondition(host)
+	if got := deploymentStateLabel(host, true); got != inventory || got != "SSH key changed" {
+		t.Errorf("update computers = %q, inventory = %q", got, inventory)
 	}
 }

@@ -271,14 +271,13 @@ func (model softwareModel) updateSearchInput(key tea.KeyPressMsg, search func(co
 		model.searching = false
 		return model, softwareSearchInput{handled: true, delegate: true}
 	case "backspace":
-		value := []rune(model.query)
-		if len(value) > 0 {
-			model.query = string(value[:len(value)-1])
+		if query := dropLastRune(model.query); query != model.query {
+			model.query = query
 			changed = true
 		}
 	default:
-		if key.Text != "" && len(model.query) < 80 {
-			model.query += key.Text
+		if query := appendInputText(model.query, key.Text, softwareQueryMax); query != model.query {
+			model.query = query
 			changed = true
 		}
 	}
@@ -595,6 +594,7 @@ func (model dashboardModel) openSoftwareDeployment() (tea.Model, tea.Cmd) {
 	model.deployment.chosen = chosen
 	model.deployment.cursor = 0
 	model.deployment.context = "Opened from a saved software change. The review deploys the complete current system configuration, not only that package."
+	model.deployment.origin = dashboardSoftware
 	model.message = ""
 	if len(missing) > 0 {
 		model.message = "Affected computers no longer in the current inventory were not selected: " + strings.Join(missing, ", ") + ". Review the remaining selection."
@@ -727,7 +727,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		back := "Details"
 		primary := "Remove"
 		if model.plan.Request.Present {
-			back = "Computers"
+			back = "Choose computers"
 			primary = "Save"
 		}
 		return []tuiAction{{key: "Enter", label: primary}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}
@@ -740,7 +740,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 			return []tuiAction{{key: "Enter", label: "Retry controller"}, {key: "a", label: "Retry controller"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canDistribute(context.controllerResult) {
-			return []tuiAction{{key: "Enter", label: "Update computers"}, {key: "d", label: "Update affected computers"}, {key: "v", label: "Check systems"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
+			return []tuiAction{{key: "Enter", label: "Update affected computers"}, {key: "v", label: "Check systems"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canInspectState() {
 			return []tuiAction{{key: "v", label: "Check systems"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
@@ -853,7 +853,12 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 		detail := item.Summary
 		if model.mode == softwareConfigured {
 			if entry, found := model.declaration(item.ID); found {
+				// What the package is, then where it goes: identifiers such as
+				// mysql-workbench mean little on their own.
 				detail = "Installed on " + softwareScopeLabel(entry.Scope)
+				if summary := strings.TrimSpace(item.Summary); summary != "" {
+					detail = summary + " · " + strings.ToLower(detail[:1]) + detail[1:]
+				}
 			}
 		} else if entry, found := model.declaration(item.ID); found {
 			detail = "Already installed on " + softwareScopeLabel(entry.Scope)
@@ -884,6 +889,9 @@ func (model softwareModel) catalogListCapacity(context softwareViewContext, pref
 	}
 	prefixHeight := lipgloss.Height(lipgloss.NewStyle().Width(width).Render(strings.Join(prefix, "\n")))
 	actionHeight := lipgloss.Height(tuiActionBar(context.width, context.dark, model.actions(context)...))
+	if !compactTerminal(context.height) && context.height > 0 {
+		actionHeight += 2 // the next-step button border
+	}
 	available := context.height - 4 // frame padding
 	available -= 2                  // shell breadcrumb and following blank line
 	available -= prefixHeight
@@ -958,7 +966,7 @@ func (model softwareModel) scopeView(context softwareViewContext) []string {
 	}
 	if options[model.scopeCursor].scope.Kind == domain.SoftwareScopeClients {
 		lines = append(lines, "")
-		start, end := listWindow(len(model.catalog.Clients), model.clientCursor, max(2, context.height-len(lines)-16))
+		start, end := listWindow(len(model.catalog.Clients), model.clientCursor, max(2, context.height-ctaRows(context.height)-len(lines)-16))
 		for index := start; index < end; index++ {
 			name := model.catalog.Clients[index]
 			checked := "[ ]"
@@ -1032,7 +1040,7 @@ func (model softwareModel) resultView(context softwareViewContext) []string {
 		if result.AffectedController != "" && !verified {
 			lines = append(lines, "", "The configuration remains saved; retrying the controller does not duplicate it.")
 		} else if len(result.AffectedClients) > 0 {
-			lines = append(lines, "", "Select computers and confirm a fresh deployment review; no client changed here.")
+			lines = append(lines, "", "The computers get this change when they are updated. Nothing has changed on them yet.")
 		} else {
 			lines = append(lines, "", "No client deployment is required.")
 		}

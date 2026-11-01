@@ -59,3 +59,10 @@ Persistent blockers have a way out that a non-expert can follow, visible on
 the Overview and in safe mode. The archived records keep the evidence for
 investigation. A recovery can still be refused (activity, changed state,
 unsafe record); the refusal names the next step.
+
+## Amendment (2026-10-19)
+
+[ADR 0030](0030-classroom-controls-beside-maintenance.md) lets Internet access,
+shut down, restart and the schedule run beside maintenance: they refuse only
+the computers named in an unfinished client update, through a per-operation
+lease on `classroom.lock`, instead of the shared operation gate.

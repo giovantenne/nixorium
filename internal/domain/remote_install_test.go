@@ -157,6 +157,21 @@ func TestDecodeRemoteMachineFactsLimitsAndSupport(t *testing.T) {
 	if _, err := DecodeRemoteMachineFacts(data); err != nil {
 		t.Fatal(err)
 	}
+	// A small excluded disk is listed, not a reason to refuse the computer.
+	facts.Disks = append(facts.Disks, RemoteDisk{
+		Path: "/dev/sdb", KName: "sdb", MajorMinor: "8:16", SizeBytes: 0,
+		Model: "card reader", Transport: "usb", DiskSeq: "2", ExclusionReasons: []string{"removable", "too-small"},
+	})
+	data, _ = json.Marshal(facts)
+	if _, err := DecodeRemoteMachineFacts(data); err != nil {
+		t.Fatal("small excluded disk refused the inventory:", err)
+	}
+	facts.Disks[1].Eligible, facts.Disks[1].ExclusionReasons = true, nil
+	data, _ = json.Marshal(facts)
+	if _, err := DecodeRemoteMachineFacts(data); err == nil {
+		t.Fatal("small eligible disk accepted")
+	}
+	facts.Disks = facts.Disks[:1]
 	facts.VariantID = "server"
 	data, _ = json.Marshal(facts)
 	if _, err := DecodeRemoteMachineFacts(data); err == nil {
@@ -167,5 +182,20 @@ func TestDecodeRemoteMachineFactsLimitsAndSupport(t *testing.T) {
 	data, _ = json.Marshal(facts)
 	if _, err := DecodeRemoteMachineFacts(data); err == nil {
 		t.Fatal("oversized interface inventory accepted")
+	}
+}
+
+func TestRemoteLiveResourcesCountTheBundleOnce(t *testing.T) {
+	// A 4 GB computer started from the minimal ISO, measured after the
+	// 763 MiB bundle reached its 2 GB live store.
+	bundle := uint64(800_000_000)
+	facts := RemoteMachineFacts{MemoryAvailableBytes: 2_770_000_000, StoreAvailableBytes: 1_250_000_000}
+	if err := CheckRemoteLiveResources(facts, bundle); err != nil {
+		t.Fatalf("4 GB computer refused: %v", err)
+	}
+	facts.StoreAvailableBytes = 500_000_000
+	err := CheckRemoteLiveResources(facts, bundle)
+	if err == nil || !strings.Contains(err.Error(), "needs 800.0 MB free and has 500.0 MB") {
+		t.Fatalf("short store error = %v", err)
 	}
 }

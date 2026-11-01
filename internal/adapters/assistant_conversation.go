@@ -194,6 +194,11 @@ type AssistantWorkspaceTools struct {
 	Store       AssistantWorkspaceStore
 	LabStatus   func(context.Context, string) string
 	Diagnostics func(context.Context, string, string, string) string
+	// SystemFiles reads one allowlisted system file of a computer (ADR 0032).
+	SystemFiles func(context.Context, string, string, string) string
+	// Marketplace resolves and downloads one VS Code Marketplace extension
+	// for the deployment's pinned editor and returns its pin.
+	Marketplace func(context.Context, string, string) string
 }
 
 func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation domain.AssistantConversation, call domain.AssistantToolCall) string {
@@ -220,14 +225,32 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	}
 	result := ""
 	switch call.Name {
-	case "host_diagnostics", "git_history", "prefetch":
+	case "host_diagnostics", "git_history", "prefetch", "read_system_file", "vscode_marketplace":
 		accepted, consentErr := tools.Store.ReadConsent()
 		if consentErr != nil || !accepted {
 			result = `{"ok":false,"error":"consent_required"}`
+		} else if call.Name == "read_system_file" {
+			var args struct{ Host, Path string }
+			// Malformed arguments leave an empty host and path, which the tool rejects.
+			_ = json.Unmarshal(call.Arguments, &args)
+			if tools.SystemFiles == nil {
+				result = `{"ok":false,"error":"system_files_unavailable"}`
+			} else {
+				result = tools.SystemFiles(ctx, workspace.Conversation.Repository, args.Host, args.Path)
+			}
 		} else if call.Name == "git_history" {
 			result = AssistantGitHistory(ctx, workspace, call)
 		} else if call.Name == "prefetch" {
 			result = prefetchAssistantFile(ctx, tools.Store, call)
+		} else if call.Name == "vscode_marketplace" {
+			var args struct{ Extension string }
+			// Malformed arguments leave the extension empty, which the resolver rejects.
+			_ = json.Unmarshal(call.Arguments, &args)
+			if tools.Marketplace == nil {
+				result = `{"ok":false,"error":"marketplace_unavailable"}`
+			} else {
+				result = tools.Marketplace(ctx, workspace.Conversation.Repository, args.Extension)
+			}
 		} else if tools.Diagnostics == nil {
 			result = `{"ok":false,"error":"diagnostics_unavailable"}`
 		} else {
@@ -339,7 +362,7 @@ func (store AssistantWorkspaceStore) CarryOverProposal(from, to string) (int, er
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	changed, err := resetGit(ctx, old.Repository, nil, 1024*1024, append([]string{"diff", "--name-only", old.Base, target.Conversation.Base, "--"}, paths...)...)
+	changed, err := resetGit(ctx, old.Repository, nil, 1024*1024, append([]string{"--literal-pathspecs", "diff", "--name-only", old.Base, target.Conversation.Base, "--"}, paths...)...)
 	if err != nil || strings.TrimSpace(changed) != "" {
 		return 0, ErrAssistantProposalConflict
 	}

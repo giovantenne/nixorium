@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -19,8 +21,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const assistantPrefetchTestHash = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
-const assistantPrefetchTestStorePath = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-tool-1.2.3.AppImage"
+// The SRI hash of assistantPrefetchTestBody.
+const assistantPrefetchTestBody = "synthetic download\n"
+const assistantPrefetchTestHash = "sha256-Fs2UJxgHZH+jYgcDoVaI1kOjO1jlwfcrA+U5C7qnbd4="
+const assistantPrefetchTestStore = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-"
 
 type assistantPrefetchRoundTripper func(*http.Request) (*http.Response, error)
 
@@ -37,6 +41,7 @@ type assistantPrefetchFixture struct {
 	limits    []int
 	run       assistantCommandRunner
 	size      int64
+	limit     int64
 }
 
 func newAssistantPrefetchFixture(t *testing.T) *assistantPrefetchFixture {
@@ -66,11 +71,10 @@ func newAssistantPrefetchFixture(t *testing.T) *assistantPrefetchFixture {
 			"unspecified6.example.org": {netip.MustParseAddr("::")},
 		},
 		responses: map[string]*http.Response{},
-		size:      123456,
+		size:      int64(len(assistantPrefetchTestBody)),
 	}
 	fixture.run = func(ctx context.Context, limit int, name string, args ...string) (string, string, error) {
-		output, _ := json.Marshal(map[string]string{"hash": assistantPrefetchTestHash, "storePath": assistantPrefetchTestStorePath})
-		return string(output), "", nil
+		return assistantPrefetchTestStore + args[3] + "\n", "", nil
 	}
 	return fixture
 }
@@ -84,7 +88,7 @@ func (fixture *assistantPrefetchFixture) prefetcher() assistantPrefetcher {
 			return nil, errors.New("no such host")
 		},
 		Transport: assistantPrefetchRoundTripper(func(request *http.Request) (*http.Response, error) {
-			if request.Method != http.MethodHead {
+			if request.Method != http.MethodGet {
 				return nil, errors.New("unexpected method " + request.Method)
 			}
 			fixture.requests = append(fixture.requests, request.URL.String())
@@ -94,16 +98,21 @@ func (fixture *assistantPrefetchFixture) prefetcher() assistantPrefetcher {
 			}
 			clone := *response
 			clone.Request = request
-			clone.Body = io.NopCloser(strings.NewReader(""))
+			body := assistantPrefetchTestBody
+			if clone.StatusCode != 200 {
+				body = ""
+			}
+			clone.Body = io.NopCloser(strings.NewReader(body))
 			return &clone, nil
 		}),
+		Limit: fixture.limit,
 		Run: func(ctx context.Context, limit int, name string, args ...string) (string, string, error) {
 			fixture.runs = append(fixture.runs, append([]string{name}, args...))
 			fixture.limits = append(fixture.limits, limit)
 			return fixture.run(ctx, limit, name, args...)
 		},
 		Stat: func(path string) (os.FileInfo, error) {
-			if path != assistantPrefetchTestStorePath {
+			if !strings.HasPrefix(path, assistantPrefetchTestStore) {
 				return nil, os.ErrNotExist
 			}
 			file := filepath.Join(fixture.store.Directory, "synthetic-download")
@@ -192,7 +201,7 @@ func TestAssistantPrefetchURLValidation(t *testing.T) {
 		}
 	}
 	fixture := newAssistantPrefetchFixture(t)
-	exact := "https://downloads.example.org/" + strings.Repeat("a", 2048-len("https://downloads.example.org/"))
+	exact := "https://downloads.example.org/tool?" + strings.Repeat("a", 2048-len("https://downloads.example.org/tool?"))
 	if result := fixture.execute(t, t.Context(), exact); result["ok"] != true {
 		t.Fatal("2048-character URL refused", result)
 	}
@@ -203,15 +212,19 @@ func TestAssistantPrefetchSuccess(t *testing.T) {
 	raw := "https://downloads.example.org/releases/v1.2.3/tool-1.2.3.AppImage?download=1"
 	arguments, _ := json.Marshal(map[string]string{"url": raw})
 	got := fixture.prefetcher().Execute(t.Context(), fixture.store, domain.AssistantToolCall{Name: "prefetch", Arguments: arguments})
-	want := `{"hash":"` + assistantPrefetchTestHash + `","ok":true,"size":123456,"storePath":"` + assistantPrefetchTestStorePath + `","url":"` + raw + `"}`
+	want := `{"hash":"` + assistantPrefetchTestHash + `","ok":true,"size":19,"storePath":"` + assistantPrefetchTestStore + `tool-1.2.3.AppImage","url":"` + raw + `"}`
 	if got != want {
 		t.Fatalf("got  %s\nwant %s", got, want)
 	}
 	if !slices.Equal(fixture.requests, []string{raw}) {
 		t.Fatal(fixture.requests)
 	}
-	if len(fixture.runs) != 1 || !slices.Equal(fixture.runs[0], []string{"nix", "store", "prefetch-file", "--json", raw}) || fixture.limits[0] != 64*1024 {
+	downloaded := filepath.Join(fixture.store.Directory, "prefetch", "download-")
+	if len(fixture.runs) != 1 || len(fixture.runs[0]) != 6 || !slices.Equal(fixture.runs[0][:5], []string{"nix", "store", "add-file", "--name", "tool-1.2.3.AppImage"}) || !strings.HasPrefix(fixture.runs[0][5], downloaded) || fixture.limits[0] != 64*1024 {
 		t.Fatal(fixture.runs, fixture.limits)
+	}
+	if _, err := os.Lstat(fixture.runs[0][5]); !os.IsNotExist(err) {
+		t.Fatal("the downloaded file was kept after it entered the store", err)
 	}
 	if info, err := os.Lstat(filepath.Join(fixture.store.Directory, "prefetch")); err != nil || !info.IsDir() || info.Mode().Perm() != 0700 {
 		t.Fatal("prefetch lock directory", info, err)
@@ -238,7 +251,7 @@ func TestAssistantPrefetchRedirectRevalidation(t *testing.T) {
 		fixture.responses = test.chain
 		result := fixture.execute(t, t.Context(), start)
 		if test.code == "" {
-			if result["ok"] != true || result["url"] != start || len(fixture.requests) != 3 || len(fixture.runs) != 1 || fixture.runs[0][4] != start {
+			if result["ok"] != true || result["url"] != start || len(fixture.requests) != 3 || len(fixture.runs) != 1 || fixture.runs[0][4] != "latest" {
 				t.Fatal(test.name, result, fixture.requests, fixture.runs)
 			}
 			continue
@@ -267,29 +280,70 @@ func TestAssistantPrefetchRedirectRevalidation(t *testing.T) {
 	}
 }
 
-func TestAssistantPrefetchHeadSize(t *testing.T) {
+func TestAssistantPrefetchSize(t *testing.T) {
 	raw := "https://downloads.example.org/tool.tar.gz"
 	for _, test := range []struct {
 		status int
 		length int64
-		ok     bool
+		code   string
 	}{
-		{200, 1<<30 + 1, false},
-		{200, 1 << 30, true},
-		{200, -1, true},
-		{405, 1<<30 + 1, true},
+		{200, 1<<30 + 1, "too_large"},
+		{200, 1 << 30, ""},
+		{200, -1, ""},
+		{404, -1, "download_failed"},
 	} {
 		fixture := newAssistantPrefetchFixture(t)
 		fixture.responses[raw] = &http.Response{StatusCode: test.status, ContentLength: test.length, Header: http.Header{}}
 		result := fixture.execute(t, t.Context(), raw)
-		if (result["ok"] == true) != test.ok || (!test.ok && (result["error"] != "too_large" || len(fixture.runs) != 0)) {
+		if result["error"] == nil && test.code != "" || test.code != "" && (result["error"] != test.code || len(fixture.runs) != 0) || test.code == "" && result["ok"] != true {
 			t.Fatal(test, result, fixture.runs)
 		}
 	}
 	fixture := newAssistantPrefetchFixture(t)
-	fixture.size = 1<<30 + 1
-	if result := fixture.execute(t, t.Context(), raw); result["error"] != "too_large" {
-		t.Fatal("downloaded file above the limit accepted", result)
+	fixture.responses[raw] = &http.Response{StatusCode: 404, ContentLength: -1, Header: http.Header{}}
+	if result := fixture.execute(t, t.Context(), raw); result["message"] != "The download did not complete: unable to download 'https://downloads.example.org/tool.tar.gz': HTTP error 404." {
+		t.Fatal(result)
+	}
+	// A server that sends more than it announced is cut at the limit.
+	fixture = newAssistantPrefetchFixture(t)
+	fixture.limit = int64(len(assistantPrefetchTestBody)) - 1
+	if result := fixture.execute(t, t.Context(), raw); result["error"] != "too_large" || len(fixture.runs) != 0 {
+		t.Fatal("download above the limit accepted", result)
+	}
+	if names, _ := os.ReadDir(filepath.Join(fixture.store.Directory, "prefetch")); len(names) != 0 {
+		t.Fatal("partial download kept", names)
+	}
+	// What the store holds must be what was downloaded.
+	fixture = newAssistantPrefetchFixture(t)
+	fixture.size = 1
+	if result := fixture.execute(t, t.Context(), raw); result["error"] != "download_failed" {
+		t.Fatal("store file of another size accepted", result)
+	}
+}
+
+func TestAssistantPrefetchStoreName(t *testing.T) {
+	for raw, name := range map[string]string{
+		"https://downloads.example.org/a/tool.AppImage?download=1": "tool.AppImage",
+		"https://downloads.example.org/releases/v1/":               "v1",
+		"https://downloads.example.org/a/tool%2B1.deb":             "tool+1.deb",
+	} {
+		fixture := newAssistantPrefetchFixture(t)
+		if result := fixture.execute(t, t.Context(), raw); result["ok"] != true || fixture.runs[0][4] != name || result["storePath"] != assistantPrefetchTestStore+name {
+			t.Fatal(raw, result, fixture.runs)
+		}
+	}
+	for _, raw := range []string{"https://downloads.example.org/", "https://downloads.example.org/a/b%20c.txt", "https://downloads.example.org/a/tool;x", "https://downloads.example.org/.hidden"} {
+		fixture := newAssistantPrefetchFixture(t)
+		if result := fixture.execute(t, t.Context(), raw); result["error"] != "download_failed" || len(fixture.requests) != 0 || len(fixture.runs) != 0 {
+			t.Fatal(raw, result, fixture.requests)
+		}
+	}
+	fixture := newAssistantPrefetchFixture(t)
+	fixture.run = func(context.Context, int, string, ...string) (string, string, error) {
+		return assistantPrefetchTestStore + "other.AppImage\n", "", nil
+	}
+	if result := fixture.execute(t, t.Context(), "https://downloads.example.org/tool.AppImage"); result["error"] != "download_failed" {
+		t.Fatal("a store path of another name accepted", result)
 	}
 }
 
@@ -297,14 +351,14 @@ func TestAssistantPrefetchRunnerFailures(t *testing.T) {
 	raw := "https://downloads.example.org/missing.deb"
 	fixture := newAssistantPrefetchFixture(t)
 	fixture.run = func(ctx context.Context, limit int, name string, args ...string) (string, string, error) {
-		stderr := "\x1b[31;1merror:\x1b[0m unable to download 'https://downloads.example.org/missing.deb': HTTP error 404\n\n       response body:\n\n       <html>Not Found</html>\n"
+		stderr := "\x1b[31;1merror:\x1b[0m cannot connect to socket at '/nix/var/nix/daemon-socket/socket'\n\n       details\n"
 		return "", stderr, errors.New("nix: " + sanitizeOperationLog([]byte(stderr)))
 	}
 	result := fixture.execute(t, t.Context(), raw)
-	if result["error"] != "download_failed" || result["message"] != "The download did not complete: unable to download 'https://downloads.example.org/missing.deb': HTTP error 404." {
+	if result["error"] != "download_failed" || result["message"] != "The download did not complete: cannot connect to socket at '/nix/var/nix/daemon-socket/socket'." {
 		t.Fatal(result)
 	}
-	for _, stdout := range []string{"", "not json", `{"hash":"md5-abc","storePath":"` + assistantPrefetchTestStorePath + `"}`, `{"hash":"` + assistantPrefetchTestHash + `","storePath":"/tmp/file"}`} {
+	for _, stdout := range []string{"", "not a path", "/tmp/missing.deb", assistantPrefetchTestStore + "missing.deb\n" + assistantPrefetchTestStore + "missing.deb"} {
 		fixture = newAssistantPrefetchFixture(t)
 		fixture.run = func(context.Context, int, string, ...string) (string, string, error) { return stdout, "", nil }
 		if result := fixture.execute(t, t.Context(), raw); result["error"] != "download_failed" {
@@ -373,5 +427,69 @@ func TestAssistantPrefetchRequiresConsent(t *testing.T) {
 	}
 	if got := tools.Execute(t.Context(), w.Conversation, domain.AssistantToolCall{Name: "prefetch", Arguments: []byte(`{"url":"http://downloads.example.org/tool.AppImage"}`)}); !strings.Contains(got, `"error":"invalid_url"`) {
 		t.Fatal("consented call did not reach the prefetch validation", got)
+	}
+}
+
+// The real transport connects only to addresses it checks itself: a host that
+// resolves again to a private address after the first check (DNS rebinding)
+// is never contacted, and every redirect hop is checked again when dialed.
+func TestAssistantPrefetchConnectsOnlyToCheckedAddresses(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/moved" {
+			http.Redirect(writer, request, "https://example.com/tool.AppImage", http.StatusFound)
+			return
+		}
+		io.WriteString(writer, assistantPrefetchTestBody)
+	}))
+	defer server.Close()
+	public, private := netip.MustParseAddr("93.184.216.34"), netip.MustParseAddr("10.0.0.7")
+	run := func(t *testing.T, raw string, answers ...[]netip.Addr) (map[string]any, []string) {
+		t.Helper()
+		fixture := newAssistantPrefetchFixture(t)
+		prefetcher := fixture.prefetcher()
+		lookups := 0
+		prefetcher.Resolve = func(ctx context.Context, host string) ([]netip.Addr, error) {
+			if host != "example.com" {
+				return nil, errors.New("no such host")
+			}
+			answer := answers[min(lookups, len(answers)-1)]
+			lookups++
+			return answer, nil
+		}
+		var dialed []string
+		prefetcher.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+			dialed = append(dialed, address)
+			return (&net.Dialer{}).DialContext(ctx, network, server.Listener.Addr().String())
+		}
+		prefetcher.TLS = server.Client().Transport.(*http.Transport).TLSClientConfig
+		prefetcher.Transport = nil
+		arguments, _ := json.Marshal(map[string]string{"url": raw})
+		var result map[string]any
+		if err := json.Unmarshal([]byte(prefetcher.Execute(t.Context(), fixture.store, domain.AssistantToolCall{Name: "prefetch", Arguments: arguments})), &result); err != nil {
+			t.Fatal(err)
+		}
+		return result, dialed
+	}
+	if result, dialed := run(t, "https://example.com/moved", []netip.Addr{public}); result["ok"] != true || result["hash"] != assistantPrefetchTestHash || result["storePath"] != assistantPrefetchTestStore+"moved" || !slices.Equal(dialed, []string{"93.184.216.34:443"}) {
+		t.Fatal("checked download", result, dialed)
+	}
+	if result, dialed := run(t, "https://example.com/tool.AppImage", []netip.Addr{public}, []netip.Addr{private}); result["error"] != "host_refused" || len(dialed) != 0 {
+		t.Fatal("rebinding to a private address was contacted", result, dialed)
+	}
+	if result, dialed := run(t, "https://example.com/tool.AppImage", []netip.Addr{public}, []netip.Addr{public, private}); result["error"] != "host_refused" || len(dialed) != 0 {
+		t.Fatal("a mixed answer was contacted", result, dialed)
+	}
+}
+
+func TestAssistantPrefetchRefusesReservedRanges(t *testing.T) {
+	for _, address := range []string{"192.0.0.8", "192.0.2.1", "198.18.0.1", "198.51.100.1", "203.0.113.1", "224.0.0.251", "239.255.255.250", "240.0.0.1", "255.255.255.255", "ff02::1", "2001:db8::1"} {
+		if assistantPrefetchPublic([]netip.Addr{netip.MustParseAddr(address)}) {
+			t.Error(address, "accepted")
+		}
+	}
+	for _, address := range []string{"93.184.216.34", "1.1.1.1", "2606:4700::1111"} {
+		if !assistantPrefetchPublic([]netip.Addr{netip.MustParseAddr(address)}) {
+			t.Error(address, "refused")
+		}
 	}
 }

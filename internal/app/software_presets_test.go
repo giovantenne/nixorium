@@ -56,7 +56,7 @@ func TestSoftwarePresetPlanAddsOneAtomicCandidateAndPreservesExistingScopes(t *t
 		Preset: "programming",
 		Scope:  domain.SoftwareScope{Kind: domain.SoftwareScopeShared},
 	})
-	if plan.HasErrors() || plan.State != "ready" || plan.ReviewToken == "" || plan.Confirmation != "ADD PROFILE" {
+	if plan.HasErrors() || plan.State != "ready" || plan.ReviewToken == "" || plan.Confirmation != "" {
 		t.Fatalf("preset plan = %+v", plan)
 	}
 	if source.validations != 1 || len(plan.SelectedPackages) != 3 || len(plan.Existing) != 1 || len(plan.Additions) != 2 || len(plan.Candidate.Packages) != 3 {

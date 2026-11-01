@@ -91,14 +91,13 @@ func (m HomeFilesManager) Plan(ctx context.Context, repository string, draft dom
 	if draft.BaseFingerprint != "" && draft.BaseFingerprint != i.Snapshot.BaseFingerprint {
 		return homeFilesPlanIssue(repository, "source", domain.ErrHomeFilesConflict)
 	}
-	r := domain.HomeFilesPlanReport{SchemaVersion: 1, Operation: "home-files-plan", State: "ready", Repository: repository, Candidate: &draft, Snapshot: &i.Snapshot, Entries: i.Entries, Changes: homeFilesChanges(i.BaseEntries, i.Entries), StudentUser: i.StudentUser, Targets: i.Targets, Confirmation: "SAVE", Issues: []domain.ValidationIssue{}, Message: "Save initial files for the student account on the controller and all clients. Files are private; explicit executables are 0700. Materials enter Git, the Nix store and cache. Systems and homes change only after separate application and normal boot."}
+	r := domain.HomeFilesPlanReport{SchemaVersion: 1, Operation: "home-files-plan", State: "ready", Repository: repository, Candidate: &draft, Snapshot: &i.Snapshot, Entries: i.Entries, Changes: homeFilesChanges(i.BaseEntries, i.Entries), StudentUser: i.StudentUser, Targets: i.Targets, Issues: []domain.ValidationIssue{}, Message: "Save initial files for the student account on the controller and all clients. Files are private; explicit executables are 0700. Materials enter Git, the Nix store and cache. Systems and homes change only after separate application and normal boot."}
 	baseJSON, _ := domain.MarshalHomeFilesProfile(i.Base)
 	if len(r.Changes) == 0 && !bytes.Equal(baseJSON, data) {
 		r.Changes = append(r.Changes, domain.HomeFilesChange{Kind: "declaration", Destination: domain.HomeFilesFileName})
 	}
 	if len(r.Changes) == 0 && bytes.Equal(baseJSON, data) && i.Snapshot.BaseExists {
 		r.State = "unchanged"
-		r.Confirmation = ""
 		r.Message = "The initial-file declaration is unchanged; deployed and running homes were not observed."
 	}
 	r.ReviewToken = homeFilesToken(r)

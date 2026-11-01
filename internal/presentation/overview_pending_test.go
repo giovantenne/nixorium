@@ -12,7 +12,7 @@ import (
 )
 
 func TestOverviewPendingRowsAndEmptyState(t *testing.T) {
-	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "unchecked"}, DashboardActions{}, false)
+	m := newTestModel(t, withSetup(domain.SetupReport{State: "unchecked"}))
 	m.screen = dashboardHome
 	if view := m.View().Content; len(m.pendingTasks()) != 0 || strings.Contains(view, "No pending work") || strings.Contains(view, "Needs attention") {
 		t.Fatal("empty overview shows a pending-work line")
@@ -55,7 +55,7 @@ func TestOverviewPendingRowsAndEmptyState(t *testing.T) {
 }
 
 func TestOverviewRefreshIsLocalAndPreservesClientObservation(t *testing.T) {
-	m := savedFollowupFixture(dashboardHome)
+	m := savedFollowupFixture(t, dashboardHome)
 	m.computers.hosts = domain.HostsReport{GeneratedAt: time.Now().UTC(), Hosts: []domain.HostStatus{{Name: "pc01"}}}
 	m.actions.LoadInitial = func(context.Context) (domain.StatusReport, domain.SetupReport, error) {
 		return domain.StatusReport{}, domain.SetupReport{State: "unchecked"}, nil
@@ -78,5 +78,38 @@ func TestOverviewRefreshIsLocalAndPreservesClientObservation(t *testing.T) {
 	m = updated.(dashboardModel)
 	if len(m.pendingTasks()) != 0 {
 		t.Fatal("verified saved revision remains pending")
+	}
+}
+
+func TestReturningToOverviewRereadsLocalState(t *testing.T) {
+	loads := 0
+	m := newTestModel(t, withActions(DashboardActions{
+		LoadInitial: func(context.Context) (domain.StatusReport, domain.SetupReport, error) {
+			loads++
+			return domain.StatusReport{Repository: "/home/admin/nixorium-deployment"}, domain.SetupReport{}, nil
+		},
+	}))
+	m.screen = dashboardAdministration
+	m.report.Git.Dirty = true
+	m.usbReserved = true
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = next.(dashboardModel)
+	if m.screen != dashboardHome || cmd == nil {
+		t.Fatalf("Esc did not return to the Overview with a refresh: screen=%d", m.screen)
+	}
+	var refresh overviewQuietRefreshMsg
+	found := false
+	for _, message := range drainBackupSync(cmd) {
+		if quiet, ok := message.(overviewQuietRefreshMsg); ok {
+			refresh, found = quiet, true
+		}
+	}
+	if !found || loads != 1 {
+		t.Fatalf("no quiet refresh: found=%t loads=%d", found, loads)
+	}
+	next, _ = m.Update(refresh)
+	m = next.(dashboardModel)
+	if m.report.Git.Dirty || m.usbReserved || m.busy != "" || m.message != "" || m.report.Repository != "/home/admin/nixorium-deployment" {
+		t.Fatalf("Overview kept stale state: %+v usb=%t busy=%q message=%q", m.report.Git, m.usbReserved, m.busy, m.message)
 	}
 }

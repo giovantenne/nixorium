@@ -26,6 +26,8 @@ access and interactive session state, checks PXE/controller-network conflicts,
 and returns an expiring content-bound review token and the one-word
 `SHUTDOWN` confirmation. When an active session is present, the confirmation
 prompt states explicitly that this word authorizes its interruption.
+(Amended 2026-10-19 by ADR 0026: the CLI types the word only when an eligible
+computer has an active or unknown session; otherwise it asks `Continue? [y/N]`.)
 Unreachable clients remain visible but ineligible and no request is
 queued for later.
 
@@ -66,3 +68,10 @@ explicit risk acknowledgement; their next normal deployment installs the
 helper. The workflow cannot prove ACPI completion, physical power state, or
 whether an unconfirmed request took effect. Wake-on-LAN, scheduling, and
 automatic retry remain outside this decision.
+
+## Amendment (2026-10-19)
+
+[ADR 0030](0030-classroom-controls-beside-maintenance.md) lets Internet access,
+shut down, restart and the schedule run beside maintenance: they refuse only
+the computers named in an unfinished client update, through a per-operation
+lease on `classroom.lock`, instead of the shared operation gate.

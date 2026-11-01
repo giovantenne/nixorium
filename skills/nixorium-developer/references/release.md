@@ -12,7 +12,10 @@ Before release:
 
 1. Start from a clean `master` synchronized with `origin/master`.
 2. Select the version from its compatibility impact.
-3. Update `VERSION`, `DEFAULT_RELEASE` in `install.sh`, and the released tag in
+3. Check that `Registry` in `internal/deploymigrate/registry.go` has an entry for every change to
+   `templates/site/**` since the previous tag that existing deployments need
+   (released entries are never edited), and that the changelog mentions them.
+   Update `VERSION`, `DEFAULT_RELEASE` in `install.sh`, and the released tag in
    `templates/site/flake.nix`.
 4. Move Unreleased notes into a dated changelog section and update links.
 5. Run the focused local checks; use `./scripts/validate.sh --full` locally
@@ -21,13 +24,7 @@ Before release:
 7. Website release branch: confirm that `release/<version>` exists in
    `nixorium-website`, is built against this commit and is green on `staging`
    (see [Website release branch](#website-release-branch)). Do not tag without it.
-8. Assistant instructions and capabilities: a feature that changes a menu label,
-   a classroom view action, a document the Assistant cites (troubleshooting,
-   administrator guide, system reference) or adds an Assistant tool updates the
-   private Assistant instructions (`nixorium-assistant`,
-   `skills/nixorium-assistant/SKILL.md`) and, for a tool, the capabilities
-   header, before the release; the service is deployed with the new instructions
-   when the release is published.
+8. Update the private service before tagging; it is deployed with the release.
 9. Run `./scripts/release.sh <version>` only with explicit authorization.
 10. Verify the GitHub workflow and published release.
 

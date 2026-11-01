@@ -26,6 +26,7 @@ var settingsHelp = map[string]settingHelp{
 	"lab.studentGitName":      {"Author name recorded by Git commits made as the student.", "Student"},
 	"lab.studentGitEmail":     {"Author email recorded by Git commits made as the student.", "student@example.org"},
 	"lab.adminGitName":        {"Author name for the administrator's Git commits.", "Lab Administrator"},
+	"lab.classroomView":       {"On (the default) gives the teacher the classroom view: screen previews, taking control, locking screens, messages, showing the teacher's screen, sending and collecting files. Off removes it from the controller and from the student computers; Internet pause, switching computers on and off and the schedule keep working.", "on"},
 	"lab.adminGitEmail":       {"Author email for the administrator's Git commits.", "admin@example.org"},
 }
 

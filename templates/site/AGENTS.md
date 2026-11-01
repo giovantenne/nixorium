@@ -90,18 +90,15 @@ The Assistant menu is available on the controller unless `lab.assistant` is
 explicitly false; updating an omitted setting enables it after controller
 application. The optional subscription-based service is a separate native
 operator workflow with explicit activation, consent, a confined candidate and
-explicit review/save. It includes
-bounded read-only diagnostics of declared computers and saved configuration
-history after renewed consent. This native disclosure does not authorize an
-external agent to read raw journals or private history on its own. It includes
-service-reported trial quota and purchase links, with conversion preserving
-controller activation. Annual quota exhaustion requires renewal or a manual
-agreement. Its availability does not expand this external agent's proposal-only
+explicit review/save. This native disclosure does not authorize an
+external agent to read raw journals or private history on its own. Its availability does not expand this external agent's proposal-only
 authority. Do not drive
 its activation, consent, save or recovery confirmations. Host-specific private
-modules that branch on networking.hostName must declare their exceptional
-hosts in hostModules or updateValidationHosts for representative evaluation;
-identifying a missing declaration is a handoff, not permission to edit it.
+modules that branch on networking.hostName, or use hostName or hostIp, must have
+their exceptional hosts in hostModules or updateValidationHosts: identical
+client computers share one system, where those two arguments stop the
+evaluation with a clear error. Identifying a missing declaration is a handoff,
+not permission to edit it.
 `groupModules` associates common modules with existing clientGroups and preserves
 software/interface distinctions; membership alone does not prove arbitrary Nix
 code equivalent. This hook does not expand this external agent's authority.

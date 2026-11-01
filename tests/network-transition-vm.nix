@@ -14,7 +14,7 @@ let
   cacheSecretKey = pkgs.writeText "network-transition-cache-secret"
     "nixorium-remote-vm-1:LyFjyE1IpGYQenMUqGQKq0fZSXr5uaoqIldXReT6v1wsQKHQIF/ewV58htcET9bsFyS9r9jMjxsRZVnv3sSXfA==";
   hostArgs = name: {
-    inherit (transitionLab.nixosConfigurations.${name}._module.specialArgs) hostName hostIp labSettings;
+    inherit (transitionLab.nixosConfigurations.${name}._module.specialArgs) hostName hostIp isController labSettings nixoriumClass;
   };
   laboratoryModules = [
     ../modules/networking.nix
@@ -30,6 +30,8 @@ in
       imports = laboratoryModules;
       _module.args = hostArgs "pc99";
       virtualisation.interfaces.eth1 = { vlan = 1; assignIP = false; };
+      # The test driver's own card is not part of the laboratory.
+      networking.networkmanager.unmanaged = [ "interface-name:eth0" ];
       systemd.tmpfiles.rules = [
         "d /var/lib/nixorium/keys 0700 root root -"
         "C /var/lib/nixorium/keys/harmonia-secret-key 0600 root root - ${cacheSecretKey}"

@@ -61,7 +61,7 @@ func TestAssistantReportsSavedRedactedHistoryWithExactWireBody(t *testing.T) {
 		t.Fatal("oversized comment uploaded")
 	}
 }
-func TestAssistantAutomaticSharingOnlyOnFinalOrErrorWithConsentAndWithoutWaitingForUpload(t *testing.T) {
+func TestAssistantAutomaticSharingOnFinalOrErrorWithConsentAndWithoutWaitingForUpload(t *testing.T) {
 	for _, terminal := range []string{"final", "error"} {
 		for _, share := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/%v", terminal, share), func(t *testing.T) {
@@ -145,5 +145,64 @@ func TestAssistantAutomaticSharingOnlyOnFinalOrErrorWithConsentAndWithoutWaiting
 				}
 			})
 		}
+	}
+}
+func TestAssistantSharingAfterAFailedStepButNotAfterAStopOrARefusal(t *testing.T) {
+	for _, mode := range []string{"protocol", "stopped", "refused"} {
+		t.Run(mode, func(t *testing.T) {
+			received := make(chan struct{}, 1)
+			stepStarted := make(chan struct{})
+			runner, conversation, store, _, _ := runnerFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/v1/turns" && mode == "refused":
+					w.WriteHeader(429)
+					io.WriteString(w, `{"error":{"code":"quota_exhausted","message":"Synthetic quota"}}`)
+				case r.URL.Path == "/v1/turns":
+					runnerAdmit(w)
+				case strings.HasSuffix(r.URL.Path, "/steps") && mode == "protocol":
+					// The platform's own error page, not a service response.
+					w.WriteHeader(503)
+					io.WriteString(w, "<html>Synthetic platform error</html>")
+				case strings.HasSuffix(r.URL.Path, "/steps"):
+					w.Header().Set("Content-Type", "text/event-stream")
+					w.(http.Flusher).Flush()
+					close(stepStarted)
+					<-r.Context().Done()
+				case strings.HasSuffix(r.URL.Path, "/cancel"):
+					w.WriteHeader(204)
+				case strings.HasPrefix(r.URL.Path, "/v1/conversations/"):
+					received <- struct{}{}
+					w.WriteHeader(204)
+				default:
+					t.Error("unexpected request")
+				}
+			})
+			if err := (adapters.AssistantStateStore{Directory: store.Directory}).WriteSharing(true); err != nil {
+				t.Fatal(err)
+			}
+			reporter := app.AssistantConversationReporter{Store: store, Client: runner.Client.(adapters.AssistantClient), Version: runner.Version}
+			runner.Sharing = &reporter
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if mode == "stopped" {
+				go func() {
+					<-stepStarted
+					cancel()
+				}()
+			}
+			if _, err := runner.Run(ctx, conversation, "Synthetic question", func(domain.AssistantEvent) {}); err == nil {
+				t.Fatal("failed turn reported success")
+			}
+			select {
+			case <-received:
+				if mode != "protocol" {
+					t.Fatal("shared a turn that was stopped or never admitted")
+				}
+			case <-time.After(time.Second):
+				if mode == "protocol" {
+					t.Fatal("failed turn not shared")
+				}
+			}
+		})
 	}
 }

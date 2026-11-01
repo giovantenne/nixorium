@@ -39,23 +39,17 @@ code shown after payment and accept its separate data-sharing consent. Review ea
 saving creates a local commit and backup, with separate system-application
 and computer-update reviews afterwards.
 You can also activate the free trial with its emailed code. The service shows
-the trial size and length when you activate (currently ten requests for thirty
-days). Assistant shows the remaining requests and a purchase link when the trial
-ends; conversion keeps the controller activated. Each account enables one lab.
-Conversation sharing is off by default. In the chat, `/share` changes it and
-`/report` reports a final answer with your explicit consent. Reports and shared
-conversations are kept for 90 days.
-Capable controllers can prepare a public npm CLI package/tag into an offline
-baseline restored after the normal student-home reset; review its exact version,
-scope and reported optional-feature limitations before saving.
+the trial size and length when you activate. Each account enables one lab.
+Conversations are saved on the Assistant service by default for 90 days to
+find and fix Assistant's mistakes; in the chat, `/share` switches saving off and
+`/report` reports a final answer with your explicit consent. Reports are kept
+for 90 days too.
 Assistant can inspect declared computer diagnostics and saved configuration
 history. Updated consent covers limited recent system logs and historical
 configuration contents; filtering is best effort, so sensitive text may remain.
 Student home files are not read. These observations do not change systems or Git.
-In extreme cases, and only after you write "I accept core overrides" in a
-conversation, Assistant may propose a private module that forces an option set
-by the Nixorium core; this is unsupported, the review warns about it, and you
-should update one computer first (see the guide for the rollback path).
+A conversation can be switched into an unsupported core-override mode only by
+an explicit phrase; the review warns about it (see the guide).
 
 Read the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md)
 for privacy, host classes, tool limits, local retention and interrupted-save
@@ -201,16 +195,20 @@ one-time adoption for older deployments, independent packages and recovery.
 
 ### Requirements for installing clients
 
-- **Network.** The controller and the clients share the lab network, and the
+- **Network.** The controller and the clients share the lab network, which is
+  wired: every computer is connected with an Ethernet cable. Wi-Fi is not a
+  laboratory network (no network boot, no Switch on, and an installed
+  computer never takes its laboratory address on a Wi-Fi card). The
   controller needs Internet for preparation and updates. It also gives the
   clients the correct time (UDP 123, laboratory network only), taken from
   Internet time servers that the school firewall must let it reach, so a
   computer needs no Internet of its own to show the right time. For
   [network boot](#install-computers-with-pxe), the clients need UEFI network
   boot and the controller must be allowed to run ProxyDHCP beside the
-  institutional DHCP server, which stays authoritative; Wi-Fi may not support
-  it. [USB over SSH](#install-one-computer-from-usb-over-ssh) needs neither:
-  the live ISO only has to reach the controller over Ethernet or Wi-Fi.
+  institutional DHCP server, which stays authoritative.
+  [USB over SSH](#install-one-computer-from-usb-over-ssh) needs neither: the
+  live ISO only has to reach the controller, over the cable or, during the
+  installation only, over Wi-Fi.
 - **Storage.** Every computer boots in UEFI mode and its disk is erased after
   you confirm it. The network installer offers only disks with room for the
   client system plus 2 GiB. Keep free space on the controller (see
@@ -238,7 +236,7 @@ The TUI first displays the operational disclaimer: Enter acknowledges it and
 q exits. This acknowledgement is remembered for this administrator and
 deployment, separately from the optional adoption statistics choice.
 
-On the statistics invitation, Enter accepts, n declines, Esc opens the menu
+On the statistics invitation, e accepts, n declines, Enter or Esc opens the menu
 without deciding, and q exits. Skipping leaves sharing off and repeats the
 invitation at the next launch; a saved refusal is not repeated. Exact report
 and Privacy & retention remain available before choosing.
@@ -259,20 +257,22 @@ in the settings editor.
 Clients expose only SSH (22) to the controller's static IPv4 address on the
 lab interface; IPv6 cannot bypass this restriction. The classroom view reaches
 each student's session through that access, and GNOME shows its sharing
-notice while the teacher watches. Changes to the classroom Shell extension
+notice while the classroom view page is open and visible. Changes to the classroom Shell extension
 apply at the student's next login. A computer whose classroom view was
 stopped from the student's terminal shows "Monitoring stopped on this PC" and
-starts it again by itself within seconds. In a computer's window of the classroom
+starts it again by itself within seconds. While you control a computer with
+your keyboard and mouse, its screen shows a small "Teacher in control" label
+until you stop. GNOME hides its sharing icon while a window is full screen; then
+the screen shows a small "Classroom view open" label instead. When you save a screenshot or collect the files on a desktop, that
+computer's screen says so for a few seconds ("Your teacher saved a picture of
+this screen", "Your teacher collected the files on your desktop"). In a computer's window of the classroom
 view page, **Save screenshot** keeps a picture of its screen in
 `Nixorium/Screenshots` of your home folder, such as
 `pc03-2026-10-15-10.30.12.jpg`; a page not opened from Nixorium downloads the
 picture through the browser instead. **Message** shows a short text over the
 screens of the selected computers, until the students close it, for 30 seconds
-or 2 minutes, or until you unlock them. **Exam mode** blocks Internet, locks the
-screens and shows a message on the selected computers with one confirmation;
-**End exam mode** undoes it and offers **Collect from desktop**; a reopened page,
-or another teacher's, shows the same. Restarting the classroom service forgets
-exam mode: then use **Remove message**, **Unlock** and **Allow Internet**.
+or 2 minutes, or until you unlock them. For an exam, use **Internet → Block
+Internet**, **Lock** and **Message** one by one.
 Update the student computers and have the students sign in again first: a
 computer that is not updated is listed as unable to show messages yet.
 
@@ -288,7 +288,8 @@ Update the controller and clients before first use.
 
 ## Lock screens
 
-With the classroom view (on unless `"classroomView": false`), open
+With the classroom view (on unless you turn it off in **Maintenance → Change
+settings → Classroom view**), open
 **Computers → Lock screens** as `admin` or the teacher, select clients, choose
 **lock** or **unlock** with Tab, and review before applying. A locked screen
 shows "Eyes on the teacher" and ignores keyboard and mouse until it is
@@ -307,8 +308,8 @@ with its name and contents: hidden files and links are left out, at most 2000
 items and 500 MB are sent, the copies belong to the student and are never
 executable, and a name already on a student's desktop is kept as
 "name (2)". A restart empties the student's home, as usual. In the classroom
-view page, **Send files** offers **A file…** and **A folder…**, which open
-the system file chooser in your home folder.
+view page, **Share files** offers **Send a folder…** and **Send a file…**,
+which open the system file chooser in your home folder.
 From a terminal, as the teacher or the administrator: `nixorium send plan
 --file <file-or-folder> --on @lab`, then `nixorium send apply --file
 <file-or-folder> --on @lab --expect` with the review token; it needs only the
@@ -320,8 +321,8 @@ and mouse blocked, until **Stop sharing** or until you close the page.
 
 ## Collect files
 
-With the classroom view, **Collect from desktop** in the classroom view page
-(beside **Send files**, and in a computer's **Actions** menu) copies the files
+With the classroom view, **Collect from students' desktops** in the classroom view page
+(in **Share files**, and in a computer's **Actions** menu) copies the files
 on the desktops of the selected students' computers into your home folder,
 in `Nixorium/Collected/<date and time>/<computer>/`, after a review. Hidden
 files and links are left out and nothing changes on the students' computers.
@@ -344,7 +345,7 @@ computers before first use.
 - `modules/workstation.nix`: GNOME desktop icons, persistent dock, application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
-- `modules/screensaver.nix`: Ghostty/TTE lab screensaver supplied by every built-in profile (starts after 5 idle minutes and never locks the session)
+- `modules/screensaver.nix`: Ghostty lab screensaver with text effects supplied by every built-in profile (starts after 5 idle minutes, stops after 30 when the screen goes black, and never locks the session)
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `groupModules` in `flake.nix`: common modules for members of those client groups
 - `hostModules` in `flake.nix`: individual hosts
@@ -371,7 +372,13 @@ Each group refers only to client PCs. Overlapping groups apply both sets of
 modules in group-name order. Group modules describe common behavior; keep
 individual exceptions in `hostModules` or declare `updateValidationHosts` when
 private modules branch by host name. Grouping preserves differences in managed
-software and network interfaces. An older pinned Nixorium must be updated before
+software and network interfaces. Computers that are identical in groups,
+software and interface share one system, which is built once; each keeps its
+name and address from a small identity record that the update or the installer
+writes. A module that uses `hostName` or `hostIp` needs its computer listed in
+`hostModules` or `updateValidationHosts`; otherwise evaluation stops with a clear
+error. If a computer reports "This computer has no Nixorium identity", see the
+troubleshooting guide. An older pinned Nixorium must be updated before
 using this new argument; do not add it to a pin that does not support it.
 
 <details>
@@ -402,8 +409,10 @@ deploy only that machine:
 ```sh
 git add flake.nix modules/pc05.nix
 nix build .#nixosConfigurations.pc05.config.system.build.toplevel --no-link
-colmena apply --on pc05
 ```
+
+Then save the change and update that computer with **Computers → Update
+computers** (or `nixorium deploy plan --on pc05` and `nixorium deploy apply`).
 
 Additional backgrounds can be passed from `flake.nix`:
 
@@ -488,19 +497,16 @@ build, deploy or reset. See the
 [save procedure](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
 for requirements and conflict/durability handling. The administrative TUI exposes
 the same save boundary at **Maintenance → Change settings → Student workspace**.
-Choose Desktop, Dock, VSCode or Browser, keep each change in the
+Choose Desktop, Dock or Browser, keep each change in the
 draft, then review the complete proposal and confirm the save. “Inherit” uses
-the deployment baseline; “Clear” is an explicit empty list. VSCode → Other
-settings adds further editor defaults by name and value, or from a pasted
-settings file; settings that can start programs are refused. Saving includes
+the deployment baseline; “Clear” is an explicit empty list. Saving includes
 an automatic local commit of just the profile, then a separate controller
-review and client selection; it never deploys automatically. In VSCode →
-extensions, `/` searches every packaged extension of the pinned package set;
-the catalog only adds prerequisites to common ones. `m` adds an extension
-from the Marketplace by its `publisher.name`, pinned to one downloaded version,
-and `u` checks those pins for newer versions; both need Internet on the
-controller at that moment. Test such third-party extensions on one computer
-first. Catalog additions and
+review and client selection; it never deploys automatically. The screen does
+not edit the students' VS Code settings or extensions, because VS Code may not
+be installed: ask Assistant to change them, including Marketplace extensions
+pinned to one downloaded version (the controller needs Internet at that
+moment), and existing ones are kept when you save. Test third-party extensions on one computer first. Catalog
+additions and
 unsupported fields remain manual deployment edits. Older pins/commands may not
 provide this workflow; the inactive example is never loaded automatically.
 Existing profiles are also compared during input-update review: current versus
@@ -558,7 +564,7 @@ step—prepare files, start PXE, boot/install a client, or recover networking—
 shows only controls relevant to the observed mode.
 
 Long PXE, controller, and deployment work displays typed phase progress.
-Press `l` for details, including controller builds started after an update or
+Press `l` for details when there are any, including controller builds started after an update or
 software change. Deployment details include recent private command output;
 `s` reviews stopping local supervision, not remote activation. An uncertain
 apply reserves the fleet until [reviewed recovery](TROUBLESHOOTING.md#interrupted-client-deployment).
@@ -636,9 +642,9 @@ the computers.
    new network with a record of the previous one and changes no computer.
    Trusted SSH keys are recorded for the new addresses from the keys already
    trusted for the previous ones, so no new fingerprint has to be accepted.
-2. **Apply to controller** (its own review, `REBUILD`). The controller then
+2. **Apply to controller** (its own review, confirmed with Enter). The controller then
    carries both addresses.
-3. **Update computers** (its own review, `DEPLOY`). Every computer is
+3. **Update computers** (its own review, confirmed with Enter). Every computer is
    selected; a computer still on the previous network is reached there, moves
    to its new address and is checked on it. Computers that are off can be
    queued (F3) and move when they are switched on.
@@ -724,14 +730,11 @@ connections from the same computer, `root` has no password, and all databases
 are discarded at every boot, like the student home. Keep work that must
 survive as exported SQL files. `modules/development.nix` holds this policy.
 
-Programming also runs Apache with PHP in the XAMPP style: files saved in the
-student's `~/public_html` open at `http://localhost/` (for example
-`~/public_html/sito/index.php` at `http://localhost/sito/`), with `.htaccess`
-rules and folder listings. The server runs as the student account and listens
-on this computer only; the folder is emptied with the rest of the home at every
-boot, and on the controller it serves the student account's folder.
+A local web server for PHP pages (Apache in the XAMPP style, serving the
+student's `~/public_html`) is not part of the profile; Assistant can add it on
+request.
 
-Every profile includes Git, the Ghostty/TTE lab screensaver (which never locks the session) and Node.js (and
+Every profile includes Git, the Ghostty lab screensaver with text effects (which never locks the session) and Node.js (and
 npm); Programming also includes the Pi and OpenCode coding agents. Git is available to every user and is also a runtime
 dependency of the controller management workflows. The screensaver therefore
 remains active in Essential as well as the larger profiles. Desktop Icons NG, Dash to Dock and
@@ -870,12 +873,12 @@ expands only configured clients, and prints the revision-bound apply command.
 In the dashboard the selection lists each computer's state at the last check
 (`r` checks again, `n` selects those needing the update), and Inventory's `u`
 opens the same review for every computer that needed it.
-Apply repeats the preflight, requires the one-word `DEPLOY` confirmation, builds before
+Apply repeats the preflight, asks `Continue? [y/N]` in the CLI (Enter on the review in the dashboard), builds before
 activation, and streams output to a mode-0600 log. In the dashboard, the same
 foreground operation shows elapsed time, named stages and authenticated-computer
 verification counts. `l` expands the progress bar and up to five authored
-activities. Raw Colmena output remains in the private log instead of being rendered
-as terminal UI. Accidental quit stays disabled until the final report appears;
+activities. The build output, each computer's copy and its activation messages
+remain in the private log instead of being rendered as terminal UI. Accidental quit stays disabled until the final report appears;
 that compact result offers direct dashboard, log, and fresh-review actions.
 
 After every attempt, Nixorium authenticates selected hosts and records only
@@ -888,12 +891,18 @@ for deliberate automation and never removes the revision check.
 
 When some selected computers do not answer, the review offers to update them
 when they are switched on (on by default; **F3** turns it off). The others are
-updated now; the controller then checks every minute and updates each waiting
-computer, one at a time, as soon as it answers, with the same build, check and
-record. **Computers → Queued updates** lists them and removes entries. An entry
-is never applied once the configuration changed after queueing: review the
-update again. From a terminal: `deploy apply ... --queue-unreachable`,
-`deploy queue status`, `deploy queue cancel --on pc02` (or `@all`).
+updated now. A computer that is switched off while the update is being built
+is left as it is and reported as not updated; with the same choice on, it is
+queued too. It never blocks the other computers.
+
+The controller checks every minute and updates the waiting computers that
+answer, all together, with the same build, check and record. While another
+operation is running it simply waits for the next minute. **Computers →
+Queued updates** lists them and removes entries. An entry is never applied
+once the configuration changed after queueing; the next **Update computers**
+selects those computers for you, so the new review includes them. From a
+terminal: `deploy apply ... --queue-unreachable`, `deploy queue status`,
+`deploy queue cancel --on pc02` (or `@all`).
 
 After any update the person at the computer sees a GNOME notification that it
 was updated. Without a restart the notification says the update is in place,
@@ -929,8 +938,8 @@ nix run .#nixorium -- restart apply --on @lab \
 
 Planning checks installation/network recovery and concurrent client work as
 well as access and sessions. When an active session is present, the review says
-explicitly that `SHUTDOWN` or `RESTART` authorizes interrupting it. Apply requires the matching single word (or explicit
-automation-only `--yes`), takes the same client-operation lock as deployment,
+explicitly that `SHUTDOWN` or `RESTART` authorizes interrupting it. In the CLI, apply requires that matching single word only when such a session (or an acknowledged unknown one) is part of the review; when every computer is idle, logged in without use, or off, it asks `Continue? [y/N]`. Explicit
+automation-only `--yes` skips the question, takes the same client-operation lock as deployment,
 and repeats inventory, conflict, and session checks immediately before sending
 the fixed operating-system request. Use
 `--acknowledge-unknown-sessions` on both plan and apply only after reviewing
@@ -1010,12 +1019,13 @@ with these differences:
   or whose session cannot be read, stays on, and so does one that is off or
   does not answer. A computer where the student is logged in but has not
   touched keyboard or mouse for ten minutes does shut down;
-- when another operation (a deployment, for example) or a network
-  installation keeps the controller from starting at the set time, it tries
-  again every minute for up to ten minutes after that time, then gives up for
-  that day and writes one line to the history saying so; once it has started
-  it is not repeated. A time at which the controller was off is not made up
-  afterwards.
+- an update of the computers does not hold it back: a computer that is being
+  updated, or whose last update was interrupted, simply stays on. When a
+  network or USB installation keeps the controller from starting at the set
+  time, it tries again every minute for up to ten minutes after that time,
+  then gives up for that day and writes one line to the history saying so;
+  once it has started it is not repeated. A time at which the controller was
+  off is not made up afterwards.
 
 Every run that does something is a line in the operation history that
 `nixorium logs` lists for the administrator (`schedule-run`, with counts only;
@@ -1100,7 +1110,7 @@ nix run .#nixorium -- git undo apply --expect REVIEW_TOKEN
 
 The review shows the description, date and files of the change that will be
 undone, what the undo does to those files, and the steps that follow. Applying
-it (confirm by typing `UNDO`) saves one new change named `Undo: <description of the
+it (confirm with Enter, or answer `y` in the CLI) saves one new change named `Undo: <description of the
 undone change>` and puts the files back; the undone change stays in the history
 and nothing is pushed. No computer changes yet: run **Apply to controller**, then
 **Update computers**, so the controller and the student computers return too. In
@@ -1132,7 +1142,7 @@ nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 ```
 
-Apply requires the one-word `REBUILD` confirmation, starts only the matching revision-bound
+Apply is confirmed with Enter on the review (`Continue? [y/N]` in the CLI), starts only the matching revision-bound
 systemd unit, builds as the deployment owner, refuses repository drift, and
 records success only after activation and active-system verification. Closing
 the dashboard does not stop the systemd-owned job. The dashboard shows elapsed
@@ -1160,7 +1170,7 @@ nix run .#nixorium -- services restart cache
 ```
 
 The report combines the persistent signed cache and on-demand PXE lifecycle.
-Cache restart requires the one-word `RESTART` confirmation and succeeds only after both systemd and
+Cache restart is confirmed with Enter and succeeds only after both systemd and
 HTTP checks pass. PXE uses its dedicated transactional workflow and cannot be
 mutated through this generic service action.
 
@@ -1177,7 +1187,7 @@ Backup is optional and never blocks client installation or updates. Open
   enter its folder instead. Enter and repeat a passphrase, review, then create the archive.
   The entire deployment, Git history, private keys and account hashes are encrypted.
 - **Private Git repository**: save local edits first, choose your school's **private**
-  GitHub/GitLab repository and branch, then confirm with a passphrase and `PUSH`.
+  GitHub/GitLab repository and branch, then enter a passphrase and press Enter once you have confirmed it is private.
   Configure independent SSH access and verify the Git server's fingerprint first.
   Private keys and account hashes are encrypted; configuration and history remain
   readable. A Git backup is complete only after the remote revision is verified.
@@ -1262,7 +1272,10 @@ fallback name (the template's `enp0s3` is VirtualBox's) and apply DHCP and their
 static lab address to the wired Ethernet card **whatever its name**, so PCs of
 different models work without any interface setting. The temporary Internet
 block and the SSH rule from the controller are likewise independent of the name.
-Wireless cards, bridges and virtual devices are never selected. A computer with
+Wireless cards, bridges and virtual devices are never selected, and the
+settings refuse a Wi-Fi card name (`wl…`, such as `wlp2s0` or `wlan0`), here and
+in the controller's and fallback names: the laboratory network is wired. A
+computer with
 more than one wired card gets the lab address on only one of them (the first to
 come up, which can differ between boots) and no automatic DHCP on the others;
 give such a PC a `hostIfaceNames` entry. Set `clientIfaceName` only when every
@@ -1288,8 +1301,8 @@ name to use.
 
 `setup install-secrets` starts a fixed sandboxed action that installs only
 verified key material to fixed destinations. After reviewed settings and public
-keys are committed, `setup apply` requires a clean ready deployment and exact
-`APPLY` confirmation. The build runs as `admin`; only exact-closure activation
+keys are committed, `setup apply` requires a clean ready deployment and a
+`Continue? [y/N]` answer (or `--yes`). The build runs as `admin`; only exact-closure activation
 runs as root. Completion requires the active system and root-owned success
 receipt to match the reviewed revision.
 While it runs, `setup apply` reports typed validation, build, activation, and
@@ -1343,7 +1356,7 @@ nix run .#nixorium -- pxe recover
 ```
 
 Start validates preparation, live addressing, cache, and services before
-requiring the one-word `START` confirmation. Stop restores normal controller addressing. Recover
+requiring Enter on its review (`Continue? [y/N]` in the CLI). Stop restores normal controller addressing. Recover
 reconciles an interrupted session, and boot recovery performs the same repair
 automatically. These actions are idempotent; a failed start rolls back before
 returning. Quitting the dashboard does not stop active systemd-owned services.
@@ -1380,13 +1393,13 @@ boot the official **NixOS 26.05 ISO**, either Minimal or Graphical (GNOME), for
 `x86_64-linux` in UEFI mode with Ethernet or Wi-Fi connectivity to the
 controller. Minimal is smaller and lighter: prefer it when the computer has
 4 GB of RAM or less, because the live system keeps the installer files in
-memory. Graphical is a larger download and needs more RAM. Connect Wi-Fi from
-the live console with `nmtui` first when needed. The installation itself works
-over Wi-Fi, but an installed client uses a wired Ethernet card unless its
-[network interface name](#configuration-and-first-run-setup) is set in the lab
-settings (`clientIfaceName`, or `hostIfaceNames` for one computer): with the
-name of a wireless card set, the static lab address is applied to that card,
-and verification after reboot needs that address. At its physical console run:
+memory. Graphical is a larger download and needs more RAM. Prefer the
+laboratory cable. Without an explicit
+[network interface name](#configuration-and-first-run-setup) the installation
+itself can run over Wi-Fi (connect it from the live console with `nmtui`), but
+the installed computer takes its laboratory address on its wired card, and
+verification after the restart needs that address: connect the cable before
+the restart. At its physical console run:
 
 ```sh
 passwd
@@ -1415,14 +1428,12 @@ that interface must carry the reviewed live address. When the
 PC is connected through a differently named card, the TUI shows both names
 before disk selection and offers to save the observed card for that computer
 only (a `hostIfaceNames` override, through the ordinary reviewed settings save).
+A Wi-Fi card is never offered: connect the configured card with a cable and
+start again.
 It then cancels the prepared session, prepares the computer again and returns
 to the live console step; set a new temporary password with `passwd`, because
 the previous one was locked. No disk is touched. Wi-Fi
-profiles and credentials are not copied from the ISO into the installed system:
-arrange persistent connectivity separately, or reconnect locally as the
-administrator after boot before verifying the configured static address.
-Keep wireless secrets out of Git and the Nix store. Wi-Fi may not support PXE
-on the selected hardware, firmware, or network; USB/SSH does not require PXE.
+profiles and credentials are not copied from the ISO into the installed system.
 
 The controller prepares only target-independent installer content before it
 contacts the live ISO; the target closure is then built and served by the
@@ -1591,7 +1602,7 @@ builds their resolved derivations without repeating the deployment evaluation. C
 preflight also shares one fresh evaluation while preserving the separate checks
 before activation and after completion. After validation, review
 the scrollable two-file patch (`F4` expands candidate checks), then press Enter.
-The longer exact phrase remains part of the explicit CLI apply workflow.
+The CLI apply asks `Continue? [y/N]`, or takes `--yes`.
 
 > [!IMPORTANT]
 > The TUI saves these files transparently, then builds, activates, and verifies

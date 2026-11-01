@@ -1,4 +1,4 @@
-{ pkgs, lib, labAssets, hostSoftwarePackages, ... }:
+{ pkgs, lib, labAssets, hostSoftwarePackages, nixoriumTtfx, ... }:
 let
   enabled = builtins.elem "ghostty" hostSoftwarePackages
     && builtins.elem "python3Packages.terminaltexteffects" hostSoftwarePackages;
@@ -10,7 +10,7 @@ in
     # that lost the executable bit (store files would then be 0444) cannot
     # break the service with 203/EXEC. The screensaver never locks the session.
     systemd.user.services.lab-screensaver = {
-      description = "Lab TTE screensaver";
+      description = "Lab text-effects screensaver";
       wantedBy = [ "graphical-session.target" ];
       after = [ "graphical-session.target" ];
       serviceConfig = {
@@ -24,7 +24,7 @@ in
         Restart = "on-failure";
         RestartSec = 5;
       };
-      path = [ pkgs.bash pkgs.glib pkgs.gnugrep pkgs.procps pkgs.ghostty pkgs.python3Packages.terminaltexteffects pkgs.ncurses ];
+      path = [ pkgs.bash pkgs.glib pkgs.gnugrep pkgs.procps pkgs.ghostty nixoriumTtfx pkgs.ncurses ];
     };
   };
 }

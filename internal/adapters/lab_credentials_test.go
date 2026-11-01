@@ -29,7 +29,7 @@ func TestCredentialsStayOutsidePublicSettingsAndStaleReviewsFail(t *testing.T) {
 	if len(issues) != 0 || decoded.Lab.AdminPassword != candidate.Lab.AdminPassword {
 		t.Fatal("local editor lost credentials")
 	}
-	candidate.Lab.AdminPassword = "$6$new$new-admin"
+	candidate.Lab.AdminPassword = "$6$new$newadmin"
 	if err := local.WriteSettingsIfUnchanged(repository, current, candidate); err == nil {
 		t.Fatal("password change without a new public version accepted")
 	}

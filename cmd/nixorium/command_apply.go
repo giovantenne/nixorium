@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
@@ -24,24 +25,25 @@ func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, reposit
 		}
 		return 1
 	}
-	if !assumeYes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintf(stderr, "Error: %s apply requires an interactive terminal or explicit --yes\n", optionsPowerCommand(action))
-			return 2
-		}
-		confirmationOutput := stdout
+	plan, match := manager.Reviewed(plan, expectedToken)
+	if match != app.ReviewMatched {
 		if jsonOutput {
-			confirmationOutput = stderr
-		}
-		approved, err := presentation.ConfirmShutdown(os.Stdin, confirmationOutput, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
+			// Scripts read the blocked result as JSON; the apply refuses the
+			// token without sending anything.
+			report := manager.ApplyPlan(ctx, plan, expectedToken)
+			if match == app.ReviewExpired {
+				report.Message = "The review expired; review again."
+			}
+			_ = presentation.JSON(stdout, report)
 			return 1
 		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Power action cancelled; no request was sent.")
-			return 0
-		}
+		reviewMismatch(stderr, match, "The computers changed after review; create a fresh plan.")
+		return 1
+	}
+	if code, proceed := confirmReviewedApply(assumeYes, stderr, confirmationStream(stdout, stderr, jsonOutput), applyConfirmation{noTerminal: fmt.Sprintf("Error: %s apply requires an interactive terminal or explicit --yes", optionsPowerCommand(action)), readFailure: "Error: read confirmation:", cancelled: "Power action cancelled; no request was sent."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmShutdown(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.ApplyPlan(ctx, plan, expectedToken)
 	report.Message = operationRecordMessage(report.Message, report)
@@ -108,24 +110,10 @@ func runDeploymentApply(ctx context.Context, repository string, stdout, stderr i
 		}
 		return 1
 	}
-	if !assumeYes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: deploy apply requires an interactive terminal or explicit --yes")
-			return 2
-		}
-		confirmationOutput := stdout
-		if jsonOutput {
-			confirmationOutput = stderr
-		}
-		approved, err := presentation.ConfirmDeploymentApply(os.Stdin, confirmationOutput, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Deployment cancelled; no build or apply was started.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(assumeYes, stderr, confirmationStream(stdout, stderr, jsonOutput), applyConfirmation{noTerminal: "Error: deploy apply requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Deployment cancelled; no build or apply was started."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmDeploymentApply(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 
 	stream := stdout
@@ -176,21 +164,25 @@ func executeDeploymentOperationWithProgress(ctx context.Context, manager *app.De
 func executeDeploymentOperationGated(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer, observe func(domain.DeploymentProgress)) (domain.DeploymentExecutionReport, bool) {
 	operation, err := adapters.OpenDeploymentOperation()
 	if err != nil {
+		// Nothing was attempted: report from the inputs, without evaluating
+		// or probing the laboratory again (the queue runner asks every minute).
 		var busy *adapters.OperationBusyError
-		plan := manager.Plan(ctx, repository, requested)
+		root, rootErr := filepath.Abs(repository)
+		if rootErr != nil {
+			root = repository
+		}
 		return domain.DeploymentExecutionReport{
-			SchemaVersion:   domain.SchemaVersion,
-			Operation:       "deploy-apply",
-			State:           "failed",
-			Repository:      plan.Repository,
-			Requested:       plan.Requested,
-			Revision:        plan.Revision,
-			ColmenaSelector: plan.ColmenaSelector,
-			Targets:         plan.Targets,
-			Phase:           domain.DeploymentPhasePreflight,
-			RetrySafe:       true,
-			Message:         "prepare deployment operation: " + err.Error(),
-			Issues:          plan.Issues,
+			SchemaVersion: domain.SchemaVersion,
+			Operation:     "deploy-apply",
+			State:         "failed",
+			Repository:    root,
+			Requested:     requested,
+			Revision:      expectedRevision,
+			Targets:       []domain.DeploymentTarget{},
+			Phase:         domain.DeploymentPhasePreflight,
+			RetrySafe:     true,
+			Message:       "prepare deployment operation: " + err.Error(),
+			Issues:        []domain.ValidationIssue{{Field: "operation", Message: err.Error()}},
 		}, errors.As(err, &busy)
 	}
 	progress := io.MultiWriter(stream, operation.Writer())
@@ -201,7 +193,40 @@ func executeDeploymentOperationGated(ctx context.Context, manager *app.Deploymen
 		report.Message = fmt.Sprintf("%s; finalize durable log: %v", report.Message, closeErr)
 	}
 	report.Message = operationRecordMessage(report.Message, report)
+	forgetQueuedUpdates(report)
 	return report, false
+}
+
+// forgetQueuedUpdates removes queue entries of computers this update just
+// verified: they run the current revision, so an older queued update for
+// them is obsolete. A refused queue change is harmless: the next pass finds
+// them current and removes them without updating them again.
+func forgetQueuedUpdates(report domain.DeploymentExecutionReport) {
+	if report.RecoveryRequired || !report.ApplyCompleted {
+		return
+	}
+	verified := []string{}
+	for _, target := range report.Verification.Targets {
+		if target.State == "verified" {
+			verified = append(verified, target.Name)
+		}
+	}
+	if len(verified) == 0 {
+		return
+	}
+	status, err := adapters.ManagedDeferredUpdates().Read()
+	if err != nil {
+		return
+	}
+	queued := []string{}
+	for _, name := range verified {
+		if _, found := status.Find(name); found {
+			queued = append(queued, name)
+		}
+	}
+	if len(queued) > 0 {
+		_, _ = newDeferredUpdateManager().Cancel(queued)
+	}
 }
 
 func runGitCommitApply(ctx context.Context, manager *app.GitCommitManager, repository string, stdout, stderr io.Writer, paths, expectedToken string, assumeYes, jsonOutput bool) int {
@@ -225,24 +250,10 @@ func runGitCommitApply(ctx context.Context, manager *app.GitCommitManager, repos
 		}
 		return 1
 	}
-	if !assumeYes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: git commit apply requires an interactive terminal or explicit --yes")
-			return 2
-		}
-		confirmationOutput := stdout
-		if jsonOutput {
-			confirmationOutput = stderr
-		}
-		approved, err := presentation.ConfirmGitCommit(os.Stdin, confirmationOutput, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Git commit cancelled; HEAD, index, and worktree were not changed.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(assumeYes, stderr, confirmationStream(stdout, stderr, jsonOutput), applyConfirmation{noTerminal: "Error: git commit apply requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Git commit cancelled; HEAD, index, and worktree were not changed."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmGitCommit(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.Apply(ctx, repository, paths, expectedToken)
 	report.Message = operationRecordMessage(report.Message, report)
@@ -279,24 +290,10 @@ func runUpdateApply(ctx context.Context, manager *app.UpdateManager, repository 
 		}
 		return 1
 	}
-	if !assumeYes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: update apply requires an interactive terminal or explicit --yes")
-			return 2
-		}
-		confirmationOutput := stdout
-		if jsonOutput {
-			confirmationOutput = stderr
-		}
-		approved, err := presentation.ConfirmUpdate(os.Stdin, confirmationOutput, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Update cancelled; flake.nix and flake.lock were not changed.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(assumeYes, stderr, confirmationStream(stdout, stderr, jsonOutput), applyConfirmation{noTerminal: "Error: update apply requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Update cancelled; flake.nix and flake.lock were not changed."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmUpdate(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.ApplyPlan(ctx, plan, expectedToken)
 	report.Message = operationRecordMessage(report.Message, report)
@@ -324,20 +321,10 @@ func runPXEStart(ctx context.Context, repository string, stdout, stderr io.Write
 		}
 		return 1
 	}
-	if !assumeYes && plan.Mode != "active" {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: pxe start requires an interactive terminal or explicit --yes")
-			return 2
-		}
-		approved, err := presentation.ConfirmPXEStart(os.Stdin, stdout, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(stdout, "PXE start cancelled; networking was not changed.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(assumeYes || plan.Mode == "active", stderr, stdout, applyConfirmation{noTerminal: "Error: pxe start requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "PXE start cancelled; networking was not changed."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmPXEStart(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	report := manager.Start(ctx, repository)
 	report.Message = operationRecordMessage(report.Message, report)
@@ -369,24 +356,10 @@ func runControllerApply(ctx context.Context, manager *app.ControllerManager, rep
 		}
 		return 1
 	}
-	if !assumeYes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: controller apply requires an interactive terminal or explicit --yes")
-			return 2
-		}
-		confirmationOutput := stdout
-		if jsonOutput {
-			confirmationOutput = stderr
-		}
-		approved, err := presentation.ConfirmControllerRebuild(os.Stdin, confirmationOutput, plan)
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Apply to controller cancelled; nothing was started.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(assumeYes, stderr, confirmationStream(stdout, stderr, jsonOutput), applyConfirmation{noTerminal: "Error: controller apply requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Apply to controller cancelled; nothing was started."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmControllerRebuild(os.Stdin, output, plan)
+	}); !proceed {
+		return code
 	}
 	writeControllerApplyActivity(stderr, app.ControllerApplyUnit(expectedRevision))
 	report := runWithManagedProgress(
@@ -423,24 +396,10 @@ func runServiceRestart(ctx context.Context, manager *app.ServiceManager, reposit
 		}
 		return 1
 	}
-	if !assumeYes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: services restart requires an interactive terminal or explicit --yes")
-			return 2
-		}
-		confirmationOutput := stdout
-		if jsonOutput {
-			confirmationOutput = stderr
-		}
-		approved, err := presentation.ConfirmServiceRestart(os.Stdin, confirmationOutput, status.Services[0])
-		if err != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", err)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Service restart cancelled; no action started.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(assumeYes, stderr, confirmationStream(stdout, stderr, jsonOutput), applyConfirmation{noTerminal: "Error: services restart requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Service restart cancelled; no action started."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmServiceRestart(os.Stdin, output, status.Services[0])
+	}); !proceed {
+		return code
 	}
 	report := manager.Restart(ctx, repository, service)
 	report.Message = operationRecordMessage(report.Message, report)
@@ -476,24 +435,10 @@ func runSetupApply(ctx context.Context, repository string, stdout, stderr io.Wri
 		fmt.Fprintln(stderr, "Error: evaluate controller identity:", err)
 		return 1
 	}
-	if !assumeYes {
-		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: setup apply requires an interactive terminal or explicit --yes")
-			return 2
-		}
-		confirmationOutput := stdout
-		if jsonOutput {
-			confirmationOutput = stderr
-		}
-		approved, confirmErr := presentation.ConfirmControllerApply(os.Stdin, confirmationOutput, meta.Controller.Name)
-		if confirmErr != nil {
-			fmt.Fprintln(stderr, "Error: read confirmation:", confirmErr)
-			return 1
-		}
-		if !approved {
-			fmt.Fprintln(confirmationOutput, "Controller apply cancelled; no action started.")
-			return 0
-		}
+	if code, proceed := confirmReviewedApply(assumeYes, stderr, confirmationStream(stdout, stderr, jsonOutput), applyConfirmation{noTerminal: "Error: setup apply requires an interactive terminal or explicit --yes", readFailure: "Error: read confirmation:", cancelled: "Controller apply cancelled; no action started."}, func(output io.Writer) (bool, error) {
+		return presentation.ConfirmControllerApply(os.Stdin, output, meta.Controller.Name)
+	}); !proceed {
+		return code
 	}
 	writeControllerApplyActivity(stderr, app.ApplyControllerUnit)
 	report := runWithManagedProgress(
@@ -516,4 +461,15 @@ func runSetupApply(ctx context.Context, repository string, stdout, stderr io.Wri
 		return 1
 	}
 	return 0
+}
+
+// reviewMismatch tells the operator why a confirmed review no longer applies:
+// it ran out, or the computers or settings it covered changed. changed is the
+// message for the second case.
+func reviewMismatch(stderr io.Writer, match app.ReviewMatch, changed string) {
+	if match == app.ReviewExpired {
+		fmt.Fprintln(stderr, "The review expired; review again.")
+		return
+	}
+	fmt.Fprintln(stderr, changed)
 }

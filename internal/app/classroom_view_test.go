@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -16,7 +18,29 @@ type fakeAgentSession struct {
 	closed *int
 	inputs *int
 	reply  classroomview.Message
+	// clip records the shared clipboard calls ("begin", "set:text", "end").
+	clip   *[]string
+	copied string
 }
+
+func (session fakeAgentSession) note(call string) {
+	if session.clip != nil {
+		session.mutex.Lock()
+		*session.clip = append(*session.clip, call)
+		session.mutex.Unlock()
+	}
+}
+func (session fakeAgentSession) ClipboardBegin() error { session.note("begin"); return nil }
+func (session fakeAgentSession) ClipboardEnd() error   { session.note("end"); return nil }
+func (session fakeAgentSession) Notice(kind string) error {
+	session.note("notice:" + kind)
+	return nil
+}
+func (session fakeAgentSession) ClipboardSet(text string) error {
+	session.note("set:" + text)
+	return nil
+}
+func (session fakeAgentSession) ClipboardGet() (string, error) { return session.copied, nil }
 
 func (session fakeAgentSession) Thumbnail(width int, since int64) (classroomview.Message, error) {
 	return session.reply, nil
@@ -51,6 +75,7 @@ type fakeAgentConnector struct {
 	mutex  sync.Mutex
 	closed int
 	inputs int
+	clip   []string
 	errors map[string]error
 	codes  map[string]string
 }
@@ -63,7 +88,7 @@ func (connector *fakeAgentConnector) Connect(_ context.Context, host domain.Host
 	if code := connector.codes[host.Name]; code != "" {
 		reply = classroomview.Message{Type: classroomview.TypeError, Code: code}
 	}
-	return fakeAgentSession{mutex: &connector.mutex, closed: &connector.closed, inputs: &connector.inputs, reply: reply}, nil
+	return fakeAgentSession{mutex: &connector.mutex, closed: &connector.closed, inputs: &connector.inputs, reply: reply, clip: &connector.clip, copied: "from pc\x00"}, nil
 }
 
 func TestClassroomViewHubShowsEveryComputerAndStopsWhenNobodyLooks(t *testing.T) {
@@ -104,6 +129,7 @@ func TestClassroomViewHubShowsEveryComputerAndStopsWhenNobodyLooks(t *testing.T)
 	if image, frame, found := hub.Frame("pc01", 0); !found || frame != 3 || string(image) != "pc01" {
 		t.Fatalf("frame = %q %d %v", image, frame, found)
 	}
+	hub.frameWait = 20 * time.Millisecond
 	if image, _, _ := hub.Frame("pc01", 3); image != nil {
 		t.Fatal("an unchanged frame was sent again")
 	}
@@ -243,5 +269,74 @@ func TestClassroomViewHubReportsComputersThatAnswered(t *testing.T) {
 	// off does not.
 	if !answered["pc01"] || !answered["pc02"] || answered["pc03"] {
 		t.Fatalf("answered = %v", answered)
+	}
+}
+
+func TestClassroomClipboardWorksOnlyUnderControl(t *testing.T) {
+	connector := &fakeAgentConnector{}
+	hub := NewClassroomViewHub(func(context.Context) ([]domain.HostMeta, error) {
+		return []domain.HostMeta{{Name: "pc01"}}, nil
+	}, connector)
+	hub.interval, hub.idle = 10*time.Millisecond, 5*time.Second
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		computers, _ := hub.Computers(context.Background())
+		if computers[0].State == ClassroomViewing {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	hub.Frame("pc01", 0)
+	if err := hub.ClipboardSet("pc01", "hello"); !errors.Is(err, ErrClassroomNotControlled) {
+		t.Fatalf("set without control: %v", err)
+	}
+	if _, err := hub.ClipboardGet("pc01"); !errors.Is(err, ErrClassroomNotControlled) {
+		t.Fatalf("get without control: %v", err)
+	}
+	if err := hub.Control("pc09", true); err == nil {
+		t.Fatal("control of an unknown computer")
+	}
+	if err := hub.Control("pc01", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := hub.ClipboardSet("pc01", strings.Repeat("x", classroomview.MaxClipboardBytes+1)); !errors.Is(err, classroomview.ErrClipboardTooLarge) {
+		t.Fatalf("large text: %v", err)
+	}
+	if err := hub.ClipboardSet("pc01", "hello\x00"); err != nil {
+		t.Fatal(err)
+	}
+	if text, err := hub.ClipboardGet("pc01"); err != nil || text != "from pc" {
+		t.Fatalf("get = %q, %v", text, err)
+	}
+	if err := hub.Control("pc01", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := hub.ClipboardSet("pc01", "late"); !errors.Is(err, ErrClassroomNotControlled) {
+		t.Fatalf("set after control ended: %v", err)
+	}
+	connector.mutex.Lock()
+	got := strings.Join(connector.clip, ",")
+	connector.mutex.Unlock()
+	if got != "begin,set:hello,end" {
+		t.Fatalf("calls = %s", got)
+	}
+}
+
+func TestClassroomFrameWaitsForTheNextPicture(t *testing.T) {
+	hub := NewClassroomViewHub(nil, nil)
+	hub.computers["pc01"] = &ClassroomComputer{Name: "pc01", Frame: 3, imageBytes: []byte("three")}
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		hub.update("pc01", func(computer *ClassroomComputer) { computer.Frame, computer.imageBytes = 4, []byte("four") })
+		hub.frameArrived()
+	}()
+	started := time.Now()
+	image, frame, found := hub.Frame("pc01", 3)
+	if !found || frame != 4 || string(image) != "four" || time.Since(started) >= classroomFrameWait {
+		t.Fatalf("frame = %q %d %v after %v", image, frame, found, time.Since(started))
+	}
+	hub.frameWait = 30 * time.Millisecond
+	if image, frame, _ := hub.Frame("pc01", 4); image != nil || frame != 4 {
+		t.Fatalf("an unchanged frame was sent: %q %d", image, frame)
 	}
 }

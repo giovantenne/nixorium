@@ -93,10 +93,17 @@ type DHCPAddressCheck struct {
 	Message  string   `json:"message,omitempty"`
 }
 
+// WirelessInterfaceName reports whether a network card name is a Wi-Fi
+// card's: systemd names them wl… (wlp2s0, wlo1, wlx…) and the kernel wlan0.
+// Used where only the name is known, such as the live USB system's cards.
+func WirelessInterfaceName(name string) bool {
+	return strings.HasPrefix(name, "wl")
+}
+
 // ControllerInterfaceFor resolves the controller's laboratory device in the
 // same order as mkLab: per-computer override, controller name, fallback.
 func ControllerInterfaceFor(lab LabSettings) string {
-	if name := lab.HostInterfaceNames[fmt.Sprintf("pc%02d", lab.MasterHostNumber)]; name != "" {
+	if name := lab.HostInterfaceNames[HostName(lab.MasterHostNumber)]; name != "" {
 		return name
 	}
 	return lab.ControllerInterface()
@@ -127,7 +134,7 @@ func NetworkPreflightNeeds(base, candidate LabSettingsFile) (controller bool, cl
 		return controller, nil
 	}
 	for number := 1; number <= min(base.Lab.PCCount, candidate.Lab.PCCount); number++ {
-		name := fmt.Sprintf("pc%02d", number)
+		name := HostName(number)
 		after, explicit := ClientInterfaceFor(candidate.Lab, name)
 		before, wasExplicit := ClientInterfaceFor(base.Lab, name)
 		if !explicit || (wasExplicit && before == after) {
@@ -270,6 +277,11 @@ func CheckClientInterface(host HostMeta, previous string, observation NetworkObs
 		check.Devices = append(check.Devices, device.Name)
 		if device.Name == host.Interface {
 			check.State = DevicePresent
+			// The laboratory profile is wired: a Wi-Fi card never carries
+			// the laboratory address.
+			if device.Kind == NetworkDeviceWireless {
+				check.State = DeviceNotWired
+			}
 		}
 	}
 	if check.State == "" {
@@ -292,6 +304,20 @@ func (preflight *NetworkPreflight) Missing() []string {
 	return names
 }
 
+// Wireless lists clients whose named device is a Wi-Fi card.
+func (preflight *NetworkPreflight) Wireless() []string {
+	if preflight == nil {
+		return nil
+	}
+	names := []string{}
+	for _, client := range preflight.Clients {
+		if client.State == DeviceNotWired {
+			names = append(names, client.Name)
+		}
+	}
+	return names
+}
+
 // Unreachable lists clients that could not be checked.
 func (preflight *NetworkPreflight) Unreachable() []string {
 	if preflight == nil {
@@ -307,15 +333,19 @@ func (preflight *NetworkPreflight) Unreachable() []string {
 }
 
 // SaveRefusal returns why the reviewed settings must not be saved, or "".
-// A controller without the chosen wired device always refuses. A client
-// without its named device refuses unless the administrator acknowledged
-// exactly that computer.
+// A controller without the chosen wired device always refuses, and so does a
+// client whose named device is a Wi-Fi card. A client without its named
+// device refuses unless the administrator acknowledged exactly that computer.
 func (preflight *NetworkPreflight) SaveRefusal() string {
 	if preflight == nil {
 		return ""
 	}
 	if preflight.Controller != nil && preflight.Controller.Blocking {
 		return preflight.Controller.Message + " Choose one of its wired devices."
+	}
+	if wireless := preflight.Wireless(); len(wireless) > 0 {
+		sort.Strings(wireless)
+		return fmt.Sprintf("The named network device is a Wi-Fi card on %s; the laboratory needs a wired one. Choose its wired card.", strings.Join(wireless, ", "))
 	}
 	acknowledged := map[string]bool{}
 	for _, name := range preflight.Acknowledged {
@@ -372,6 +402,9 @@ type DHCPAddressChoice struct {
 // ControllerAddresses is what the settings form detects on the controller.
 type ControllerAddresses struct {
 	Choices []DHCPAddressChoice `json:"choices"`
+	// Wired lists the controller's wired network devices, offered as its
+	// laboratory interface.
+	Wired []NetworkDevice `json:"wired,omitempty"`
 	// Detected is false when the controller's addresses could not be read;
 	// the form then keeps a typed value.
 	Detected bool   `json:"detected"`

@@ -53,7 +53,7 @@ func (fixture *recoveryFixture) actions() DashboardActions {
 					{Name: "pc02", IP: "10.0.0.2", State: domain.RecoveryTargetUnreachable, Detail: "off or not reachable; check it at the console"},
 				}}
 			if acknowledge {
-				plan.State, plan.Confirmation, plan.ReviewToken, plan.Message = "ready", "RECOVERED", "sha256:x", "Every reachable computer has finished."
+				plan.State, plan.ReviewToken, plan.Message = "ready", "sha256:x", "Every reachable computer has finished."
 			} else {
 				plan.Issues = []domain.ValidationIssue{{Field: "unreachable", Message: plan.Message}}
 			}
@@ -202,7 +202,7 @@ func TestUpdateResultNoticeOpensTheInterruptedUpdateReview(t *testing.T) {
 	view := plainView(model)
 	for _, want := range []string{
 		"! The controller was not updated: a previous update of the student computers was interrupted.",
-		"  Nixorium does not know how it ended on every computer, so the student computers wait until you review it.",
+		"  Nixorium does not know how it ended on every computer, so maintenance waits until you review it; classroom controls leave only those computers alone.",
 		"  Next: Review the interrupted update (Enter)",
 		"Enter Review the interrupted update", "a Retry controller", "d Details", "Esc Maintenance",
 	} {
@@ -288,7 +288,7 @@ func TestUpdateResultAfterActivationPastInterruptedUpdateKeepsItsReview(t *testi
 	revision := "0123456789abcdef0123456789abcdef01234567"
 	started := time.Date(2026, 10, 15, 15, 4, 0, 0, time.Local)
 	held := domain.RecoveryReport{Conditions: []domain.BlockingCondition{
-		{Kind: domain.RecoveryDeploymentPending, Title: situationTitle("DEPLOY-PENDING"), Detail: "Update of 2026-10-15 15:04 to pc01; how it ended is unknown.", Since: &started},
+		{Kind: domain.RecoveryDeploymentPending, Title: situationTitle("DEPLOY-PENDING"), Detail: "Update of pc01 started 2026-10-15 15:04; how it ended is unknown.", Since: &started},
 	}}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: fixture.actions(), width: 160, height: 44, screen: dashboardUpdate,
 		updates: updateModel{applying: true, result: domain.UpdateApplyReport{Operation: "update-save", State: "saved", Updated: true, Revision: revision, Target: "v3.7.0"}}}
@@ -342,7 +342,7 @@ func TestControllerResultPastUSBReservationShowsItWithoutTheClientLine(t *testin
 		t.Fatalf("controller result does not show the USB reservation:\n%s", view)
 	}
 	// Without a record the result stays as before.
-	model.recovery = domain.RecoveryReport{}
+	model.recovery.report = domain.RecoveryReport{}
 	if view := plainView(model); contains(view, "USB installation was not finished") || contains(view, heldDeploymentLine) {
 		t.Fatalf("controller result shows a record that is not there:\n%s", view)
 	}

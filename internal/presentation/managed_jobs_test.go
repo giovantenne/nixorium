@@ -14,7 +14,7 @@ import (
 func TestManagedJobsAttachOldProgressWithoutStartingOrFollowingUp(t *testing.T) {
 	started := time.Now().Add(-time.Hour)
 	job := domain.ManagedJob{Operation: "controller-apply", State: "running", Unit: "nixorium-apply-controller@" + strings.Repeat("a", 40) + ".service", Progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "build", StartedAt: started, Recent: []string{"Existing build"}}}
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{
+	model := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}), withActions(DashboardActions{
 		LoadManagedJobs: func(context.Context) ([]domain.ManagedJob, error) { return []domain.ManagedJob{job}, nil },
 		ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 			t.Fatal("attachment started a controller job")
@@ -24,7 +24,7 @@ func TestManagedJobsAttachOldProgressWithoutStartingOrFollowingUp(t *testing.T) 
 			t.Fatal("attachment resumed guided installation")
 			return domain.ActionReport{}
 		},
-	}, false)
+	}))
 	model.width, model.height = 120, 30
 	updated, command := model.Update(model.loadManagedJobs(0)())
 	model = updated.(dashboardModel)
@@ -55,7 +55,7 @@ func TestManagedJobsAttachOldProgressWithoutStartingOrFollowingUp(t *testing.T) 
 }
 
 func TestManagedJobsInterruptedAndConflict(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	model := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}))
 	model.width, model.height = 120, 30
 	job := domain.ManagedJob{Operation: "pxe-prepare", State: "running", Unit: "nixorium-prepare-pxe.service"}
 	model.jobs.items = []domain.ManagedJob{job}
@@ -86,7 +86,7 @@ func TestManagedJobsInterruptedAndConflict(t *testing.T) {
 }
 
 func TestManagedJobsStalePollAndOwnedProgressFilters(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	model := newTestModel(t, withSetup(domain.SetupReport{State: "ready"}))
 	model.jobs.id = 3
 	updated, command := model.Update(managedJobsMsg{id: 2, jobs: []domain.ManagedJob{{State: "running"}}})
 	if command != nil || len(updated.(dashboardModel).jobs.items) != 0 {
@@ -107,9 +107,9 @@ func TestManagedJobsStalePollAndOwnedProgressFilters(t *testing.T) {
 }
 
 func TestManagedJobsCachedObservationDoesNotBlockOwnedGuidedFollowup(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+	model := newTestModel(t, withActions(DashboardActions{
 		PreparePXE: func() domain.ActionReport { return domain.ActionReport{} },
-	}, false)
+	}))
 	model.jobs.items = []domain.ManagedJob{{Operation: "controller-apply", State: "running"}}
 	model.controller.result = domain.ControllerRebuildExecutionReport{Applied: true, Verified: true}
 	updated, command := model.startComputerInstallationPreparation()
@@ -119,12 +119,12 @@ func TestManagedJobsCachedObservationDoesNotBlockOwnedGuidedFollowup(t *testing.
 }
 
 func TestManagedJobsStartupDoesNotResumeSetupOrExposeClassroomAdmin(t *testing.T) {
-	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{LoadManagedJobs: func(ctx context.Context) ([]domain.ManagedJob, error) {
+	model := newTestModel(t, withActions(DashboardActions{LoadManagedJobs: func(ctx context.Context) ([]domain.ManagedJob, error) {
 		if _, ok := ctx.Deadline(); !ok {
 			t.Fatal("unbounded observation")
 		}
 		return []domain.ManagedJob{{State: "running"}}, nil
-	}}, true)
+	}}), withSetupMode())
 	updated, _ := model.Update(dashboardInitialMsg{setup: domain.SetupReport{CurrentStage: domain.SetupStageApply}, jobs: []domain.ManagedJob{{Operation: "controller-apply", State: "running"}}})
 	if updated.(dashboardModel).screen != dashboardHome || updated.(dashboardModel).installation.flow {
 		t.Fatal("startup resumed setup while job runs")
@@ -145,5 +145,63 @@ func TestManagedJobsStartupDoesNotResumeSetupOrExposeClassroomAdmin(t *testing.T
 	}
 	if jobs, err := model.observeManagedJobs(context.Background()); err != nil || jobs != nil {
 		t.Fatal("classroom has administrative jobs")
+	}
+}
+
+func TestManagedJobPollingContinuesAfterReturningToOverview(t *testing.T) {
+	model := newTestModel(t, withActions(DashboardActions{
+		LoadManagedJobs: func(context.Context) ([]domain.ManagedJob, error) { return nil, nil },
+		LoadInitial: func(context.Context) (domain.StatusReport, domain.SetupReport, error) {
+			return testDashboardReport("ready"), testSetupReport(true, true, true, true), nil
+		},
+	}))
+	model.jobs.id = 1
+	updated, command := model.Update(managedJobsMsg{id: 1})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("polling did not start")
+	}
+	model.screen = dashboardAdministration
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHome {
+		t.Fatalf("screen %d", model.screen)
+	}
+	// Returning to the Overview started a new observation identity: the tick
+	// that was already waiting belongs to the old one and is dropped.
+	updated, command = model.Update(managedJobsTickMsg{id: 1})
+	model = updated.(dashboardModel)
+	if command != nil {
+		t.Fatal("the tick of the replaced polling chain was followed")
+	}
+	updated, command = model.Update(overviewQuietRefreshMsg{jobsID: model.jobs.id, read: model.overviewReads, report: testDashboardReport("ready"), setup: testSetupReport(true, true, true, true)})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("polling never restarted after the Overview refresh")
+	}
+	// A refresh that was overtaken still restarts the chain of its own
+	// identity, but one that belongs to an older identity does not.
+	model.overviewReads++
+	if _, command = model.Update(overviewQuietRefreshMsg{jobsID: model.jobs.id, read: model.overviewReads - 1}); command == nil {
+		t.Fatal("an overtaken refresh left polling stopped")
+	}
+	if _, command = model.Update(overviewQuietRefreshMsg{jobsID: model.jobs.id - 1, read: model.overviewReads}); command != nil {
+		t.Fatal("a refresh of an older identity started a second chain")
+	}
+}
+
+func TestBackgroundWorkListMovesUpAndDown(t *testing.T) {
+	model := newTestModel(t, withReadyLab())
+	model.screen = dashboardManagedJobs
+	model.jobs.items = []domain.ManagedJob{{Operation: "controller-apply"}, {Operation: "pxe-prepare"}, {Operation: "other"}}
+	for _, step := range []struct {
+		key  tea.KeyPressMsg
+		want int
+	}{{tea.KeyPressMsg{Code: tea.KeyDown}, 1}, {tea.KeyPressMsg{Code: tea.KeyDown}, 2}, {tea.KeyPressMsg{Code: tea.KeyUp}, 1}, {tea.KeyPressMsg{Code: tea.KeyUp}, 0}, {tea.KeyPressMsg{Code: tea.KeyUp}, 2}, {tea.KeyPressMsg{Code: tea.KeyTab}, 0}} {
+		updated, _ := model.Update(step.key)
+		model = updated.(dashboardModel)
+		if model.jobs.cursor != step.want {
+			t.Fatalf("after %s the cursor is %d, want %d", step.key.String(), model.jobs.cursor, step.want)
+		}
 	}
 }

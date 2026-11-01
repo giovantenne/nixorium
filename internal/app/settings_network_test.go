@@ -171,10 +171,21 @@ func TestSettingsSaveRefusesAMissingControllerDevice(t *testing.T) {
 	source := &mutableSettingsSource{data: data}
 	manager := NewSettingsSaveManager(NewSettingsManager(source).WithNetworkObserver(networkTestObserver()), NewGitReviewManager(&fakeGitCommitSource{revision: strings.Repeat("a", 40)}), NewGitCommitManager(&fakeGitCommitSource{}))
 	reviewed := manager.settings.PlanSettings(context.Background(), ".", candidate)
+	// A Wi-Fi card name is refused by validation, before any device check.
+	if !reviewed.HasErrors() || reviewed.NetworkPreflight != nil {
+		t.Fatalf("Wi-Fi controller plan = %+v", reviewed)
+	}
+	if report := manager.Save(context.Background(), ".", candidate, reviewed); report.State == "saved" || source.writes != 0 {
+		t.Fatalf("Wi-Fi controller save = %+v", report)
+	}
+
+	// A wired name the controller does not have is refused by the device check.
+	candidate.Lab.ControllerInterfaceName = "enp9s0"
+	reviewed = manager.settings.PlanSettings(context.Background(), ".", candidate)
 	// Acknowledgement covers clients only, never the controller.
 	reviewed.NetworkPreflight.Acknowledged = []string{"controller", "pc99"}
 	report := manager.Save(context.Background(), ".", candidate, reviewed)
-	if report.State != "blocked" || source.writes != 0 || !strings.Contains(report.Message, "wlp2s0 is a wireless device") {
+	if report.State != "blocked" || source.writes != 0 || !strings.Contains(report.Message, "no network device called enp9s0") {
 		t.Fatalf("controller save = %+v", report)
 	}
 }

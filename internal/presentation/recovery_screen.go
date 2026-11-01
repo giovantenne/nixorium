@@ -36,7 +36,7 @@ func (model dashboardModel) observeRecovery(ctx context.Context) domain.Recovery
 
 func (model dashboardModel) openRecovery() (tea.Model, tea.Cmd) {
 	model.screen = dashboardRecovery
-	model.recoveryCursor = 0
+	model.recovery.cursor = 0
 	model.message = ""
 	if model.actions.LoadRecovery == nil {
 		return model, nil
@@ -85,22 +85,22 @@ func (model dashboardModel) recoveryFlow(condition domain.BlockingCondition) (te
 }
 
 func (model dashboardModel) updateRecovery(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	conditions := model.recovery.Conditions
+	conditions := model.recovery.report.Conditions
 	switch key.String() {
 	case "esc", "left":
 		model.screen = dashboardHome
 		model.message = ""
 	case "up", "k":
-		model.recoveryCursor = max(0, model.recoveryCursor-1)
+		model.recovery.cursor = max(0, model.recovery.cursor-1)
 	case "down", "j":
-		model.recoveryCursor = min(max(0, len(conditions)-1), model.recoveryCursor+1)
+		model.recovery.cursor = min(max(0, len(conditions)-1), model.recovery.cursor+1)
 	case "r":
 		return model.openRecovery()
 	case "enter":
 		if len(conditions) == 0 {
 			return model, nil
 		}
-		condition := conditions[min(model.recoveryCursor, len(conditions)-1)]
+		condition := conditions[min(model.recovery.cursor, len(conditions)-1)]
 		if next, command, opened := model.recoveryFlow(condition); opened {
 			return next, command
 		}
@@ -117,12 +117,12 @@ func (model dashboardModel) recoveryView() string {
 		return model.renderShell(shell)
 	}
 	lines := []string{tuiTitle("What blocks operations", model.isDark), tuiMuted("Read from local state only; nothing is changed by this screen.", model.isDark), ""}
-	conditions := model.recovery.Conditions
+	conditions := model.recovery.report.Conditions
 	if len(conditions) == 0 {
 		lines = append(lines, "Nothing blocks Nixorium operations.")
 	}
 	for index, condition := range conditions {
-		lines = append(lines, tuiSelection(condition.Title, index == model.recoveryCursor, model.isDark))
+		lines = append(lines, tuiSelection(condition.Title, index == model.recovery.cursor, model.isDark))
 		if condition.Detail != "" {
 			lines = append(lines, "  "+condition.Detail)
 		}
@@ -154,9 +154,9 @@ func (model dashboardModel) safeModeView() string {
 		detail: model.message + " No configuration or computer was changed.",
 	})
 	lines := []string{tuiTitle("Safe mode", model.isDark), "Nixorium cannot read the saved laboratory state. These tools still work and change nothing.", ""}
-	if len(model.recovery.Conditions) > 0 {
+	if len(model.recovery.report.Conditions) > 0 {
 		lines = append(lines, tuiSection("What blocks operations", model.isDark))
-		for _, condition := range model.recovery.Conditions {
+		for _, condition := range model.recovery.report.Conditions {
 			lines = append(lines, "• "+condition.Title, tuiMuted("  Next: "+condition.Next.Action, model.isDark))
 		}
 		lines = append(lines, "")

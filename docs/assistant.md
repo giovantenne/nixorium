@@ -22,7 +22,7 @@ deployment's existing `lab-settings.json`, preserving the other settings:
 Review and commit the configuration change, then use the ordinary controller
 application review. Once that controller configuration is active, the menu
 entry is removed. Set it to `true` and apply the controller to enable it again.
-When enabled, **Assistant** is the fifth administrator menu entry (`m`);
+When enabled, **Assistant** is the fifth administrator menu entry (`a`);
 it is absent on clients and from the teacher's classroom dashboard.
 Menu availability does not activate an account, accept consent or send requests.
 
@@ -74,12 +74,12 @@ Subscription, quota, network and deployment-conflict notices appear inside the
 conversation and preserve the draft. An invalid token is removed, the chat explains that the activation is no
 longer valid, and the next send asks to activate again. `/code` opens activation for a replacement code.
 `/name` gives this laboratory a name (up to 60 characters), shown after the
-school name in the header, on invoices and emails and in support, so several
+school name in the header and on invoices and emails, so several
 laboratories of one school can be told apart; an empty name removes it.
 
 The service sets the size and length of the free trial and shows them when you
 activate: on the trial choice in Assistant, on the `/trial` page and in the
-email with your code (currently ten requests for thirty days). There is one
+email with your code. There is one
 trial per laboratory: the same email address can register several laboratories,
 each under its own name, and a trial keeps the requests and end date it started
 with. Register with your email, school name and privacy consent on the
@@ -109,9 +109,10 @@ a request containing client version and tool version only. The subsequent steps 
 names, requested file contents and tool results to the Assistant service and
 its AI provider. The service does not keep your configuration files. It keeps the text of your
 messages and Assistant's answers for 30 days to detect abuse, then deletes it.
-Whole conversations, including files, saved history and diagnostics Assistant
-read, are kept for 90 days
-only if you report an answer or turn on sharing. Sharing is off by default. Do not enter passwords or student data in a request.
+Conversations (your questions, the answers and the tool results Assistant
+used, after the controller's best-effort redaction) are saved on the service
+for 90 days to find and fix Assistant's mistakes. Saving is on by default and the
+administrator can switch it off. Do not enter passwords or student data in a request.
 
 The model sees tracked files from the chat's base commit plus its own candidate
 files. Untracked and ignored files, private-key paths, `keys/`, `.git`, `.ssh`,
@@ -119,17 +120,17 @@ files. Untracked and ignored files, private-key paths, `keys/`, `.git`, `.ssh`,
 locks, instruction files and Git control files are read-only, and so are the
 settings except the few listed under [Laboratory settings](#laboratory-settings).
 Sensitive settings fields are withheld; known token formats, password hashes and
-private key material are redacted from model-facing output. The laboratory token is
+private key material are redacted from model-facing output, including Nix
+cache secret keys, `age` secret keys and Wi-Fi `psk` or `wpa_passphrase` values.
+Redaction is pattern-based, so a secret in a format the controller does not
+recognise can still be sent: do not keep secrets in tracked files of the
+deployment, because Assistant reads only those. The laboratory token is
 kept separate from the transcript. Only bounded journal excerpts from fixed
 core units are diagnostic inputs; arbitrary logs, student home files and other
 files outside the workspace are not tool inputs.
 Assistant sees only the lab configuration folder on the controller (normally
 `/home/admin/nixorium-deployment`; the exact path is recorded in
-`/etc/nixorium/deployment-path`), never your home folder or `Downloads`. For a
-program available from an official download, such as an AppImage, it proposes
-a package that the controller downloads with a pinned hash when it builds the
-update; a private file must first be copied into that folder and committed to
-its Git before a new chat can use it.
+`/etc/nixorium/deployment-path`), never your home folder or `Downloads`.
 
 ## Subscription and payments
 
@@ -142,14 +143,18 @@ of the transcript and model messages. The portal return page lets you close the
 tab and return to Nixorium. The displayed invoice notice is **Official electronic
 invoices are delivered through SDI.**
 
-## Reports and conversation sharing
+## Reports and saved conversations
 
-The activation consent offers **Share my conversations with Nixorium for 90 days
-to improve Assistant** (off by default; Space toggles it). In the chat,
-**/share** opens **Conversation sharing**; Enter changes the saved setting and
-Esc cancels. Sharing uploads the complete redacted saved conversation after
-final and error responses, replacing the previous version. Upload failures
-never block a response or change its result.
+The activation consent shows **Save conversations on the service: On**,
+pre-selected (Space switches it off). The consent text says that conversations
+are saved on the Nixorium Assistant service for 90 days to find and fix
+Assistant's mistakes. In the chat, **/share** opens **Assistant settings** with the same
+switch; Enter changes the saved setting and Esc cancels. Saving uploads the
+complete redacted saved conversation after final and error responses, replacing
+the previous version; nothing is uploaded when it is Off. Upload failures never
+block a response or change its result. A controller that accepted an earlier
+consent text sees the updated consent once, with saving pre-selected On, and
+can refuse it.
 
 After a final response, **/report** opens **Report this answer**. Choose
 **Helpful** or **Wrong** with Up/Down and optionally type up to 500 characters.
@@ -157,7 +162,7 @@ The screen explains that sending includes the whole conversation: your
 messages, configuration and history contents read, diagnostics and check
 results. Known secret patterns are filtered, but personal or sensitive text
 may remain. Enter sends; Esc cancels. A report is retained for 90 days even when
-ongoing sharing is off. Successful submission shows **Report sent. Thank you.**
+saving conversations is off. Successful submission shows **Report sent. Thank you.**
 The laboratory token authenticates requests and is kept out of their bodies.
 
 ## Tools and limits
@@ -176,17 +181,11 @@ The model has fixed tools, with no shell or system-operation tool:
 | `build` | New non-cached candidate derivations after evaluation; bounded build logs, no activation |
 | `lab_status` | Read-only controller observations of the lab computers |
 | `prepare_npm` | Capable controllers only: prepare a public npm CLI package/tag and its tested offline dependency artifact |
-| `host_diagnostics` | One exact declared computer and a fixed area; read-only state and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
+| `host_diagnostics` | One exact declared computer and a fixed area (`system`, `home_reset`, `updates`, `network`, `cache`, `pxe`, `hardware`); read-only state or device facts and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
+| `read_system_file` | Capable controllers only, after the updated consent: one allowlisted system file or directory of one declared computer (see [System files](#system-files)); 256 KiB of text, 500 listing entries, 60-second timeout |
 | `prefetch` | Capable controllers only, after the updated consent: one public `https` file of at most 1 GiB downloaded once into the controller's Nix store; returns its pinned hash, size and store path; 15-minute timeout |
-
-Assistant never changes the laboratory network; for a new network address or
-prefix it refers the administrator to the guided change (Maintenance → Change
-network addressing, `nixorium network migrate`).
-
-A program downloaded by hand runs on these computers thanks to nix-ld, but
-that is a convenience for one user; the `prefetch` route remains the one that
-puts a program on every computer.
+| `vscode_marketplace` | Capable controllers only, after the updated consent: one VS Code extension (`publisher.name`) resolved in the public Marketplace for the deployment's pinned editor and downloaded into the controller's Nix store; returns the pin for `vscode.marketplace` in `workspace-profile.json`, its dependencies and whether it ships native programs |
 
 The wire-level step context and service messages are specified in the
 [assistant protocol v2.5](assistant-protocol-v25.md); the tool schemas are in
@@ -196,7 +195,10 @@ Paths must be relative, with no traversal, backslashes or control characters;
 the limit is 12 components and 512 bytes. A file cannot replace a directory
 that still contains visible files. Tools cannot activate a system,
 manage services, deploy computers, or save a proposal into the deployment.
-Evaluation errors are redacted and limited to 8 KiB. Passing evaluation proves
+The candidate is evaluated without network (a network namespace of its own,
+through bubblewrap), so a fetch written into the proposal cannot make the
+controller send requests during the review; the committed base is evaluated
+normally. Evaluation errors are redacted and limited to 8 KiB. Passing evaluation proves
 that Nix can evaluate the candidate; it does not prove a successful build,
 activation, boot or safe behavior of arbitrary configuration code.
 
@@ -210,8 +212,8 @@ filtered, but filtering cannot guarantee removal of every personal or sensitive
 detail in logs or historical configuration. Student home files are not read.
 
 `host_diagnostics` takes an exact name from fresh evaluated inventory and one of
-`system`, `home_reset`, `updates`, `network`, `cache`, or `pxe`. Cache and PXE are
-controller-only. The native helper accepts only that area, using immutable
+`system`, `home_reset`, `updates`, `network`, `cache`, `pxe`, or `hardware`. Cache
+and PXE are controller-only. The native helper accepts only that area, using immutable
 systemd executable paths and fixed core unit lists. It reports service loading,
 state, result, exit status and timestamps; boot ID and deployment revision;
 numeric free space for fixed mounts; and available reset/update markers. It
@@ -224,6 +226,68 @@ roles, missing helpers, insufficient journal permissions and incomplete evidence
 remain explicit; an empty journal is not proof of service health. Apply an
 updated configuration through ordinary reviews to install the helper on older
 computers. This tool never restarts a service, changes a system or runs a queue.
+
+The `hardware` area works on the controller and on every client and
+lists USB, PCI, display, audio and printer facts. It adds these optional lists
+to the report, each bounded; a source that cannot be read is named in
+`unavailable` (`usb`, `pci`, `displays`, `audio`, `printers`, `kernel_log`)
+instead of being reported as empty:
+
+- `usbDevices` (at most 32): `path` (for example `1-2`), `vendorId`,
+  `productId`, `manufacturer`, `product`, `class` and `interfaceClasses`
+  (hexadecimal USB class codes), from `/sys/bus/usb/devices`.
+- `pciDevices` (at most 64): `slot`, `vendorId`, `deviceId`, `class` and the
+  kernel `driver` in use, from `/sys/bus/pci/devices`. Names are not looked up.
+- `displays` (at most 16): `connector` (for example `card0-HDMI-A-1`),
+  `status` (`connected` or `disconnected`), `enabled` and at most five `modes`,
+  from `/sys/class/drm`. The EDID is not read, so there is no monitor name.
+- `audioCards` (at most 8): `index`, `id`, `driver` and `name`, from
+  `/proc/asound/cards`.
+- `printers` (at most 16): `name`, `uri` and `state` (`idle`, `printing`,
+  `disabled` or `unknown`), from `lpstat` of the installed CUPS.
+- `journal`: at most 50 kernel messages of the current boot (`kernel` source
+  only) about USB, graphics, sound, HID and CUPS.
+
+When a computer still has an older helper that does not know an area, the tool
+answers `helper_outdated` (distinct from `diagnostics_unavailable`, which also
+covers a computer that is off, SSH failures and timeouts); applying the current
+configuration through ordinary reviews installs the new helper.
+
+Serial numbers are never read, because a serial can identify a student's
+personal device: the USB `serial` attribute is not opened, and any label,
+kernel message or printer address that carries a serial value
+("SerialNumber: ...") is dropped. Names such as "USB Serial" are kept. Kernel
+messages about Bluetooth are dropped (they carry device names and addresses),
+and hardware (MAC) addresses are redacted in all text. Printer
+addresses keep only scheme, host, port and path; credentials
+(`user:password@`), query strings and fragments are removed. The computer
+chooses the files and commands; the model chooses only the computer and the
+area.
+
+### System files
+
+Controllers that advertise `system_files_v1` offer `read_system_file`: one
+path of one computer from fresh declared inventory, after the version-3
+disclosure. Only `/etc`, `/boot/grub`, `/boot/loader`, `/proc/cmdline`,
+`/proc/cpuinfo`, `/proc/meminfo`, `/proc/mounts`, `/proc/partitions`,
+`/proc/swaps`, `/proc/version`, `/sys/class/net`, `/sys/class/dmi/id`,
+`/var/lib/nixorium` and `/run/nixorium` are readable. Home folders, `/root`,
+shadow files, private SSH keys, Wi-Fi connections, Nixorium keys, reset
+snapshots, installation state and device serial numbers are refused, by path
+and by name (`secret`, `private`, `token`, `password`, key files), and so is
+any link leading there; links are followed into the Nix store and, for the
+paths that need them, into `/sys/devices`, `/proc/PID/mounts`, `/var/lib/cups`
+and `/run/systemd/resolve`. `/etc/machine-id` and `/etc/passwd` are refused on
+purpose. A directory is listed with refused entries counted, not named. Text is
+returned up to 256 KiB, binary files only as such; lines that set passwords,
+passphrases, pre-shared keys, tokens or keys keep only their first word, and
+credentials in URIs are withheld. The fixed helper
+`nixorium-host-diagnostics file PATH` reads clients as root through the
+existing strict SSH trust; on the controller it runs as the administrator, so
+root-only files there (such as the boot menu on `/boot`) are reported as not
+readable. A computer whose helper is older answers `computer_needs_update`.
+The controller checks every answer again before it reaches the model. See
+ADR 0032.
 
 `git_history` reads only committed ancestors of the conversation's original
 base, with a default of ten and a maximum of twenty. An optional `path` is an
@@ -243,8 +307,7 @@ The `home_files_v1` advisory capability uses the optional HTTP header; discovery
 reads only the input's pure `lib.homeFilesVersion` marker, with offline,
 no-lock-update and no-IFD evaluation, once per immutable conversation baseline.
 It never runs during TUI startup. Absent or unavailable metadata omits the
-capability, and the service gives clear Update Nixorium guidance rather than
-proposing declarations or ordinary-file copy services on older controllers.
+capability.
 The existing evaluate, build and reviewed SAVE boundaries still apply.
 
 Local imports are opaque to model-facing file tools: `home-files/imports/` and
@@ -272,10 +335,8 @@ autostart entry.
 (default `latest`). It resolves the tag once using the deployment's pinned
 Node/npm, and writes five bounded text files under `npm/<id>/`: package and
 lock declarations, a manifest, a Nix package, and a deployment-owned module.
-Import the module explicitly for the requested hosts before ordinary evaluation,
-build and SAVE review. Preparing alone changes no system or home. To update a
-baseline, prepare a new `id`, replace the scoped import, and remove the old
-generated files in the reviewed proposal.
+Preparing alone changes no system or home; the files go through ordinary
+evaluation, build and SAVE review.
 Controllers advertise support through the optional `X-Nixorium-Capabilities`
 HTTP header. Request/share JSON keeps its original schema: older services ignore
 the header and continue ordinary chats; newer services offer this tool only to
@@ -288,10 +349,8 @@ are refused. Every required tarball has SHA-512 integrity and confined archive
 validation. Install hooks and CLI version/help tests run in separate Bubblewrap
 namespaces with no controller home, credentials or external network. Hooks
 requiring downloads or unavailable build tools fail. Optional dependencies are
-omitted and listed, which can remove features such as Pi's native clipboard
-support. CLI smoke tests do not certify every feature or package safety; additional
-runtime programs may be needed. Pi's normal file tools need pinned `fd` and
-`ripgrep` in the same host scope, so they do not try to download binaries.
+omitted and listed, which can remove features. CLI smoke tests do not certify
+every feature or package safety; additional runtime programs may be needed.
 
 Preparation allows 512 lock entries, 512 KiB of lock text, 8 MiB of metadata per
 package/64 MiB total, 128 MiB per tarball/512 MiB total, and 50,000 archive
@@ -316,14 +375,27 @@ network or installation at boot. A switch does not reset or seed a live home.
 Student updates disappear at the next reset; npm and credential snapshot
 exclusions remain intact.
 
+### VS Code extensions for students
+
+Students' VS Code extensions are listed in `vscode.extensions` of
+`workspace-profile.json`; the TUI no longer edits them. Extensions packaged in the deployment's package
+collection are found with `search_packages` (`vscode-extensions.<text>`). For
+one that exists only in the public Marketplace, controllers advertise
+`vscode_marketplace_v1` and the `vscode_marketplace` tool resolves the newest
+stable Linux version that the pinned VS Code accepts, downloads it into the
+controller's Nix store and returns its pin (publisher, name, version, hash and
+platform when needed), its dependencies and extension pack members, and whether
+it ships native programs. Pins in `vscode.marketplace` do not follow
+package-base updates. The tool writes no deployment file, uses the
+controller's Internet access only when called, and requires the updated
+consent; failures are reported as `not_resolved` with a one-line reason,
+`consent_required` or `marketplace_unavailable`.
+
 ### Prefetched downloads
 
-Controllers advertise `prefetch_v1` through the same optional header. For a
-program its publisher distributes as an AppImage, `.deb` package or tarball at
-a fixed-version address, `prefetch` downloads that one file on the controller
-and returns its `sha256-…` hash, its size in bytes and its Nix store path. The
-Assistant puts the hash in the module it writes, so the administrator never
-computes it. The tool does not read the file or send it to the service, and it
+Controllers advertise `prefetch_v1` through the same optional header. `prefetch`
+downloads one file on the controller and returns its `sha256-…` hash, its size
+in bytes and its Nix store path for a proposal. The tool does not read the file or send it to the service, and it
 installs or activates nothing. Like computer diagnostics, it requires the
 updated consent.
 
@@ -332,12 +404,16 @@ no user name, password, fragment, spaces or control characters. Hosts written
 as IP addresses, `localhost` and names ending in `.localhost`, `.local`,
 `.internal` or `.lan` are refused, and so is a host with any loopback, private
 (10/8, 172.16/12, 192.168/16, IPv6 unique-local), link-local, carrier-grade NAT
-(100.64/10) or unspecified address. A first HEAD request (10 seconds, at most
-five redirects, each redirect checked by the same rules) refuses a file whose
-reported size exceeds 1 GiB; a missing size is allowed, and a download that
-turns out larger is refused afterwards. These checks cover the address and the
-redirects seen by the HEAD request; Nix then performs the download itself with
-`nix store prefetch-file`, one at a time on the controller, within 15 minutes.
+(100.64/10), multicast, reserved, documentation, benchmarking or unspecified
+address. Nixorium downloads the file itself (at most five redirects, each
+checked by the same rules), one at a time on the controller, within 15
+minutes, and every connection goes only to an address it has just checked, so
+a host name that resolves again to a local address is never contacted.
+Through a school proxy the proxy makes the connection, so only the checks of
+the host name (which still resolves on the controller) apply. A file whose reported size exceeds 1 GiB is refused before it is
+downloaded, and a download that turns out larger is stopped at the limit. The
+file then enters the Nix store with `nix store add-file`, under the name Nix
+itself would give it (the last component of the address path).
 Refusals and failures are reported as `invalid_url`, `host_refused`,
 `too_large`, `busy`, `consent_required`, `download_failed` (with a one-line
 reason) or `timeout`.
@@ -352,7 +428,7 @@ and Nix checks the same hash.
 
 ### Laboratory settings
 
-Controllers advertise `settings_v1` through the same optional header. The
+Controllers advertise `settings_v1` and `settings_v2` through the same optional header. The
 Assistant can then propose a change to these settings in `lab-settings.json`,
 reviewed and saved like any other proposal:
 
@@ -364,12 +440,20 @@ reviewed and saved like any other proposal:
 | Keyboard layout | `lab.keyboardLayout` |
 | Student Git name and email | `lab.studentGitName`, `lab.studentGitEmail` |
 | Administrator Git name and email | `lab.adminGitName`, `lab.adminGitEmail` |
+| Classroom view on or off | `lab.classroomView` |
+| Number of client computers | `lab.pcCount` |
+| Teacher and student user names | `lab.teacherUser`, `lab.studentUser` |
 
 Everything else stays in the menu (Maintenance → Change settings): the
-network and its addresses, the number of computers, the controller number,
-network devices, the DHCP address hint, account names and passwords, the
-credentials version, the classroom view, the `assistant` switch and the schema
-version. Assistant cannot change them, and it cannot delete the file.
+network and its addresses, the controller number, network devices, the DHCP
+address hint, passwords, the credentials version, the `assistant` switch and
+the schema version. Assistant cannot change them, and it cannot delete the
+file. The classroom view is written as the menu writes it: turning it off
+writes `"classroomView": false`, turning it on again leaves the key out. The
+number of computers, the user names and the classroom view get the same
+validation, warnings and review lines as in the menu, for example the
+removed-computers warning, the account warning (a renamed account gets a new,
+empty home) and the classroom view explanation.
 
 The model reads a copy of the file with sensitive fields withheld and writes it
 back whole. Nixorium never takes that copy as it is: it keeps the saved file,
@@ -381,8 +465,8 @@ error and leaves the candidate as it was:
 
 | Error | Meaning |
 |---|---|
-| `settings_field_read_only: lab.pcCount` | The copy differs from what the model read in a setting it may not change, or adds or removes one. The message names every such field, even when a writable setting changed too. |
-| `settings_invalid: …` | The content is not a settings file or has an unknown field, a value is not text, a value fails the settings validation (for example `lab.timeZone: must not be empty` or `lab.homepageUrl: must be an absolute http:// or https:// URL`), a value is longer than 128 bytes (256 for a Git name or email, 2,048 for the homepage), has spaces at either end, spans several lines or carries a `[REDACTED]` or `[WITHHELD]` stand-in, or the saved settings no longer validate and must be repaired in the menu first. |
+| `settings_field_read_only: lab.ifaceName` | The copy differs from what the model read in a setting it may not change, or adds or removes one. The message names every such field, even when a writable setting changed too. |
+| `settings_invalid: …` | The content is not a settings file or has an unknown field, a value has the wrong type (`lab.pcCount must be an integer`, `lab.classroomView must be true or false`), a value fails the settings validation (for example `lab.timeZone: must not be empty`, `lab.pcCount: must be between 1 and 253 in laboratory mode` or `lab.homepageUrl: must be an absolute http:// or https:// URL`), a value is longer than 128 bytes (256 for a Git name or email, 64 for a user name, 2,048 for the homepage), has spaces at either end, spans several lines or carries a `[REDACTED]` or `[WITHHELD]` stand-in, or the saved settings no longer validate and must be repaired in the menu first. |
 
 Deleting `lab-settings.json` and writing a file of that name in a subfolder
 remain `protected_path`.
@@ -433,7 +517,9 @@ Group modules declare common behavior within each class; this is a configuration
 contract, not automatic proof that arbitrary Nix code is equivalent. A private
 module that branches on `networking.hostName` must declare the
 exceptional hosts in `hostModules` or `updateValidationHosts`. Otherwise the
-representative cannot establish their individual behavior. Class/base results
+representative cannot establish their individual behavior. The same classes
+share one system (ADR 0033), where `hostName` and `hostIp` stop the evaluation
+with an error naming the hosts that need their own configuration. Class/base results
 are cached only within the conversation; the candidate is evaluated afresh.
 System derivations are evaluated in sequential batches of at most two
 representatives per Nix process, on both sides. This limits memory accumulation
@@ -454,7 +540,7 @@ laboratory again and says how long ago it was verified; any edit evaluates
 afresh.
 Read the full comparison with arrows, PgUp/PgDn and Home/End.
 
-Type **SAVE**, then **Enter**, to record the reviewed proposal. The complete
+Choose **Save and update the controller** or **Save only** and press **Enter** to record the reviewed proposal (typing `save` in the chat only opens this review). The complete
 diff must fit within 2 MiB and the evaluation must pass. A review expires after
 ten minutes; changes to the candidate or deployment require another review.
 The save repeats evaluation, under the same reuse rule, and checks the
@@ -465,35 +551,23 @@ The new commit is `Save reviewed Assistant proposal`. Its parent and a durable
 `refs/nixorium/assistant-backups/…` ref preserve the previous committed tree.
 The result displays the backup. Nothing is built or activated by saving.
 
-The next action opens the ordinary **Apply to this controller** review. After
-verified application at the saved revision, **Update computers** opens client
-selection with fresh inventory and another review. Neither action runs
-automatically. Use a new chat for further proposals after saving, since the
-previous conversation remains tied to its original base commit.
+With **Save and update the controller**, a clean controller review is applied
+without another key press. After verified application at the saved revision,
+the client review opens with fresh inventory and only the computers whose
+system the change alters selected; computers are never updated without that
+review's confirmation. When the change alters no client computer, the flow
+stops at the controller and says the computers need no update. With **Save
+only**, nothing runs: apply and update later from the menus. Use a new chat
+for further proposals after saving, since the previous conversation remains
+tied to its original base commit.
 
 ### Core override mode
 
-By default the Assistant only extends Nixorium's supported mechanisms. In
-extreme cases it can propose overriding a NixOS option that the Nixorium core
-sets, from a private module in your deployment (`lib.mkForce` or
-`lib.mkOverride` in `sharedModules`, `clientModules`, `controllerModules`,
-`groupModules` or `hostModules`). This mode is off by default and applies to one
-conversation only. You enable it by writing "I accept core overrides" (Italian:
-"Accetto override del core"); it ends with "I no longer accept core overrides"
-or a new chat.
-
-Each such proposal includes a **Core override** section listing the forced
-options and the affected computers, why the change is unsupported (it is outside
-Nixorium's tests, and a Nixorium update can change the option and silently void
-the override) and the rollback path. The review also shows a warning, with the
-files that mention `mkForce` or `mkOverride`, above the save choices. The check
-is a plain text match, so a mention in a comment or a string counts too; the
-warning is informational and the save flow is unchanged.
-
-The Assistant never edits or patches Nixorium itself, and never overrides the
-controller's management channel (SSH access, keys, firewall protection, cache
-signing), credentials, or the student home reset in a way that could block
-login.
+Core override mode is off by default and is enabled per conversation by an
+explicit phrase. When a proposal contains `mkForce` or `mkOverride`, the review
+shows a warning above the save choices with the files that mention them; the
+check is a plain text match, so a mention in a comment or a string counts too,
+and the save flow is unchanged.
 
 Evaluation and build prove that the configuration builds, not that it boots or
 works: update one computer first. If a PC does not boot or loses the network

@@ -129,7 +129,7 @@ func (preparer *RemoteInstallPreparer) PrepareArtifacts(ctx context.Context, ope
 	if !remoteStateID(operationID) {
 		return result, errors.New("remote artifact preparation operation ID is invalid")
 	}
-	if !domain.ValidRemoteHostName(hostName) {
+	if !domain.ValidHostName(hostName) {
 		return result, errors.New("remote artifact preparation host is invalid")
 	}
 	if err := preparer.validateRepository(ctx); err != nil {
@@ -189,7 +189,7 @@ func (preparer *RemoteInstallPreparer) PrepareArtifacts(ctx context.Context, ope
 	if err != nil {
 		return result, err
 	}
-	if !strings.Contains(systemPath, "-nixos-system-"+hostName+"-") {
+	if !domain.ValidClientClass(hostName, host.Class) || !strings.Contains(systemPath, "-nixos-system-"+domain.ClientSystemName(hostName, host.Class)+"-") {
 		return result, errors.New("built system path does not match selected client")
 	}
 	systemBytes, err := preparer.closureSize(ctx, systemPath)
@@ -204,7 +204,7 @@ func (preparer *RemoteInstallPreparer) PrepareArtifacts(ctx context.Context, ope
 		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID, Repository: preparer.repository,
 		DeploymentRevision: revision, BundlePath: bundlePath, BundleClosureBytes: bundleBytes,
 		SystemPath: systemPath, SystemClosureBytes: systemBytes, HostName: host.Name,
-		HostInterface: host.Interface, HostStaticIP: host.IP, CachePublicKey: cachePublicKey,
+		HostInterface: host.Interface, HostStaticIP: host.IP, HostClass: host.Class, CachePublicKey: cachePublicKey,
 		AdminPublicKey: adminPublicKey, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},
 	}
 	if err := domain.ValidateRemoteInstallArtifacts(result); err != nil {
@@ -290,22 +290,22 @@ func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts d
 			hostInterface = live
 		}
 	}
-	if facts.BootID != session.Facts.BootID || !remoteFactsHaveAddress(facts, hostInterface, session.Address) {
-		return result, errors.New("live boot identity, declared NIC, or DHCP address changed during preparation")
+	// A computer with an explicit name that is connected through another card
+	// is still prepared: the dashboard then offers to save the observed card,
+	// or asks for the cable when it is a Wi-Fi card, and a plan for the
+	// declared card is refused (remoteInterfaceHasAddress in the app).
+	if facts.BootID != session.Facts.BootID || !remoteLiveAddressPresent(facts, hostInterface, session.Address) {
+		return result, errors.New("live boot identity or DHCP address changed during preparation")
 	}
-	if artifacts.BundleClosureBytes > ^uint64(0)/2 {
-		return result, errors.New("installer bundle resource requirement overflows")
-	}
-	requiredLiveBytes := artifacts.BundleClosureBytes * 2
-	if facts.MemoryAvailableBytes < requiredLiveBytes || facts.StoreAvailableBytes < requiredLiveBytes {
-		return result, fmt.Errorf("live installer needs at least %d bytes free in memory and store for the installer bundle", requiredLiveBytes)
+	if err := domain.CheckRemoteLiveResources(facts, artifacts.BundleClosureBytes); err != nil {
+		return result, err
 	}
 
 	result = domain.RemoteInstallPreparation{
 		OperationID: artifacts.OperationID, Repository: artifacts.Repository, DeploymentRevision: artifacts.DeploymentRevision,
 		BundlePath: artifacts.BundlePath, BundleClosureBytes: artifacts.BundleClosureBytes,
 		SystemPath: artifacts.SystemPath, SystemClosureBytes: artifacts.SystemClosureBytes,
-		Host:  domain.RemoteInstallHost{Name: host.Name, Interface: hostInterface, LiveIP: session.Address, StaticIP: host.IP},
+		Host:  domain.RemoteInstallHost{Name: host.Name, Interface: hostInterface, LiveIP: session.Address, StaticIP: host.IP, Class: artifacts.HostClass},
 		Cache: cache, AdminPublicKey: artifacts.AdminPublicKey, HostKeyPublic: session.HostPublicKey,
 		HostFingerprint: session.HostFingerprint, KnownHostConflict: knownHostConflict,
 		Facts: facts, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},
@@ -579,6 +579,12 @@ func remoteFactsInterfaceWithAddress(facts domain.RemoteMachineFacts, address st
 		found = networkInterface.Name
 	}
 	return found
+}
+
+// remoteLiveAddressPresent reports whether the live address is still on the
+// declared card, or on exactly one other card.
+func remoteLiveAddressPresent(facts domain.RemoteMachineFacts, interfaceName, address string) bool {
+	return remoteFactsHaveAddress(facts, interfaceName, address) || remoteFactsInterfaceWithAddress(facts, address) != ""
 }
 
 func remoteFactsHaveAddress(facts domain.RemoteMachineFacts, interfaceName, address string) bool {

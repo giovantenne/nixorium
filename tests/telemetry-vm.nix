@@ -17,7 +17,7 @@ let
   settings = { masterHostName = "controller"; pcCount = 2; deploymentMode = "laboratory"; };
   node = name: { ... }: {
     imports = [ ../modules/telemetry.nix ../modules/nix-ld.nix ];
-    _module.args = { inherit nixoriumPackage; hostName = name; labSettings = settings; };
+    _module.args = { inherit nixoriumPackage; hostName = name; isController = name == settings.masterHostName; labSettings = settings; };
     users.users.admin = { isNormalUser = true; };
     users.users.student = { isNormalUser = true; };
     environment.systemPackages = [ nixoriumPackage pkgs.jq ];

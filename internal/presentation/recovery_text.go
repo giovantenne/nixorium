@@ -15,6 +15,7 @@ var deploymentRecoveryStateWords = map[string]string{
 	domain.RecoveryTargetOther:       "finished, but running another version",
 	domain.RecoveryTargetActivating:  "still updating",
 	domain.RecoveryTargetUnreachable: "not answering (switched off, or not reachable at this address)",
+	domain.RecoveryTargetNotStarted:  "not changed: the update never started on it",
 }
 
 const (

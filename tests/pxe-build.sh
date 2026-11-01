@@ -82,6 +82,22 @@ for MODE in failure missing invalid invalid-derivation identity extra; do
   fi
 done
 
+# Computers of a class share one system (ADR 0033): one member per class is
+# evaluated and every member receives its system.
+: >"$NIXORIUM_TEST_LOG.evals"
+CLIENT_CLASSES=(shared-1 pc02 shared-1 shared-1)
+build_pxe_outputs 'git+file:///deployment' pc01 pc02 pc03 pc05
+[[ "$(grep '^EVAL clients' "$NIXORIUM_TEST_LOG.evals" | cut -d' ' -f3 | jq -sc 'add')" == '["pc01","pc02"]' ]]
+[[ "${#CLIENT_PATHS[@]}" -eq 4 ]]
+[[ "${CLIENT_PATHS[0]}" == "$NIXORIUM_TEST_STORE_PATH" && "${CLIENT_PATHS[2]}" == "$NIXORIUM_TEST_STORE_PATH" && "${CLIENT_PATHS[3]}" == "$NIXORIUM_TEST_STORE_PATH" ]]
+[[ "${CLIENT_PATHS[1]}" == "$NIXORIUM_TEST_SECOND_STORE_PATH" ]]
+CLIENT_CLASSES=(other)
+if (build_pxe_outputs 'git+file:///deployment' pc01) >/dev/null 2>&1; then
+  echo "an invalid class was accepted" >&2
+  exit 1
+fi
+unset CLIENT_CLASSES
+
 # Bounded batches: ceil(n/batch) client evaluations after one artifacts evaluation.
 NAMES=(pc01 pc02 pc03 pc04 pc05 pc06 pc07 pc08 pc09 pc10)
 for BATCH in 1 3 4 10 64; do

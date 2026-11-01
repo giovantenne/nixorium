@@ -1,0 +1,96 @@
+package deploymigrate
+
+// Registry is the list of migrations of this release, in the order they
+// run. Append new migrations at the end; never remove a released one or change
+// what it writes (widening the forms it recognises is allowed).
+var Registry = []Migration{
+	{
+		ID:          "2026-10-workstation-is-controller",
+		Description: "The workstation profile finds the controller with isController: computers that share a configuration have no single name (ADR 0033).",
+		Apply: func(tree Tree) Outcome {
+			return ReplaceExact(tree, "modules/workstation.nix",
+				"  isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);\n",
+				"  isController = args.isController or false;\n")
+		},
+	},
+	{
+		ID:          "2026-10-jq-in-every-laboratory",
+		Description: "jq joins the software every laboratory starts with, on the controller and all clients.",
+		Apply: func(tree Tree) Outcome {
+			return AddSharedPackage(tree, "jq")
+		},
+	},
+	{
+		ID:          "2026-10-ttfx-screensaver",
+		Description: "The lab screensaver uses ttfx, the faster Rust version of its text effects, at 30 frames per second, and stops when the screen goes blank after 30 idle minutes.",
+		Apply: func(tree Tree) Outcome {
+			// Released forms: 2.0.0-beta.4 up to 3.5.0 (the tte screensaver that
+			// locked the session), 3.6.0, and 3.6.1 up to 3.10.0-beta.3. The
+			// forms before 3.6.0 were added after release: they only widen which
+			// files are replaced, the new content is unchanged.
+			const id = "2026-10-ttfx-screensaver"
+			return ReplaceWholeFiles(tree, []WholeFile{
+				{Path: "modules/screensaver.nix", Content: frozen(id, "screensaver.nix"), Released: []string{
+					"57b3b2f31d51ac0fed7e4875effff51484a0c7b3efbb543cda920a87c2a77086",
+					"5080f60ffc5dfe4244ea197886b6b0dab8d3199957d475d5b131c2ced14ba9ca",
+					"a65abcd56b3624cd8159bad89c99bc9bd993e9f7e350d818e95281efc8cf3b4c",
+				}},
+				{Path: "scripts/cmd-screensaver.sh", Content: frozen(id, "cmd-screensaver.sh"), Released: []string{
+					"e91fe6ce438d4f8589cea1da3b41162333824c48c480917275d415a191296310",
+					"c4bc7fb93494dd55f2e4a1209032abb2783d8d69764a83d4697f5c52da5dcc8d",
+				}, Later: []string{
+					// 2026-10-screensaver-60-fps applied, as released in 3.10.0.
+					"29f1b0ff986cc02d91db8f39dc48531b1d48c08ef5788548be7d19d352b395f6",
+				}},
+				{Path: "scripts/screensaver-monitor.sh", Content: frozen(id, "screensaver-monitor.sh"), Released: []string{
+					"102183eaefdd54f35799f4ec0c5be605a54de6e35347fbec9de3a5212084d0c8",
+					"1ca0eda66faa35f0cc974da0bc92b97d1a4cd9d1081901905b1a0f3a0a3ac128",
+					"9a8d5fd89b6ddd475d6f0bfb5b767cee9fd7ba67b1ab6d0b92b58d09ea954359",
+				}, Later: []string{
+					// 2026-10-screensaver-idle-inhibitors applied.
+					"ecbe4e02fed27c4eb7e5bfa67c470dd15705410435d062e63babeb715ed27b86",
+				}},
+			})
+		},
+	},
+	{
+		ID:          "2026-10-screensaver-60-fps",
+		Description: "The lab screensaver draws 60 frames per second instead of 30: its effects advance once per frame, so at 30 they ran at half speed.",
+		Apply: func(tree Tree) Outcome {
+			return ReplaceExact(tree, "scripts/cmd-screensaver.sh",
+				"  # 30 frames per second look the same here and cost the terminal a quarter of\n  # the drawing that 120 would.\n  ttfx -i \"$SCREENSAVER_TEXT\" \\\n    --frame-rate 30 \\\n",
+				"  # Effects advance once per frame, so the frame rate is also their speed: 60\n  # keeps them lively for half the drawing that 120 cost the terminal.\n  ttfx -i \"$SCREENSAVER_TEXT\" \\\n    --frame-rate 60 \\\n")
+		},
+	},
+	{
+		ID:          "2026-10-teacher-dock-classroom-launcher",
+		Description: "The teacher's dock icon is always the classroom launcher, which opens the Nixorium menu when the classroom view is off.",
+		Apply: func(tree Tree) Outcome {
+			return ReplaceExact(tree, "modules/workstation.nix",
+				"  teacherFavorites = lib.optionals isController\n    [ (if labSettings.classroomView or true then \"nixorium-classroom.desktop\" else \"nixorium.desktop\") ]\n",
+				"  teacherFavorites = lib.optionals isController\n    [ \"nixorium-classroom.desktop\" ]\n")
+		},
+	},
+	{
+		ID:          "2026-10-screensaver-idle-inhibitors",
+		Description: "The lab screensaver does not start while an application or the Caffeine toggle keeps the screen on.",
+		Apply: func(tree Tree) Outcome {
+			return ReplaceExact(tree, "scripts/screensaver-monitor.sh",
+				"while true; do\n  IDLE_MS=$(get_idle_ms)\n\n  if [[ \"$IDLE_MS\" -ge \"$IDLE_BLANK_MS\" ]]; then\n",
+				"# An application or the Caffeine toggle that keeps the screen on (a session\n# idle inhibitor) keeps the screensaver away too.\nidle_inhibited() {\n  gdbus call --session \\\n    --dest org.gnome.SessionManager \\\n    --object-path /org/gnome/SessionManager \\\n    --method org.gnome.SessionManager.IsInhibited 8 2>/dev/null |\n  grep -q true\n}\n\nwhile true; do\n  IDLE_MS=$(get_idle_ms)\n  if idle_inhibited; then\n    IDLE_MS=0\n  fi\n\n  if [[ \"$IDLE_MS\" -ge \"$IDLE_BLANK_MS\" ]]; then\n")
+		},
+	},
+	{
+		ID:          "2026-10-staff-home-writes-as-owner",
+		Description: "Editor and browser defaults in the administrator's and teacher's homes are written as those users, so a link left in a home cannot redirect a write to a system file.",
+		Apply: func(tree Tree) Outcome {
+			// Released form: 3.0.0 up to 3.11.0.
+			const id = "2026-10-staff-home-writes-as-owner"
+			return ReplaceWholeFiles(tree, []WholeFile{
+				{Path: "modules/home-profile.nix", Content: frozen(id, "home-profile.nix"), Released: []string{
+					"e93dd4f571ba6e88ce940d0ee31c7ede1e1f3fd1dfa59784d3a3e0258f4325ea",
+				}},
+			})
+		},
+	},
+}

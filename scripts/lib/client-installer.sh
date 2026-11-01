@@ -40,6 +40,31 @@ nixorium_canonical_disk() {
   readlink -m -- "$raw"
 }
 
+# nixos-install forwards nix's "copying path ..." line for every store path
+# (thousands per installation), lists every path it is about to fetch, and has
+# no quiet option. This keeps everything else, including errors, and replaces
+# those lines with a count every 500.
+nixorium_summarize_copy_output() {
+  awk '
+    /^copying path / { n++; if (n % 500 == 0) { print "  " n " store paths copied..."; fflush() }; next }
+    /^[[:space:]]+\/nix\/store\// { next }
+    { print; fflush() }
+    END { if (n > 0) print "  " n " store paths copied." }
+  '
+}
+
+# The quiet variant for the guided client installer, which keeps the complete
+# output in a log file: only the "these N paths will be fetched" summary and a
+# running count reach the screen. Errors are in the log, which the caller shows
+# when the installation fails.
+nixorium_copy_progress() {
+  awk '
+    /^copying path / { n++; if (n % 250 == 0) { print "      " n " store paths copied so far..."; fflush() }; next }
+    /^(these|this) [0-9]+ paths? will be (fetched|built)/ { print "      " $0; fflush(); next }
+    END { if (n > 0) print "      " n " store paths copied." }
+  '
+}
+
 nixorium_disk_kname() {
   lsblk -dnro KNAME -- "$1"
 }
@@ -189,6 +214,33 @@ nixorium_run_disko() {
   fi
 }
 
+# nixos-install installs GRUB inside a chroot of the target that lacks the live
+# system's /run/udev. Without it os-prober cannot read partition types, skips
+# the EFI partition of Windows on another disk, and the boot menu lists Windows
+# only after the first update. This runs a command with that database visible,
+# read-only, inside the target; without it the command still runs.
+nixorium_with_udev_in_target() {
+  local root=$1 status=0
+  local -a as_root=()
+  shift
+  (( EUID == 0 )) || as_root=(sudo)
+  if [[ -d /run/udev ]] && {
+    "${as_root[@]}" mkdir -p "$root/run" &&
+      "${as_root[@]}" mount -t tmpfs -o mode=0755 nixorium-run "$root/run" &&
+      "${as_root[@]}" mkdir "$root/run/udev" &&
+      "${as_root[@]}" mount --bind /run/udev "$root/run/udev" &&
+      "${as_root[@]}" mount -o remount,bind,ro "$root/run/udev"
+  }; then
+    "$@" || status=$?
+    "${as_root[@]}" umount -R "$root/run" || true
+    return "$status"
+  fi
+  if findmnt -rn --mountpoint "$root/run" >/dev/null 2>&1; then
+    "${as_root[@]}" umount -R "$root/run" || return 1
+  fi
+  "$@"
+}
+
 nixorium_require_clean_install_mount() {
   if findmnt -rn --mountpoint /mnt >/dev/null 2>&1; then
     echo "/mnt is already occupied" >&2
@@ -206,6 +258,60 @@ nixorium_require_unique_target_labels() {
       return 1
     fi
   done < <(lsblk -nrpo PATH,PARTLABEL)
+}
+
+# The name inside a client's system store path: its own name, or the class
+# name when the computer shares one system with its class (ADR 0033).
+nixorium_expected_system_name() {
+  local host_name=$1 class=${2:-}
+  [[ "$host_name" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ ]] || { echo "invalid computer name" >&2; return 1; }
+  if [[ -z "$class" || "$class" == "$host_name" ]]; then
+    printf '%s\n' "$host_name"
+  elif [[ "$class" =~ ^shared-[0-9]{1,4}$ ]]; then
+    printf 'nixorium-client-%s\n' "$class"
+  else
+    echo "invalid class of $host_name" >&2
+    return 1
+  fi
+}
+
+# The identity record of the installed computer: a shared system takes the
+# computer's name and address from it; a per-host system writes the same
+# record itself. Written before the first boot and read back.
+nixorium_write_identity_record() {
+  local host_name=$1 install_root=${2:-/mnt} number expected record
+  [[ "$host_name" =~ ^pc(0[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])$ ]] || { echo "invalid computer name" >&2; return 1; }
+  number=$((10#${host_name#pc}))
+  expected="{\"schemaVersion\":1,\"number\":${number}}"
+  record="$install_root/var/lib/nixorium/identity.json"
+  local -a privileged=()
+  (( EUID == 0 )) || privileged=(sudo)
+  "${privileged[@]}" mkdir -p "$install_root/var/lib/nixorium"
+  printf '%s\n' "$expected" | "${privileged[@]}" tee "$record.tmp" >/dev/null
+  "${privileged[@]}" chmod 0644 "$record.tmp"
+  "${privileged[@]}" mv -f "$record.tmp" "$record"
+  sync
+  [[ "$("${privileged[@]}" cat "$record")" == "$expected" ]] || {
+    echo "the identity record was not written" >&2
+    return 1
+  }
+}
+
+# nixorium_prepare_host_key creates the installed computer's SSH host key
+# (ed25519, the type the controller pins) when the installation has none and
+# prints its fingerprint, so it can be shown at the end of the installation and
+# compared with the one the controller asks to review for a reinstalled
+# computer.
+nixorium_prepare_host_key() {
+  local install_root=${1:-/mnt} key
+  key="$install_root/etc/ssh/ssh_host_ed25519_key"
+  local -a privileged=()
+  (( EUID == 0 )) || privileged=(sudo)
+  if ! "${privileged[@]}" test -s "$key"; then
+    "${privileged[@]}" install -d -m 0755 "$install_root/etc/ssh"
+    "${privileged[@]}" ssh-keygen -q -t ed25519 -N "" -C "" -f "$key" </dev/null >/dev/null
+  fi
+  "${privileged[@]}" ssh-keygen -l -E sha256 -f "$key.pub" | awk '{ print $2 }'
 }
 
 nixorium_verify_installed_profile() {

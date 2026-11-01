@@ -37,13 +37,6 @@ type RemoteInstallReservation interface {
 	ReleaseResolved() error
 }
 
-type RemoteInstallCapabilities struct {
-	SchemaVersion int                 `json:"schemaVersion"`
-	Method        RemoteInstallMethod `json:"method"`
-	Ready         bool                `json:"ready"`
-	Issues        []ValidationIssue   `json:"issues"`
-}
-
 type RemoteInstallerEndpoint struct {
 	Address     string `json:"address"`
 	Port        int    `json:"port"`
@@ -89,6 +82,9 @@ type RemoteInstallHost struct {
 	Interface string `json:"interface"`
 	LiveIP    string `json:"liveIp"`
 	StaticIP  string `json:"staticIp"`
+	// Class is the computer's class (ADR 0033); it names the system the
+	// computer installs when it shares one.
+	Class string `json:"class"`
 }
 
 type RemoteInstallCache struct {
@@ -111,6 +107,7 @@ type RemoteInstallArtifacts struct {
 	HostName           string            `json:"hostName"`
 	HostInterface      string            `json:"hostInterface"`
 	HostStaticIP       string            `json:"hostStaticIp"`
+	HostClass          string            `json:"hostClass,omitempty"`
 	CachePublicKey     string            `json:"cachePublicKey"`
 	AdminPublicKey     string            `json:"adminPublicKey"`
 	PreparedAt         time.Time         `json:"preparedAt"`
@@ -330,8 +327,6 @@ func RemoteInstallDiskCompleted(session RemoteInstallSession) bool {
 var (
 	remoteOperationIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 	remoteBootIDPattern      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	remoteHostPattern        = regexp.MustCompile(`^pc[0-9]{2}$`)
-	remoteInterfacePattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$`)
 	remoteDevicePattern      = regexp.MustCompile(`^/dev/[A-Za-z0-9_.+-]+$`)
 	remoteKNamePattern       = regexp.MustCompile(`^[A-Za-z0-9_.+-]+$`)
 	remoteMajorMinorPattern  = regexp.MustCompile(`^[0-9]+:[0-9]+$`)
@@ -339,6 +334,36 @@ var (
 	remotePublicKeyPattern   = regexp.MustCompile(`^ssh-ed25519 [A-Za-z0-9+/]+={0,2}(?: [^\r\n]{1,256})?$`)
 	remoteCacheKeyPattern    = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}:[A-Za-z0-9+/]+={0,2}$`)
 )
+
+// CheckRemoteLiveResources checks the live computer's free memory and store
+// once the installer bundle is already in its store, as both are measured.
+// The installed system goes straight to the target disk, so the live store
+// only needs room to run the bundle: as much again as the bundle itself.
+// Counting the bundle twice refused every 4 GB computer, whose live store is
+// half its memory.
+func CheckRemoteLiveResources(facts RemoteMachineFacts, bundleClosureBytes uint64) error {
+	required := bundleClosureBytes
+	if facts.MemoryAvailableBytes < required || facts.StoreAvailableBytes < required {
+		return fmt.Errorf("the computer started from USB has too little free memory: the installer needs %s free and has %s; use a computer with more memory, or close other programs on it",
+			decimalBytes(required), decimalBytes(min(facts.MemoryAvailableBytes, facts.StoreAvailableBytes)))
+	}
+	return nil
+}
+
+// decimalBytes prints a size in decimal units, as memory and disks are sold.
+func decimalBytes(size uint64) string {
+	units := []string{"kB", "MB", "GB", "TB"}
+	if size < 1000 {
+		return fmt.Sprintf("%d B", size)
+	}
+	value := float64(size) / 1000
+	unit := 0
+	for value >= 1000 && unit < len(units)-1 {
+		value /= 1000
+		unit++
+	}
+	return fmt.Sprintf("%.1f %s", value, units[unit])
+}
 
 func NewRemoteOperationID() (string, error) {
 	value := make([]byte, 16)
@@ -425,7 +450,7 @@ func ValidateRemoteInstallPlan(plan RemoteInstallPlan) error {
 	if !gitRevisionPattern.MatchString(plan.DeploymentRevision) {
 		return errors.New("remote installation revision is not a full Git object ID")
 	}
-	if !validStorePath(plan.SystemPath) || !strings.Contains(plan.SystemPath, "-nixos-system-"+plan.Host.Name+"-") {
+	if !validStorePath(plan.SystemPath) || !strings.Contains(plan.SystemPath, "-nixos-system-"+ClientSystemName(plan.Host.Name, plan.Host.Class)+"-") {
 		return errors.New("remote installation system path does not match the host")
 	}
 	if err := validateRemoteHost(plan.Host); err != nil {
@@ -454,13 +479,14 @@ func ValidateRemoteInstallArtifacts(artifacts RemoteInstallArtifacts) error {
 		return errors.New("remote installation artifact revision is invalid")
 	}
 	if !validStorePath(artifacts.BundlePath) || !validStorePath(artifacts.SystemPath) ||
-		!strings.Contains(artifacts.SystemPath, "-nixos-system-"+artifacts.HostName+"-") {
+		!ValidClientClass(artifacts.HostName, artifacts.HostClass) ||
+		!strings.Contains(artifacts.SystemPath, "-nixos-system-"+ClientSystemName(artifacts.HostName, artifacts.HostClass)+"-") {
 		return errors.New("remote installation artifact store paths are invalid")
 	}
 	if artifacts.BundleClosureBytes == 0 || artifacts.SystemClosureBytes == 0 || artifacts.PreparedAt.IsZero() {
 		return errors.New("remote installation artifact measurements are incomplete")
 	}
-	if !remoteHostPattern.MatchString(artifacts.HostName) || !remoteInterfacePattern.MatchString(artifacts.HostInterface) || validateRemoteIPv4(artifacts.HostStaticIP) != nil {
+	if !ValidHostName(artifacts.HostName) || !interfaceNamePattern.MatchString(artifacts.HostInterface) || validateRemoteIPv4(artifacts.HostStaticIP) != nil {
 		return errors.New("remote installation artifact host is invalid")
 	}
 	if !remoteCacheKeyPattern.MatchString(artifacts.CachePublicKey) || !remotePublicKeyPattern.MatchString(artifacts.AdminPublicKey) {
@@ -487,7 +513,7 @@ func ValidateRemoteMachineFacts(facts RemoteMachineFacts) error {
 	}
 	interfaceNames := map[string]bool{}
 	for _, networkInterface := range facts.Interfaces {
-		if !remoteInterfacePattern.MatchString(networkInterface.Name) || interfaceNames[networkInterface.Name] || len(networkInterface.Addresses) > 64 {
+		if !interfaceNamePattern.MatchString(networkInterface.Name) || interfaceNames[networkInterface.Name] || len(networkInterface.Addresses) > 64 {
 			return errors.New("remote machine interface inventory is invalid")
 		}
 		interfaceNames[networkInterface.Name] = true
@@ -503,8 +529,13 @@ func ValidateRemoteMachineFacts(facts RemoteMachineFacts) error {
 			return errors.New("remote machine disk inventory contains duplicate paths")
 		}
 		diskPaths[disk.Path] = true
-		if err := validateRemoteDisk(disk); err != nil {
+		// A small extra disk (card reader, second USB stick, the live
+		// medium) is listed as excluded, not a reason to refuse the computer.
+		if err := validateRemoteDiskIdentity(disk); err != nil {
 			return err
+		}
+		if disk.Eligible && disk.SizeBytes < remoteDiskMinimumBytes {
+			return errors.New("remote disk is below the minimum capacity")
 		}
 		if disk.Eligible != (len(disk.ExclusionReasons) == 0) {
 			return errors.New("remote disk eligibility disagrees with exclusion reasons")
@@ -532,7 +563,7 @@ func ValidateRemoteInstallPreparation(preparation RemoteInstallPreparation) erro
 	if err := validateRemoteHost(preparation.Host); err != nil {
 		return err
 	}
-	if !strings.Contains(preparation.SystemPath, "-nixos-system-"+preparation.Host.Name+"-") {
+	if !strings.Contains(preparation.SystemPath, "-nixos-system-"+ClientSystemName(preparation.Host.Name, preparation.Host.Class)+"-") {
 		return errors.New("remote installation preparation system does not match the host")
 	}
 	if err := validateRemoteCache(preparation.Cache); err != nil {
@@ -664,7 +695,7 @@ func consumeRemoteJSONValue(decoder *json.Decoder) error {
 }
 
 func validateRemoteHost(host RemoteInstallHost) error {
-	if !remoteHostPattern.MatchString(host.Name) || !remoteInterfacePattern.MatchString(host.Interface) {
+	if !ValidHostName(host.Name) || !interfaceNamePattern.MatchString(host.Interface) || !ValidClientClass(host.Name, host.Class) {
 		return errors.New("remote installation host identity is invalid")
 	}
 	if err := validateRemoteIPv4(host.LiveIP); err != nil {
@@ -716,12 +747,23 @@ func ValidateRemoteInstallCache(cache RemoteInstallCache) error {
 	return validateRemoteCache(cache)
 }
 
+// remoteDiskMinimumBytes matches MINIMUM_DISK_BYTES of the live installer.
+const remoteDiskMinimumBytes = 8 * 1024 * 1024 * 1024
+
+// validateRemoteDisk checks a disk selected for installation.
 func validateRemoteDisk(disk RemoteDisk) error {
+	if err := validateRemoteDiskIdentity(disk); err != nil {
+		return err
+	}
+	if disk.SizeBytes < remoteDiskMinimumBytes {
+		return errors.New("remote disk is below the minimum capacity")
+	}
+	return nil
+}
+
+func validateRemoteDiskIdentity(disk RemoteDisk) error {
 	if !remoteDevicePattern.MatchString(disk.Path) || !remoteKNamePattern.MatchString(disk.KName) || disk.Path != "/dev/"+disk.KName || !remoteMajorMinorPattern.MatchString(disk.MajorMinor) {
 		return errors.New("remote disk device identity is invalid")
-	}
-	if disk.SizeBytes < 8*1024*1024*1024 {
-		return errors.New("remote disk is below the minimum capacity")
 	}
 	for _, value := range []string{disk.Serial, disk.WWN, disk.Model, disk.Transport, disk.DiskSeq} {
 		if len(value) > 256 || strings.ContainsAny(value, "\x00\r\n") {
@@ -745,8 +787,4 @@ func validateRemoteDisk(disk RemoteDisk) error {
 
 func ValidRemoteFingerprint(value string) bool {
 	return remoteFingerprintPattern.MatchString(value)
-}
-
-func ValidRemoteHostName(value string) bool {
-	return remoteHostPattern.MatchString(value)
 }

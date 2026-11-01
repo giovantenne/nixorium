@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,7 @@ import (
 // update (app.DeploymentRecoveryManager).
 type deploymentRecoverer interface {
 	Plan(context.Context, string, bool) domain.DeploymentRecoveryPlan
+	Reviewed(domain.DeploymentRecoveryPlan, string) (domain.DeploymentRecoveryPlan, app.ReviewMatch)
 	Apply(context.Context, domain.DeploymentRecoveryPlan, string) domain.DeploymentRecoveryResult
 }
 
@@ -37,8 +39,9 @@ func deploymentRecoveryCommand(ctx context.Context, manager deploymentRecoverer,
 		}
 		return 0
 	}
-	if options.expect != plan.ReviewToken {
-		fmt.Fprintln(stderr, "The computers or the interrupted update record changed after review; create a fresh plan.")
+	plan, match := manager.Reviewed(plan, options.expect)
+	if match != app.ReviewMatched {
+		reviewMismatch(stderr, match, "The computers or the interrupted update record changed after review; create a fresh plan.")
 		return 1
 	}
 	if !options.yes {
@@ -164,4 +167,21 @@ func runGitDiscardApply(ctx context.Context, manager *app.GitDiscardManager, rep
 		return 1
 	}
 	return 0
+}
+
+// parseRecoveryWord reads the words that only mean something after recovery.
+func parseRecoveryWord(result *options, word string) (bool, error) {
+	if word == "status" && result.command == "recovery" && result.subcommand == "" {
+		result.subcommand = "status"
+		return true, nil
+	}
+	return false, nil
+}
+
+// validateRecoveryCommand rejects option combinations that do not belong to the command.
+func validateRecoveryCommand(result *options) error {
+	if result.command == "recovery" && result.subcommand != "status" {
+		return errors.New("recovery accepts only the status subcommand")
+	}
+	return nil
 }

@@ -10,7 +10,9 @@
 //	         lock request (--lock on|off), sends a folder's contents to the
 //	         desktop (--send DIR), collects the desktop into a folder
 //	         (--collect DIR), shows a picture as the teacher's screen for
-//	         some seconds (--show JPEG SECONDS), or shows (--message TEXT
+//	         some seconds (--show JPEG SECONDS), takes control for some
+//	         seconds (--control SECONDS), shows a notice (--notice
+//	         screenshot|collect), or shows (--message TEXT
 //	         SECONDS|unlock) or removes (--message-hide) the teacher's
 //	         message; used by tests and diagnostics.
 package main
@@ -33,6 +35,7 @@ import (
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
+	"golang.org/x/sys/unix"
 )
 
 // SocketName is the agent socket inside the user's runtime directory.
@@ -79,12 +82,16 @@ const probeTimeout = 10 * time.Minute
 // name; the command it starts ends when ctx does.
 func runProbe(ctx context.Context, arguments []string, output io.Writer) error {
 	thumbnail, input := "", false
+	var hold time.Duration
 	if len(arguments) >= 3 && arguments[0] == "--show" {
 		seconds, err := strconv.Atoi(arguments[2])
 		if err != nil || seconds < 0 || seconds > 60 {
 			return errors.New("--show needs a JPEG file and 0–60 seconds")
 		}
 		return probeShow(ctx, arguments[3:], arguments[1], time.Duration(seconds)*time.Second, output)
+	}
+	if len(arguments) >= 2 && arguments[0] == "--notice" {
+		return probeNotice(ctx, arguments[2:], arguments[1], output)
 	}
 	if len(arguments) >= 3 && arguments[0] == "--message" {
 		return probeMessage(ctx, arguments[3:], true, arguments[1], arguments[2], output)
@@ -104,10 +111,19 @@ func runProbe(ctx context.Context, arguments []string, output io.Writer) error {
 	if len(arguments) >= 1 && arguments[0] == "--input" {
 		input, arguments = true, arguments[1:]
 	}
+	// --control SECONDS keeps the control open (input not released) for
+	// some seconds after the first input, as the teacher's page does.
+	if len(arguments) >= 2 && arguments[0] == "--control" {
+		seconds, err := strconv.Atoi(arguments[1])
+		if err != nil || seconds < 1 || seconds > 60 {
+			return errors.New("--control needs 1–60 seconds")
+		}
+		input, hold, arguments = true, time.Duration(seconds)*time.Second, arguments[2:]
+	}
 	if len(arguments) >= 2 && arguments[0] == "--thumbnail" {
 		thumbnail, arguments = arguments[1], arguments[2:]
 	}
-	return probe(ctx, arguments, thumbnail, input, output)
+	return probe(ctx, arguments, thumbnail, input, hold, output)
 }
 
 // startProbe runs command with its standard input and output for a probe to
@@ -165,8 +181,11 @@ func serve(runtimeDirectory string) error {
 		return err
 	}
 	lock := &extensionLocker{}
-	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}, notice: lock})
+	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(lock), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}, notice: lock})
 }
+
+// captureStopper is a capturer that can end its capture at once.
+type captureStopper interface{ StopCapture() }
 
 // agentContext is what every connection of the session's agent shares.
 type agentContext struct {
@@ -181,16 +200,36 @@ type agentContext struct {
 
 func serveConnections(listener net.Listener, agent agentContext) error {
 	slots := make(chan struct{}, maxConnections)
+	var open atomic.Int32
+	var backoff time.Duration
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
-			return err
+			// Running out of descriptors or an aborted connection is passing:
+			// the agent keeps serving, as net/http does.
+			if !temporaryAcceptError(err) {
+				return err
+			}
+			backoff = min(max(2*backoff, 5*time.Millisecond), time.Second)
+			time.Sleep(backoff)
+			continue
 		}
+		backoff = 0
 		select {
 		case slots <- struct{}{}:
+			open.Add(1)
 			go func() {
 				defer func() { <-slots }()
 				handle(connection, agent)
+				// The hub holds its channel while it polls and closes it
+				// when the page stops asking, so the last channel closing
+				// ends the capture (a dead channel only delays this to the
+				// idle timeout).
+				if open.Add(-1) == 0 {
+					if stopper, ok := agent.capture.(captureStopper); ok {
+						stopper.StopCapture()
+					}
+				}
 			}()
 		default:
 			_ = connection.SetWriteDeadline(time.Now().Add(time.Second))
@@ -198,6 +237,15 @@ func serveConnections(listener net.Listener, agent agentContext) error {
 			_ = connection.Close()
 		}
 	}
+}
+
+// temporaryAcceptError tells an Accept failure that may pass from one that
+// ends the listener.
+func temporaryAcceptError(err error) bool {
+	if errors.Is(err, net.ErrClosed) {
+		return false
+	}
+	return errors.Is(err, syscall.EMFILE) || errors.Is(err, syscall.ENFILE) || errors.Is(err, syscall.ECONNABORTED) || errors.Is(err, syscall.ENOBUFS) || errors.Is(err, syscall.ENOMEM)
 }
 
 // removeStaleSocket removes a previous socket of this user, never anything else.
@@ -224,18 +272,55 @@ func currentUserName() string {
 }
 
 // handle answers one connection until the peer closes it or misbehaves.
+// helloLockedWait is how long the hello reply waits for the extension to say
+// whether the computer is locked. The relay gives the whole hello helloTimeout
+// (3 s), and the extension may take lockTimeout (3 s) to answer, so the hello
+// must stop waiting sooner or a slow gnome-shell would make a healthy agent
+// look stopped. An extension that has not answered counts as not locked, as
+// it does when it is absent.
+var helloLockedWait = time.Second
+
+func lockedForHello(lock locker) bool {
+	answer := make(chan bool, 1)
+	go func() { answer <- lock.Locked() }()
+	timer := time.NewTimer(helloLockedWait)
+	defer timer.Stop()
+	select {
+	case locked := <-answer:
+		return locked
+	case <-timer.C:
+		return false
+	}
+}
+
+// replyWriteTimeout bounds one reply to a peer that stopped reading.
+var replyWriteTimeout = 30 * time.Second
+
 func handle(connection net.Conn, agent agentContext) {
 	defer connection.Close()
 	userName, capture, lock := agent.userName, agent.capture, agent.lock
+	// A peer that stops reading must not pin this handler and its slot: a
+	// reply that cannot be written in time ends the connection (callers
+	// return on a write error).
+	send := func(message classroomview.Message) error {
+		_ = connection.SetWriteDeadline(time.Now().Add(replyWriteTimeout))
+		return classroomview.Write(connection, message)
+	}
 	// Files of an unfinished sending are removed when the connection ends,
 	// and a showing of the teacher's screen through it ends too.
-	var incoming *receiver
+	var incoming *classroomview.TreeWriter
 	// A collection of the desktop through this connection ends with it.
 	var outgoing *collector
 	showing := false
+	// The shared clipboard lives only as long as the control that began it:
+	// another channel closing (a lock, a message, a sending) must not end it.
+	clipboardBegun := false
 	defer func() {
+		if clipboardBegun {
+			capture.ClipboardRelease()
+		}
 		if incoming != nil {
-			incoming.abort()
+			incoming.Abort()
 		}
 		if outgoing != nil {
 			outgoing.close()
@@ -249,17 +334,17 @@ func handle(connection net.Conn, agent agentContext) {
 		message, err := classroomview.Read(connection)
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBadRequest})
+				_ = send(classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBadRequest})
 			}
 			return
 		}
 		switch message.Type {
 		case classroomview.TypeHello:
 			if message.Version != classroomview.ProtocolVersion {
-				_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported, Detail: fmt.Sprintf("protocol version %d is not supported", message.Version)})
+				_ = send(classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported, Detail: fmt.Sprintf("protocol version %d is not supported", message.Version)})
 				return
 			}
-			if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName, Locked: lock.Locked()}); err != nil {
+			if err := send(classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName, Locked: lockedForHello(lock)}); err != nil {
 				return
 			}
 		case classroomview.TypeThumbnailRequest:
@@ -267,15 +352,19 @@ func handle(connection net.Conn, agent agentContext) {
 			if reply.Type == classroomview.TypeThumbnail {
 				reply.Locked = lock.Locked()
 			}
-			if err := classroomview.Write(connection, reply); err != nil {
+			if err := send(reply); err != nil {
 				return
 			}
 		case classroomview.TypeLock:
-			if err := classroomview.Write(connection, lockReply(lock, message.Locked)); err != nil {
+			if err := send(lockReply(lock, message.Locked)); err != nil {
 				return
 			}
 		case classroomview.TypeMessageShow, classroomview.TypeMessageHide:
-			if err := classroomview.Write(connection, messageReply(agent.notice, message)); err != nil {
+			if err := send(messageReply(agent.notice, message)); err != nil {
+				return
+			}
+		case classroomview.TypeNotice:
+			if err := send(noticeReply(agent.notice, message)); err != nil {
 				return
 			}
 		case classroomview.TypeBroadcastFrame, classroomview.TypeBroadcastStop:
@@ -295,35 +384,63 @@ func handle(connection net.Conn, agent agentContext) {
 					showing = true
 				}
 			}
-			if err := classroomview.Write(connection, reply); err != nil {
+			if err := send(reply); err != nil {
 				return
 			}
 		case classroomview.TypeFilesBegin, classroomview.TypeFilesChunk, classroomview.TypeFilesEnd:
 			reply := filesReply(&incoming, agent.home, message)
-			if err := classroomview.Write(connection, reply); err != nil {
+			if err := send(reply); err != nil {
 				return
 			}
 		case classroomview.TypeCollectList, classroomview.TypeCollectChunk, classroomview.TypeCollectEnd:
-			if err := classroomview.Write(connection, collectReply(&outgoing, agent.home, message)); err != nil {
+			// The controller asks for the collect notice (notice.show)
+			// once a collection succeeded: a review also lists and ends,
+			// and a desktop of folders or empty files hands no bytes over.
+			reply := collectReply(&outgoing, agent.home, message)
+			if err := send(reply); err != nil {
 				return
 			}
 		case classroomview.TypeInput:
-			if err := classroomview.Write(connection, inputReply(capture, message)); err != nil {
+			if err := send(inputReply(capture, message)); err != nil {
+				return
+			}
+		case classroomview.TypeClipboardBegin, classroomview.TypeClipboardSet, classroomview.TypeClipboardGet, classroomview.TypeClipboardEnd:
+			reply := clipboardReply(capture, message)
+			switch {
+			case message.Type == classroomview.TypeClipboardBegin && reply.Type == classroomview.TypeClipboardDone:
+				clipboardBegun = true
+			case message.Type == classroomview.TypeClipboardEnd:
+				clipboardBegun = false
+			}
+			if err := send(reply); err != nil {
 				return
 			}
 		default:
-			if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported}); err != nil {
+			if err := send(classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported}); err != nil {
 				return
 			}
 		}
 	}
 }
 
+// newIncoming starts receiving files for this session's desktop. They are
+// written into a private folder of the home first and move to the desktop
+// only when everything arrived, so the student never sees half a sending.
+// The agent runs as the student: the files belong to the student, folders
+// are 0755 and files 0644, never executable.
+func newIncoming(home string, entries []classroomview.FileEntry) (*classroomview.TreeWriter, error) {
+	desktop, err := classroomview.DesktopDirectory(home)
+	if err != nil {
+		return nil, err
+	}
+	return classroomview.NewStagedTreeWriter(desktop, filepath.Join(home, ".local", "share", "nixorium-classroom"), entries)
+}
+
 // filesReply advances a sending to the desktop; any refusal ends it.
-func filesReply(incoming **receiver, home string, message classroomview.Message) classroomview.Message {
+func filesReply(incoming **classroomview.TreeWriter, home string, message classroomview.Message) classroomview.Message {
 	refuse := func(err error) classroomview.Message {
 		if *incoming != nil {
-			(*incoming).abort()
+			(*incoming).Abort()
 			*incoming = nil
 		}
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeFilesRefused, Detail: err.Error()}
@@ -331,9 +448,9 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 	switch message.Type {
 	case classroomview.TypeFilesBegin:
 		if *incoming != nil {
-			(*incoming).abort()
+			(*incoming).Abort()
 		}
-		started, err := newReceiver(home, message.Entries)
+		started, err := newIncoming(home, message.Entries)
 		if err != nil {
 			*incoming = nil
 			return refuse(err)
@@ -344,7 +461,7 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 		if *incoming == nil {
 			return refuse(errors.New("no sending is open"))
 		}
-		if err := (*incoming).chunk(message.Index, message.Data); err != nil {
+		if err := (*incoming).Write(message.Index, message.Data); err != nil {
 			return refuse(err)
 		}
 		return classroomview.Message{Type: classroomview.TypeFilesAck, Index: message.Index}
@@ -352,7 +469,7 @@ func filesReply(incoming **receiver, home string, message classroomview.Message)
 		if *incoming == nil {
 			return refuse(errors.New("no sending is open"))
 		}
-		placed, err := (*incoming).finish()
+		placed, err := (*incoming).Finish()
 		*incoming = nil
 		if err != nil {
 			return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeFilesRefused, Detail: err.Error()}
@@ -395,6 +512,10 @@ func thumbnailReply(capture capturer, width int, since int64) classroomview.Mess
 	}
 	if err != nil {
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: err.Error()}
+	}
+	if len(image) > classroomview.MaxImageBytes {
+		// Sending it would fail and close the channel.
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: "the screen picture is too large"}
 	}
 	return classroomview.Message{Type: classroomview.TypeThumbnail, Width: width, Height: height, Image: image, CapturedAt: capturedAt.UnixMilli(), Frame: frame}
 }
@@ -457,18 +578,32 @@ func activeSeatUser(ctx context.Context, run commandRunner) (int, error) {
 	return uid, nil
 }
 
-// agentSocket returns the socket of uid after checking it without following links.
-func agentSocket(runtimeBase string, uid int) (string, error) {
-	path := filepath.Join(runtimeBase, strconv.Itoa(uid), SocketName)
-	info, err := os.Lstat(path)
+// agentSocket pins the socket of uid without ever following a link and returns
+// a path that stays bound to that very socket until release is called. The
+// runtime directory belongs to the student, who can replace the socket's name
+// at any moment, so checking the name and connecting to it afterwards would
+// let a link send this root process to any other socket. Instead the directory
+// and then the socket are opened with O_PATH|O_NOFOLLOW and checked through
+// their descriptors; /proc/self/fd/N names the checked socket itself.
+func agentSocket(runtimeBase string, uid int) (path string, release func(), err error) {
+	directory, err := unix.Open(filepath.Join(runtimeBase, strconv.Itoa(uid)), unix.O_PATH|unix.O_NOFOLLOW|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
 	if err != nil {
-		return "", errors.New("the classroom agent is not running in the active session")
+		return "", nil, errors.New("the classroom agent is not running in the active session")
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if info.Mode()&os.ModeSocket == 0 || !ok || int(stat.Uid) != uid {
-		return "", errors.New("the classroom agent socket is not owned by the session user")
+	defer unix.Close(directory)
+	var stat unix.Stat_t
+	if unix.Fstat(directory, &stat) != nil || int(stat.Uid) != uid {
+		return "", nil, errors.New("the classroom agent socket is not owned by the session user")
 	}
-	return path, nil
+	socket, err := unix.Openat(directory, SocketName, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return "", nil, errors.New("the classroom agent is not running in the active session")
+	}
+	if unix.Fstat(socket, &stat) != nil || stat.Mode&unix.S_IFMT != unix.S_IFSOCK || int(stat.Uid) != uid {
+		unix.Close(socket)
+		return "", nil, errors.New("the classroom agent socket is not owned by the session user")
+	}
+	return "/proc/self/fd/" + strconv.Itoa(socket), func() { unix.Close(socket) }, nil
 }
 
 // connect relays the controller's stream to the active session's agent. A
@@ -482,10 +617,11 @@ func connect(ctx context.Context, input io.Reader, output io.Writer, run command
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoSession, Detail: err.Error()})
 	}
-	path, err := agentSocket(runtimeBase, uid)
+	path, release, err := agentSocket(runtimeBase, uid)
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: err.Error()})
 	}
+	defer release()
 	connection, err := (&net.Dialer{Timeout: dialTimeout}).DialContext(ctx, "unix", path)
 	if err != nil {
 		return classroomview.Write(output, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent, Detail: "the classroom agent does not answer"})
@@ -696,7 +832,7 @@ func probeLock(ctx context.Context, command []string, locked bool, output io.Wri
 }
 
 // probe exchanges one hello through a command's standard input and output.
-func probe(ctx context.Context, command []string, thumbnail string, input bool, output io.Writer) error {
+func probe(ctx context.Context, command []string, thumbnail string, input bool, hold time.Duration, output io.Writer) error {
 	stdin, stdout, finish, err := startProbe(ctx, command)
 	if err != nil {
 		return err
@@ -739,7 +875,7 @@ func probe(ctx context.Context, command []string, thumbnail string, input bool, 
 				{Kind: classroomview.InputKey, Keysym: 0xffe1, Pressed: true},
 				{Kind: classroomview.InputKey, Keysym: 0xffe1},
 			}
-			if err := classroomview.Write(stdin, classroomview.Message{Type: classroomview.TypeInput, Events: events, Release: true}); err != nil {
+			if err := classroomview.Write(stdin, classroomview.Message{Type: classroomview.TypeInput, Events: events, Release: hold == 0}); err != nil {
 				return err
 			}
 			reply, err = classroomview.Read(stdout)
@@ -749,6 +885,10 @@ func probe(ctx context.Context, command []string, thumbnail string, input bool, 
 			fmt.Fprintf(output, "%s code=%s detail=%s\n", reply.Type, reply.Code, reply.Detail)
 			if reply.Type != classroomview.TypeInputDone {
 				return errors.New("the agent refused the input")
+			}
+			select {
+			case <-time.After(hold):
+			case <-ctx.Done():
 			}
 			return nil
 		}

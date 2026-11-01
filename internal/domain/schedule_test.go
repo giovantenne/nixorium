@@ -205,3 +205,59 @@ func TestScheduleOperationsAreClassroomOperations(t *testing.T) {
 		t.Fatal("schedule-run is not a classroom operation: the timer runs it, not the service")
 	}
 }
+
+func TestScheduleDueOnTheDaylightSavingNights(t *testing.T) {
+	rome, err := time.LoadLocation("Europe/Rome")
+	if err != nil {
+		t.Skipf("no time zone database: %v", err)
+	}
+	at := func(month time.Month, day, hour, minute int) time.Time {
+		return time.Date(2026, month, day, hour, minute, 0, 0, rome)
+	}
+	// Spring: on Sunday 29 March 2026 the clock goes from 02:00 to 03:00.
+	schedule := Schedule{On: "02:30", Off: "02:59", Days: []string{"sun"}}
+	if at(time.March, 29, 3, 0).Hour() != 3 || at(time.March, 29, 1, 59).Add(time.Minute).Hour() != 3 {
+		t.Fatal("the zone has no spring jump on 29 March 2026")
+	}
+	for name, test := range map[string]struct {
+		now     time.Time
+		on, off bool
+	}{
+		"minute before the jump":       {at(time.March, 29, 1, 59), false, false},
+		"first minute after the jump":  {at(time.March, 29, 3, 0), true, true},
+		"second minute after the jump": {at(time.March, 29, 3, 1), false, false},
+		"the next day":                 {at(time.March, 30, 3, 0), false, false},
+		"a week earlier at 03:00":      {at(time.March, 22, 3, 0), false, false},
+		"a week earlier at 02:30":      {at(time.March, 22, 2, 30), true, false},
+	} {
+		if on, off := schedule.Due(test.now); on != test.on || off != test.off {
+			t.Errorf("%s: due = %v %v, want %v %v", name, on, off, test.on, test.off)
+		}
+	}
+	// A time just before the jump, or right at the first minute after it,
+	// keeps its own minute and does not fire a second time.
+	around := Schedule{On: "01:59", Off: "03:00", Days: []string{"sun"}}
+	if on, off := around.Due(at(time.March, 29, 3, 0)); on || !off {
+		t.Errorf("03:00 after the jump = %v %v", on, off)
+	}
+	if on, _ := around.Due(at(time.March, 29, 1, 59)); !on {
+		t.Error("01:59 before the jump is not due")
+	}
+
+	// Autumn: on Sunday 25 October 2026 02:00-02:59 happens twice. Both are
+	// due; the record of the last run makes it run once.
+	autumn := Schedule{On: "02:30", Days: []string{"sun"}}
+	first := time.Date(2026, time.October, 25, 0, 30, 0, 0, time.UTC).In(rome)
+	second := first.Add(time.Hour)
+	if first.Hour() != 2 || second.Hour() != 2 || first.Format("MST") == second.Format("MST") {
+		t.Fatalf("the zone has no autumn repeat: %s %s", first, second)
+	}
+	for _, now := range []time.Time{first, second} {
+		if on, _ := autumn.Due(now); !on {
+			t.Errorf("%s is not due", now)
+		}
+	}
+	if on, _ := autumn.Due(at(time.October, 25, 3, 0)); on {
+		t.Error("03:00 after the repeated hour fired the skipped-minute rule")
+	}
+}

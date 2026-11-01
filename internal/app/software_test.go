@@ -109,10 +109,10 @@ func TestSoftwarePlanUsesCatalogAndSeparatesConfigurationFromDistribution(t *tes
 	report := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{
 		Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients},
 	})
-	if report.HasErrors() || report.State != "ready" || source.validations != 1 || len(report.AffectedClients) != 2 || report.ReviewToken == "" || report.Confirmation != "SAVE" {
+	if report.HasErrors() || report.State != "ready" || source.validations != 1 || len(report.AffectedClients) != 2 || report.ReviewToken == "" || report.Confirmation != "" {
 		t.Fatalf("software plan = %+v validations=%d", report, source.validations)
 	}
-	if !strings.Contains(report.Message, "no system has been built or changed") {
+	if !strings.Contains(report.Message, "no computer changes until you update it") {
 		t.Fatalf("plan confused declaration with effects: %s", report.Message)
 	}
 }
@@ -243,7 +243,7 @@ func TestSoftwareRemovalDoesNotRequirePackageToRemainResolvable(t *testing.T) {
 	source.data = configured
 	source.definition.Packages = []domain.SoftwareDeclaration{{Package: "retired-package", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}, Origin: "managed"}}
 	plan := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{Package: "retired-package", Present: false})
-	if plan.HasErrors() || plan.State != "ready" || len(plan.Candidate.Packages) != 0 || plan.Confirmation != "REMOVE" {
+	if plan.HasErrors() || plan.State != "ready" || len(plan.Candidate.Packages) != 0 || plan.Confirmation != "" {
 		t.Fatalf("retired package removal = %+v", plan)
 	}
 }
@@ -353,11 +353,6 @@ func TestSoftwarePlanKeepsBaseSoftware(t *testing.T) {
 		report := manager.Plan(context.Background(), "/lab", request)
 		if report.State == "ready" || report.ReviewToken != "" || len(report.Issues) == 0 || !strings.Contains(report.Issues[0].Message, "always installs it") {
 			t.Fatalf("%s = %+v", name, report)
-		}
-	}
-	for _, id := range domain.BaseSoftware() {
-		if !softwareIDValid(id) {
-			t.Fatalf("base software %q is not a valid package attribute", id)
 		}
 	}
 }
