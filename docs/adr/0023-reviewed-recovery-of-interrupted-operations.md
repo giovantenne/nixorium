@@ -25,8 +25,10 @@ Interrupted client update (`deploy recover`):
 
 - The plan validates the record, confirms that the process that started the
   update has exited, and observes every recorded computer over authenticated
-  SSH with a fixed read-only probe: running revision, queued systemd jobs and
-  a running `switch-to-configuration`.
+  SSH with a fixed read-only probe: running revision, the state of the
+  `nixorium-activate.service` unit and a running `switch-to-configuration`.
+  (Until November 2026 any queued systemd job counted as applying; a job that
+  never finished then blocked the review for good.)
 - A computer that is still applying blocks the review. A computer that cannot
   be checked requires an explicit acknowledgement after a console inspection.
 - The token binds the record, the observations, the acknowledgement and an

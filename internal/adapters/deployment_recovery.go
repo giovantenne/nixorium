@@ -20,8 +20,11 @@ import (
 )
 
 // deploymentActivityCommand is a fixed read-only probe: the running system
-// and revision, queued systemd jobs, and any running activation.
-const deploymentActivityCommand = "nixorium-host-state 2>/dev/null; echo '--- jobs'; systemctl list-jobs --no-legend --no-pager 2>/dev/null; echo '--- activation'; pgrep -c -f '[s]witch-to-configuration' 2>/dev/null; echo '--- result'; cat /var/lib/nixorium/activation/last.json 2>/dev/null; true"
+// and revision, the state of the activation unit, and any running
+// switch-to-configuration. Other systemd jobs are not activity: a computer
+// that is starting up, or a unit that never finishes starting, would otherwise
+// look like an update that never ends and block the recovery review.
+const deploymentActivityCommand = "nixorium-host-state 2>/dev/null; echo '--- unit'; systemctl show -p SubState --value " + clientActivationUnit + " 2>/dev/null; echo '--- activation'; pgrep -c -f '[s]witch-to-configuration' 2>/dev/null; echo '--- result'; cat /var/lib/nixorium/activation/last.json 2>/dev/null; true"
 
 // ProcessRunning reports whether the process that wrote the pending record
 // still runs. With a recorded start time the PID must still have that start
@@ -80,8 +83,8 @@ func (Local) ObserveDeploymentActivity(ctx context.Context, hosts []domain.HostM
 
 func parseDeploymentActivity(output string) domain.DeploymentActivity {
 	activity := domain.DeploymentActivity{Reachable: true}
-	state, rest, _ := strings.Cut(output, "--- jobs\n")
-	jobs, rest, _ := strings.Cut(rest, "--- activation\n")
+	state, rest, _ := strings.Cut(output, "--- unit\n")
+	unit, rest, _ := strings.Cut(rest, "--- activation\n")
 	activation, result, _ := strings.Cut(rest, "--- result\n")
 	var record struct {
 		ActivationID string `json:"activationId"`
@@ -100,10 +103,12 @@ func parseDeploymentActivity(output string) domain.DeploymentActivity {
 	} else if count, err := strconv.Atoi(fields[0]); err != nil || count > 0 {
 		activity.Activating = true
 	}
-	for _, line := range strings.Split(jobs, "\n") {
-		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "No jobs") {
-			activity.Activating = true
-		}
+	// Only an activation unit at rest is idle (a computer that never ran one
+	// reports "dead"); any other state, or an unreadable one, is activity.
+	switch strings.TrimSpace(unit) {
+	case "dead", "exited", "failed":
+	default:
+		activity.Activating = true
 	}
 	return activity
 }

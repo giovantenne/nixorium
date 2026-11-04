@@ -26,6 +26,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Review the interrupted update** can be confirmed again when a student
+  computer has an unrelated systemd job, for example while it is still
+  starting up. Any queued job counted as "still updating", so the review
+  refused with "pcNN started applying again after review" and, with a job
+  that never finished, refused every time. Now only Nixorium's own
+  activation, or a running `switch-to-configuration`, counts.
 - The lab screensaver no longer closes as soon as it starts. Caffeine, added
   in 3.12.0, switched itself on whenever a window was fullscreen, and the
   screensaver is a fullscreen window that stops while the screen is kept on.

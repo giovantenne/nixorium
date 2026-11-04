@@ -695,7 +695,9 @@ student computers was interrupted**, or press Enter on a failure notice that
 names it (for example on the result of **Update Nixorium**).
 
 **Review the interrupted update** lists every recorded computer, checked over
-authenticated SSH (running revision, queued systemd jobs, running activation):
+authenticated SSH (running revision, state of its Nixorium activation, running
+`switch-to-configuration`; other systemd jobs, such as those of a computer
+still starting up, do not count):
 
 - *finished, running the new version* or *finished, but running another
   version*: nothing to do now;

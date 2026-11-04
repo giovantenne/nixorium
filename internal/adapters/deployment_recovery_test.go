@@ -14,21 +14,30 @@ import (
 
 func TestParseDeploymentActivity(t *testing.T) {
 	revision := strings.Repeat("a", 40)
-	idle := parseDeploymentActivity("/nix/store/x-system\n" + revision + "\n--- jobs\n--- activation\n0\n")
+	idle := parseDeploymentActivity("/nix/store/x-system\n" + revision + "\n--- unit\ndead\n--- activation\n0\n")
 	if !idle.Reachable || idle.Activating || idle.Revision != revision {
 		t.Fatalf("idle = %+v", idle)
 	}
 	for _, output := range []string{
-		"/nix/store/x\n" + revision + "\n--- jobs\n42 nixos-activation.service start running\n--- activation\n0\n",
-		"/nix/store/x\n" + revision + "\n--- jobs\n--- activation\n1\n",
-		"/nix/store/x\n" + revision + "\n--- jobs\n--- activation\n",
+		"/nix/store/x\n" + revision + "\n--- unit\nrunning\n--- activation\n0\n",
+		"/nix/store/x\n" + revision + "\n--- unit\nstart\n--- activation\n0\n",
+		"/nix/store/x\n" + revision + "\n--- unit\n\n--- activation\n0\n",
+		"/nix/store/x\n" + revision + "\n--- unit\ndead\n--- activation\n1\n",
+		"/nix/store/x\n" + revision + "\n--- unit\ndead\n--- activation\n",
 	} {
 		if !parseDeploymentActivity(output).Activating {
 			t.Fatalf("activity not detected in %q", output)
 		}
 	}
-	if parseDeploymentActivity("--- jobs\nNo jobs running.\n--- activation\n0\n").Activating {
-		t.Fatal("the empty job message was treated as activity")
+	// A finished or failed activation is at rest. The probe no longer reads
+	// the systemd job queue: a computer still starting up is not updating.
+	for _, unit := range []string{"exited", "failed", "dead"} {
+		if parseDeploymentActivity("--- unit\n" + unit + "\n--- activation\n0\n").Activating {
+			t.Fatalf("an activation unit at rest (%s) was treated as activity", unit)
+		}
+	}
+	if !strings.Contains(deploymentActivityCommand, "systemctl show -p SubState --value "+clientActivationUnit) || strings.Contains(deploymentActivityCommand, "list-jobs") {
+		t.Fatalf("probe = %q", deploymentActivityCommand)
 	}
 }
 
@@ -163,11 +172,11 @@ func TestCreateDeploymentPendingRecordsTheProcessStartTime(t *testing.T) {
 
 func TestDeploymentActivityReadsTheActivationResult(t *testing.T) {
 	id := strings.Repeat("d", 32)
-	activity := parseDeploymentActivity("/nix/store/x\n" + strings.Repeat("a", 40) + "\n--- jobs\nNo jobs running.\n--- activation\n0\n--- result\n{\"activationId\":\"" + id + "\",\"exitCode\":0}\n")
+	activity := parseDeploymentActivity("/nix/store/x\n" + strings.Repeat("a", 40) + "\n--- unit\nexited\n--- activation\n0\n--- result\n{\"activationId\":\"" + id + "\",\"exitCode\":0}\n")
 	if !activity.Reachable || activity.Activating || activity.LastActivationID != id || activity.LastExitCode == nil || *activity.LastExitCode != 0 {
 		t.Fatalf("activity = %+v", activity)
 	}
-	activity = parseDeploymentActivity("/nix/store/x\n" + strings.Repeat("a", 40) + "\n--- jobs\nNo jobs running.\n--- activation\n0\n--- result\n")
+	activity = parseDeploymentActivity("/nix/store/x\n" + strings.Repeat("a", 40) + "\n--- unit\nexited\n--- activation\n0\n--- result\n")
 	if activity.LastActivationID != "" || activity.LastExitCode != nil {
 		t.Fatalf("missing result = %+v", activity)
 	}

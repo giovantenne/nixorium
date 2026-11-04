@@ -175,10 +175,10 @@ in
         "systemctl poweroff --no-block")
           printf 'accepted\n' >> /tmp/nixorium-test-shutdown-dispatch.log
           ;;
-        "nixorium-host-state 2>/dev/null; echo '--- jobs';"*)
+        "nixorium-host-state 2>/dev/null; echo '--- unit';"*)
           readlink -f /run/current-system
           cat /tmp/nixorium-test-recover-revision 2>/dev/null || echo unknown
-          printf -- '--- jobs\n--- activation\n0\n'
+          printf -- '--- unit\ndead\n--- activation\n0\n'
           ;;
         "nixorium-clean-generations --plan")
           printf 'format 1\nkeep 9 newest\nremove 1\nfree 1000\nexpect aaaaaaaaaaaaaaaa\n'
