@@ -17,7 +17,7 @@ cp "$REPO_ROOT/templates/site/lab-software.json" "$SOFTWARE"
 cp "$REPO_ROOT/templates/site/workspace-profile.json" "$PROFILE"
 cp "$REPO_ROOT/templates/site/workspace-profile.programming.example.json" "$TEST_ROOT/"
 
-printf '\n\n' | bash "$REPO_ROOT/templates/site/scripts/configure-software-profile.sh" \
+printf '\n\n' | bash "$REPO_ROOT/scripts/configure-software-profile.sh" \
   "$CATALOG" "$SOFTWARE" > "$TEST_ROOT/default.out"
 jq -S . "$REPO_ROOT/templates/site/lab-software.json" > "$TEST_ROOT/default-expected.json"
 jq -S . "$SOFTWARE" > "$TEST_ROOT/default-actual.json"
@@ -28,7 +28,7 @@ cmp "$REPO_ROOT/templates/site/workspace-profile.json" "$PROFILE"
 
 cp "$REPO_ROOT/templates/site/lab-software.json" "$SOFTWARE"
 printf '3\n\n' | bash \
-  "$REPO_ROOT/templates/site/scripts/configure-software-profile.sh" \
+  "$REPO_ROOT/scripts/configure-software-profile.sh" \
   "$CATALOG" "$SOFTWARE" > "$TEST_ROOT/programming.out"
 jq -e '
   .schemaVersion == 1 and
@@ -53,7 +53,7 @@ fi
 
 cp "$REPO_ROOT/templates/site/lab-software.json" "$SOFTWARE"
 printf '99\nessential\n\n' | bash \
-  "$REPO_ROOT/templates/site/scripts/configure-software-profile.sh" \
+  "$REPO_ROOT/scripts/configure-software-profile.sh" \
   "$CATALOG" "$SOFTWARE" > "$TEST_ROOT/empty.out"
 jq -e '.packages | length > 0' "$SOFTWARE" >/dev/null
 grep -F 'Type a number from 1 to 7' "$TEST_ROOT/empty.out" >/dev/null
@@ -61,7 +61,7 @@ grep -F 'Type a number from 1 to 7' "$TEST_ROOT/empty.out" >/dev/null
 cp "$REPO_ROOT/templates/site/lab-software.json" "$SOFTWARE"
 BEFORE="$(sha256sum "$SOFTWARE")"
 if printf '\nno\n' | bash \
-  "$REPO_ROOT/templates/site/scripts/configure-software-profile.sh" \
+  "$REPO_ROOT/scripts/configure-software-profile.sh" \
   "$CATALOG" "$SOFTWARE" > "$TEST_ROOT/cancel.out" 2>&1; then
   echo "cancelled software profile selection succeeded" >&2
   exit 1
@@ -75,7 +75,7 @@ grep -F 'Setup input ended while choosing the applications' "$TEST_ROOT/cancel.o
 
 jq '.schemaVersion = 99' "$CATALOG" > "$TEST_ROOT/invalid-catalog.json"
 if printf '\n\n' | bash \
-  "$REPO_ROOT/templates/site/scripts/configure-software-profile.sh" \
+  "$REPO_ROOT/scripts/configure-software-profile.sh" \
   "$TEST_ROOT/invalid-catalog.json" "$SOFTWARE" > "$TEST_ROOT/invalid.out" 2>&1; then
   echo "invalid software profile catalog was accepted" >&2
   exit 1

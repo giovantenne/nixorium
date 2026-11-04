@@ -126,6 +126,20 @@ var Registry = []Migration{
 			})
 		},
 	},
+	{
+		ID:          "2026-11-profile-helper-in-core",
+		Description: "The software profile menu of the controller installation comes from Nixorium itself: its unused copy, scripts/configure-software-profile.sh, leaves the deployment.",
+		Apply: func(tree Tree) Outcome {
+			// Released forms: 2.0.0, 2.1.0 up to 3.5.0, 3.6.0 up to 3.12.0.
+			return RemoveLeftovers(tree, []RemovedFile{
+				{Path: "scripts/configure-software-profile.sh", Released: []string{
+					"a5c1246c68d48ee0e1bcead5f8134ef6051405b9bb56bf310971181ef85e5db8",
+					"93ae918bb5208378c00b2a6d4c7c0b131e5cd1c5c16b2b3c4cd982f4bc8457ae",
+					"d26ad56ecec8a00c854d0fe671a4025c178be04b0a17a0bba547b27580849993",
+				}},
+			})
+		},
+	},
 }
 
 // screensaverInCore reports whether the deployment no longer carries the lab

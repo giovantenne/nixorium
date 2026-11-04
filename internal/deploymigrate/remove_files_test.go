@@ -131,3 +131,24 @@ func TestAFailedRemovalRestoresEverything(t *testing.T) {
 		}
 	}
 }
+
+func TestTheProfileHelperLeavesTheDeploymentUnlessEdited(t *testing.T) {
+	migration := registryWith("profile-helper-in-core")
+	released, err := releasedTemplateFile(t, "v3.12.0", "scripts/configure-software-profile.sh")
+	if err != nil {
+		t.Skip("no Git history with release tags")
+	}
+	root := treeWith(t, map[string]string{"scripts/configure-software-profile.sh": released})
+	report, err := Run(root, "3.13.0", migration)
+	if err != nil || report.Migrations[0].State != Applied || !slices.Equal(report.Migrations[0].Files, []string{"scripts/configure-software-profile.sh"}) {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "scripts/configure-software-profile.sh")); !os.IsNotExist(err) {
+		t.Fatalf("the helper was kept: %v", err)
+	}
+	edited := treeWith(t, map[string]string{"scripts/configure-software-profile.sh": released + "# local\n"})
+	report, err = Run(edited, "3.13.0", migration)
+	if err != nil || report.Migrations[0].State != Done || read(t, edited, "scripts/configure-software-profile.sh") != released+"# local\n" {
+		t.Fatalf("an edited helper was not kept: %+v, %v", report, err)
+	}
+}

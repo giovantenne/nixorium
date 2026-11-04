@@ -18,6 +18,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   software includes Ghostty and the text effects. If you edited one of those
   files, the review shows a manual change: your screensaver keeps running and
   Nixorium's stays off until you remove them.
+- The software profile menu of the controller installation now comes from
+  Nixorium itself, at the same revision as the template. The deployment
+  migration `2026-11-profile-helper-in-core` removes the copy every
+  laboratory kept and never used afterwards,
+  `scripts/configure-software-profile.sh`; one you edited stays.
 
 ### Fixed
 

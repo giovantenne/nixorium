@@ -93,3 +93,28 @@ func RemoveFiles(tree Tree, file, use string, removed []RemovedFile) Outcome {
 	}
 	return Outcome{State: Applied, Files: changed}
 }
+
+// RemoveLeftovers deletes unused template files in a released form; a file
+// changed by hand is kept, since nothing uses it. Applied when it deleted
+// one, done otherwise.
+func RemoveLeftovers(tree Tree, removed []RemovedFile) Outcome {
+	var changed []string
+	for _, candidate := range removed {
+		content, _, found, err := tree.Read(candidate.Path)
+		if err != nil || !found {
+			continue
+		}
+		digest := sha256.Sum256(content)
+		if !slices.Contains(candidate.Released, hex.EncodeToString(digest[:])) {
+			continue
+		}
+		if err := tree.Remove(candidate.Path); err != nil {
+			return Outcome{State: Manual, Detail: candidate.Path + " cannot be removed. It is no longer used: delete it."}
+		}
+		changed = append(changed, candidate.Path)
+	}
+	if len(changed) == 0 {
+		return Outcome{State: Done}
+	}
+	return Outcome{State: Applied, Files: changed}
+}

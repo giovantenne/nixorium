@@ -770,9 +770,13 @@ UPSTREAM_REF="github:${REPOSITORY}/${UPSTREAM_REV}"
 DECLARED_UPSTREAM_REF="github:${REPOSITORY}/${RELEASE}"
 INSTALLER_URL="https://raw.githubusercontent.com/${REPOSITORY}/${UPSTREAM_REV}/scripts/install-controller.sh"
 DISKO_LAYOUT_URL="https://raw.githubusercontent.com/${REPOSITORY}/${UPSTREAM_REV}/lib/disko-layout.nix"
+# The software profile menu comes from the same revision as the template, so
+# it offers exactly that revision's software-presets.json.
+PROFILE_HELPER_URL="https://raw.githubusercontent.com/${REPOSITORY}/${UPSTREAM_REV}/scripts/configure-software-profile.sh"
 CAPABILITY_URL="https://raw.githubusercontent.com/${REPOSITORY}/${UPSTREAM_REV}/flake.nix"
 TEMP_INSTALLER="$(mktemp)"
 TEMP_DISKO_LAYOUT="$(mktemp)"
+TEMP_PROFILE_HELPER="$(mktemp)"
 TEMP_DEPLOYMENT="$(mktemp -d)"
 
 cleanup() {
@@ -788,7 +792,7 @@ cleanup() {
   BOOTSTRAP_ADMIN_HASH=""
   BOOTSTRAP_TEACHER_HASH=""
   BOOTSTRAP_STUDENT_HASH=""
-  rm -f "$TEMP_INSTALLER" "$TEMP_DISKO_LAYOUT"
+  rm -f "$TEMP_INSTALLER" "$TEMP_DISKO_LAYOUT" "$TEMP_PROFILE_HELPER"
   rm -rf "$TEMP_DEPLOYMENT"
 }
 trap cleanup EXIT
@@ -829,6 +833,7 @@ ui_section "Preparing the lab configuration"
 ui_log "Downloading the installer and the lab configuration template..."
 curl -fsSL "$INSTALLER_URL" -o "$TEMP_INSTALLER"
 curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
+curl -fsSL "$PROFILE_HELPER_URL" -o "$TEMP_PROFILE_HELPER"
 
 (
   cd "$TEMP_DEPLOYMENT"
@@ -848,13 +853,8 @@ curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
     exit 1
   fi
   configure_bootstrap_settings lab-settings.json
-  PROFILE_HELPER="scripts/configure-software-profile.sh"
-  if [[ ! -r "$PROFILE_HELPER" ]]; then
-    echo "Error: the selected revision advertises software profiles but its template helper is missing." >&2
-    exit 1
-  fi
-  # shellcheck source=/dev/null
-  source "$PROFILE_HELPER"
+  # shellcheck source=scripts/configure-software-profile.sh
+  source "$TEMP_PROFILE_HELPER"
   ui_step 4 "Applications"
   configure_site_software_profile software-presets.json lab-software.json "$BOOTSTRAP_INPUT_FD"
   "${GIT_COMMAND[@]}" init -q -b master

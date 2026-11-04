@@ -57,6 +57,9 @@ INSTALLER
   https://raw.githubusercontent.com/giovantenne/nixorium/*/lib/disko-layout.nix)
     printf 'layout-from-resolved-revision\n' > "$output"
     ;;
+  https://raw.githubusercontent.com/giovantenne/nixorium/*/scripts/configure-software-profile.sh)
+    cp "$BOOTSTRAP_PROFILE_HELPER" "$output"
+    ;;
   https://raw.githubusercontent.com/giovantenne/nixorium/*/flake.nix)
     printf 'controllerBootstrapVersion = %s;\n' "${BOOTSTRAP_CAPABILITY_VERSION:-2}"
     ;;
@@ -138,6 +141,7 @@ export BOOTSTRAP_CALL_LOG="$CALL_LOG"
 export BOOTSTRAP_INSTALLER_LOG="$INSTALLER_LOG"
 export BOOTSTRAP_REVISION="$REVISION"
 export BOOTSTRAP_TEMPLATE="${REPO_ROOT}/templates/site"
+export BOOTSTRAP_PROFILE_HELPER="${REPO_ROOT}/scripts/configure-software-profile.sh"
 export NIXORIUM_INSTALLER_EFI_DIRECTORY="${TEST_ROOT}/efi"
 mkdir -p "$NIXORIUM_INSTALLER_EFI_DIRECTORY"
 
@@ -382,6 +386,7 @@ fi
 grep -F "commits/master" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/scripts/install-controller.sh" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-layout.nix" "$CALL_LOG" >/dev/null
+grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/scripts/configure-software-profile.sh" "$CALL_LOG" >/dev/null
 grep -F "flake init -t github:giovantenne/nixorium/${REVISION}#site" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/flake.nix" "$CALL_LOG" >/dev/null
 grep -F "loadkeys it -" "$CALL_LOG" >/dev/null

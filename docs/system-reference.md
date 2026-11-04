@@ -158,8 +158,9 @@ SYSTEM=$(nix build \
 nix path-info --json-format 1 --json --closure-size "$SYSTEM"
 ```
 
-Use `scripts/configure-software-profile.sh software-presets.json lab-software.json`
-in that disposable deployment to select another profile, then repeat. Record
+Run Nixorium's `scripts/configure-software-profile.sh software-presets.json
+lab-software.json` in that disposable deployment to select another profile,
+then repeat. Record
 the upstream revision, lock and store/cache condition. Closure size includes
 the common NixOS/GNOME base; it is neither download size nor total disk usage.
 Time builds separately and measure network transfer independently. A warm

@@ -15,8 +15,6 @@ var releasedDrift = map[string]string{
 	// The local web server left the template in 3.10.0; a laboratory that has
 	// it keeps it, so its exercises keep working.
 	"modules/development.nix": "keeps the web server",
-	// Only the wording of an installer error message changed in 3.6.0.
-	"scripts/configure-software-profile.sh": "message wording",
 }
 
 // TestEveryStableReleaseMigratesToThisTemplate runs every migration on the
