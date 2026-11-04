@@ -277,7 +277,7 @@ let
     exec = if classroomViewOn
       then "${classroomOpen}/bin/nixorium-classroom-open"
       else "${classroomDashboardOpen}/bin/nixorium-classroom-dashboard";
-    icon = "${../assets/nixorium-icon.svg}";
+    icon = "${../assets/nixorium-classroom-icon.svg}";
     categories = [ "Education" ];
     startupWMClass = classroomWindowClass;
   };
