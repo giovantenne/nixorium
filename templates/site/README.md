@@ -345,14 +345,12 @@ computers before first use.
 - `modules/workstation.nix`: GNOME desktop icons, persistent dock, application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
-- `modules/screensaver.nix`: Ghostty lab screensaver with text effects supplied by every built-in profile (starts after 5 idle minutes, stops after 30 when the screen goes black, and never locks the session)
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `groupModules` in `flake.nix`: common modules for members of those client groups
 - `hostModules` in `flake.nix`: individual hosts
 - `updateValidationHosts` in `mkLab`: extra validation hosts when private shared
   modules branch on host identity (explicit host modules are already covered)
-- `assets/logo.txt`: screensaver logo
-- `scripts/screensaver-monitor.sh`, `scripts/cmd-screensaver.sh`: screensaver idle monitor and effect loop, used straight from the Nix store and always run through bash, so they do not need the executable bit
+- `assets/logo.txt`: the logo the lab screensaver animates (the screensaver itself is part of Nixorium: it starts after 5 idle minutes, stops after 30 when the screen goes black, and never locks the session)
 
 These files are the lab's workstation profile. They are intentionally part of
 this private repository rather than Nixorium core, so package and policy changes

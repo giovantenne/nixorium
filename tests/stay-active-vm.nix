@@ -5,10 +5,10 @@
 let
   caffeine = pkgs.gnomeExtensions.caffeine;
   schemas = "${caffeine}/share/gnome-shell/extensions/${caffeine.extensionUuid}/schemas";
-  # The check the lab screensaver runs, taken from the template script.
+  # The check the lab screensaver runs, taken from its script.
   inhibitedCheck = pkgs.writeShellScript "stay-active-inhibited" ''
     export PATH=${pkgs.lib.makeBinPath [ pkgs.glib pkgs.gnugrep ]}
-    eval "$(${pkgs.gnused}/bin/sed -n '/^idle_inhibited() {/,/^}/p' ${../templates/site/scripts/screensaver-monitor.sh})"
+    eval "$(${pkgs.gnused}/bin/sed -n '/^idle_inhibited() {/,/^}/p' ${../scripts/screensaver-monitor.sh})"
     idle_inhibited
   '';
   # A window that asks to be fullscreen as it opens, like the screensaver's

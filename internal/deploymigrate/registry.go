@@ -24,6 +24,9 @@ var Registry = []Migration{
 		ID:          "2026-10-ttfx-screensaver",
 		Description: "The lab screensaver uses ttfx, the faster Rust version of its text effects, at 30 frames per second, and stops when the screen goes blank after 30 idle minutes.",
 		Apply: func(tree Tree) Outcome {
+			if screensaverInCore(tree) {
+				return Outcome{State: Done}
+			}
 			// Released forms: 2.0.0-beta.4 up to 3.5.0 (the tte screensaver that
 			// locked the session), 3.6.0, and 3.6.1 up to 3.10.0-beta.3. The
 			// forms before 3.6.0 were added after release: they only widen which
@@ -57,6 +60,9 @@ var Registry = []Migration{
 		ID:          "2026-10-screensaver-60-fps",
 		Description: "The lab screensaver draws 60 frames per second instead of 30: its effects advance once per frame, so at 30 they ran at half speed.",
 		Apply: func(tree Tree) Outcome {
+			if screensaverInCore(tree) {
+				return Outcome{State: Done}
+			}
 			return ReplaceExact(tree, "scripts/cmd-screensaver.sh",
 				"  # 30 frames per second look the same here and cost the terminal a quarter of\n  # the drawing that 120 would.\n  ttfx -i \"$SCREENSAVER_TEXT\" \\\n    --frame-rate 30 \\\n",
 				"  # Effects advance once per frame, so the frame rate is also their speed: 60\n  # keeps them lively for half the drawing that 120 cost the terminal.\n  ttfx -i \"$SCREENSAVER_TEXT\" \\\n    --frame-rate 60 \\\n")
@@ -75,6 +81,9 @@ var Registry = []Migration{
 		ID:          "2026-10-screensaver-idle-inhibitors",
 		Description: "The lab screensaver does not start while an application or the Caffeine toggle keeps the screen on.",
 		Apply: func(tree Tree) Outcome {
+			if screensaverInCore(tree) {
+				return Outcome{State: Done}
+			}
 			return ReplaceExact(tree, "scripts/screensaver-monitor.sh",
 				"while true; do\n  IDLE_MS=$(get_idle_ms)\n\n  if [[ \"$IDLE_MS\" -ge \"$IDLE_BLANK_MS\" ]]; then\n",
 				"# An application or the Caffeine toggle that keeps the screen on (a session\n# idle inhibitor) keeps the screensaver away too.\nidle_inhibited() {\n  gdbus call --session \\\n    --dest org.gnome.SessionManager \\\n    --object-path /org/gnome/SessionManager \\\n    --method org.gnome.SessionManager.IsInhibited 8 2>/dev/null |\n  grep -q true\n}\n\nwhile true; do\n  IDLE_MS=$(get_idle_ms)\n  if idle_inhibited; then\n    IDLE_MS=0\n  fi\n\n  if [[ \"$IDLE_MS\" -ge \"$IDLE_BLANK_MS\" ]]; then\n")
@@ -93,4 +102,40 @@ var Registry = []Migration{
 			})
 		},
 	},
+	{
+		ID:          "2026-11-screensaver-in-core",
+		Description: "The lab screensaver is now part of Nixorium: its module and scripts leave the deployment, which keeps only the logo it animates (assets/logo.txt).",
+		Apply: func(tree Tree) Outcome {
+			// Every form the earlier screensaver migrations leave, as released
+			// in 3.10.0 up to 3.12.0, and the leftover of 3.5.0 and older.
+			return RemoveFiles(tree, "modules/shared.nix", "    ./screensaver.nix\n", []RemovedFile{
+				{Path: "modules/screensaver.nix", Released: []string{
+					"d7365b1cad8afa7cf9506409bf56f06282094d5f4ab5dc5c034df4b0708fe1c6",
+				}},
+				{Path: "scripts/cmd-screensaver.sh", Released: []string{
+					"29f1b0ff986cc02d91db8f39dc48531b1d48c08ef5788548be7d19d352b395f6",
+					"f9a9e775670838a6d5d2a435f682f9598ee6422f13a2dca91dc936b7f2d82e21",
+				}},
+				{Path: "scripts/screensaver-monitor.sh", Released: []string{
+					"ecbe4e02fed27c4eb7e5bfa67c470dd15705410435d062e63babeb715ed27b86",
+					"7d58036ffee944f02da816c04e9354beb93658c1c351413ec3cd01a8183ed5eb",
+				}},
+				{Path: "scripts/launch-screensaver.sh", Optional: true, Released: []string{
+					"00a2f868c00e3760fd5940bd72b9527ac7219090663714bfd21f9c82ffa0e682",
+				}},
+			})
+		},
+	},
+}
+
+// screensaverInCore reports whether the deployment no longer carries the lab
+// screensaver (2026-11-screensaver-in-core): the earlier migrations of its
+// files then have nothing left to change.
+func screensaverInCore(tree Tree) bool {
+	for _, name := range []string{"modules/screensaver.nix", "scripts/cmd-screensaver.sh", "scripts/screensaver-monitor.sh"} {
+		if _, _, found, err := tree.Read(name); found || err != nil {
+			return false
+		}
+	}
+	return true
 }

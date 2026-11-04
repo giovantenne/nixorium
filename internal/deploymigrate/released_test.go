@@ -17,8 +17,6 @@ var releasedDrift = map[string]string{
 	"modules/development.nix": "keeps the web server",
 	// Only the wording of an installer error message changed in 3.6.0.
 	"scripts/configure-software-profile.sh": "message wording",
-	// No longer used from 3.6.0: the idle monitor launches the screensaver.
-	"scripts/launch-screensaver.sh": "unused leftover",
 }
 
 // TestEveryStableReleaseMigratesToThisTemplate runs every migration on the

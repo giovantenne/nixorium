@@ -12,6 +12,13 @@ import (
 // ttfxOnly runs the screensaver migration alone.
 var ttfxOnly = Registry[2:3]
 
+// earlierScreensaver runs the screensaver migrations made before the
+// screensaver moved to the core.
+var earlierScreensaver = registryWith("screensaver")[:3]
+
+// releasedShared is modules/shared.nix as released up to 3.12.0.
+const releasedShared = "{ ... }:\n{\n  imports = [\n    ./development.nix\n    ./home-profile.nix\n    ./screensaver.nix\n    ./workstation.nix\n  ];\n}\n"
+
 // releasedScreensaver is the 3.6.1 form of the three screensaver files.
 func releasedScreensaver(t *testing.T) map[string]string {
 	return screensaverForm(t, "2026-10-ttfx-screensaver")
@@ -98,8 +105,20 @@ func TestTheScreensaverMigrationIsDoneOrPartialOnNewFiles(t *testing.T) {
 	}
 }
 
-func TestTheScreensaverMigrationIsManualWithoutTheFiles(t *testing.T) {
-	report, err := Run(treeWith(t, map[string]string{"README.md": "lab\n"}), "3.10.0", ttfxOnly)
+func TestTheEarlierScreensaverMigrationsAreDoneWithoutTheFiles(t *testing.T) {
+	// The screensaver is part of the core: a deployment without its files
+	// has nothing left for them to change.
+	report, err := Run(treeWith(t, map[string]string{"README.md": "lab\n"}), "3.10.0", earlierScreensaver)
+	if err != nil || len(report.Migrations) != 3 {
+		t.Fatalf("report = %+v, %v", report, err)
+	}
+	for _, entry := range report.Migrations {
+		if entry.State != Done {
+			t.Fatalf("%s = %s: %s", entry.ID, entry.State, entry.Detail)
+		}
+	}
+	// One file left behind: the earlier migrations still look at it.
+	report, err = Run(treeWith(t, map[string]string{"modules/screensaver.nix": "edited\n"}), "3.10.0", ttfxOnly)
 	if err != nil || report.Migrations[0].State != Manual {
 		t.Fatalf("report = %+v, %v", report, err)
 	}
@@ -107,11 +126,13 @@ func TestTheScreensaverMigrationIsManualWithoutTheFiles(t *testing.T) {
 
 func TestAMigratedScreensaverIsTheTemplateOfThisRelease(t *testing.T) {
 	// A deployment with any released screensaver that runs every screensaver
-	// migration ends up with the template's own files. When the template
-	// changes again, this test points at the need for a new migration.
+	// migration ends up like the template: no screensaver files and no
+	// import of them.
 	for _, directory := range []string{"2026-10-ttfx-screensaver-3.5.0", "2026-10-ttfx-screensaver"} {
 		t.Run(directory, func(t *testing.T) {
-			root := treeWith(t, screensaverForm(t, directory))
+			files := screensaverForm(t, directory)
+			files["modules/shared.nix"] = releasedShared
+			root := treeWith(t, files)
 			report, err := Run(root, "3.10.0", registryWith("screensaver"))
 			if err != nil {
 				t.Fatal(err)
@@ -122,16 +143,19 @@ func TestAMigratedScreensaverIsTheTemplateOfThisRelease(t *testing.T) {
 				}
 			}
 			for _, file := range []string{"modules/screensaver.nix", "scripts/cmd-screensaver.sh", "scripts/screensaver-monitor.sh"} {
-				template, err := os.ReadFile(filepath.Join("..", "..", "templates", "site", file))
-				if os.IsNotExist(err) {
-					t.Skip("the template is not in this source tree (the package build)")
+				if _, err := os.Stat(filepath.Join(root, file)); !os.IsNotExist(err) {
+					t.Errorf("%s is still in the migrated deployment: %v", file, err)
 				}
-				if err != nil {
-					t.Fatal(err)
-				}
-				if read(t, root, file) != string(template) {
-					t.Errorf("a migrated templates/site/%s differs from the template: add a migration", file)
-				}
+			}
+			template, err := os.ReadFile(filepath.Join("..", "..", "templates", "site", "modules", "shared.nix"))
+			if os.IsNotExist(err) {
+				t.Skip("the template is not in this source tree (the package build)")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if read(t, root, "modules/shared.nix") != string(template) {
+				t.Error("a migrated modules/shared.nix differs from the template: add a migration")
 			}
 		})
 	}
@@ -164,7 +188,7 @@ func TestALaboratoryCreatedWithTheLaterScreensaverNeedsNoChange(t *testing.T) {
 	}
 	// The later forms are what those migrations make of the frozen files.
 	root := treeWith(t, current)
-	if report, err := Run(root, "3.10.0", registryWith("screensaver")); err != nil || len(report.Migrations) != 3 {
+	if report, err := Run(root, "3.10.0", earlierScreensaver); err != nil || len(report.Migrations) != 3 {
 		t.Fatalf("report = %+v, %v", report, err)
 	}
 	current["scripts/cmd-screensaver.sh"] = read(t, root, "scripts/cmd-screensaver.sh")
@@ -176,7 +200,7 @@ func TestALaboratoryCreatedWithTheLaterScreensaverNeedsNoChange(t *testing.T) {
 		t.Fatal("the idle inhibitor migration did not apply")
 	}
 	root = treeWith(t, current)
-	report, err := Run(root, "3.10.0", registryWith("screensaver"))
+	report, err := Run(root, "3.10.0", earlierScreensaver)
 	if err != nil || len(report.Migrations) != 3 {
 		t.Fatalf("report = %+v, %v", report, err)
 	}
@@ -185,7 +209,7 @@ func TestALaboratoryCreatedWithTheLaterScreensaverNeedsNoChange(t *testing.T) {
 			t.Fatalf("%s = %s: %s", entry.ID, entry.State, entry.Detail)
 		}
 	}
-	if report, err = Run(root, "3.10.0", registryWith("screensaver")); err != nil || len(report.Migrations) != 0 {
+	if report, err = Run(root, "3.10.0", earlierScreensaver); err != nil || len(report.Migrations) != 0 {
 		t.Fatalf("recorded migrations ran again: %+v, %v", report, err)
 	}
 }

@@ -321,7 +321,8 @@ profile_state() {
         && pkgs.lib.hasInfix "gnome-extensions enable \"dash-to-dock@micxgx.gmail.com\""
           config.environment.etc."lab/gnome-user-setup.sh".text;
       docker = config.virtualisation.docker.rootless.enable;
-      screensaver = config.systemd.user.services ? lab-screensaver;
+      screensaver = config.systemd.user.services ? nixorium-screensaver
+        && config.systemd.user.services.nixorium-screensaver.enable;
       vscodeHome = builtins.match ".*vscjava[.]vscode-java-pack.*"
         config.system.activationScripts.siteHomeProfile.text != null;
       # The core repairs ownership first; the site profile then writes into

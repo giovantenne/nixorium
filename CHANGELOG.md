@@ -6,6 +6,27 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The lab screensaver is now part of Nixorium instead of the deployment. The
+  deployment migration `2026-11-screensaver-in-core` removes
+  `modules/screensaver.nix`, `scripts/cmd-screensaver.sh` and
+  `scripts/screensaver-monitor.sh` and their import from
+  `modules/shared.nix`, and the unused `scripts/launch-screensaver.sh` of
+  laboratories created with 3.5.0 or older. The screensaver still animates
+  the deployment's `assets/logo.txt` and still starts on the computers whose
+  software includes Ghostty and the text effects. If you edited one of those
+  files, the review shows a manual change: your screensaver keeps running and
+  Nixorium's stays off until you remove them.
+
+### Fixed
+
+- The lab screensaver no longer closes as soon as it starts. Caffeine, added
+  in 3.12.0, switched itself on whenever a window was fullscreen, and the
+  screensaver is a fullscreen window that stops while the screen is kept on.
+  Now a fullscreen window no longer switches Caffeine on; the toggle, and an
+  application that asks GNOME to keep the screen on, still do.
+
 ## [3.12.0] - 2026-10-30
 
 From 3.11.0, Update Nixorium, then Apply to controller and Update computers as

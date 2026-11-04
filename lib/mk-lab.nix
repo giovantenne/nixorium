@@ -237,6 +237,7 @@ let
     (upstreamRoot + "/modules/filesystems.nix")
     (upstreamRoot + "/modules/home-reset.nix")
     (upstreamRoot + "/modules/classroom-view.nix")
+    (upstreamRoot + "/modules/screensaver.nix")
     (upstreamRoot + "/modules/management.nix")
     (upstreamRoot + "/modules/telemetry.nix")
     (upstreamRoot + "/modules/assistant.nix")

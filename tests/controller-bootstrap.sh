@@ -483,15 +483,15 @@ if grep -R -F -e 'admin-secret' -e 'teacher-secret' -e 'student-secret' \
   exit 1
 fi
 test -f "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.lock"
-# New laboratories keep the template's executable bits on disk and in Git.
-template_executables=0
+# New laboratories keep the template's file modes on disk and in Git. The
+# template has no executable file: nix flake init drops the bit, so one added
+# later needs install.sh to restore it, and this check fails until it does.
 while IFS= read -r -d '' template_file; do
   relative="${template_file#"${BOOTSTRAP_TEMPLATE}/"}"
   deployed="${TARGET_ROOT}/home/admin/nixorium-deployment/${relative}"
   [[ -f "$deployed" ]] || continue
   index_mode="$(git -C "${TARGET_ROOT}/home/admin/nixorium-deployment" ls-files -s -- "$relative" | cut -d' ' -f1)"
   if [[ -x "$template_file" ]]; then
-    template_executables=$((template_executables + 1))
     if [[ ! -x "$deployed" || "$index_mode" != 100755 ]]; then
       echo "template script lost its executable bit: ${relative} (index ${index_mode})" >&2
       exit 1
@@ -501,6 +501,5 @@ while IFS= read -r -d '' template_file; do
     exit 1
   fi
 done < <(find "$BOOTSTRAP_TEMPLATE" -type f -print0)
-test "$template_executables" -ge 2
 
 echo "Controller bootstrap tests passed."

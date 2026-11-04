@@ -214,6 +214,28 @@ func (tree Tree) Write(name string, content []byte, mode fs.FileMode) error {
 	return os.Chmod(path, mode)
 }
 
+// removeFile is os.Remove; tests replace it to make a removal fail.
+var removeFile = os.Remove
+
+// Remove deletes a regular file; a missing one is already removed.
+func (tree Tree) Remove(name string) error {
+	path, err := tree.path(name)
+	if err != nil {
+		return err
+	}
+	info, err := os.Lstat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", name)
+	}
+	return removeFile(path)
+}
+
 // ReplaceExact replaces one exact, known text of file: applied when it is
 // there exactly once, done when the new text is already there (for a
 // deletion: when the old text is gone), manual otherwise (the file was changed by hand).

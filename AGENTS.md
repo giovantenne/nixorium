@@ -102,7 +102,7 @@ templates/site/            # Private deployment repository template
   software-catalog.nix     # Deployment-owned suggestions for the software UI
   assets/                  # Site branding, MIME and editor defaults
   modules/                 # Workstation, development and home-profile policy
-  scripts/                 # Site screensaver implementation
+  scripts/                 # Software-profile helper used by the installer
 skills/nixorium-developer/ # Public upstream development and release workflow
 skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 docs/management-architecture.md # Accepted management-system target design
@@ -1007,7 +1007,9 @@ that release's notes, so a release is not finished until the site follows it.
 - The `nixorium-staff` group (declared in `modules/users.nix`) lets `admin` and the teacher read the student's home snapshots.
 - `modules/common.nix` is only the composition point for core desktop, firewall,
   time, power, SSH and nix-ld modules. Packages, shell preferences, development tools,
-  screensaver behavior, and application policy belong in the deployment.
+  and application policy belong in the deployment. The lab screensaver is core
+  (`modules/screensaver.nix`, scripts under `scripts/`); the deployment supplies
+  only its logo (`assets/logo.txt`).
   The one exception, by owner decision, is base software:
   `internal/domain/base-software.json` (Chromium, Ghostty, Git, the
   screensaver's terminaltexteffects, whose presence switches the screensaver on;

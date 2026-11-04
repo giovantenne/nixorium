@@ -118,17 +118,20 @@ suggestions in `software-catalog.nix`, desktop and shell policy under
 
 `mkLab` passes each host's effective managed package IDs to downstream modules
 as `hostSoftwarePackages`. The template uses this list to enable Docker, npm
-setup, application favorites, shortcuts, browser policy, VS Code extensions,
-and the site screensaver only when their packages apply to that host. Every
-built-in profile, including Essential, declares the Ghostty and TTE packages
-that switch the screensaver on; its effects come from `ttfx` (`pkgs/ttfx.nix`,
-until nixpkgs ships it) at 30 frames per second. After 30 idle minutes GNOME
+setup, application favorites, shortcuts, browser policy and VS Code extensions
+only when their packages apply to that host; the core lab screensaver
+(`modules/screensaver.nix`) uses it the same way. Every built-in profile,
+including Essential, declares the Ghostty and TTE packages that switch the
+screensaver on. After 5 idle minutes a fullscreen Ghostty animates the
+deployment's `assets/logo.txt` with `ttfx` effects (`pkgs/ttfx.nix`, until
+nixpkgs ships it) at 60 frames per second. After 30 idle minutes GNOME
 blanks and switches off the screen and the screensaver stops; the session is
 never locked and the computer does not sleep. Every user has a **Caffeine**
 toggle in the quick settings (the Caffeine GNOME Shell extension, enabled by
 `modules/stay-active.nix`): while it is on, or while an application asks GNOME
 to keep the screen on, neither the screensaver nor the blank screen starts.
-It is off at every sign-in.
+It is off at every sign-in. Caffeine's own rule that switches it on while a
+window is fullscreen is off, because the screensaver is such a window.
 Removing a declaration therefore does not leave an upstream launcher or service
 behind.
 

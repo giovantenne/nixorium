@@ -409,8 +409,10 @@ nix --extra-experimental-features 'nix-command flakes' \
 
 `stay-active-vm` boots the same kind of GNOME login with the Caffeine
 extension: it is enabled and off at sign-in, turning it on holds a session idle
-inhibitor, and the lab screensaver's own check (taken from the template
-script) sees it; turning it off releases it.
+inhibitor, and the lab screensaver's own check (taken from
+`scripts/screensaver-monitor.sh`) sees it; turning it off releases it. A
+window that opens fullscreen, as the screensaver does, holds no inhibitor:
+Caffeine's fullscreen rule is off.
 
 `staff-home-writes-vm` runs the root activation steps that write into the
 administrator's and teacher's homes (core users, home-reset and desktop

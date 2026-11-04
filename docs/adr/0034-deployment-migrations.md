@@ -34,8 +34,9 @@ fixed rules, shows it in the review and saves it with the update.
   with the year and month (`2026-10-short-slug`), `Description` is one sentence
   for the administrator, and `Apply` receives a `Tree` (the deployment copy)
   and returns an outcome. A migration can read, change or create regular files
-  through `Tree.Read` and `Tree.Write`. Removing a file is not implemented
-  yet: it needs a `Tree` method and a migration that uses it. The helper
+  through `Tree.Read` and `Tree.Write`, and remove them with `Tree.Remove`
+  (`RemoveFiles` deletes released template files together with the text that
+  imports them, as `2026-11-screensaver-in-core` does). The helper
   `ReplaceExact` covers the common case of one exact text (replacing it with
   nothing deletes it), and `ReplaceWholeFiles` the case of template files
   replaced as a whole. The first
