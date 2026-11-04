@@ -9,6 +9,13 @@ in
 {
   environment.systemPackages = [ caffeine ];
 
+  # Caffeine switches itself on while any window is fullscreen. The lab
+  # screensaver is a fullscreen window and stops while the screen is kept on,
+  # so it would stop itself as soon as it appeared. Only the toggle counts.
+  programs.dconf.profiles.user.databases = [{
+    settings."org/gnome/shell/extensions/caffeine".enable-fullscreen = false;
+  }];
+
   # Enabled in every session like the classroom extension: gnome-extensions
   # keeps the other enabled extensions, including those a persistent home
   # already lists. A failed enable is retried after one second.
