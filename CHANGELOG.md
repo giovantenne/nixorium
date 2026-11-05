@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.13.0] - 2026-11-05
+
+From 3.12.0, Update Nixorium, then Apply to controller and Update computers as
+usual; the deployment migrations below run during the update. From 3.11.0 or
+older, first follow the notes of those releases.
+
 ### Added
 
 - Assistant can change part of a file in place: the new `edit_file` tool
@@ -32,6 +38,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   migration `2026-11-profile-helper-in-core` removes the copy every
   laboratory kept and never used afterwards,
   `scripts/configure-software-profile.sh`; one you edited stays.
+- The classroom view has its own dock icon, a smaller Nixorium mark with
+  four green screens, so it is no longer mistaken for Nixorium's.
 
 ### Fixed
 
