@@ -77,6 +77,29 @@
     }
   },
   {
+    "name": "edit_file",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "new_text": {
+          "type": "string"
+        },
+        "old_text": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "old_text",
+        "new_text"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "delete_file",
     "schema": {
       "additionalProperties": false,

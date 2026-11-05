@@ -67,6 +67,8 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		return "Reading " + args.Path
 	case "write_file":
 		return "Writing " + args.Path
+	case "edit_file":
+		return "Editing " + args.Path
 	case "delete_file":
 		return "Removing " + args.Path
 	case "search":
@@ -195,7 +197,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			core = nil
 		}
 	}
-	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1", "settings_v1", "settings_v2", "system_files_v1", "vscode_marketplace_v1"}}
+	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "prefetch_v1", "settings_v1", "settings_v2", "system_files_v1", "vscode_marketplace_v1", "edit_file_v1"}}
 	if discovery, ok := runner.Store.(interface {
 		HomeFilesSupported(context.Context, domain.AssistantConversation) bool
 	}); ok && discovery.HomeFilesSupported(ctx, conversation) {

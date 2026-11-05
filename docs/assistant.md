@@ -175,6 +175,7 @@ The model has fixed tools, with no shell or system-operation tool:
 | `read_file` | UTF-8 text; at most 64 KiB per call |
 | `search` | RE2 regular expression; at most 200 matches, 300 characters per matching line |
 | `write_file` | Candidate text only; 512 KiB per file, 4 MiB and 200 changed paths per conversation; `lab-settings.json` only for the settings under [Laboratory settings](#laboratory-settings) |
+| `edit_file` | Capable controllers only: replaces one exact occurrence of a text in a candidate file, keeping its mode, under the `write_file` limits; refused when the text is missing or repeated, for files with withheld parts and for `lab-settings.json` |
 | `delete_file` | Existing, unprotected candidate files only |
 | `search_packages` | Deployment's pinned package search; at most 50 results, 60-second timeout |
 | `evaluate` | Isolated temporary Git clone; five minutes, bounded output, no import-from-derivation |

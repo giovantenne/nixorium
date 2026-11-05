@@ -6,6 +6,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Assistant can change part of a file in place: the new `edit_file` tool
+  replaces one exact piece of text instead of rewriting the whole file.
+  Small changes give shorter, faster answers, and a long file such as
+  `flake.nix` is no longer copied out in full, where a single mistyped
+  character could break it. Controllers advertise `edit_file_v1`; files with
+  withheld parts and `lab-settings.json` are still written whole.
+
 ### Changed
 
 - The lab screensaver is now part of Nixorium instead of the deployment. The

@@ -24,6 +24,7 @@ func AssistantToolsV1() []AssistantToolDefinition {
 		definition("read_file", map[string]any{"path": str, "offset": integer, "limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 65536}}, []string{"path"}),
 		definition("search", map[string]any{"pattern": str, "path": str}, []string{"pattern"}),
 		definition("write_file", map[string]any{"path": str, "content": str, "executable": boolean}, []string{"path", "content"}),
+		definition("edit_file", map[string]any{"path": str, "old_text": str, "new_text": str}, []string{"path", "old_text", "new_text"}),
 		definition("delete_file", map[string]any{"path": str}, []string{"path"}),
 		definition("search_packages", map[string]any{"query": str}, []string{"query"}),
 		definition("evaluate", map[string]any{}, []string{}),

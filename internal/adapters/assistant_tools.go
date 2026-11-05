@@ -57,6 +57,8 @@ func (AssistantFileTools) Execute(ctx context.Context, workspace *AssistantWorks
 		Offset     int
 		Limit      int
 		Executable bool
+		OldText    string `json:"old_text"`
+		NewText    string `json:"new_text"`
 	}
 	if json.Unmarshal(call.Arguments, &args) != nil {
 		return assistantToolFailure(nil)
@@ -154,6 +156,15 @@ func (AssistantFileTools) Execute(ctx context.Context, workspace *AssistantWorks
 		return assistantToolResult(map[string]any{"ok": true, "matches": matches})
 	case "write_file":
 		if err := workspace.Write(args.Path, args.Content, args.Executable); err != nil {
+			return assistantToolFailure(err)
+		}
+		return assistantToolResult(map[string]any{"ok": true})
+	case "edit_file":
+		if err := workspace.Edit(args.Path, args.OldText, args.NewText); err != nil {
+			var edit *assistantEditError
+			if errors.As(err, &edit) {
+				return assistantToolResult(map[string]any{"ok": false, "error": "invalid_arguments", "message": edit.message})
+			}
 			return assistantToolFailure(err)
 		}
 		return assistantToolResult(map[string]any{"ok": true})

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -581,6 +582,47 @@ func (workspace *AssistantWorkspace) Write(path, content string, executable bool
 	}
 	delete(workspace.deleted, path)
 	return workspace.saveDeleted()
+}
+
+// assistantEditError explains to the model why an edit was not applied.
+type assistantEditError struct{ message string }
+
+func (err *assistantEditError) Error() string { return err.message }
+
+// Edit replaces the single occurrence of oldText in a candidate file and keeps
+// its executability, so a small change does not need the whole file rewritten.
+// It works on the text the read tool shows: a file with withheld parts, and
+// lab-settings.json, which write_file merges, are rewritten instead.
+func (workspace *AssistantWorkspace) Edit(path, oldText, newText string) error {
+	if domain.AssistantSettingsPath(path) {
+		return &assistantEditError{"Use write_file for " + path + "."}
+	}
+	raw, err := workspace.raw(path)
+	if err != nil {
+		return err
+	}
+	visible, err := workspace.Read(path)
+	if err != nil {
+		return err
+	}
+	if string(visible) != string(raw) {
+		return &assistantEditError{"This file has withheld parts and cannot be edited in place; rewrite it with write_file."}
+	}
+	if oldText == "" {
+		return &assistantEditError{"old_text is empty; copy the exact text to replace from the file."}
+	}
+	switch count := strings.Count(string(raw), oldText); count {
+	case 1:
+	case 0:
+		return &assistantEditError{"old_text was not found; read the file again and copy the exact text, including spaces and line breaks."}
+	default:
+		return &assistantEditError{fmt.Sprintf("old_text appears %d times; include more surrounding lines so it appears once.", count)}
+	}
+	executable, written := workspace.modes[path]
+	if !written {
+		executable = workspace.base[path].mode == "100755"
+	}
+	return workspace.Write(path, strings.Replace(string(raw), oldText, newText, 1), executable)
 }
 func (workspace *AssistantWorkspace) Delete(path string) error {
 	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || domain.AssistantReadOnlyPath(path) {

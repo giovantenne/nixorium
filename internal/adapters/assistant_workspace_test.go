@@ -349,3 +349,41 @@ func TestAssistantRejectsFileFolderCollisionsAndAllowsDeletedPaths(t *testing.T)
 		t.Fatal(err)
 	}
 }
+func TestAssistantEditFileReplacesOneExactOccurrence(t *testing.T) {
+	w, _, _ := assistantWorkspaceFixture(t)
+	edit := func(path, oldText, newText string) map[string]any {
+		return assistantFileCall(t, w, "edit_file", map[string]any{"path": path, "old_text": oldText, "new_text": newText})
+	}
+	if result := edit("flake.nix", "outputs = _: {};", "outputs = _: { x = 1; };"); result["ok"] != true {
+		t.Fatal(result)
+	}
+	if content, err := w.Read("flake.nix"); err != nil || string(content) != "{ outputs = _: { x = 1; }; }\n" {
+		t.Fatalf("edited = %q %v", content, err)
+	}
+	if assistantFileCall(t, w, "write_file", map[string]any{"path": "scripts/run.sh", "content": "echo a\necho a\n", "executable": true})["ok"] != true {
+		t.Fatal("write failed")
+	}
+	for _, test := range []struct{ path, oldText, message string }{
+		{"scripts/run.sh", "echo a", "appears 2 times"},
+		{"scripts/run.sh", "echo b", "not found"},
+		{"scripts/run.sh", "", "empty"},
+		{"lab-settings.json", "Synthetic", "Use write_file"},
+		{"secrets-in-text.nix", "sk-example", "withheld parts"},
+	} {
+		result := edit(test.path, test.oldText, "x")
+		if result["ok"] != false || result["error"] != "invalid_arguments" || !strings.Contains(result["message"].(string), test.message) {
+			t.Fatalf("%s %q: %v", test.path, test.oldText, result)
+		}
+	}
+	if result := edit("scripts/run.sh", "echo a\necho a", "echo a\necho b"); result["ok"] != true {
+		t.Fatal(result)
+	}
+	if !w.modes["scripts/run.sh"] {
+		t.Fatal("an edit dropped the executable bit")
+	}
+	for path, code := range map[string]string{"AGENTS.md": "protected_path", "missing.nix": "not_found", "keys/public": "protected_path"} {
+		if result := edit(path, "a", "b"); result["error"] != code {
+			t.Fatalf("%s: %v", path, result)
+		}
+	}
+}
