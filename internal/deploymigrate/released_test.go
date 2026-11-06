@@ -17,6 +17,16 @@ var releasedDrift = map[string]string{
 	"modules/development.nix": "keeps the web server",
 }
 
+// Package builds intentionally omit Git history and most of the template.
+// The checkout CI gate requires both fixtures and must never pass by skipping.
+func missingMigrationFixture(t *testing.T, message string) {
+	t.Helper()
+	if os.Getenv("NIXORIUM_REQUIRE_MIGRATION_FIXTURES") == "1" {
+		t.Fatal(message)
+	}
+	t.Skip(message)
+}
+
 // TestEveryStableReleaseMigratesToThisTemplate runs every migration on the
 // deployment template of each stable release from 3.0.0 and of each later
 // beta (a beta can be installed), as a laboratory created then and never edited has it. Each migration must apply or find its
@@ -24,9 +34,18 @@ var releasedDrift = map[string]string{
 // Git history with tags, so the package build skips it.
 func TestEveryStableReleaseMigratesToThisTemplate(t *testing.T) {
 	repository := filepath.Join("..", "..")
+	if os.Getenv("NIXORIUM_REQUIRE_MIGRATION_FIXTURES") == "1" {
+		out, err := exec.Command("git", "-C", repository, "rev-parse", "--is-shallow-repository").Output()
+		if err != nil || strings.TrimSpace(string(out)) != "false" {
+			t.Fatal("migration checks require a complete Git checkout (fetch-depth: 0)")
+		}
+		if err := exec.Command("git", "-C", repository, "rev-parse", "--verify", "refs/tags/v3.0.0^{commit}").Run(); err != nil {
+			t.Fatal("migration checks require release tags starting at v3.0.0")
+		}
+	}
 	out, err := exec.Command("git", "-C", repository, "tag", "--list", "v3.*").Output()
 	if err != nil || len(strings.TrimSpace(string(out))) == 0 {
-		t.Skip("no Git history with release tags")
+		missingMigrationFixture(t, "no Git history with release tags")
 	}
 	stable := regexp.MustCompile(`^v3\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$`)
 	template := filepath.Join(repository, "templates", "site")
@@ -39,15 +58,22 @@ func TestEveryStableReleaseMigratesToThisTemplate(t *testing.T) {
 			root := t.TempDir()
 			archive := exec.Command("git", "-C", repository, "archive", tag, "templates/site")
 			extract := exec.Command("tar", "-x", "-C", root, "--strip-components=2")
-			extract.Stdin, _ = archive.StdoutPipe()
+			pipe, err := extract.StdinPipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			archive.Stdout = pipe
 			if err := extract.Start(); err != nil {
+				_ = pipe.Close()
 				t.Fatal(err)
 			}
-			if err := archive.Run(); err != nil {
-				t.Fatal(err)
-			}
-			if err := extract.Wait(); err != nil {
-				t.Fatal(err)
+			archiveErr := archive.Run()
+			// Close tar input and reap it even when Git fails to start or exits
+			// unsuccessfully; otherwise the extractor could keep waiting for input.
+			_ = pipe.Close()
+			extractErr := extract.Wait()
+			if archiveErr != nil || extractErr != nil {
+				t.Fatalf("extract %s: git archive: %v; tar: %v", tag, archiveErr, extractErr)
 			}
 			report, err := Run(root, "3.10.0", Registry)
 			if err != nil {
@@ -58,25 +84,8 @@ func TestEveryStableReleaseMigratesToThisTemplate(t *testing.T) {
 					t.Errorf("%s = %s: %s", entry.ID, entry.State, entry.Detail)
 				}
 			}
-			for _, directory := range []string{"modules", "scripts"} {
-				names := map[string]bool{}
-				for _, side := range []string{root, template} {
-					entries, _ := os.ReadDir(filepath.Join(side, directory))
-					for _, entry := range entries {
-						names[entry.Name()] = true
-					}
-				}
-				for name := range names {
-					file := directory + "/" + name
-					migrated, migratedErr := os.ReadFile(filepath.Join(root, file))
-					current, currentErr := os.ReadFile(filepath.Join(template, file))
-					if _, allowed := releasedDrift[file]; allowed {
-						continue
-					}
-					if migratedErr != nil || currentErr != nil || string(migrated) != string(current) {
-						t.Errorf("%s differs from this release's template after migrating: add or widen a migration", file)
-					}
-				}
+			if err := compareMigratedTemplate(root, template); err != nil {
+				t.Error(err)
 			}
 		})
 	}
@@ -92,7 +101,7 @@ func TestEveryStableReleaseMigratesToThisTemplate(t *testing.T) {
 func TestTheTemplateOfThisReleaseNeedsNoMigration(t *testing.T) {
 	template := filepath.Join("..", "..", "templates", "site")
 	if _, err := os.Stat(filepath.Join(template, "modules", "workstation.nix")); err != nil {
-		t.Skip("the template is not in this source tree (the package build)")
+		missingMigrationFixture(t, "the template is not in this source tree (the package build)")
 	}
 	root := t.TempDir()
 	if err := os.CopyFS(root, os.DirFS(template)); err != nil {

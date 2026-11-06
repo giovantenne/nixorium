@@ -108,6 +108,34 @@ ISO acceptance run therefore remains a required separate checkpoint for that
 cross-machine user journey; it must not be represented as covered by the
 simulated remote-client VM.
 
+## Deployment migration compatibility
+
+The reusable `.github/workflows/migrations.yml` job runs on pull requests and
+master pushes, and inside full validation for releases, nightly runs and manual
+checks. It uses a complete checkout (`fetch-depth: 0`) with release tags and
+the locked Go toolchain:
+
+```sh
+NIXORIUM_REQUIRE_MIGRATION_FIXTURES=1 ./scripts/test-go.sh ./internal/deploymigrate -count=1 -v
+```
+
+This gate requires Git history, the `v3.0.0` baseline tag and the current site
+template. Missing fixtures fail instead of skipping. It checks every available
+stable/beta release template in the supported range, comparing the complete
+`modules/` and `scripts/` trees recursively with only the documented drift
+exceptions. Missing modules, unreadable files and symbolic links fail the
+comparison. The scripts directory may be absent after all scripts move into
+core; any remaining script on the other side still counts as a difference.
+The gate also verifies that the current template needs no migration. The
+dedicated run disables test caching because the set of release tags is part
+of its input.
+
+The packaged Go tests remain unchanged in scope (`go test ./...`), but their
+filtered source intentionally omits Git history and most template files. They
+may skip these two checkout-only tests; a successful package build alone is
+not migration compatibility evidence. Release publication waits for the
+migration job as well as the full validation shards.
+
 ## Shell and error-handling lint
 
 The default gate runs `scripts/lint.sh` before its Nix builds, in the `lint-shell`

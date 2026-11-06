@@ -14,6 +14,9 @@ permissions:
   contents: read
 
 jobs:
+  migrations:
+    uses: ./.github/workflows/migrations.yml
+
   plan:
     name: Plan validation shards
     runs-on: ubuntu-latest

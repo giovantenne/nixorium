@@ -69,6 +69,12 @@ outputs with import-from-derivation disabled. The release-tag workflow
 calls `full-validation.yml`, which runs `--full` with KVM as parallel
 `NIXORIUM_FULL_SHARD` jobs (each check group plus `systems`, 240 minutes each)
 before publication; it also runs nightly on `master` and on demand.
+Both ordinary CI and full validation also call `migrations.yml`: a complete
+checkout with release tags runs the migration package with
+`NIXORIUM_REQUIRE_MIGRATION_FIXTURES=1`, so missing history or template fixtures
+fail instead of skipping. See the validation guide's migration compatibility
+section for the local command. Packaged tests alone do not cover this boundary.
+
 Full local preflight is optional for releases; successful full CI on the tagged
 commit is mandatory. Report local and remote evidence separately.
 

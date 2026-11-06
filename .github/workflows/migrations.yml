@@ -1,0 +1,30 @@
+name: Deployment migrations
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  migrations:
+    name: Check current and released deployment templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source and every release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test migrations against the complete checkout
+        run: ./scripts/test-go.sh ./internal/deploymigrate -count=1 -v
+        env:
+          NIXORIUM_REQUIRE_MIGRATION_FIXTURES: "1"
