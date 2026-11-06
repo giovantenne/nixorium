@@ -34,7 +34,8 @@ Extend `mkLab` instead of requiring downstream copies of built-in modules.
 Reject unknown configuration rather than ignoring it. Preserve standalone
 outputs unless a deliberate breaking release removes them.
 
-Read [references/architecture.md](references/architecture.md) before changing
+Read [references/code-style.md](references/code-style.md) before editing Nix or
+shell code. Read [references/architecture.md](references/architecture.md) before changing
 the public API, modules, assets, netboot, or template. Read
 [references/validation.md](references/validation.md) for every implementation
 change. Read [references/git-workflow.md](references/git-workflow.md) before

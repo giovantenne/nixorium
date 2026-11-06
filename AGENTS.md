@@ -35,85 +35,7 @@ CHANGELOG rule: describe the controller feature (tool, what it reads, refuses, r
 
 ## Project Structure
 
-```
-.github/workflows/validate.yml # Go build/tests plus evaluation-only source/template CI
-.github/workflows/security.yml # CodeQL plus pinned Go vulnerability/static analysis
-.github/workflows/full-validation.yml # Parallel full gate: release, nightly and manual
-.github/workflows/release.yml # Metadata check; full validation gates GitHub Release publication
-install.sh                  # Public entrypoint for controller bootstrap
-flake.nix                  # Public Flake API plus backward-compatible example deployment
-flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko)
-VERSION                    # Canonical Semantic Version
-CHANGELOG.md               # Curated release notes
-LICENSE                    # MIT license
-DISCLAIMER.md              # Operational responsibility and risk boundaries
-TRADEMARKS.md              # Name and logo usage policy
-SECURITY.md                # Private reporting and coordinated disclosure policy
-lab-config.nix             # Standalone example configuration for this upstream
-disko-uefi.nix             # NixOS wrapper for the shared Disko layout
-lib/
-  disko-layout.nix         # Shared Disko layout function (device + student user)
-  eval-lab-config.nix      # Typed schema and validation for lab-config.nix
-  eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
-  eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
-  eval-workspace-profile.nix # Internal student preference JSON validator
-  mk-lab.nix               # Host, class, netboot, app, and installer output constructor
-setup.sh                   # Installer script for PXE-booted client PCs
-scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
-pkgs/
-  nixorium.nix             # Go management command package
-cmd/nixorium/              # Management CLI entrypoint
-cmd/nixorium-remote-worker/ # Controller-owned USB/SSH operation worker
-cmd/nixorium-demo/         # Developer-only deterministic website demo exporter
-internal/                  # Domain, application, adapter, and presentation layers
-  deploymigrate/           # Changes a release makes to deployment files: registry.go (ADR 0034)
-modules/
-  common.nix               # Composition point and shared system defaults
-  firewall.nix             # Interface-scoped SSH, cache, PXE, and time policy
-  desktop.nix              # Core GNOME session, locale and regional policy
-  power.nix                # Idle and controller sleep policy
-  time.nix                 # Controller serves time (chrony); clients use only the controller
-  nix-ld.nix               # nix-ld loader and common libraries for downloaded Linux binaries
-  ssh.nix                  # SSH client and server policy
-  hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
-  networking.nix           # Hostname + NetworkManager profile nixorium-lab (DHCP + static IP)
-  identity.nix             # Client identity record (/var/lib/nixorium/identity.json)
-  management.nix           # Controller-only management command installation
-  pxe.nix                  # Transactional PXE address state and boot recovery
-  users.nix                # User accounts (admin + teacher + student, nixorium-staff group)
-  cache.nix                # Controller Harmonia service + client cache trust
-  filesystems.nix          # Btrfs subvolume mount declarations
-  home-reset.nix           # Student home directory templating + boot-time reset
-  classroom-view.nix       # Classroom view agent and Shell extension on clients
-scripts/
-  release.sh               # Validates, tags, and publishes a release
-  install-controller.sh    # Live USB bootstrap installer for controller with disk selection
-  lib/lab-meta.sh          # Shared helper: loads labMeta from the flake for shell scripts
-  lib/ui.sh                # Terminal presentation helpers for setup.sh (install scripts carry guarded copies)
-  create-home-template.sh  # Builds clean home directory template
-  validate.sh              # Tiered upstream validation entry point
-  security-check.sh        # Pinned staticcheck and govulncheck entry point
-  lint.sh                  # Pinned ShellCheck, gofmt and errcheck entry point
-  apply-controller.sh      # Body of nixorium-apply-controller (filled in by modules/management.nix)
-  prepare-pxe.sh           # Body of nixorium-prepare-pxe (filled in by modules/management.nix)
-assets/
-  empty-*                  # Neutral fallbacks for optional deployment assets
-templates/site/            # Private deployment repository template
-  software-catalog.nix     # Deployment-owned suggestions for the software UI
-  assets/                  # Site branding, MIME and editor defaults
-  modules/                 # Workstation, development and home-profile policy
-skills/nixorium-developer/ # Public upstream development and release workflow
-skills/nixorium-maintainer/ # Private laboratory maintenance workflow
-docs/management-architecture.md # Accepted management-system target design
-docs/development-validation.md # Validation pyramid and gate-selection guide
-docs/troubleshooting.md         # Task-oriented recovery and backup guide
-docs/system-reference.md        # Workstation defaults and mkLab extension reference
-docs/adr/                   # Product architecture decision records
-```
-
-Generated locally during setup and committed in the private deployment repo:
-- `keys/cache-public-key`
-- `keys/admin-ssh.pub`
+See the [source map](docs/source-map.md) for file ownership and entry points.
 
 ## Development and validation
 
@@ -177,6 +99,11 @@ Lab operation commands belong in the
 [administrator guide](templates/site/README.md) and the
 [maintainer skill](skills/nixorium-maintainer/SKILL.md), not in the upstream
 development workflow. Do not run a deployment merely to validate upstream code.
+
+The separate migration CI gate runs against a complete checkout with release
+tags and the current template, requiring fixtures rather than skipping tests.
+It also gates full validation and release publication. See
+[migration compatibility](docs/development-validation.md#deployment-migration-compatibility).
 
 ## Keep agent guidance current
 
@@ -302,6 +229,8 @@ that release's notes, so a release is not finished until the site follows it.
 
 ## Architecture Notes
 
+### Bootstrap and package inputs
+
 - Public controller bootstrap must resolve the selected branch/tag once to a
   full Git revision. Its template, installer, Disko layout, and initial lock
   must use that revision; keep the human-selected channel in the generated
@@ -335,6 +264,8 @@ that release's notes, so a release is not finished until the site follows it.
   session) as the supported bootstrap environments, and derive the console from
   the XKB layout (`console.useXkbConfig`) on installed systems and netboot;
   see ADR 0015.
+
+### Host composition and installation
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `groupModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
@@ -401,6 +332,9 @@ that release's notes, so a release is not finished until the site follows it.
   Never put host-resolved values (interface, address, software) in global
   arguments; `specialArgsForHost` and `specialArgsForClass` resolve them per system.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
+
+### Settings and software
+
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - Guided software changes use `software catalog`, `software plan`, and
   `software apply`. Optional deployment-owned profiles use `software presets`
@@ -450,6 +384,9 @@ that release's notes, so a release is not finished until the site follows it.
   hooks/smoke tests. Keep lock/hash declarations reviewable and artifacts rooted
   across SAVE/resume; boot-time baseline restoration must remain unprivileged,
   after home-reset and before login, with no online install or collision overwrite.
+
+### Presentation and evaluated observations
+
 - Administrative TUI startup must not evaluate Nix outputs, including labMeta:
   older pins can make even metadata evaluate every host. Observe
   local setup/Git/service state only, without claiming readiness. Load evaluated
@@ -501,6 +438,9 @@ that release's notes, so a release is not finished until the site follows it.
   exact selected identities, and always returns to fresh planning and explicit
   deployment confirmation. Never clear reservations or infer verified identity
   from a completion label in presentation code.
+
+### Client operations and recovery
+
 - The netboot image starts the guided client installer once on tty1 through
   the autologin shell; it remains interactive (identity, `ERASE`, reboot) and
   is never unattended. Both installers use `ERASE` and ask again after a
@@ -542,6 +482,9 @@ that release's notes, so a release is not finished until the site follows it.
   deployment mode 0700, exclude the student, reject repository/address/command
   selection over IPC, and never expose administrative TUI callbacks there.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
+
+### Assistant, telemetry and support
+
 - `lab.assistant` is on unless explicitly `false`; settings saves preserve it; only an enabled controller installs `/etc/nixorium/assistant.json` and the private state directory; service/subscription URL overrides are staging/test only.
 - Activation, consent (text version 4) and conversation saving are explicit, separate, local choices; saving is on by default but still needs saved consent; an older consent text is asked once more; account checks send no draft or files; reports need their own whole-chat disclosure and confirmation.
 - The laboratory token authenticates requests and never enters bodies, transcripts or uploads; uploads carry only redacted saved transcripts through typed callbacks, fail silently and never block a turn.
@@ -573,6 +516,9 @@ that release's notes, so a release is not finished until the site follows it.
   The administrator TUI uses typed preview/export callbacks, cancels pending
   collection, ignores stale replies and exports only the displayed snapshot.
   Keep the entire payload scrollable and the feature out of classroom mode.
+
+### Trust, backups and Git
+
 - Reviewed client host-key rotation uses only the existing managed SSH trust
   store, preserves unrelated entries and an atomic backup, and requires physical
   fingerprint verification after deliberate reinstall. Recheck inventory, offered
@@ -650,6 +596,9 @@ that release's notes, so a release is not finished until the site follows it.
   refusal with its catalogued next step and what Enter does, and never decides
   what can be undone. Enter on a saved undo chains to the ordinary controller
   review through `continueSavedConfiguration`, like a settings save.
+
+### Updates and configuration contracts
+
 - Upstream update planning must preserve the configured source identity, accept
   only the exact `master` branch or an explicit SemVer tag, generate the
   candidate lock outside the checkout from the proposed `flake.nix` (Nix
@@ -722,6 +671,9 @@ that release's notes, so a release is not finished until the site follows it.
   wired device, and a device missing on a reachable client unless exactly that
   computer is acknowledged; unreachable clients are listed, never blocking.
   `config apply` does not run the preflight.
+
+### Workspace and student homes
+
 - `lib/eval-workspace-profile.nix` accepts raw JSON text so duplicate keys are
   rejected before they can disappear in `builtins.fromJSON`. Keep it aligned
   with `internal/domain/workspace.go` through `tests/workspace-validation-cases.json`.
@@ -855,6 +807,9 @@ that release's notes, so a release is not finished until the site follows it.
   no automatic retry, and `X-OnlyManualStart` so first-time installation during
   a rebuild also waits for boot. Keep student ownership repair, template writes
   and login preference changes out of this path; staff homes keep theirs.
+
+### System services and classroom controls
+
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
@@ -1025,95 +980,11 @@ that release's notes, so a release is not finished until the site follows it.
   validate extension metadata and GSettings, and preserve the targeted one-time
   migration rather than resetting unrelated user preferences.
 
-## Nix Code Style
+## Code style
 
-### Formatting
-- **2-space indentation**, no tabs
-- No block comments (`/* ... */`); use single-line `#` comments with a space after `#`
-- Place comments on the line above the code they describe
-- No trailing commas in lists or attribute sets (Nix does not use them)
-
-### Module Signatures
-Use only the arguments the module actually needs:
-```nix
-{ ... }:            # When no module args are used
-{ config, pkgs, lib, ... }:   # When config/pkgs/lib are needed
-{ labSettings, ... }:          # When consuming specialArgs
-```
-
-### Attribute Sets
-- Dot-path notation for one-liners: `boot.loader.grub.enable = true;`
-- Nested set notation for grouped settings:
-  ```nix
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    pulse.enable = true;
-  };
-  ```
-- Mixing both styles within a file is acceptable and expected.
-
-### Lists
-- Short lists on one line: `[ "nix-command" "flakes" ]`
-- Long lists with one item per line:
-  ```nix
-  environment.systemPackages = with pkgs; [
-    wget
-    curl
-    bat
-  ];
-  ```
-
-### `with` Usage
-- Use `with pkgs;` **only** for `environment.systemPackages` (the long package list)
-- Everywhere else, use explicit `pkgs.packageName` references
-- Always use store-qualified paths for executables: `"${pkgs.bash}/bin/bash"`
-
-### `inherit` Usage
-- One binding per `inherit` statement, each on its own line:
-  ```nix
-  inherit name;
-  inherit system;
-  ```
-
-### `let...in` Blocks
-- Place between the function signature and the attribute set body
-- Only use when there are repeated values or complex expressions to extract
-
-### String Handling
-- Multi-line strings: `''...''` (Nix indented strings)
-- Interpolation: `${...}` inside strings
-- Explicit `toString` for int-to-string conversion: `toString n`
-
-### Naming Conventions
-| Scope            | Convention       | Examples                                    |
-|------------------|------------------|---------------------------------------------|
-| Nix variables    | camelCase        | `masterIp`, `mkHost`, `labSettings`         |
-| File names       | kebab-case       | `home-reset.nix`, `install-controller.sh`   |
-| Shell variables  | UPPER_SNAKE_CASE | `PC_NUMBER`, `TEMPLATE_DIR`                 |
-| NixOS options    | Standard dotted  | `services.openssh.enable`                   |
-| Helper functions | `mk` prefix      | `mkHost`, `mkLab`                           |
-
-### Imports
-- Flake uses root-relative: `./modules/networking.nix`, `./modules/cache.nix`
-- Script references from modules: `../scripts/create-home-template.sh`
-
-## Shell Script Style
-
-All shell scripts must follow these conventions:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-```
-
-- Shebang: always `#!/usr/bin/env bash` (not `/bin/bash`)
-- Safety: always `set -euo pipefail` as the first non-comment line
-- Variables: `UPPER_SNAKE_CASE`, always double-quoted (`"$VAR"`, `"${VAR}"`)
-- Positional args: assign to named variables immediately (`TEMPLATE_DIR="$1"`)
-- Errors: print to stderr with `>&2` (`echo "Error: ..." >&2`)
-- Cleanup: use `trap '...' EXIT` for temporary file cleanup
-- Validation: check argument count and format before proceeding
+Before editing Nix or shell code, read the
+[Nix and shell conventions](skills/nixorium-developer/references/code-style.md).
+Use gofmt for changed Go files; do not reformat unrelated files.
 
 ## Security
 
