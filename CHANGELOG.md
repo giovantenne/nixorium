@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.13.1] - 2026-11-09
+
+From 3.13.0, Update Nixorium, then Apply to controller. A controller blocked
+by an interrupted client update can do both; then review the interrupted
+update again and confirm it. From 3.12.0 or older, first follow the notes of
+those releases.
+
 ### Fixed
 
 - Confirming the review of an interrupted client update no longer refuses
