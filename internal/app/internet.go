@@ -74,17 +74,32 @@ func (m *InternetManager) Plan(ctx context.Context, repository, requested string
 	}
 	eligible := 0
 	updating := []string{}
-	for _, host := range shutdownHostMeta(selected) {
+	hosts := shutdownHostMeta(selected)
+	observe := []domain.HostMeta{}
+	for _, host := range hosts {
 		if host.Name == meta.Controller.Name {
 			return fail("The controller cannot be selected.")
 		}
+		if _, found := blocked[host.Name]; !found {
+			observe = append(observe, host)
+		}
+	}
+	// Ask every computer at once: a switched-off one waits for the SSH
+	// connection timeout, which must not add up across the classroom.
+	observations := make([]domain.InternetObservation, len(observe))
+	eachHost(observe, lockParallel, func(index int, host domain.HostMeta) {
+		observations[index] = m.source.ObserveInternet(ctx, host)
+	})
+	next := 0
+	for _, host := range hosts {
 		if _, found := blocked[host.Name]; found {
 			// Named in an unfinished client update: not touched, not observed.
 			p.Targets = append(p.Targets, domain.InternetTarget{HostMeta: host, Eligible: false})
 			updating = append(updating, host.Name)
 			continue
 		}
-		observed := m.source.ObserveInternet(ctx, host)
+		observed := observations[next]
+		next++
 		ok := observed.Valid() && (observed.State != "unknown" || action == domain.InternetUnblock)
 		if ok {
 			eligible++
@@ -141,8 +156,15 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 			return fail("Client inventory changed; review again.")
 		}
 	}
-	confirmed := 0
-	for _, t := range p.Targets {
+	// Each computer is changed and checked on its own, all at once, so the
+	// computers that do not answer cost one timeout in total, not one each.
+	targets := make([]domain.HostMeta, len(p.Targets))
+	for index, t := range p.Targets {
+		targets[index] = t.HostMeta
+	}
+	outcomes := make([]domain.InternetOutcome, len(p.Targets))
+	eachHost(targets, lockParallel, func(index int, _ domain.HostMeta) {
+		t := p.Targets[index]
 		o := domain.InternetOutcome{Name: t.Name, State: "not-sent", Detail: "Unavailable in the reviewed plan; no request queued."}
 		if reason, found := blocked[t.Name]; found {
 			o.Detail = "Not changed: " + reason + "."
@@ -164,7 +186,6 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 					if p.Action == domain.InternetBlock {
 						o.Detail = "Internet is blocked until you enable it again or the computer restarts."
 					}
-					confirmed++
 				} else {
 					o.State = "unconfirmed"
 					o.Detail = "State could not be confirmed. Refresh and review before retrying."
@@ -173,6 +194,13 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 					}
 				}
 			}
+		}
+		outcomes[index] = o
+	})
+	confirmed := 0
+	for _, o := range outcomes {
+		if o.State == "verified" {
+			confirmed++
 		}
 		r.Targets = append(r.Targets, o)
 	}

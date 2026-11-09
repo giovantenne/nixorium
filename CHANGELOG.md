@@ -20,6 +20,10 @@ those releases.
   is unchanged. The check compared the memory addresses of the computers'
   exit codes instead of their values, so it failed whenever a computer had
   finished.
+- Blocking or enabling Internet on many computers is no longer slow when some
+  of them are switched off. The review and the change now ask up to eight
+  computers at a time instead of one after the other, so the computers that
+  do not answer no longer each add a connection timeout.
 
 ## [3.13.0] - 2026-11-05
 

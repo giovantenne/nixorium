@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,12 +18,28 @@ type fakeInternetSource struct {
 	changed   []string
 	changeErr error
 	loseReply bool
+	// The manager asks the computers at the same time.
+	mu       sync.Mutex
+	delay    time.Duration
+	inFlight int
+	peak     int
 }
 
 func (s *fakeInternetSource) ObserveInternet(_ context.Context, h domain.HostMeta) domain.InternetObservation {
+	s.mu.Lock()
+	s.inFlight++
+	s.peak = max(s.peak, s.inFlight)
+	delay := s.delay
+	s.mu.Unlock()
+	time.Sleep(delay)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inFlight--
 	return s.states[h.Name]
 }
 func (s *fakeInternetSource) ChangeInternet(_ context.Context, h domain.HostMeta, a domain.InternetAction, boot string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.changed = append(s.changed, h.Name)
 	if s.changeErr == nil || s.loseReply {
 		o := s.states[h.Name]
@@ -46,6 +63,22 @@ func TestInternetPartialNeverQueuesOfflineClients(t *testing.T) {
 	}
 	r := m.Apply(context.Background(), p, p.ReviewToken)
 	if r.State != "partial" || len(s.changed) != 1 || s.changed[0] != "pc01" || r.Targets[0].State != "verified" || r.Targets[1].State != "not-sent" {
+		t.Fatalf("report: %+v", r)
+	}
+}
+func TestInternetAsksSwitchedOffComputersAtTheSameTime(t *testing.T) {
+	s, m := internetFixture()
+	// Each answer takes as long as an SSH connection timeout would.
+	s.delay = 200 * time.Millisecond
+	p := m.Plan(context.Background(), ".", "@lab", domain.InternetBlock)
+	if p.HasErrors() || len(p.Targets) != 3 || p.Targets[0].Name != "pc01" || !p.Targets[0].Eligible || p.Targets[1].Eligible || p.Targets[2].Eligible {
+		t.Fatalf("plan: %+v", p)
+	}
+	if s.peak != len(p.Targets) {
+		t.Fatalf("the plan asked %d computers at once, want %d", s.peak, len(p.Targets))
+	}
+	r := m.Apply(context.Background(), p, p.ReviewToken)
+	if r.State != "partial" || len(r.Targets) != 3 || r.Targets[0].Name != "pc01" || r.Targets[0].State != "verified" || r.Targets[1].State != "not-sent" {
 		t.Fatalf("report: %+v", r)
 	}
 }
