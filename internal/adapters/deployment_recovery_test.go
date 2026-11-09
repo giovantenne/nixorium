@@ -47,6 +47,10 @@ func TestArchivePendingDeploymentMovesOnlyTheReviewedRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	record := domain.PendingDeployment{SchemaVersion: 1, Repository: "/srv/lab", Revision: strings.Repeat("b", 40), Targets: []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}}, StartedAt: time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC), ControllerPID: 99}
+	// A finished computer carries its exit code as a pointer: each read of
+	// the unchanged file must still compare equal to the reviewed one.
+	exitCode := 0
+	record.Activations = []domain.PendingActivation{{Name: "pc01", State: domain.ActivationFinished, ActivationID: "a1", Result: "switched", ExitCode: &exitCode}}
 	data, _ := json.Marshal(record)
 	if err := os.WriteFile(filepath.Join(directory, deploymentPendingName), data, 0600); err != nil {
 		t.Fatal(err)

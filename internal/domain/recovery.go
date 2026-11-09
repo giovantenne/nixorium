@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // OperationHolder describes the operation holding the shared lock, when it
 // could be confirmed against a live process.
@@ -104,6 +107,15 @@ type PendingActivation struct {
 	ActivationID string `json:"activationId,omitempty"`
 	Result       string `json:"result,omitempty"`
 	ExitCode     *int   `json:"exitCode,omitempty"`
+}
+
+// SameRecord tells whether two reads of a pending record hold the same
+// values. Exit codes are pointers, so formatted structures would differ by
+// address between reads of an unchanged file; compare the JSON form instead.
+func (record PendingDeployment) SameRecord(other PendingDeployment) bool {
+	left, errLeft := json.Marshal(record)
+	right, errRight := json.Marshal(other)
+	return errLeft == nil && errRight == nil && string(left) == string(right)
 }
 
 // ActivationOf returns the engine's progress for a computer. Records without

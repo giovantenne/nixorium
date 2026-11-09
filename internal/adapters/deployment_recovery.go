@@ -146,7 +146,7 @@ func archivePendingDeploymentAt(directoryPath string, managed bool, expected dom
 	if err != nil {
 		return "", err
 	}
-	if currentText, expectedText := fmt.Sprintf("%+v", current), fmt.Sprintf("%+v", expected); currentText != expectedText {
+	if !current.SameRecord(expected) {
 		return "", errors.New("the interrupted update record changed after review")
 	}
 	if err := unix.Mkdirat(int(directory.Fd()), "recovered", 0o770); err != nil && !errors.Is(err, unix.EEXIST) {

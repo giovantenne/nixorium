@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Confirming the review of an interrupted client update no longer refuses
+  with "the interrupted update record changed after review" when the record
+  is unchanged. The check compared the memory addresses of the computers'
+  exit codes instead of their values, so it failed whenever a computer had
+  finished.
+
 ## [3.13.0] - 2026-11-05
 
 From 3.12.0, Update Nixorium, then Apply to controller and Update computers as

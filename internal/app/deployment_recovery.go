@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -270,9 +269,7 @@ func recoveryTarget(host domain.HostMeta, activity domain.DeploymentActivity, re
 }
 
 func samePendingDeployment(left, right domain.PendingDeployment) bool {
-	a, errA := json.Marshal(left)
-	b, errB := json.Marshal(right)
-	return errA == nil && errB == nil && string(a) == string(b)
+	return left.SameRecord(right)
 }
 
 // Reviewed tells whether token confirms a review of the plan fresh, a plan
