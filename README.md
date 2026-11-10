@@ -151,6 +151,12 @@ lists the network, storage and console requirements in full.
 
 ## Quick start
 
+
+
+https://github.com/user-attachments/assets/e8a6cd3d-1444-401b-af72-358b0c31f875
+
+
+
 Verify **one client** before preparing the rest of the room. For a disposable
 trial on virtual machines, follow the
 [evaluation environment](docs/evaluation-environment.md).
