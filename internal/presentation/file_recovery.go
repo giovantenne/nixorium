@@ -237,10 +237,19 @@ func (model dashboardModel) updateFileRecovery(key tea.KeyPressMsg) (tea.Model, 
 	case recoveryStageResult:
 		switch key.String() {
 		case "n":
-			// Another recovery from the same session.
 			m.chosen = map[string]bool{}
-			m.stage = recoveryStageBrowse
 			model.message = ""
+			if m.result.HasErrors() {
+				// The session may have moved: read the sessions again.
+				computer := m.computer
+				model.busy = "Reading the saved sessions of " + computer
+				return model.startRead(func(ctx context.Context) tea.Msg {
+					sessions, err := actions.Sessions(ctx, computer)
+					return fileRecoverySessionsMsg{computer, sessions, err}
+				})
+			}
+			// Another recovery from the same session.
+			m.stage = recoveryStageBrowse
 		case "enter", "esc":
 			model.screen = dashboardComputersArea
 			model.message = ""
@@ -357,7 +366,11 @@ func (model dashboardModel) fileRecoveryView() string {
 		if count := len(m.chosen); count > 0 {
 			lines = append(lines, "", fmt.Sprintf("Chosen: %d", count))
 		}
-		shell.actions = []tuiAction{{key: "Space", label: "Choose"}, {key: "Enter", label: "Open folder"}, {key: "Backspace", label: "Up"}, {key: "r", label: "Review"}, {key: "Esc", label: "Sessions"}, {key: "F1", label: "Help"}}
+		enter := "Open folder"
+		if entries := m.listing.Entries; len(entries) > 0 && m.cursor < len(entries) && !entries[m.cursor].Dir {
+			enter = "Choose"
+		}
+		shell.actions = []tuiAction{{key: "Enter", label: enter}, {key: "Space", label: "Choose"}, {key: "Backspace", label: "Up"}, {key: "r", label: "Review"}, {key: "Esc", label: "Sessions"}, {key: "F1", label: "Help"}}
 	case recoveryStageReview:
 		lines = append(lines, "", m.plan.Message, "")
 		if !m.plan.HasErrors() {
@@ -378,7 +391,11 @@ func (model dashboardModel) fileRecoveryView() string {
 				lines = append(lines, "  "+m.result.Restored.Folder+"/"+name)
 			}
 		}
-		shell.actions = []tuiAction{{key: "Enter", label: "Computers"}, {key: "n", label: "More from this session"}, {key: "F1", label: "Help"}}
+		again := "More from this session"
+		if m.result.HasErrors() {
+			again = "Choose the session again"
+		}
+		shell.actions = []tuiAction{{key: "Enter", label: "Computers"}, {key: "n", label: again}, {key: "F1", label: "Help"}}
 	}
 	shell.body = strings.Join(lines, "\n")
 	if model.message != "" {

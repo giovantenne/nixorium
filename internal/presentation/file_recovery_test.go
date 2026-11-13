@@ -159,6 +159,34 @@ func TestRecoverStudentFilesShowsRefusals(t *testing.T) {
 	if model.fileRecovery.stage != recoveryStageComputer || !strings.Contains(model.View().Content, "could not be reached") {
 		t.Fatalf("refusal not shown:\n%s", model.View().Content)
 	}
+	// A failed copy offers to read the sessions again, not the old session.
+	calls2 := &recoveryCalls{}
+	actions2 := recoveryActions(t, calls2)
+	actions2.Apply = func(domain.FileRecoveryPlan) domain.FileRecoveryReport {
+		return domain.FileRecoveryReport{State: "failed", Message: "The computer restarted since the review and its saved sessions moved. Choose the session again."}
+	}
+	model = newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{FileRecovery: actions2}, false)
+	model.width, model.height = 120, 30
+	model.screen = dashboardFileRecovery
+	model.fileRecovery = newFileRecoveryModel()
+	model.fileRecovery.stage, model.fileRecovery.computer = recoveryStageReview, "pc02"
+	model.fileRecovery.plan = domain.FileRecoveryPlan{State: "ready", ReviewToken: "t", Paths: []string{"a"}}
+	press := func(code rune, text string) {
+		updated, cmd := model.updateFileRecovery(tea.KeyPressMsg{Code: code, Text: text})
+		model = updated.(dashboardModel)
+		if cmd != nil {
+			updated, _ = model.Update(cmd())
+			model = updated.(dashboardModel)
+		}
+	}
+	press(tea.KeyEnter, "")
+	if !strings.Contains(model.View().Content, "Choose the session again") {
+		t.Fatalf("failed copy view:\n%s", model.View().Content)
+	}
+	press('n', "n")
+	if model.fileRecovery.stage != recoveryStageSession {
+		t.Fatalf("n after a failure: stage %d", model.fileRecovery.stage)
+	}
 	model = dashboardModel{report: testDashboardReport("ready"), width: 120, height: 30, screen: dashboardComputersArea}
 	if slices.ContainsFunc(model.availableComputerTasks(), func(task dashboardTask) bool { return task.id == "recover" }) {
 		t.Fatal("Recover student files listed without its actions")
