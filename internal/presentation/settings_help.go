@@ -27,6 +27,7 @@ var settingsHelp = map[string]settingHelp{
 	"lab.studentGitEmail":     {"Author email recorded by Git commits made as the student.", "student@example.org"},
 	"lab.adminGitName":        {"Author name for the administrator's Git commits.", "Lab Administrator"},
 	"lab.classroomView":       {"On (the default) gives the teacher the classroom view: screen previews, taking control, locking screens, messages, showing the teacher's screen, sending and collecting files. Off removes it from the controller and from the student computers; Internet pause, switching computers on and off and the schedule keep working.", "on"},
+	"lab.studentSnapshots":    {"At every startup each student computer saves the previous session as a read-only snapshot that the teacher and the administrator can open in Files → Snapshots. Choose how many it keeps, from 0 (none) to 30; the default is 5. A lower number deletes the older ones at the next startup after Update computers.", "5"},
 	"lab.adminGitEmail":       {"Author email for the administrator's Git commits.", "admin@example.org"},
 }
 

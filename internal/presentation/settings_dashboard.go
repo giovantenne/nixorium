@@ -110,6 +110,15 @@ var routineSettingsGroups = []routineSettingsGroup{
 		},
 	},
 	{
+		id:          "snapshots",
+		shortcut:    "s",
+		label:       "Student snapshots",
+		description: "How many past sessions each student computer keeps",
+		fields: []settingsField{
+			{id: "lab.studentSnapshots", group: "Student snapshots", label: "Saved student sessions per computer"},
+		},
+	},
+	{
 		id: "workspace", shortcut: "w", label: "Student workspace",
 		description: "Desktop, dock, editor extensions and initial student preferences",
 	},

@@ -366,7 +366,7 @@ The internal home-reset engine has ordinary Go filesystem tests under
 check adds real same-filesystem file/directory bind mounts and nested Btrfs
 subvolumes on a disposable VM disk. It also exercises immutable-seed validation,
 account ownership, a held login barrier, active student-process rejection,
-whole-home preflight, private snapshot sanitization, five-snapshot rotation,
+whole-home preflight, private snapshot sanitization, configured snapshot rotation (lowering it, 0 and back),
 restore ownership, editable preferences and dconf/wallpaper composition.
 A failure before deletion discards its own work. Simulated interruptions
 before and after the read-only snapshot, and after publication, recover at

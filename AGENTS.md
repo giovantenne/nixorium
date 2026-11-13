@@ -788,7 +788,10 @@ that release's notes, so a release is not finished until the site follows it.
   boot-reset engine. Preserve complete preflight, no-follow traversal,
   mount/subvolume checks, immutable seed validation, account/process checks,
   and a held login barrier. The private recovery snapshot is sanitized before
-  publication; five read-only managed snapshots are kept. The durable pending
+  publication; `lab.studentSnapshots` read-only managed snapshots are kept
+  (0-30, five by default; 0 publishes none). A lower number prunes the
+  oldest before publishing; a published phase with no `snapshot-1` (an
+  attempt that kept none) publishes the retained copy instead of blocking. The durable pending
   record carries a phase (ADR 0029): a failure before the restore phase
   discards that attempt's own work; at the next boot an interrupted prepare
   phase restarts, and a restore/published phase completes from the read-only

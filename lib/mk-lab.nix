@@ -100,6 +100,7 @@ let
   inherit (config) extraLocale;
   inherit (config) keyboardLayout;
   inherit (config) classroomView;
+  inherit (config) studentSnapshots;
   inherit (config) assistant;
 
   ipv4ToInt = address:
@@ -201,6 +202,7 @@ let
     inherit extraLocale;
     inherit keyboardLayout;
     inherit classroomView;
+    inherit studentSnapshots;
     inherit assistant;
     inherit cachePublicKey;
     inherit cachePort;

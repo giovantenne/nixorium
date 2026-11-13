@@ -10,6 +10,7 @@
     btrfs = "${pkgs.btrfs-progs}/bin/btrfs";
     dconf = "${pkgs.dconf}/bin/dconf";
     systemctl = "${pkgs.systemd}/bin/systemctl";
+    snapshots = labSettings.studentSnapshots or 5;
   };
 
   systemd.services.home-reset = {

@@ -56,6 +56,10 @@ func TestDiffLabSettingsCoversEveryLabSettingsField(t *testing.T) {
 					// nil means on; the opposite of the starting value is off.
 					off := false
 					target.Set(reflect.ValueOf(&off))
+				case reflect.Int:
+					// nil means the default; any other number is a change.
+					changed := 12
+					target.Set(reflect.ValueOf(&changed))
 				default:
 					target.Set(reflect.New(field.Type.Elem()))
 					target.Elem().Field(0).SetString("changed")

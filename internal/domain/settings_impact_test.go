@@ -55,3 +55,39 @@ func TestSettingsInterfaceChangesExplainConnectionRisk(t *testing.T) {
 		})
 	}
 }
+
+func TestStudentSnapshotsImpact(t *testing.T) {
+	base := validSettings()
+	for _, test := range []struct {
+		count   int
+		warning bool
+		detail  string
+	}{
+		{0, true, "keeps none from then on"},
+		{3, true, "deletes the older saved sessions"},
+		{12, false, "keeps up to its last 12 sessions"},
+	} {
+		candidate := base
+		count := test.count
+		candidate.Lab.StudentSnapshots = &count
+		impacts := SettingsImpacts(base, candidate, DiffLabSettings(base, candidate))
+		found := false
+		for _, impact := range impacts {
+			if impact.Kind == "student-snapshots" {
+				found = true
+				if impact.Warning != test.warning || !strings.Contains(impact.Detail, test.detail) || !strings.Contains(impact.Detail, "Update computers") {
+					t.Fatalf("%d: unexpected impact %+v", test.count, impact)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("%d: no student snapshots impact in %+v", test.count, impacts)
+		}
+	}
+	unchanged := base
+	five := DefaultStudentSnapshots
+	unchanged.Lab.StudentSnapshots = &five
+	if changes := DiffLabSettings(base, unchanged); len(changes) != 0 {
+		t.Fatalf("an explicit default is reported as a change: %+v", changes)
+	}
+}

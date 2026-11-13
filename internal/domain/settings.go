@@ -56,6 +56,21 @@ func (settings LabSettings) ClassroomViewOn() bool {
 // CLASSROOM-VIEW-OFF).
 const ClassroomViewOffMessage = "The classroom view is turned off in this laboratory's settings (Maintenance → Change settings). Code: CLASSROOM-VIEW-OFF."
 
+// DefaultStudentSnapshots and MaxStudentSnapshots bound lab.studentSnapshots.
+const (
+	DefaultStudentSnapshots = 5
+	MaxStudentSnapshots     = 30
+)
+
+// StudentSnapshotCount is how many past student sessions each client keeps:
+// five unless the settings say otherwise.
+func (settings LabSettings) StudentSnapshotCount() int {
+	if settings.StudentSnapshots == nil {
+		return DefaultStudentSnapshots
+	}
+	return *settings.StudentSnapshots
+}
+
 // AssistantOn tells whether the controller offers Assistant: it is on unless
 // the settings turn it off. Account activation and consent remain separate.
 func (settings LabSettings) AssistantOn() bool {
@@ -66,11 +81,13 @@ type LabSettings struct {
 	CredentialsVersion int    `json:"credentialsVersion"`
 	DeploymentMode     string `json:"deploymentMode,omitempty"`
 	// ClassroomView is on unless set to false; see ClassroomViewOn.
-	ClassroomView *bool  `json:"classroomView,omitempty"`
-	Assistant     *bool  `json:"assistant,omitempty"`
-	MasterDHCPIP  string `json:"masterDhcpIp"`
-	NetworkBase   string `json:"networkBase"`
-	NetworkPrefix int    `json:"networkPrefixLength"`
+	ClassroomView *bool `json:"classroomView,omitempty"`
+	// StudentSnapshots is five unless set; see StudentSnapshotCount.
+	StudentSnapshots *int   `json:"studentSnapshots,omitempty"`
+	Assistant        *bool  `json:"assistant,omitempty"`
+	MasterDHCPIP     string `json:"masterDhcpIp"`
+	NetworkBase      string `json:"networkBase"`
+	NetworkPrefix    int    `json:"networkPrefixLength"`
 	// NetworkTransition is set only while the laboratory moves from a previous
 	// network to NetworkBase/NetworkPrefix. It is managed by the guided change
 	// of the laboratory network, never typed in the settings form.
@@ -311,6 +328,9 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 		if password.value != "" && !passwordHashPattern.MatchString(password.value) {
 			add(password.field, "must be a SHA-512 crypt hash beginning with $6$")
 		}
+	}
+	if count := lab.StudentSnapshotCount(); count < 0 || count > MaxStudentSnapshots {
+		add("lab.studentSnapshots", fmt.Sprintf("must be between 0 and %d", MaxStudentSnapshots))
 	}
 	parsedURL, urlErr := url.Parse(lab.HomepageURL)
 	if urlErr != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Host == "" {

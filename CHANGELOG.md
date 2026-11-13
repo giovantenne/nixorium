@@ -6,6 +6,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Student snapshots** in Maintenance → Change settings (`lab.studentSnapshots`
+  in `lab-settings.json`): how many past sessions each student computer keeps
+  as read-only snapshots, from 0 to 30; five as before unless changed. Each
+  computer applies the new number at its first startup after Update computers:
+  a lower number deletes the oldest snapshots, and 0 keeps none and deletes
+  those already saved. The settings review says so before saving.
+
 ## [3.13.1] - 2026-11-09
 
 From 3.13.0, Update Nixorium, then Apply to controller. A controller blocked

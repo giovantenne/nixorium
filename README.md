@@ -100,8 +100,8 @@ together. Open **Nixorium** for the restricted classroom dashboard.
 ![Classroom view on the controller, showing a grid of twelve student computers with screen previews and classroom controls](docs/images/nixorium-classroom-view.webp)
 
 - **A clean desktop at every boot.** Every student PC starts with the same
-  GNOME desktop and applications. The last five sessions stay on that PC as
-  snapshots, so a lost file can be recovered from **Snapshots** in the Files
+  GNOME desktop and applications. The last sessions (five unless you choose
+  another number, up to 30) stay on that PC as snapshots, so a lost file can be recovered from **Snapshots** in the Files
   sidebar.
 - **Help students from your desk.** See every student screen at once, open
   one in its own window, take control or save a screenshot of it, lock

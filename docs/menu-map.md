@@ -30,6 +30,7 @@ Maintenance → Change settings → Regional (r): Time zone and keyboard layout
 Maintenance → Change settings → Browser (b): Default classroom homepage
 Maintenance → Change settings → Classroom view (v): Turn the teacher's classroom view on or off
 Maintenance → Change settings → Git (g): Student and administrator commit identity
+Maintenance → Change settings → Student snapshots (s): How many past sessions each student computer keeps
 Maintenance → Change settings → Student workspace (w): Desktop, dock, editor extensions and initial student preferences
 Maintenance → Diagnostics (i): Check the lab and see recovery instructions
 Maintenance → Update system and packages (b): Refresh the NixOS base or review a channel migration

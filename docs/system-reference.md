@@ -387,8 +387,13 @@ the CLI keeps reboot and verification as separate explicit operations.
 
 ## Student home reset
 
-At boot, the previous student home becomes one of five rotating snapshots and
-a clean home is restored from the activation-time template. Core creates the
+At boot, the previous student home becomes the newest of the rotating
+read-only snapshots and a clean home is restored from the activation-time
+template. `lab.studentSnapshots` (0 to 30, five unless set; Maintenance →
+Change settings → Student snapshots) sets how many each client keeps. A
+client applies a new number at its first boot after Update computers: a lower
+number deletes the oldest snapshots, and 0 publishes none and deletes those
+already published. Core creates the
 configured Git identity and standard XDG directories; deployment modules add
 editor and MIME defaults when those applications are selected.
 
@@ -397,11 +402,14 @@ npm, and XDG roots for admin, teacher, and student accounts. If a runtime
 directory already exists, only its top-level ownership and mode are reconciled;
 logind remains responsible for creating `/run/user/<uid>` and its contents.
 
-Administrators and the teacher can recover a file from the snapshot store:
+Administrators and the teacher can read and copy a file from the snapshot
+store (`snapshot-1` is the newest); only the administrator can write it back
+into the student home, which belongs to the student:
 
 ```sh
 ls /var/lib/home-snapshots/workspace/snapshot-1/
-cp /var/lib/home-snapshots/workspace/snapshot-1/file.txt /home/<studentUser>/
+sudo cp /var/lib/home-snapshots/workspace/snapshot-1/file.txt /home/<studentUser>/
+sudo chown <studentUser>:users /home/<studentUser>/file.txt
 ```
 
 Docker images, npm's download cache, and user-installed global npm packages are
