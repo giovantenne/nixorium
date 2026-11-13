@@ -554,7 +554,11 @@ func (e *demoExplorer) merge(id int, result demoGraphExplored) {
 		target, seen := e.byView[candidate.view]
 		if !seen {
 			// Esc must always lead back, or a capped screen becomes a dead end.
-			if len(e.views) >= e.limits.views || (key.name != "esc" && e.byScreen[demoGraphScreen(candidate.view)] >= e.limits.perScreen) {
+			// Moving the cursor within a menu stays possible after the total
+			// limit, so every entry of a long menu can be reached.
+			screen := demoGraphScreen(candidate.view)
+			cursorMove := (key.name == "up" || key.name == "down") && screen == demoGraphScreen(e.views[id])
+			if (len(e.views) >= e.limits.views && !cursorMove) || (key.name != "esc" && e.byScreen[screen] >= e.limits.perScreen) {
 				target = demoGraphTrimmed
 			} else {
 				target = e.add(candidate.view, candidate.path)
