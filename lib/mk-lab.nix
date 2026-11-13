@@ -100,6 +100,7 @@ let
   inherit (config) extraLocale;
   inherit (config) keyboardLayout;
   inherit (config) classroomView;
+  inherit (config) studentSnapshots;
   inherit (config) assistant;
 
   ipv4ToInt = address:
@@ -201,6 +202,7 @@ let
     inherit extraLocale;
     inherit keyboardLayout;
     inherit classroomView;
+    inherit studentSnapshots;
     inherit assistant;
     inherit cachePublicKey;
     inherit cachePort;
@@ -215,7 +217,7 @@ let
           ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key")
           ++ lib.optional networkTransitionIgnored
             "lab.networkTransition is ignored because no client computers are configured; remove it from lab-settings.json";
-        environment.systemPackages = [ hostState hostSessionState hostCleanGenerations hostDiagnostics ];
+        environment.systemPackages = [ hostState hostSessionState hostCleanGenerations hostDiagnostics hostHomeRecover ];
         environment.etc."nixorium-host-diagnostics.json".text = builtins.toJSON {
           controller = isController;
           systemctl = "${bootstrapPkgs.systemd}/bin/systemctl";
@@ -710,6 +712,12 @@ let
   hostDiagnostics = bootstrapPkgs.runCommand "nixorium-host-diagnostics" {} ''
     mkdir -p "$out/bin"
     ln -s ${nixoriumPackage}/bin/nixorium-host-diagnostics "$out/bin/nixorium-host-diagnostics"
+  '';
+  # The controller runs it over SSH to recover a student's files from the
+  # saved sessions; same identical-target link as hostDiagnostics.
+  hostHomeRecover = bootstrapPkgs.runCommand "nixorium-home-recover" {} ''
+    mkdir -p "$out/bin"
+    ln -s ${nixoriumPackage}/bin/nixorium-home-recover "$out/bin/nixorium-home-recover"
   '';
   hostSessionState = bootstrapPkgs.writeShellApplication {
     name = "nixorium-session-state";

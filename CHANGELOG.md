@@ -6,6 +6,32 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Student snapshots** in Maintenance → Change settings (`lab.studentSnapshots`
+  in `lab-settings.json`): how many past sessions each student computer keeps
+  as read-only snapshots, from 0 to 30; five as before unless changed. Each
+  computer applies the new number at its first startup after Update computers:
+  a lower number deletes the oldest snapshots, and 0 keeps none and deletes
+  those already saved. The settings review says so before saving. Before
+  going back to an older release, set the number to 5 or less and let every
+  computer restart once: older releases refuse more than five snapshots and
+  would keep the student from logging in.
+- **Computers → Recover student files**, for the teacher and the
+  administrator: choose a student computer, one of its saved sessions and
+  the files or folders, and after a review they are copied into a
+  "Recovered files" folder on that computer's desktop. Nothing there is
+  replaced, the student's own files are not changed, and it works with or
+  without the classroom view. Each session shows when its files last
+  changed; recovered files keep their modification times. Each student
+  computer needs Update computers before it can be used.
+
+### Security
+
+- The required Go is now 1.26.11 (was 1.26.10), which fixes GO-2026-6859 in
+  the standard library. While the package set has an older Go, Nixorium keeps
+  using the official build from go.dev.
+
 ## [3.13.1] - 2026-11-09
 
 From 3.13.0, Update Nixorium, then Apply to controller. A controller blocked

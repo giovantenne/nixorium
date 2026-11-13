@@ -834,3 +834,23 @@ func TestSetupPasswordCancellationNamesSetup(t *testing.T) {
 		}
 	}
 }
+
+func TestStudentSnapshotsField(t *testing.T) {
+	settings := wizardSettings()
+	if got := settingFieldValue(settings, "lab.studentSnapshots"); got != "5" {
+		t.Fatalf("default shown as %q", got)
+	}
+	unchanged, err := setSettingField(settings, "lab.studentSnapshots", "5")
+	if err != nil || unchanged.Lab.StudentSnapshots != nil {
+		t.Fatal("the default was written into the file", err)
+	}
+	none, err := setSettingField(settings, "lab.studentSnapshots", "0")
+	if err != nil || none.Lab.StudentSnapshots == nil || *none.Lab.StudentSnapshots != 0 {
+		t.Fatal("zero not saved", err)
+	}
+	for _, value := range []string{"31", "-1", "five"} {
+		if _, err := setSettingField(settings, "lab.studentSnapshots", value); err == nil {
+			t.Fatalf("%q accepted", value)
+		}
+	}
+}

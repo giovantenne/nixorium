@@ -133,6 +133,9 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 			return *response.LockReport
 		},
 	}
+	// Recovering files reaches the computers over SSH, with or without the
+	// classroom view.
+	actions.FileRecovery = classroomFileRecovery(ctx)
 	// Without the classroom view there is nothing to open, lock or send to.
 	if adapters.ClassroomViewApplied() {
 		actions.OpenClassroomView = openClassroomView

@@ -160,6 +160,9 @@ func SettingsImpacts(base, candidate LabSettingsFile, changes []SettingChange) [
 	if changed["lab.classroomView"] {
 		impacts = append(impacts, ClassroomViewImpact(candidate.Lab.ClassroomViewOn()))
 	}
+	if changed["lab.studentSnapshots"] {
+		impacts = append(impacts, StudentSnapshotsImpact(base.Lab.StudentSnapshotCount(), candidate.Lab.StudentSnapshotCount()))
+	}
 	if passwords {
 		impacts = append(impacts, SettingImpact{Kind: "passwords", Detail: "Passwords change on this controller when applied and on each computer when it is updated."})
 	}
@@ -181,6 +184,18 @@ func computerRange(first, last int) string {
 
 // ClassroomViewImpact says in plain words what the classroom view setting
 // turns on or off, what does not depend on it and when it takes effect.
+// StudentSnapshotsImpact explains when a new number of saved student sessions
+// takes effect and what a lower number deletes.
+func StudentSnapshotsImpact(before, after int) SettingImpact {
+	switch {
+	case after == 0:
+		return SettingImpact{Kind: "student-snapshots", Warning: true, Detail: "Student snapshots off: at its next startup after Update computers, each student computer deletes its saved sessions and keeps none from then on. Files a student loses can no longer be recovered."}
+	case after < before:
+		return SettingImpact{Kind: "student-snapshots", Warning: true, Detail: fmt.Sprintf("Each student computer keeps its last %d sessions: at its next startup after Update computers it deletes the older saved sessions.", after)}
+	}
+	return SettingImpact{Kind: "student-snapshots", Detail: fmt.Sprintf("Each student computer keeps up to its last %d sessions, from its next startup after Update computers.", after)}
+}
+
 func ClassroomViewImpact(on bool) SettingImpact {
 	if on {
 		return SettingImpact{Kind: "classroom-view", Detail: "Classroom view on: the classroom view page (screen previews, taking control of a computer, shared text, screenshots, showing your screen), locking screens, messages, sending files and collecting files work again, and the teacher's dock icon opens the classroom view. Internet pause, switching computers on and off and the schedule never depended on it. It starts on the controller after Apply to controller, and on the student computers after Update computers; students already signed in may need to sign in again."}

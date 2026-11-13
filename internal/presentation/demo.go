@@ -211,8 +211,9 @@ func renderSupportDemo(revision string, width, height int) DemoScenario {
 func renderClassroomDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	actions.ClassroomMode = true
-	// A real teacher session also wires the classroom view, screen locking and
-	// file sending, so the dashboard lists them. This scenario never opens them.
+	// A real teacher session also wires the classroom view, screen locking,
+	// file sending and file recovery, so the dashboard lists them. This
+	// scenario never opens them.
 	unused := func(name string) { panic("demo callback invoked without a synthetic implementation: " + name) }
 	actions.OpenClassroomView = func(context.Context) (string, error) {
 		unused("OpenClassroomView")
@@ -233,6 +234,24 @@ func renderClassroomDemo(revision string, width, height int) DemoScenario {
 	actions.ApplyShare = func(domain.SharePlan) domain.ShareReport {
 		unused("ApplyShare")
 		return domain.ShareReport{}
+	}
+	actions.FileRecovery = &FileRecoveryActions{
+		Sessions: func(context.Context, string) ([]domain.FileRecoverySession, error) {
+			unused("FileRecovery.Sessions")
+			return nil, nil
+		},
+		List: func(context.Context, string, int, string) (domain.FileRecoveryListing, error) {
+			unused("FileRecovery.List")
+			return domain.FileRecoveryListing{}, nil
+		},
+		Plan: func(context.Context, string, int, []string) domain.FileRecoveryPlan {
+			unused("FileRecovery.Plan")
+			return domain.FileRecoveryPlan{}
+		},
+		Apply: func(domain.FileRecoveryPlan) domain.FileRecoveryReport {
+			unused("FileRecovery.Apply")
+			return domain.FileRecoveryReport{}
+		},
 	}
 	actions.PlanPower = func(ctx context.Context, requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
 		return domain.ShutdownPlanReport{

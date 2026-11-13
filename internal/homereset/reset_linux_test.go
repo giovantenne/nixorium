@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/giovantenne/nixorium/internal/classroomview"
 	"golang.org/x/sys/unix"
 )
 
@@ -378,6 +379,178 @@ func TestResetLifecycleVM(t *testing.T) {
 			t.Fatal("rotation discarded a snapshot while a slot was free", before, after)
 		}
 	})
+	t.Run("configured-retention", func(t *testing.T) {
+		keep := func(count int) Config {
+			candidate := config
+			candidate.Snapshots = &count
+			return candidate
+		}
+		names := func(t *testing.T, expected int) {
+			t.Helper()
+			entries, err := os.ReadDir(publishedSnapshots)
+			if err != nil || len(entries) != expected {
+				t.Fatal("unexpected snapshot count", len(entries), expected, err)
+			}
+			for i, entry := range entries {
+				if entry.Name() != "snapshot-"+strconv.Itoa(i+1) {
+					t.Fatal("unexpected snapshot", entry.Name())
+				}
+			}
+		}
+		for snapshotCount(t) < 5 {
+			if err := Reset(config); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// A lower number deletes the oldest snapshots at the next reset.
+		writeFixture(t, home+"/three-lesson.txt")
+		if err := Reset(keep(3)); err != nil {
+			t.Fatal(err)
+		}
+		names(t, 3)
+		intact(t, publishedSnapshots+"/snapshot-1/three-lesson.txt")
+		// Zero publishes nothing, removes every snapshot and the retained copy.
+		if err := Reset(keep(0)); err != nil {
+			t.Fatal(err)
+		}
+		names(t, 0)
+		if _, err := os.Lstat(resetState + "/previous"); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("retained snapshot kept with no snapshots configured", err)
+		}
+		if err := Reset(keep(0)); err != nil {
+			t.Fatal(err)
+		}
+		names(t, 0)
+		// An attempt interrupted after publication with none kept completes under
+		// a positive number by publishing its retained copy instead of blocking.
+		writeFixture(t, home+"/zero-lesson.txt")
+		record, err := pendingJSON(config, phasePublished)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(resetState+"/pending.json", record, 0600); err != nil {
+			t.Fatal(err)
+		}
+		retainHome(t)
+		recovered(t)
+		names(t, 1)
+		intact(t, publishedSnapshots+"/snapshot-1/zero-lesson.txt")
+		for _, count := range []int{2, 3} {
+			if err := Reset(config); err != nil {
+				t.Fatal(err)
+			}
+			names(t, count)
+		}
+		// A value outside 0-30 or a missing one changes nothing.
+		for _, candidate := range []Config{keep(-1), keep(31), func() Config { c := config; c.Snapshots = nil; return c }()} {
+			if err := Reset(candidate); err == nil || !strings.Contains(err.Error(), "snapshot count") {
+				t.Fatal("invalid snapshot count accepted", err)
+			}
+			names(t, 3)
+		}
+	})
+	t.Run("file-recovery-writes-as-the-student", func(t *testing.T) {
+		writeFixture(t, home+"/Documents/essay.txt")
+		writeFixture(t, home+"/Desktop/Project/main.c")
+		writeFixture(t, home+"/Desktop/Project/.git/config")
+		linkFixture(t, "/etc/shadow", home+"/Desktop/Project/shadow")
+		if err := Reset(config); err != nil {
+			t.Fatal(err)
+		}
+		sessions, err := recoverySessions(publishedSnapshots, snapshotInfo(config))
+		if err != nil || len(sessions) < 2 || sessions[0].Number != 1 || time.Since(sessions[0].SavedAt) > time.Minute || sessions[0].SavedAt.Before(sessions[1].SavedAt) {
+			t.Fatal("unexpected saved sessions", sessions, err)
+		}
+		// Each session has its own identity and creation time, not those of
+		// the home it was taken from, and keeps its identity when a restart
+		// moves it to the next number.
+		ids := map[string]bool{}
+		for _, session := range sessions {
+			if ids[session.ID] {
+				t.Fatal("two sessions share an identity", sessions)
+			}
+			ids[session.ID] = true
+		}
+
+		root, err := sessionDirectory(publishedSnapshots, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		listing, err := recoveryList(root, 1, "Desktop/Project")
+		if err != nil || len(listing.Entries) != 1 || listing.Entries[0].Name != "main.c" {
+			t.Fatal("unexpected listing", listing, err)
+		}
+		restored, err := recoverAsStudent(config, root, []string{"Documents/essay.txt", "Desktop/Project"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		desktop, err := classroomview.DesktopDirectory(home)
+		if err != nil {
+			t.Fatal(err)
+		}
+		folder := filepath.Join(desktop, "Recovered files")
+		if restored.Files != 2 || strings.Join(restored.Placed, ",") != "essay.txt,Project" {
+			t.Fatal("unexpected recovery", restored)
+		}
+		intact(t, folder+"/essay.txt")
+		intact(t, folder+"/Project/main.c")
+		if sessions[0].LastChange.IsZero() {
+			t.Fatal("no last change for the newest session")
+		}
+		for _, name := range []string{"Documents/essay.txt", "Desktop/Project/main.c"} {
+			saved, err := os.Stat(root + "/" + name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			copied, err := os.Stat(folder + "/" + strings.TrimPrefix(strings.TrimPrefix(name, "Documents/"), "Desktop/"))
+			if err != nil || !copied.ModTime().Equal(saved.ModTime()) {
+				t.Fatal("modification time not kept", name, err)
+			}
+		}
+		for _, absent := range []string{"Project/.git", "Project/shadow"} {
+			if _, err := os.Lstat(folder + "/" + absent); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("hidden file or link recovered", absent, err)
+			}
+		}
+		for name, mode := range map[string]os.FileMode{folder: 0755, folder + "/Project": 0755, folder + "/essay.txt": 0644, folder + "/Project/main.c": 0644} {
+			info, err := os.Lstat(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if stat := info.Sys().(*syscall.Stat_t); stat.Uid != 2000 || stat.Gid != 100 || info.Mode().Perm() != mode {
+				t.Fatalf("%s: uid %d gid %d mode %v", name, stat.Uid, stat.Gid, info.Mode().Perm())
+			}
+		}
+		// A second recovery never replaces the first.
+		if restored, err := recoverAsStudent(config, root, []string{"Documents/essay.txt"}); err != nil || restored.Placed[0] != "essay (2).txt" {
+			t.Fatal("second recovery", restored, err)
+		}
+		intact(t, folder+"/essay (2).txt")
+		// The student cannot redirect the copy: a desktop folder replaced by a
+		// link to a root-owned folder makes the write fail as the student.
+		if err := os.RemoveAll(folder); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink("/etc", folder); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := recoverAsStudent(config, root, []string{"Documents/essay.txt"}); err == nil {
+			t.Fatal("recovery wrote through a link to a root-owned folder")
+		}
+		if _, err := os.Lstat("/etc/essay.txt"); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("recovery wrote into /etc", err)
+		}
+		if err := os.Remove(folder); err != nil {
+			t.Fatal(err)
+		}
+		if err := Reset(config); err != nil {
+			t.Fatal(err)
+		}
+		moved, err := recoverySessions(publishedSnapshots, snapshotInfo(config))
+		if err != nil || moved[1].ID != sessions[0].ID || moved[0].ID == sessions[0].ID || !moved[1].SavedAt.Equal(sessions[0].SavedAt) {
+			t.Fatal("a session did not keep its identity when it moved", sessions, moved, err)
+		}
+	})
 	t.Run("failed-recovery-blocks-retry", func(t *testing.T) {
 		writeFixture(t, home+"/last-lesson.txt")
 		failure := errors.New("injected copy failure")
@@ -437,4 +610,33 @@ func TestCleanHomePreflight(t *testing.T) {
 		t.Fatal("home root not preserved empty", err)
 	}
 	intact(t, outside+"/sentinel")
+}
+
+func TestSnapshotNames(t *testing.T) {
+	for name, expected := range map[string]int{"snapshot-1": 1, "snapshot-9": 9, "snapshot-10": 10, "snapshot-30": 30} {
+		if number, valid := snapshotNumber(name); !valid || number != expected {
+			t.Fatal("valid snapshot name refused", name, number)
+		}
+	}
+	for _, name := range []string{"snapshot-0", "snapshot-01", "snapshot-31", "snapshot-100", "snapshot-", "snapshot-1a", "snapshot--1", "snapshot-3-moved", "other"} {
+		if _, valid := snapshotNumber(name); valid {
+			t.Fatal("unexpected snapshot name accepted", name)
+		}
+	}
+}
+
+func TestSnapshotLimit(t *testing.T) {
+	for _, count := range []int{0, 5, 30} {
+		if got, err := snapshotLimit(Config{Snapshots: &count}); err != nil || got != count {
+			t.Fatal("valid snapshot count refused", count, err)
+		}
+	}
+	for _, count := range []int{-1, 31} {
+		if _, err := snapshotLimit(Config{Snapshots: &count}); err == nil {
+			t.Fatal("invalid snapshot count accepted", count)
+		}
+	}
+	if _, err := snapshotLimit(Config{}); err == nil {
+		t.Fatal("missing snapshot count accepted")
+	}
 }

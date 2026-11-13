@@ -1,6 +1,18 @@
 {
   "invalid": [
     {
+      "name": "student snapshots above 30",
+      "overrides": { "studentSnapshots": 31 }
+    },
+    {
+      "name": "negative student snapshots",
+      "overrides": { "studentSnapshots": -1 }
+    },
+    {
+      "name": "student snapshots must be an integer",
+      "overrides": { "studentSnapshots": "5" }
+    },
+    {
       "name": "Assistant availability must be boolean",
       "overrides": { "assistant": "true" }
     },
@@ -216,6 +228,14 @@
     }
   ],
   "valid": [
+    {
+      "name": "no student snapshots",
+      "overrides": { "studentSnapshots": 0 }
+    },
+    {
+      "name": "thirty student snapshots",
+      "overrides": { "studentSnapshots": 30 }
+    },
     {
       "name": "UTC time zone",
       "overrides": {"timeZone": "UTC"}

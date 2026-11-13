@@ -572,6 +572,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.lockView()
 	case dashboardShare:
 		content = model.shareView()
+	case dashboardFileRecovery:
+		content = model.fileRecoveryView()
 	case dashboardDeferredUpdates:
 		content = model.deferredUpdatesView()
 	case dashboardNetworkChange:

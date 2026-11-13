@@ -387,8 +387,13 @@ the CLI keeps reboot and verification as separate explicit operations.
 
 ## Student home reset
 
-At boot, the previous student home becomes one of five rotating snapshots and
-a clean home is restored from the activation-time template. Core creates the
+At boot, the previous student home becomes the newest of the rotating
+read-only snapshots and a clean home is restored from the activation-time
+template. `lab.studentSnapshots` (0 to 30, five unless set; Maintenance →
+Change settings → Student snapshots) sets how many each client keeps. A
+client applies a new number at its first boot after Update computers: a lower
+number deletes the oldest snapshots, and 0 publishes none and deletes those
+already published. Core creates the
 configured Git identity and standard XDG directories; deployment modules add
 editor and MIME defaults when those applications are selected.
 
@@ -397,11 +402,47 @@ npm, and XDG roots for admin, teacher, and student accounts. If a runtime
 directory already exists, only its top-level ownership and mode are reconciled;
 logind remains responsible for creating `/run/user/<uid>` and its contents.
 
-Administrators and the teacher can recover a file from the snapshot store:
+**Computers → Recover student files** (teacher and administrator) copies
+files back from one computer's snapshots. It lists the computer's saved
+sessions with their last change (the newest modification time of a visible
+file or folder, found within 50,000 entries and 15 seconds for all sessions)
+and the time each was taken (when the computer was next switched on),
+browses the folders of one, and after a review copies the chosen files and
+folders into `Recovered files` on that computer's XDG desktop with their
+original modification times. Hidden
+names, links and special files are left out, at most 2000 items and 500 MB
+are copied at once, and nothing in the student home is replaced: a taken name
+becomes "name (2)". The copies are ordinary files of the student home, so
+the next reset removes them like everything else there. It works with or
+without the classroom view.
+
+The controller runs the client's fixed `nixorium-home-recover` helper as
+root over SSH, as the administrator's dashboard does directly and the
+classroom service does for the teacher; the helper reads one JSON request
+on standard input and writes one JSON answer. Root only reads the read-only
+published snapshots, opening every name without following links; it streams
+the files to a copy of the helper running with the student's user and group,
+which writes them through a private staging folder in the home with modes
+0755/0644, so nothing the student controls can redirect the write. The
+review binds the computer, the session number, the session's snapshot
+identity (Btrfs UUID, read with its creation time from `btrfs subvolume
+show`; the snapshot folder itself keeps the home's times) and the paths for
+ten minutes; the computer checks the identity again when it copies and
+refuses when a restart moved the sessions since the review. The writing
+child's report is accepted only when it matches what was sent, and a child
+that takes nothing for a minute ends the copy; text that reaches the
+teacher's terminal is stripped of control characters. Hidden names are
+refused in requests too.
+
+Administrators and the teacher can also read and copy a file from the
+snapshot store (`snapshot-1` is the newest) in Files → Snapshots; writing it
+back by hand into the student home, which belongs to the student, needs the
+administrator:
 
 ```sh
 ls /var/lib/home-snapshots/workspace/snapshot-1/
-cp /var/lib/home-snapshots/workspace/snapshot-1/file.txt /home/<studentUser>/
+sudo cp /var/lib/home-snapshots/workspace/snapshot-1/file.txt /home/<studentUser>/
+sudo chown <studentUser>:users /home/<studentUser>/file.txt
 ```
 
 Docker images, npm's download cache, and user-installed global npm packages are

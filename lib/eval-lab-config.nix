@@ -66,6 +66,11 @@ let
             default = true;
             description = "Assistant menu on the controller (on unless set to false; activation and consent are separate)";
           };
+          studentSnapshots = lib.mkOption {
+            type = lib.types.ints.between 0 30;
+            default = 5;
+            description = "Past student sessions each client computer keeps as read-only snapshots (0 keeps none)";
+          };
           deploymentMode = lib.mkOption {
             type = lib.types.enum [ "laboratory" "controller" ];
             default = "laboratory";

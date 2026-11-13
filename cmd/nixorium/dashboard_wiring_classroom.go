@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/domain"
 	"github.com/giovantenne/nixorium/internal/presentation"
 )
@@ -33,6 +34,7 @@ func wireClassroomActions(actions *presentation.DashboardActions, deps dashboard
 	actions.ApplyLock = func(plan domain.LockPlan) domain.LockReport {
 		return lockManager.Apply(ctx, plan, plan.ReviewToken)
 	}
+	actions.FileRecovery = directFileRecovery(ctx, app.NewFileRecoveryManager(deps.local), repository)
 	// The administrator's files go through the classroom service too.
 	actions.PlanShare = planShare
 	actions.ApplyShare = func(plan domain.SharePlan) domain.ShareReport {

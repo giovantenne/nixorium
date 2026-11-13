@@ -788,7 +788,10 @@ that release's notes, so a release is not finished until the site follows it.
   boot-reset engine. Preserve complete preflight, no-follow traversal,
   mount/subvolume checks, immutable seed validation, account/process checks,
   and a held login barrier. The private recovery snapshot is sanitized before
-  publication; five read-only managed snapshots are kept. The durable pending
+  publication; `lab.studentSnapshots` read-only managed snapshots are kept
+  (0-30, five by default; 0 publishes none). A lower number prunes the
+  oldest before publishing; a published phase with no `snapshot-1` (an
+  attempt that kept none) publishes the retained copy instead of blocking. The durable pending
   record carries a phase (ADR 0029): a failure before the restore phase
   discards that attempt's own work; at the next boot an interrupted prepare
   phase restarts, and a restore/published phase completes from the read-only
@@ -796,7 +799,13 @@ that release's notes, so a release is not finished until the site follows it.
   writable-snapshot or already-recovered states still block login until an
   administrator inspects them. Never overwrite or rotate away the retained
   snapshot, repeat a verified publication, or treat a previous success
-  receipt as completion of a pending attempt. The fixed root-only `nixorium-home-reset`
+  receipt as completion of a pending attempt. `nixorium-home-recover`
+  (Computers → Recover student files) only reads published snapshots as root,
+  never follows links, and writes into the student home only from its child
+  running with the student's credentials; keep the review bound to the
+  snapshot UUID (never the snapshot folder's times, which are the home's)
+  so a restart that moves the sessions is refused, and treat the child's
+  report as untrusted text. The fixed root-only `nixorium-home-reset`
   helper accepts no target arguments and reads only its store-backed system
   configuration. The isolated `modules/workspace-reset.nix` service retains
   the `home-reset` unit name, never restarts on switch, and gates both the

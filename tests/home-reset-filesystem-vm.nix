@@ -27,6 +27,7 @@ let
     btrfs = "${pkgs.btrfs-progs}/bin/btrfs";
     dconf = "${pkgs.dconf}/bin/dconf";
     systemctl = "${pkgs.systemd}/bin/systemctl";
+    snapshots = 5;
   });
   tests = (pkgs.callPackage ../pkgs/nixorium.nix {}).overrideAttrs {
     pname = "nixorium-home-reset-filesystem-tests";

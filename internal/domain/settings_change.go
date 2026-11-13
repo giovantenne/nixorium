@@ -70,6 +70,7 @@ func DiffLabSettings(before, after LabSettingsFile) []SettingChange {
 
 	add("lab.deploymentMode", before.Lab.DeploymentMode, after.Lab.DeploymentMode)
 	add("lab.classroomView", before.Lab.ClassroomViewOn(), after.Lab.ClassroomViewOn())
+	add("lab.studentSnapshots", before.Lab.StudentSnapshotCount(), after.Lab.StudentSnapshotCount())
 	add("lab.assistant", before.Lab.AssistantOn(), after.Lab.AssistantOn())
 	add("lab.masterDhcpIp", before.Lab.MasterDHCPIP, after.Lab.MasterDHCPIP)
 	add("lab.networkBase", before.Lab.NetworkBase, after.Lab.NetworkBase)

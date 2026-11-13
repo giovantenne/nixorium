@@ -39,8 +39,9 @@ func menuMapActions(classroom bool) DashboardActions {
 		OpenClassroomView: func(context.Context) (string, error) {
 			return "", nil
 		},
-		PlanLock:  func(context.Context, string, domain.LockAction) domain.LockPlan { return domain.LockPlan{} },
-		PlanShare: func(context.Context, string, string) domain.SharePlan { return domain.SharePlan{} },
+		PlanLock:     func(context.Context, string, domain.LockAction) domain.LockPlan { return domain.LockPlan{} },
+		PlanShare:    func(context.Context, string, string) domain.SharePlan { return domain.SharePlan{} },
+		FileRecovery: &FileRecoveryActions{},
 	}
 	if !classroom {
 		actions.LoadDeferredUpdates = func(context.Context) domain.DeferredUpdateStatus { return domain.DeferredUpdateStatus{} }

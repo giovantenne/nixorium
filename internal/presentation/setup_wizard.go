@@ -710,6 +710,8 @@ func settingFieldValue(settings domain.LabSettingsFile, field string) string {
 		return settings.Lab.KeyboardLayout
 	case "lab.consoleKeyMap":
 		return settings.Lab.ConsoleKeyMap
+	case "lab.studentSnapshots":
+		return strconv.Itoa(settings.Lab.StudentSnapshotCount())
 	case "lab.classroomView":
 		if settings.Lab.ClassroomViewOn() {
 			return "on"
@@ -785,6 +787,16 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		if settings.Lab.ConsoleKeyMap != "" {
 			settings.Lab.ConsoleKeyMap = value
 		}
+	case "lab.studentSnapshots":
+		parsed, err := parseInteger()
+		if err != nil {
+			return settings, err
+		}
+		// The default leaves the key out of the file; an explicit value stays.
+		if parsed == domain.DefaultStudentSnapshots && settings.Lab.StudentSnapshots == nil {
+			break
+		}
+		settings.Lab.StudentSnapshots = &parsed
 	case "lab.classroomView":
 		switch value {
 		case "on":

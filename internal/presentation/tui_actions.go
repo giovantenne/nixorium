@@ -47,7 +47,10 @@ type DashboardActions struct {
 	// PlanShare prepares a file or folder (its path is the last argument)
 	// and reviews sending it to the selected students' desktops; nil
 	// without the classroom view.
-	PlanShare               func(context.Context, string, string) domain.SharePlan
+	PlanShare func(context.Context, string, string) domain.SharePlan
+	// FileRecovery copies a student's files from a saved session back to
+	// that computer's desktop; nil hides Recover student files.
+	FileRecovery            *FileRecoveryActions
 	ApplyShare              func(domain.SharePlan) domain.ShareReport
 	PlanCleanup             func(context.Context, string) domain.CleanupPlanReport
 	ApplyCleanup            func(domain.CleanupPlanReport) domain.CleanupApplyReport

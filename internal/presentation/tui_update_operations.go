@@ -7,6 +7,9 @@ import (
 // handleOperationsMessage handles the operations message family and forwards other messages
 // to the next family handler.
 func (model dashboardModel) handleOperationsMessage(message tea.Msg) (tea.Model, tea.Cmd) {
+	if next, handled := model.handleFileRecoveryMessage(message); handled {
+		return next, nil
+	}
 	switch message := message.(type) {
 	case cleanupPlanMsg:
 		model.busy = ""

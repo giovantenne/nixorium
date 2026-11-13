@@ -12,6 +12,7 @@ Computers → Power controls (x): Switch on, shut down or restart selected clien
 Computers → Internet access (i): Temporarily block or restore Internet on selected clients
 Computers → Lock screens (l): Lock or unlock the screens of selected students' computers
 Computers → Send files (s): Copy a file or folder to the desktops of selected students' computers
+Computers → Recover student files (r): Copy files from a past session back to a student's desktop
 Installation (n): Configure the lab and install computers by PXE or the official USB ISO over SSH
 Installation → Network boot (PXE) (p): Prepare, start or finish network installation; recover interrupted networking here
 Installation → USB over SSH (u): Install one physically identified computer from the official NixOS ISO
@@ -30,6 +31,7 @@ Maintenance → Change settings → Regional (r): Time zone and keyboard layout
 Maintenance → Change settings → Browser (b): Default classroom homepage
 Maintenance → Change settings → Classroom view (v): Turn the teacher's classroom view on or off
 Maintenance → Change settings → Git (g): Student and administrator commit identity
+Maintenance → Change settings → Student snapshots (s): How many past sessions each student computer keeps
 Maintenance → Change settings → Student workspace (w): Desktop, dock, editor extensions and initial student preferences
 Maintenance → Diagnostics (i): Check the lab and see recovery instructions
 Maintenance → Update system and packages (b): Refresh the NixOS base or review a channel migration
@@ -54,3 +56,4 @@ Computers → Power controls (x): Switch on, shut down or restart selected clien
 Computers → Internet access (i): Temporarily block or restore Internet on selected clients
 Computers → Lock screens (l): Lock or unlock the screens of selected students' computers
 Computers → Send files (s): Copy a file or folder to the desktops of selected students' computers
+Computers → Recover student files (r): Copy files from a past session back to a student's desktop

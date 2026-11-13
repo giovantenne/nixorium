@@ -47,6 +47,7 @@ const (
 	dashboardInternet
 	dashboardLock
 	dashboardShare
+	dashboardFileRecovery
 	dashboardDeferredUpdates
 	dashboardNetworkChange
 	dashboardCleanup
@@ -383,6 +384,7 @@ type dashboardModel struct {
 	software           softwareModel
 	internet           internetModel
 	lock               lockModel
+	fileRecovery       fileRecoveryModel
 	share              shareModel
 	cleanup            cleanupModel
 	shutdown           shutdownModel
