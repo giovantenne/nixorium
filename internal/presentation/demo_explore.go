@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"fmt"
+	"path"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -357,8 +358,76 @@ func demoExploreActions(revision string) DashboardActions {
 		return domain.TemplateResetCatalog{UpstreamRevision: reset.UpstreamRevision, Catalog: domain.SoftwarePresetCatalog{Presets: []domain.SoftwarePreset{reset.Preset}}}
 	}
 	actions.PlanTemplateReset = func(context.Context, string, func(string)) domain.TemplateResetPlan { return reset }
+	actions.FileRecovery = demoFileRecoveryActions(hosts)
 	demoStubMissingActions(&actions)
 	return actions
+}
+
+// demoFileRecoveryActions shows three saved sessions with a few student files
+// on every computer; the review is ready and the copy completes.
+func demoFileRecoveryActions(hosts domain.HostsReport) *FileRecoveryActions {
+	sessions := []domain.FileRecoverySession{
+		{Number: 1, ID: "3f6c1a2e-7b4d-4c8e-9a10-2b5d6e7f8a91", SavedAt: demoObservedAt.Add(-20 * time.Hour), LastChange: demoObservedAt.Add(-21 * time.Hour)},
+		{Number: 2, ID: "8d2e4f6a-1c3b-4e5d-8f70-9a1b2c3d4e5f", SavedAt: demoObservedAt.Add(-44 * time.Hour), LastChange: demoObservedAt.Add(-45 * time.Hour)},
+		{Number: 3, ID: "c4b5a6d7-e8f9-4a0b-9c1d-2e3f4a5b6c7d", SavedAt: demoObservedAt.Add(-68 * time.Hour), LastChange: demoObservedAt.Add(-70 * time.Hour)},
+	}
+	folders := map[string][]domain.FileRecoveryEntry{
+		"": {
+			{Name: "Desktop", Dir: true, Modified: demoObservedAt.Add(-21 * time.Hour)},
+			{Name: "Documents", Dir: true, Modified: demoObservedAt.Add(-22 * time.Hour)},
+		},
+		"Desktop": {
+			{Name: "esercizio-cicli.py", Size: 1840, Modified: demoObservedAt.Add(-21 * time.Hour)},
+			{Name: "relazione-laboratorio.odt", Size: 48213, Modified: demoObservedAt.Add(-22 * time.Hour)},
+		},
+		"Documents": {
+			{Name: "progetto-sito", Dir: true, Modified: demoObservedAt.Add(-23 * time.Hour)},
+		},
+		"Documents/progetto-sito": {
+			{Name: "index.html", Size: 2310, Modified: demoObservedAt.Add(-23 * time.Hour)},
+			{Name: "style.css", Size: 905, Modified: demoObservedAt.Add(-23 * time.Hour)},
+		},
+	}
+	hostIP := func(computer string) string {
+		for _, host := range hosts.Hosts {
+			if host.Name == computer {
+				return host.IP
+			}
+		}
+		return ""
+	}
+	return &FileRecoveryActions{
+		Sessions: func(context.Context, string) ([]domain.FileRecoverySession, error) {
+			return append([]domain.FileRecoverySession(nil), sessions...), nil
+		},
+		List: func(_ context.Context, _ string, session int, folder string) (domain.FileRecoveryListing, error) {
+			return domain.FileRecoveryListing{Session: session, Path: folder, Entries: append([]domain.FileRecoveryEntry{}, folders[folder]...)}, nil
+		},
+		Plan: func(_ context.Context, computer string, session int, paths []string) domain.FileRecoveryPlan {
+			plan := domain.FileRecoveryPlan{
+				SchemaVersion: domain.SchemaVersion, Operation: "file-recovery-plan", State: "ready", Repository: "/demo/lab", Requested: computer,
+				Target: domain.FileRecoveryTarget{HostMeta: domain.HostMeta{Name: computer, IP: hostIP(computer)}}, Session: session,
+				Paths: append([]string(nil), paths...), ExpiresAt: demoObservedAt.Add(15 * time.Minute), Issues: []domain.ValidationIssue{},
+			}
+			if session >= 1 && session <= len(sessions) {
+				plan.SessionID, plan.SavedAt = sessions[session-1].ID, sessions[session-1].SavedAt
+			}
+			plan.ReviewToken = domain.FileRecoveryReviewToken(plan)
+			plan.Message = fmt.Sprintf("Copies %d chosen item(s) into the folder “%s” on the desktop of %s. Nothing there is replaced.", len(paths), domain.FileRecoveryFolder, computer)
+			return plan
+		},
+		Apply: func(plan domain.FileRecoveryPlan) domain.FileRecoveryReport {
+			placed := make([]string, 0, len(plan.Paths))
+			for _, chosen := range plan.Paths {
+				placed = append(placed, path.Base(chosen))
+			}
+			return domain.FileRecoveryReport{
+				SchemaVersion: domain.SchemaVersion, Operation: "file-recovery-apply", State: "completed", Computer: plan.Target.Name,
+				Restored: &domain.FileRecoveryRestored{Folder: domain.FileRecoveryFolder, Placed: placed, Files: len(placed), Bytes: 4096},
+				Message:  fmt.Sprintf("%d file(s) copied into “%s” on %s. They stay until the computer restarts: the student should save them where they keep their work.", len(placed), domain.FileRecoveryFolder, plan.Target.Name),
+			}
+		},
+	}
 }
 
 // demoStubMissingActions gives every remaining callback an empty answer. Some
