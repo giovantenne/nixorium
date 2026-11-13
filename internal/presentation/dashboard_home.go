@@ -69,6 +69,9 @@ func (model dashboardModel) availableComputerTasks() []dashboardTask {
 	if model.actions.PlanShare != nil {
 		tasks = append(append([]dashboardTask{}, tasks...), sendDesktopTask)
 	}
+	if model.actions.FileRecovery != nil {
+		tasks = append(append([]dashboardTask{}, tasks...), recoverFilesTask)
+	}
 	if model.actions.LoadDeferredUpdates != nil && !model.actions.ClassroomMode {
 		// Right after Update computers, which queues them.
 		for index, task := range tasks {

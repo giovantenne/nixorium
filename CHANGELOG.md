@@ -14,6 +14,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   computer applies the new number at its first startup after Update computers:
   a lower number deletes the oldest snapshots, and 0 keeps none and deletes
   those already saved. The settings review says so before saving.
+- **Computers → Recover student files**, for the teacher and the
+  administrator: choose a student computer, one of its saved sessions and
+  the files or folders, and after a review they are copied into a
+  "Recovered files" folder on that computer's desktop. Nothing there is
+  replaced, the student's own files are not changed, and it works with or
+  without the classroom view. Each student computer needs Update computers
+  before it can be used.
 
 ## [3.13.1] - 2026-11-09
 

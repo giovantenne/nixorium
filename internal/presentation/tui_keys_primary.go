@@ -134,7 +134,7 @@ func (model dashboardModel) updateComputersAreaKey(key tea.KeyPressMsg) (tea.Mod
 		}
 		model.navigation.areaReturn = dashboardComputersArea
 		return model.openComputerTask(action)
-	case "h", "x", "i", "l", "s":
+	case "h", "x", "i", "l", "s", "r":
 		model.navigation.areaReturn = dashboardComputersArea
 		return model.openComputerTask(action)
 	case "u":

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/giovantenne/nixorium/internal/classroomview"
 	"golang.org/x/sys/unix"
 )
 
@@ -446,6 +447,77 @@ func TestResetLifecycleVM(t *testing.T) {
 				t.Fatal("invalid snapshot count accepted", err)
 			}
 			names(t, 3)
+		}
+	})
+	t.Run("file-recovery-writes-as-the-student", func(t *testing.T) {
+		writeFixture(t, home+"/Documents/essay.txt")
+		writeFixture(t, home+"/Desktop/Project/main.c")
+		writeFixture(t, home+"/Desktop/Project/.git/config")
+		linkFixture(t, "/etc/shadow", home+"/Desktop/Project/shadow")
+		if err := Reset(config); err != nil {
+			t.Fatal(err)
+		}
+		sessions, err := recoverySessions(publishedSnapshots)
+		if err != nil || len(sessions) == 0 || sessions[0].Number != 1 || sessions[0].SavedAt.IsZero() || time.Since(sessions[0].SavedAt) > time.Hour {
+			t.Fatal("unexpected saved sessions", sessions, err)
+		}
+		root, err := sessionDirectory(publishedSnapshots, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		listing, err := recoveryList(root, 1, "Desktop/Project")
+		if err != nil || len(listing.Entries) != 1 || listing.Entries[0].Name != "main.c" {
+			t.Fatal("unexpected listing", listing, err)
+		}
+		restored, err := recoverAsStudent(config, root, []string{"Documents/essay.txt", "Desktop/Project"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		desktop, err := classroomview.DesktopDirectory(home)
+		if err != nil {
+			t.Fatal(err)
+		}
+		folder := filepath.Join(desktop, "Recovered files")
+		if restored.Files != 2 || strings.Join(restored.Placed, ",") != "essay.txt,Project" {
+			t.Fatal("unexpected recovery", restored)
+		}
+		intact(t, folder+"/essay.txt")
+		intact(t, folder+"/Project/main.c")
+		for _, absent := range []string{"Project/.git", "Project/shadow"} {
+			if _, err := os.Lstat(folder + "/" + absent); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("hidden file or link recovered", absent, err)
+			}
+		}
+		for name, mode := range map[string]os.FileMode{folder: 0755, folder + "/Project": 0755, folder + "/essay.txt": 0644, folder + "/Project/main.c": 0644} {
+			info, err := os.Lstat(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if stat := info.Sys().(*syscall.Stat_t); stat.Uid != 2000 || stat.Gid != 100 || info.Mode().Perm() != mode {
+				t.Fatalf("%s: uid %d gid %d mode %v", name, stat.Uid, stat.Gid, info.Mode().Perm())
+			}
+		}
+		// A second recovery never replaces the first.
+		if restored, err := recoverAsStudent(config, root, []string{"Documents/essay.txt"}); err != nil || restored.Placed[0] != "essay (2).txt" {
+			t.Fatal("second recovery", restored, err)
+		}
+		intact(t, folder+"/essay (2).txt")
+		// The student cannot redirect the copy: a desktop folder replaced by a
+		// link to a root-owned folder makes the write fail as the student.
+		if err := os.RemoveAll(folder); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink("/etc", folder); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := recoverAsStudent(config, root, []string{"Documents/essay.txt"}); err == nil {
+			t.Fatal("recovery wrote through a link to a root-owned folder")
+		}
+		if _, err := os.Lstat("/etc/essay.txt"); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("recovery wrote into /etc", err)
+		}
+		if err := os.Remove(folder); err != nil {
+			t.Fatal(err)
 		}
 	})
 	t.Run("failed-recovery-blocks-retry", func(t *testing.T) {

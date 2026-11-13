@@ -59,7 +59,7 @@ func (o ClassroomOperation) Valid() bool {
 		ClassroomWakePlanOperation, ClassroomWakeApplyOperation:
 		return true
 	default:
-		return saveOperations[o] || collectOperations[o] || messageOperations[o] || scheduleOperations[o]
+		return saveOperations[o] || collectOperations[o] || messageOperations[o] || scheduleOperations[o] || fileRecoveryOperations[o]
 	}
 }
 
@@ -97,6 +97,12 @@ type ClassroomRequest struct {
 	MessagePlan    *MessagePlan    `json:"messagePlan,omitempty"`
 	// Schedule is the schedule to set; an empty one clears it.
 	Schedule *Schedule `json:"schedule,omitempty"`
+	// Recovering a student's files (file_recovery.go): the saved session, the
+	// folder to list or the chosen paths, and the reviewed plan to apply.
+	FileRecoverySession int               `json:"recoverySession,omitempty"`
+	FileRecoveryPath    string            `json:"recoveryPath,omitempty"`
+	FileRecoveryPaths   []string          `json:"recoveryPaths,omitempty"`
+	FileRecoveryPlan    *FileRecoveryPlan `json:"recoveryPlan,omitempty"`
 }
 
 // Send files from the classroom view page: what the user's file chooser
@@ -142,6 +148,11 @@ type ClassroomResponse struct {
 	MessageReport *MessageReport `json:"messageReport,omitempty"`
 	// The schedule, after it was read or set.
 	Schedule *ScheduleReport `json:"schedule,omitempty"`
+	// Saved sessions, a folder of one, the recovery review and its result.
+	FileRecoverySessions []FileRecoverySession `json:"recoverySessions,omitempty"`
+	FileRecoveryListing  *FileRecoveryListing  `json:"recoveryListing,omitempty"`
+	FileRecoveryPlan     *FileRecoveryPlan     `json:"recoveryPlan,omitempty"`
+	FileRecoveryReport   *FileRecoveryReport   `json:"recoveryReport,omitempty"`
 }
 
 func NewClassroomRequest(operation ClassroomOperation) (ClassroomRequest, error) {

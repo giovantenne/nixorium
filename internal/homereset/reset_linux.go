@@ -94,30 +94,8 @@ func ResetConfigured() error {
 	if os.Geteuid() != 0 {
 		return errors.New("reset requires root")
 	}
-	if err := trustedDirectory("/etc"); err != nil {
-		return err
-	}
-	const configPath = "/etc/nixorium-workspace-reset.json"
-	info, err := os.Lstat(configPath)
+	config, err := loadConfigured()
 	if err != nil {
-		return err
-	}
-	if info.Sys().(*syscall.Stat_t).Uid != 0 {
-		return errors.New("reset configuration is not root-owned")
-	}
-	resolved, err := filepath.EvalSymlinks(configPath)
-	if err != nil {
-		return err
-	}
-	if err := immutableStoreFile(resolved); err != nil {
-		return err
-	}
-	data, err := readBounded(resolved, 128*1024)
-	if err != nil {
-		return err
-	}
-	var config Config
-	if err := decodeStrict(data, &config); err != nil {
 		return err
 	}
 	return Reset(config)

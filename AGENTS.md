@@ -799,7 +799,11 @@ that release's notes, so a release is not finished until the site follows it.
   writable-snapshot or already-recovered states still block login until an
   administrator inspects them. Never overwrite or rotate away the retained
   snapshot, repeat a verified publication, or treat a previous success
-  receipt as completion of a pending attempt. The fixed root-only `nixorium-home-reset`
+  receipt as completion of a pending attempt. `nixorium-home-recover`
+  (Computers → Recover student files) only reads published snapshots as root,
+  never follows links, and writes into the student home only from its child
+  running with the student's credentials; keep the review bound to the
+  session's time so a restart that moves the sessions is refused. The fixed root-only `nixorium-home-reset`
   helper accepts no target arguments and reads only its store-backed system
   configuration. The isolated `modules/workspace-reset.nix` service retains
   the `home-reset` unit name, never restarts on switch, and gates both the

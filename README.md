@@ -101,8 +101,10 @@ together. Open **Nixorium** for the restricted classroom dashboard.
 
 - **A clean desktop at every boot.** Every student PC starts with the same
   GNOME desktop and applications. The last sessions (five unless you choose
-  another number, up to 30) stay on that PC as snapshots, so a lost file can be recovered from **Snapshots** in the Files
-  sidebar.
+  another number, up to 30) stay on that PC as snapshots. **Computers →
+  Recover student files** copies a lost file or folder from one of them back
+  to that student's desktop, and **Snapshots** in the Files sidebar shows
+  them too.
 - **Help students from your desk.** See every student screen at once, open
   one in its own window, take control or save a screenshot of it, lock
   screens, show students a message, collect students' files from their desktops,

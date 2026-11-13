@@ -88,6 +88,9 @@ var screenHelp = map[dashboardScreen]helpText{
 	dashboardLock: helpText{head: []string{
 		"Space select clients; a select all; Tab choose lock or unlock; Enter review, then Enter applies.", "A locked screen shows \"Eyes on the teacher\" and ignores keyboard and mouse; logging out or restarting unlocks it.", "Computers that are off or have nobody signed in are listed and skipped.",
 	}},
+	dashboardFileRecovery: helpText{head: []string{
+		"At every startup a student computer saves the previous session; Change settings → Student snapshots sets how many it keeps (5 unless changed).", "Choose the computer the student used, then the session: \"Session before\" names when the computer was next switched on.", "Enter opens a folder, Backspace goes up, Space chooses a file or folder, r reviews; Enter in the review copies.", "The copies go into the folder \"Recovered files\" on that computer's desktop; nothing is replaced and the student's own files are not changed.", "The copies disappear at the next restart like everything in the student account: the student should save them where they keep their work. Hidden files are not copied.",
+	}},
 	dashboardInternet: helpText{head: []string{
 		"Space select clients; a select all; Tab choose block or unblock; Enter review.", "r checks Internet access on all clients (read-only); n selects those the chosen action would change.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.",
 	}},

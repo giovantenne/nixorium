@@ -402,9 +402,33 @@ npm, and XDG roots for admin, teacher, and student accounts. If a runtime
 directory already exists, only its top-level ownership and mode are reconciled;
 logind remains responsible for creating `/run/user/<uid>` and its contents.
 
-Administrators and the teacher can read and copy a file from the snapshot
-store (`snapshot-1` is the newest); only the administrator can write it back
-into the student home, which belongs to the student:
+**Computers → Recover student files** (teacher and administrator) copies
+files back from one computer's snapshots. It lists the computer's saved
+sessions with the time each was taken (when the computer was next switched
+on), browses the folders of one, and after a review copies the chosen files
+and folders into `Recovered files` on that computer's XDG desktop. Hidden
+names, links and special files are left out, at most 2000 items and 500 MB
+are copied at once, and nothing in the student home is replaced: a taken name
+becomes "name (2)". The copies are ordinary files of the student home, so
+the next reset removes them like everything else there. It works with or
+without the classroom view.
+
+The controller runs the client's fixed `nixorium-home-recover` helper as
+root over SSH, as the administrator's dashboard does directly and the
+classroom service does for the teacher; the helper reads one JSON request
+on standard input and writes one JSON answer. Root only reads the read-only
+published snapshots, opening every name without following links; it streams
+the files to a copy of the helper running with the student's user and group,
+which writes them through a private staging folder in the home with modes
+0755/0644, so nothing the student controls can redirect the write. The
+review binds the computer, the session number, its time and the paths for
+ten minutes; applying asks the computer again and refuses when a restart
+moved the sessions since the review.
+
+Administrators and the teacher can also read and copy a file from the
+snapshot store (`snapshot-1` is the newest) in Files → Snapshots; writing it
+back by hand into the student home, which belongs to the student, needs the
+administrator:
 
 ```sh
 ls /var/lib/home-snapshots/workspace/snapshot-1/

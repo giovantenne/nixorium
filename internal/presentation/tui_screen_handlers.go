@@ -48,6 +48,8 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.screen = dashboardLock
 		model.lock = lockModel{hostPicker: newHostPicker(), action: domain.LockOn}
 		model.message = ""
+	case "r":
+		return model.openFileRecovery()
 	case "s":
 		if model.actions.PlanShare == nil {
 			return model, nil
@@ -231,6 +233,8 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		return model.updateLock(key)
 	case dashboardShare:
 		return model.updateShare(key)
+	case dashboardFileRecovery:
+		return model.updateFileRecovery(key)
 	case dashboardDeferredUpdates:
 		return model.updateDeferredUpdates(key)
 	case dashboardNetworkChange:

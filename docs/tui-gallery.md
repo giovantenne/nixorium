@@ -942,6 +942,7 @@ computers on, shut them down or restart them after a review. Administrative conf
   [i] Internet access
   [l] Lock screens
   [s] Send files
+  [r] Recover student files
 
 See, control and lock the students' screens, show yours, send your desktop
 
