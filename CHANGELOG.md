@@ -26,6 +26,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   changed; recovered files keep their modification times. Each student
   computer needs Update computers before it can be used.
 
+### Security
+
+- The required Go is now 1.26.11 (was 1.26.10), which fixes GO-2026-6859 in
+  the standard library. While the package set has an older Go, Nixorium keeps
+  using the official build from go.dev.
+
 ## [3.13.1] - 2026-11-09
 
 From 3.13.0, Update Nixorium, then Apply to controller. A controller blocked
