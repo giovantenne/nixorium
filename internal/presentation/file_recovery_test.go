@@ -78,7 +78,7 @@ func TestRecoverStudentFilesBrowseChooseReviewAndApply(t *testing.T) {
 	text := func(value string) tea.KeyPressMsg { return tea.KeyPressMsg{Code: rune(value[0]), Text: value} }
 	key(code(tea.KeyDown))
 	key(code(tea.KeyEnter))
-	if model.fileRecovery.stage != recoveryStageSession || model.fileRecovery.computer != "pc02" || !strings.Contains(model.View().Content, "Session before") {
+	if model.fileRecovery.stage != recoveryStageSession || model.fileRecovery.computer != "pc02" || !strings.Contains(model.View().Content, "Last change") {
 		t.Fatalf("sessions: stage %d, %q\n%s", model.fileRecovery.stage, model.message, model.View().Content)
 	}
 	key(code(tea.KeyDown))

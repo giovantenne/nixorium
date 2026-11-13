@@ -70,9 +70,12 @@ type FileRecoveryHelperRequest struct {
 
 // FileRecoverySession is one saved session: Number 1 is the most recent.
 // SavedAt is when the computer started and saved the session before it.
+// LastChange is the most recent modification of the session's visible
+// files and folders; zero when it is not known.
 type FileRecoverySession struct {
-	Number  int       `json:"number"`
-	SavedAt time.Time `json:"savedAt"`
+	Number     int       `json:"number"`
+	SavedAt    time.Time `json:"savedAt"`
+	LastChange time.Time `json:"lastChange"`
 }
 
 // FileRecoveryEntry is a file or folder of a listed folder.

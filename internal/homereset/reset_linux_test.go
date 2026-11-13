@@ -483,6 +483,19 @@ func TestResetLifecycleVM(t *testing.T) {
 		}
 		intact(t, folder+"/essay.txt")
 		intact(t, folder+"/Project/main.c")
+		if sessions[0].LastChange.IsZero() {
+			t.Fatal("no last change for the newest session")
+		}
+		for _, name := range []string{"Documents/essay.txt", "Desktop/Project/main.c"} {
+			saved, err := os.Stat(root + "/" + name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			copied, err := os.Stat(folder + "/" + strings.TrimPrefix(strings.TrimPrefix(name, "Documents/"), "Desktop/"))
+			if err != nil || !copied.ModTime().Equal(saved.ModTime()) {
+				t.Fatal("modification time not kept", name, err)
+			}
+		}
 		for _, absent := range []string{"Project/.git", "Project/shadow"} {
 			if _, err := os.Lstat(folder + "/" + absent); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("hidden file or link recovered", absent, err)

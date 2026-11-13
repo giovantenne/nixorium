@@ -326,10 +326,13 @@ read-only snapshot (five unless you choose another number, from 0 to 30, in
 **Maintenance → Change settings → Student snapshots**). To give a student
 back a lost file, open **Computers → Recover student files** as `admin` or
 the teacher, choose the computer the student used, then the saved session:
-"Session before" names when the computer was next switched on. Enter opens a
+"Last change" is when one of its visible files or folders last changed, and
+"saved at startup" when the computer was next switched on. Enter opens a
 folder, Backspace goes up, Space chooses a file or folder and r reviews;
 Enter in the review copies them into **Recovered files** on that computer's
-desktop. Nothing there is replaced, the student's own files are not changed,
+desktop, with their original modification times; they belong to the
+student and files are never executable. Nothing there is replaced, the
+student's own files are not changed,
 hidden files and links are left out, and at most 2000 items and 500 MB are
 copied at once. The copies disappear at the next restart like everything in
 the student account, so the student should save them where they keep their

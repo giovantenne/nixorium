@@ -404,9 +404,12 @@ logind remains responsible for creating `/run/user/<uid>` and its contents.
 
 **Computers → Recover student files** (teacher and administrator) copies
 files back from one computer's snapshots. It lists the computer's saved
-sessions with the time each was taken (when the computer was next switched
-on), browses the folders of one, and after a review copies the chosen files
-and folders into `Recovered files` on that computer's XDG desktop. Hidden
+sessions with their last change (the newest modification time of a visible
+file or folder, found within 50,000 entries and 15 seconds for all sessions)
+and the time each was taken (when the computer was next switched on),
+browses the folders of one, and after a review copies the chosen files and
+folders into `Recovered files` on that computer's XDG desktop with their
+original modification times. Hidden
 names, links and special files are left out, at most 2000 items and 500 MB
 are copied at once, and nothing in the student home is replaced: a taken name
 becomes "name (2)". The copies are ordinary files of the student home, so

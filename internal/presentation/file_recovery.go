@@ -96,11 +96,18 @@ func (m fileRecoveryModel) entryPath(entry domain.FileRecoveryEntry) string {
 	return m.listing.Path + "/" + entry.Name
 }
 
+// recoverySessionLabel names a session by its last change, which is when
+// the student last worked, and by when the computer saved it at startup.
 func recoverySessionLabel(session domain.FileRecoverySession) string {
-	if session.SavedAt.IsZero() {
+	const layout = "Mon 2 Jan 15:04"
+	saved := "saved at startup " + session.SavedAt.Local().Format(layout)
+	switch {
+	case session.SavedAt.IsZero():
 		return fmt.Sprintf("Session %d", session.Number)
+	case session.LastChange.IsZero():
+		return "Last change unknown · " + saved
 	}
-	return "Session before " + session.SavedAt.Local().Format("Mon 2 Jan 2006, 15:04")
+	return "Last change " + session.LastChange.Local().Format(layout) + " · " + saved
 }
 
 func (model dashboardModel) openFileRecovery() (tea.Model, tea.Cmd) {
@@ -304,7 +311,7 @@ func (model dashboardModel) fileRecoveryView() string {
 		}
 		shell.actions = []tuiAction{{key: "Enter", label: "Choose"}, {key: "↑/↓", label: "Move"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	case recoveryStageSession:
-		lines = append(lines, tuiMuted("Saved sessions of "+m.computer+", the most recent first. Each is what the computer held when it was next switched on.", dark), "")
+		lines = append(lines, tuiMuted("Saved sessions of "+m.computer+", the most recent first. \"Last change\" is when a visible file or folder last changed.", dark), "")
 		if len(m.sessions) == 0 {
 			lines = append(lines, "This computer has no saved session. The number of saved sessions is set in Change settings → Student snapshots.")
 		}
@@ -350,7 +357,7 @@ func (model dashboardModel) fileRecoveryView() string {
 	case recoveryStageReview:
 		lines = append(lines, "", m.plan.Message, "")
 		if !m.plan.HasErrors() {
-			lines = append(lines, tuiMuted(recoverySessionLabel(domain.FileRecoverySession{Number: m.plan.Session, SavedAt: m.plan.SavedAt}), dark))
+			lines = append(lines, tuiMuted(recoverySessionLabel(m.session), dark))
 			for _, name := range m.plan.Paths {
 				lines = append(lines, "  "+name)
 			}

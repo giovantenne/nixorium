@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -136,10 +137,17 @@ func TestRecoveryTreeAndWriting(t *testing.T) {
 	if err := os.Symlink("/etc/passwd", filepath.Join(root, "Desktop", "Project", "passwd")); err != nil {
 		t.Fatal(err)
 	}
-	entries, sources, err := recoveryTree(root, []string{"Desktop/notes.txt", "Desktop/Project", "Documents/notes.txt"})
+	old := time.Date(2026, 3, 4, 10, 30, 0, 0, time.UTC)
+	for _, name := range []string{"Desktop/Project/main.c", "Desktop/Project"} {
+		if err := os.Chtimes(filepath.Join(root, name), old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := recoveryTree(root, []string{"Desktop/notes.txt", "Desktop/Project", "Documents/notes.txt"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	entries, sources := items.entries, items.sources
 	paths := []string{}
 	for _, entry := range entries {
 		paths = append(paths, entry.Path)
@@ -149,7 +157,7 @@ func TestRecoveryTreeAndWriting(t *testing.T) {
 	}
 
 	var stream bytes.Buffer
-	if err := streamRecovery(&stream, root, entries, sources); err != nil {
+	if err := streamRecovery(&stream, root, items); err != nil {
 		t.Fatal(err)
 	}
 	home := t.TempDir()
@@ -173,6 +181,12 @@ func TestRecoveryTreeAndWriting(t *testing.T) {
 		data, err := os.ReadFile(filepath.Join(home, "Desktop", domain.FileRecoveryFolder, filepath.FromSlash(name)))
 		if err != nil || string(data) != want {
 			t.Fatalf("%s = %q, %v", name, data, err)
+		}
+	}
+	for _, name := range []string{"Project", "Project/main.c"} {
+		info, err := os.Stat(filepath.Join(home, "Desktop", domain.FileRecoveryFolder, filepath.FromSlash(name)))
+		if err != nil || !info.ModTime().Equal(old) {
+			t.Fatalf("%s modified %v, want %v (%v)", name, info.ModTime(), old, err)
 		}
 	}
 	if _, err := os.Lstat(filepath.Join(home, "Desktop", domain.FileRecoveryFolder, "Project", ".git")); !os.IsNotExist(err) {
@@ -201,7 +215,7 @@ func TestRecoveryTreeRefusals(t *testing.T) {
 		{[]string{"Desktop/etc"}, domain.FileRecoveryCodeNotFound},
 		{[]string{"Desktop/etc/passwd"}, domain.FileRecoveryCodeNotFound},
 	} {
-		if _, _, err := recoveryTree(root, test.paths); refusal(err) != test.code {
+		if _, err := recoveryTree(root, test.paths); refusal(err) != test.code {
 			t.Fatalf("%v = %v, want %s", test.paths, err, test.code)
 		}
 	}
@@ -214,7 +228,7 @@ func TestRecoveryTreeRefusals(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, _, err := recoveryTree(root, []string{"Big"}); refusal(err) != domain.FileRecoveryCodeTooLarge {
+	if _, err := recoveryTree(root, []string{"Big"}); refusal(err) != domain.FileRecoveryCodeTooLarge {
 		t.Fatalf("too many files = %v", err)
 	}
 }
@@ -226,12 +240,12 @@ func TestWritingRefusesBrokenStreams(t *testing.T) {
 	}
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{"a.txt": "abcdef"})
-	entries, sources, err := recoveryTree(root, []string{"a.txt"})
+	items, err := recoveryTree(root, []string{"a.txt"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	var stream bytes.Buffer
-	if err := streamRecovery(&stream, root, entries, sources); err != nil {
+	if err := streamRecovery(&stream, root, items); err != nil {
 		t.Fatal(err)
 	}
 	short := stream.Bytes()[:stream.Len()-2]
@@ -240,6 +254,34 @@ func TestWritingRefusesBrokenStreams(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(home, "Desktop", domain.FileRecoveryFolder, "a.txt")); !os.IsNotExist(err) {
 		t.Fatalf("a partial file appeared: %v", err)
+	}
+}
+
+func TestLastChangeIgnoresHiddenNamesAndLinks(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{"Desktop/essay.odt": "x", "Documents/old.txt": "y", ".config/app/state": "z"})
+	essay := time.Date(2026, 11, 9, 11, 40, 0, 0, time.UTC)
+	old := essay.Add(-48 * time.Hour)
+	for name, when := range map[string]time.Time{"Desktop/essay.odt": essay, "Desktop": old, "Documents/old.txt": old, "Documents": old} {
+		if err := os.Chtimes(filepath.Join(root, name), when, when); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink("/etc", filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	// The hidden folder and the home itself are newer and do not count.
+	changed, known := lastChange(root, time.Now().Add(time.Minute))
+	if !known || !changed.Equal(essay) {
+		t.Fatalf("last change = %v, %v; want %v", changed, known, essay)
+	}
+	if _, known := lastChange(root, time.Now().Add(-time.Second)); known {
+		t.Fatal("a passed deadline gave a last change")
+	}
+	empty := t.TempDir()
+	writeTree(t, empty, map[string]string{".bashrc": "x"})
+	if _, known := lastChange(empty, time.Now().Add(time.Minute)); known {
+		t.Fatal("a home with nothing visible gave a last change")
 	}
 }
 

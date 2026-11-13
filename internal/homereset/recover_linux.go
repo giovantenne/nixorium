@@ -173,7 +173,84 @@ func recoverySessions(directory string) ([]domain.FileRecoverySession, error) {
 		sessions = append(sessions, domain.FileRecoverySession{Number: number, SavedAt: saved.UTC()})
 	}
 	slices.SortFunc(sessions, func(a, b domain.FileRecoverySession) int { return a.Number - b.Number })
+	// The last change of every session, most recent sessions first, within
+	// one time budget: a session not reached keeps only its saving time.
+	deadline := time.Now().Add(lastChangeBudget)
+	for index := range sessions {
+		name := filepath.Join(directory, "snapshot-"+strconv.Itoa(sessions[index].Number))
+		if changed, known := lastChange(name, deadline); known {
+			sessions[index].LastChange = changed.UTC()
+		}
+	}
 	return sessions, nil
+}
+
+// Bounds of the search for a session's last change.
+const (
+	lastChangeBudget  = 15 * time.Second
+	lastChangeEntries = 50000
+)
+
+// lastChange finds the most recent modification time among the visible
+// files and folders of a saved home: hidden names (programs' settings and
+// caches, which change on their own) and links are left out, and the home
+// folder itself does not count. It reports false when the home has nothing
+// visible, is too large or the deadline passes.
+func lastChange(root string, deadline time.Time) (time.Time, bool) {
+	fd, err := unix.Open(root, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return time.Time{}, false
+	}
+	var newest time.Time
+	seen := 0
+	var walk func(folder *os.File, depth int) bool
+	walk = func(folder *os.File, depth int) bool {
+		names := []string{}
+		if err := walkEntries(folder, func(name string) error {
+			if !strings.HasPrefix(name, ".") {
+				names = append(names, name)
+			}
+			return nil
+		}); err != nil {
+			return false
+		}
+		for _, name := range names {
+			seen++
+			if seen > lastChangeEntries || time.Now().After(deadline) {
+				return false
+			}
+			var stat unix.Stat_t
+			if err := unix.Fstatat(int(folder.Fd()), name, &stat, unix.AT_SYMLINK_NOFOLLOW); err != nil {
+				return false
+			}
+			kind := stat.Mode & unix.S_IFMT
+			if kind != unix.S_IFREG && kind != unix.S_IFDIR {
+				continue
+			}
+			if modified := time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec); modified.After(newest) {
+				newest = modified
+			}
+			if kind == unix.S_IFDIR && depth < 32 {
+				child, err := unix.Openat(int(folder.Fd()), name, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+				if err != nil {
+					return false
+				}
+				file := os.NewFile(uintptr(child), name)
+				complete := walk(file, depth+1)
+				file.Close()
+				if !complete {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	home := os.NewFile(uintptr(fd), root)
+	defer home.Close()
+	if !walk(home, 0) || newest.IsZero() {
+		return time.Time{}, false
+	}
+	return newest, true
 }
 
 // sessionDirectory names a published snapshot that exists.
@@ -282,6 +359,14 @@ func recoveryList(root string, session int, relative string) (*domain.FileRecove
 	return listing, nil
 }
 
+// recoveryItems are the entries to write, the modification time of each
+// (Unix nanoseconds) and the saved file of each file entry.
+type recoveryItems struct {
+	entries  []classroomview.FileEntry
+	modified []int64
+	sources  []recoverySource
+}
+
 // recoverySource is the saved file of a file entry, relative to the
 // session root.
 type recoverySource struct {
@@ -293,12 +378,13 @@ type recoverySource struct {
 // folders before their contents, each chosen item at the top under its own
 // name ("name (2)" when two chosen items share a name). Hidden names, links
 // and special files inside chosen folders are left out.
-func recoveryTree(root string, paths []string) ([]classroomview.FileEntry, []recoverySource, error) {
+func recoveryTree(root string, paths []string) (recoveryItems, error) {
 	if err := domain.ValidFileRecoveryPaths(paths); err != nil {
-		return nil, nil, refuse(domain.FileRecoveryCodeInvalid, "The choice is not valid: "+err.Error()+".")
+		return recoveryItems{}, refuse(domain.FileRecoveryCodeInvalid, "The choice is not valid: "+err.Error()+".")
 	}
 	tooLarge := refuse(domain.FileRecoveryCodeTooLarge, fmt.Sprintf("The chosen files are more than %d or larger than %d MB; choose fewer.", classroomview.MaxFileEntries, classroomview.MaxFileBytes>>20))
 	entries := []classroomview.FileEntry{}
+	modified := []int64{}
 	sources := []recoverySource{}
 	used := map[string]bool{}
 	var total int64
@@ -324,10 +410,12 @@ func recoveryTree(root string, paths []string) ([]classroomview.FileEntry, []rec
 				return tooLarge
 			}
 			entries = append(entries, classroomview.FileEntry{Path: target, Size: stat.Size})
+			modified = append(modified, stat.Mtim.Nano())
 			sources = append(sources, recoverySource{entry: len(entries) - 1, source: source})
 			return nil
 		}
 		entries = append(entries, classroomview.FileEntry{Path: target, Dir: true})
+		modified = append(modified, stat.Mtim.Nano())
 		fd, err := unix.Openat(int(parent.Fd()), name, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 		if err != nil {
 			return err
@@ -358,23 +446,23 @@ func recoveryTree(root string, paths []string) ([]classroomview.FileEntry, []rec
 		}
 		parent, err := openBelow(root, folder, true)
 		if missing(err) {
-			return nil, nil, refuse(domain.FileRecoveryCodeNotFound, "“"+chosen+"” is not in the saved session.")
+			return recoveryItems{}, refuse(domain.FileRecoveryCodeNotFound, "“"+chosen+"” is not in the saved session.")
 		} else if err != nil {
-			return nil, nil, err
+			return recoveryItems{}, err
 		}
 		name := path.Base(chosen)
 		err = add(parent, name, chosen, uniqueName(name, used), 0)
 		parent.Close()
 		if missing(err) {
-			return nil, nil, refuse(domain.FileRecoveryCodeNotFound, "“"+chosen+"” is not in the saved session.")
+			return recoveryItems{}, refuse(domain.FileRecoveryCodeNotFound, "“"+chosen+"” is not in the saved session.")
 		} else if err != nil {
-			return nil, nil, err
+			return recoveryItems{}, err
 		}
 	}
 	if err := classroomview.ValidateFileEntries(entries); err != nil {
-		return nil, nil, refuse(domain.FileRecoveryCodeInvalid, "The chosen files cannot be recovered: "+err.Error()+".")
+		return recoveryItems{}, refuse(domain.FileRecoveryCodeInvalid, "The chosen files cannot be recovered: "+err.Error()+".")
 	}
-	return entries, sources, nil
+	return recoveryItems{entries, modified, sources}, nil
 }
 
 // uniqueName gives a top-level name not used yet: "name (2).ext" and so on.
@@ -395,11 +483,14 @@ func uniqueName(name string, used map[string]bool) string {
 // recoveryHeader starts the stream to the writing child.
 type recoveryHeader struct {
 	Entries []classroomview.FileEntry `json:"entries"`
+	// Modified is each entry's modification time in Unix nanoseconds.
+	Modified []int64 `json:"modified"`
 }
 
 // streamRecovery writes the header and then each file's bytes in order.
-func streamRecovery(output io.Writer, root string, entries []classroomview.FileEntry, sources []recoverySource) error {
-	header, err := json.Marshal(recoveryHeader{Entries: entries})
+func streamRecovery(output io.Writer, root string, items recoveryItems) error {
+	entries := items.entries
+	header, err := json.Marshal(recoveryHeader{Entries: entries, Modified: items.modified})
 	if err != nil {
 		return err
 	}
@@ -411,7 +502,7 @@ func streamRecovery(output io.Writer, root string, entries []classroomview.FileE
 	if _, err := output.Write(append(length[:], header...)); err != nil {
 		return err
 	}
-	for _, source := range sources {
+	for _, source := range items.sources {
 		size := entries[source.entry].Size
 		if size == 0 {
 			continue
@@ -432,7 +523,7 @@ func streamRecovery(output io.Writer, root string, entries []classroomview.FileE
 // recoverAsStudent lists the chosen files and streams them to a child that
 // writes them as the student.
 func recoverAsStudent(config Config, root string, paths []string) (*domain.FileRecoveryRestored, error) {
-	entries, sources, err := recoveryTree(root, paths)
+	items, err := recoveryTree(root, paths)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +560,7 @@ func recoverAsStudent(config Config, root string, paths []string) (*domain.FileR
 	if err := child.Start(); err != nil {
 		return nil, err
 	}
-	streamErr := streamRecovery(stdin, root, entries, sources)
+	streamErr := streamRecovery(stdin, root, items)
 	stdin.Close()
 	waitErr := child.Wait()
 	if streamErr != nil {
@@ -499,6 +590,39 @@ func recoverAsStudent(config Config, root string, paths []string) (*domain.FileR
 		return nil, streamErr
 	}
 	return reply.Restored, nil
+}
+
+// keepModificationTimes gives the written files and folders the
+// modification times they had in the saved session, deepest first so a
+// folder's time is not changed again by its contents. A top-level item may
+// have been placed under another name ("name (2)"). It is best effort: the
+// files are already in place and the student may be using them.
+func keepModificationTimes(folder string, header recoveryHeader, placed []string) {
+	tops := map[string]string{}
+	index := 0
+	for _, entry := range header.Entries {
+		if !strings.Contains(entry.Path, "/") && index < len(placed) {
+			tops[entry.Path] = placed[index]
+			index++
+		}
+	}
+	order := make([]int, len(header.Entries))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortStableFunc(order, func(a, b int) int {
+		return strings.Count(header.Entries[b].Path, "/") - strings.Count(header.Entries[a].Path, "/")
+	})
+	for _, i := range order {
+		top, rest, _ := strings.Cut(header.Entries[i].Path, "/")
+		name, found := tops[top]
+		if !found {
+			continue
+		}
+		target := filepath.Join(folder, name, filepath.FromSlash(rest))
+		times := []unix.Timespec{unix.NsecToTimespec(header.Modified[i]), unix.NsecToTimespec(header.Modified[i])}
+		_ = unix.UtimesNanoAt(unix.AT_FDCWD, target, times, unix.AT_SYMLINK_NOFOLLOW)
+	}
 }
 
 // limitedBuffer keeps at most limit bytes and fails beyond.
@@ -566,6 +690,9 @@ func writeRecoveredInto(input io.Reader, home string) (*domain.FileRecoveryResto
 	if err := decodeStrict(data, &header); err != nil {
 		return nil, err
 	}
+	if len(header.Modified) != len(header.Entries) {
+		return nil, errors.New("the list of files is not valid")
+	}
 	desktop, err := classroomview.DesktopDirectory(home)
 	if err != nil {
 		return nil, err
@@ -594,10 +721,12 @@ func writeRecoveredInto(input io.Reader, home string) (*domain.FileRecoveryResto
 			remaining -= int64(len(chunk))
 		}
 	}
+	folder := filepath.Join(desktop, domain.FileRecoveryFolder)
 	placed, err := writer.Finish()
 	if err != nil {
 		return nil, err
 	}
+	keepModificationTimes(folder, header, placed)
 	relative, err := filepath.Rel(home, filepath.Join(desktop, domain.FileRecoveryFolder))
 	if err != nil {
 		relative = domain.FileRecoveryFolder
