@@ -93,8 +93,8 @@ func RenderDemoGraphs(sourceCommit, sourceDate string) DemoGraphBundle {
 		Terminal:      fmt.Sprintf("%dx%d", width, height),
 		Synthetic:     true,
 		Graphs: []DemoGraph{
-			exploreDemoGraph("teacher", "Teacher dashboard", func() dashboardModel { return demoExploreModel(sourceCommit, width, height, true) }, demoGraphLimits{views: 900, perScreen: 160, depth: 16}),
-			exploreDemoGraph("administrator", "Administrator menu", func() dashboardModel { return demoExploreModel(sourceCommit, width, height, false) }, demoGraphLimits{views: 2400, perScreen: 160, depth: 16}),
+			exploreDemoGraph("teacher", "Teacher dashboard", func() dashboardModel { return demoExploreModel(sourceCommit, width, height, true) }, demoGraphLimits{views: 1000, perScreen: 160, depth: 16}),
+			exploreDemoGraph("administrator", "Administrator menu", func() dashboardModel { return demoExploreModel(sourceCommit, width, height, false) }, demoGraphLimits{views: 2600, perScreen: 160, depth: 16}),
 		},
 	}
 }
