@@ -103,18 +103,18 @@ func (m *FileRecoveryManager) List(ctx context.Context, repository, requested st
 	return *answer.Listing, nil
 }
 
-// savedAt finds when a session was saved, asking the computer again.
-func (m *FileRecoveryManager) savedAt(ctx context.Context, host domain.HostMeta, session int) (time.Time, error) {
+// session finds a saved session by number, asking the computer again.
+func (m *FileRecoveryManager) session(ctx context.Context, host domain.HostMeta, number int) (domain.FileRecoverySession, error) {
 	answer, err := m.ask(ctx, host, domain.FileRecoveryHelperRequest{Operation: domain.FileRecoveryHelperSessions})
 	if err != nil {
-		return time.Time{}, err
+		return domain.FileRecoverySession{}, err
 	}
 	for _, saved := range answer.Sessions {
-		if saved.Number == session {
-			return saved.SavedAt, nil
+		if saved.Number == number && domain.ValidFileRecoverySessionID(saved.ID) {
+			return saved, nil
 		}
 	}
-	return time.Time{}, errors.New("This saved session no longer exists; the computer may have restarted. Choose the session again.")
+	return domain.FileRecoverySession{}, errors.New("This saved session no longer exists; the computer may have restarted. Choose the session again.")
 }
 
 // Plan reviews copying chosen files of a saved session back to the
@@ -142,9 +142,11 @@ func (m *FileRecoveryManager) Plan(ctx context.Context, repository, requested st
 		return fail(err.Error())
 	}
 	p.Requested, p.Target = host.Name, domain.FileRecoveryTarget{HostMeta: host}
-	if p.SavedAt, err = m.savedAt(ctx, host, session); err != nil {
+	saved, err := m.session(ctx, host, session)
+	if err != nil {
 		return fail(err.Error())
 	}
+	p.SessionID, p.SavedAt = saved.ID, saved.SavedAt
 	p.State = "ready"
 	p.ExpiresAt = reviewExpiry(m.now(), fileRecoveryReviewLifetime)
 	p.Message = fmt.Sprintf("Copies %d chosen item(s) into the folder “%s” on the desktop of %s. Nothing there is replaced.", len(paths), domain.FileRecoveryFolder, host.Name)
@@ -169,21 +171,13 @@ func (m *FileRecoveryManager) Apply(ctx context.Context, p domain.FileRecoveryPl
 		r.Message = "Client inventory changed; review again."
 		return r
 	}
-	saved, err := m.savedAt(ctx, host, p.Session)
-	if err != nil {
-		r.Message = err.Error()
-		return r
-	}
-	if !saved.Equal(p.SavedAt) {
-		r.Message = "The computer restarted since the review and its saved sessions moved. Choose the session again."
-		return r
-	}
-	answer, err := m.ask(ctx, host, domain.FileRecoveryHelperRequest{Operation: domain.FileRecoveryHelperRestore, Session: p.Session, Paths: p.Paths})
+	// The computer checks the session's identity again when it copies.
+	answer, err := m.ask(ctx, host, domain.FileRecoveryHelperRequest{Operation: domain.FileRecoveryHelperRestore, Session: p.Session, SessionID: p.SessionID, Paths: p.Paths})
 	if err != nil {
 		r.State, r.Message = "failed", err.Error()
 		return r
 	}
-	if answer.Restored == nil {
+	if answer.Restored == nil || answer.Restored.Files < 0 {
 		r.State, r.Message = "failed", "The student computer gave an answer that is not understood; run Update computers first."
 		return r
 	}

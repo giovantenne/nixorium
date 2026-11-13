@@ -61,21 +61,77 @@ const (
 // client helper's standard input. Paths are relative to the student's home
 // as it was saved in the session.
 type FileRecoveryHelperRequest struct {
-	SchemaVersion int      `json:"schemaVersion"`
-	Operation     string   `json:"operation"`
-	Session       int      `json:"session,omitempty"`
-	Path          string   `json:"path,omitempty"`
-	Paths         []string `json:"paths,omitempty"`
+	SchemaVersion int    `json:"schemaVersion"`
+	Operation     string `json:"operation"`
+	Session       int    `json:"session,omitempty"`
+	// SessionID, required to restore, is the reviewed session's snapshot
+	// identity: the computer refuses when its session Session is another.
+	SessionID string   `json:"sessionId,omitempty"`
+	Path      string   `json:"path,omitempty"`
+	Paths     []string `json:"paths,omitempty"`
 }
 
 // FileRecoverySession is one saved session: Number 1 is the most recent.
-// SavedAt is when the computer started and saved the session before it.
-// LastChange is the most recent modification of the session's visible
-// files and folders; zero when it is not known.
+// ID is its snapshot's identity (Btrfs UUID), which stays the same while
+// restarts move the session to higher numbers. SavedAt is when the
+// computer started and saved the session before it. LastChange is the most
+// recent modification of the session's visible files and folders; zero
+// when it is not known.
 type FileRecoverySession struct {
 	Number     int       `json:"number"`
+	ID         string    `json:"id"`
 	SavedAt    time.Time `json:"savedAt"`
 	LastChange time.Time `json:"lastChange"`
+}
+
+// ValidFileRecoverySessionID accepts a Btrfs UUID in its usual form.
+func ValidFileRecoverySessionID(id string) bool {
+	if len(id) != 36 {
+		return false
+	}
+	for index, r := range id {
+		switch index {
+		case 8, 13, 18, 23:
+			if r != '-' {
+				return false
+			}
+		default:
+			if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// SafeFileRecoveryText makes text from a student computer safe to show in
+// a terminal: control, C1 and bidirectional formatting characters become
+// spaces and the text is cut to max bytes.
+func SafeFileRecoveryText(text string, max int) string {
+	text = strings.ToValidUTF8(text, "?")
+	var result strings.Builder
+	for _, r := range text {
+		if !printableRecoveryRune(r) {
+			r = ' '
+		}
+		if result.Len()+utf8.RuneLen(r) > max {
+			break
+		}
+		result.WriteRune(r)
+	}
+	return result.String()
+}
+
+// printableRecoveryRune refuses C0 and C1 controls, DEL and the
+// bidirectional formatting characters that can disguise a name.
+func printableRecoveryRune(r rune) bool {
+	switch {
+	case r < 0x20, r == 0x7f, r >= 0x80 && r <= 0x9f:
+		return false
+	case r >= 0x200e && r <= 0x200f, r >= 0x202a && r <= 0x202e, r >= 0x2066 && r <= 0x2069:
+		return false
+	}
+	return true
 }
 
 // FileRecoveryEntry is a file or folder of a listed folder.
@@ -118,6 +174,7 @@ type FileRecoveryHelperAnswer struct {
 // Codes of the helper's refusals.
 const (
 	FileRecoveryCodeNoSession = "RECOVERY-NO-SESSION"
+	FileRecoveryCodeMoved     = "RECOVERY-SESSION-MOVED"
 	FileRecoveryCodeNotFound  = "RECOVERY-NOT-FOUND"
 	FileRecoveryCodeTooLarge  = "RECOVERY-TOO-LARGE"
 	FileRecoveryCodeInvalid   = "RECOVERY-INVALID"
@@ -125,8 +182,9 @@ const (
 )
 
 // ValidFileRecoveryPath accepts "" (the home itself) or a plain relative path
-// below it: no leading slash, no "." or ".." elements, no empty elements,
-// no backslashes or control characters, within length limits.
+// below it: no leading slash, no hidden ("."-prefixed) or empty elements, no
+// backslashes, control or bidirectional formatting characters, within
+// length limits. Hidden files are never listed or recovered.
 func ValidFileRecoveryPath(name string) error {
 	if name == "" {
 		return nil
@@ -140,11 +198,11 @@ func ValidFileRecoveryPath(name string) error {
 		return errors.New("folders are nested too deeply")
 	}
 	for _, element := range elements {
-		if element == "" || element == "." || element == ".." || len(element) > recoveryMaxNameBytes {
+		if element == "" || strings.HasPrefix(element, ".") || len(element) > recoveryMaxNameBytes {
 			return invalid
 		}
 		for _, r := range element {
-			if r < 0x20 || r == 0x7f {
+			if !printableRecoveryRune(r) {
 				return invalid
 			}
 		}
@@ -202,6 +260,7 @@ type FileRecoveryPlan struct {
 	Requested     string             `json:"requested"`
 	Target        FileRecoveryTarget `json:"target"`
 	Session       int                `json:"session"`
+	SessionID     string             `json:"sessionId"`
 	SavedAt       time.Time          `json:"savedAt"`
 	Paths         []string           `json:"paths"`
 	ExpiresAt     time.Time          `json:"expiresAt"`

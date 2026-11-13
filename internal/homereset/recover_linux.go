@@ -69,7 +69,7 @@ func recoverAnswer(input io.Reader) domain.FileRecoveryHelperAnswer {
 	if errors.As(err, &failure) {
 		return domain.FileRecoveryHelperAnswer{Error: failure.message, Code: failure.code}
 	}
-	return domain.FileRecoveryHelperAnswer{Error: "The student computer could not read its saved sessions: " + err.Error(), Code: domain.FileRecoveryCodeFailed}
+	return domain.FileRecoveryHelperAnswer{Error: domain.SafeFileRecoveryText("The student computer could not complete the request: "+err.Error(), 1024), Code: domain.FileRecoveryCodeFailed}
 }
 
 func recoverRequest(input io.Reader) (domain.FileRecoveryHelperAnswer, error) {
@@ -96,7 +96,7 @@ func recoverRequest(input io.Reader) (domain.FileRecoveryHelperAnswer, error) {
 	}
 	switch request.Operation {
 	case domain.FileRecoveryHelperSessions:
-		sessions, err := recoverySessions(publishedSnapshots)
+		sessions, err := recoverySessions(publishedSnapshots, snapshotInfo(config))
 		return domain.FileRecoveryHelperAnswer{Sessions: sessions}, err
 	case domain.FileRecoveryHelperList:
 		root, err := sessionDirectory(publishedSnapshots, request.Session)
@@ -109,6 +109,16 @@ func recoverRequest(input io.Reader) (domain.FileRecoveryHelperAnswer, error) {
 		root, err := sessionDirectory(publishedSnapshots, request.Session)
 		if err != nil {
 			return domain.FileRecoveryHelperAnswer{}, err
+		}
+		if !domain.ValidFileRecoverySessionID(request.SessionID) {
+			return domain.FileRecoveryHelperAnswer{}, refuse(domain.FileRecoveryCodeInvalid, "The request is not understood; update the student computer.")
+		}
+		// The reviewed session must still be the one with this number: a
+		// restart since the review moves every session one place on.
+		if id, _, err := snapshotInfo(config)(root); err != nil {
+			return domain.FileRecoveryHelperAnswer{}, err
+		} else if id != request.SessionID {
+			return domain.FileRecoveryHelperAnswer{}, refuse(domain.FileRecoveryCodeMoved, "The computer restarted since the review and its saved sessions moved. Choose the session again.")
 		}
 		restored, err := recoverAsStudent(config, root, request.Paths)
 		return domain.FileRecoveryHelperAnswer{Restored: restored}, err
@@ -147,9 +157,51 @@ func loadConfigured() (Config, error) {
 	return config, err
 }
 
+// snapshotInfoFunc reads a snapshot's identity and creation time.
+type snapshotInfoFunc func(string) (string, time.Time, error)
+
+// snapshotInfo asks Btrfs for a snapshot's UUID and creation time. The
+// snapshot's own folder cannot tell: it keeps the times of the home it was
+// taken from.
+func snapshotInfo(config Config) snapshotInfoFunc {
+	return func(name string) (string, time.Time, error) {
+		output, err := commandOutput(config.Btrfs, "subvolume", "show", name)
+		if err != nil {
+			return "", time.Time{}, fmt.Errorf("btrfs subvolume show failed: %w", err)
+		}
+		return parseSnapshotInfo(string(output))
+	}
+}
+
+// parseSnapshotInfo reads "UUID:" and "Creation time:" of `btrfs
+// subvolume show`.
+func parseSnapshotInfo(output string) (string, time.Time, error) {
+	id, created := "", time.Time{}
+	for _, line := range strings.Split(output, "\n") {
+		key, value, found := strings.Cut(strings.TrimSpace(line), ":")
+		if !found {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		switch key {
+		case "UUID":
+			id = value
+		case "Creation time":
+			if parsed, err := time.Parse("2006-01-02 15:04:05 -0700", value); err == nil {
+				created = parsed
+			}
+		}
+	}
+	if !domain.ValidFileRecoverySessionID(id) || created.IsZero() {
+		return "", time.Time{}, errors.New("cannot identify a saved session")
+	}
+	return id, created.UTC(), nil
+}
+
 // recoverySessions lists the published snapshots, most recent first, with
-// the time each was taken. No published folder means no saved session.
-func recoverySessions(directory string) ([]domain.FileRecoverySession, error) {
+// their identity and the time each was taken. No published folder means no
+// saved session.
+func recoverySessions(directory string, info snapshotInfoFunc) ([]domain.FileRecoverySession, error) {
 	entries, err := os.ReadDir(directory)
 	if errors.Is(err, os.ErrNotExist) {
 		return []domain.FileRecoverySession{}, nil
@@ -162,15 +214,11 @@ func recoverySessions(directory string) ([]domain.FileRecoverySession, error) {
 		if !valid || !entry.IsDir() {
 			continue
 		}
-		var stat unix.Statx_t
-		if err := unix.Statx(unix.AT_FDCWD, filepath.Join(directory, entry.Name()), unix.AT_SYMLINK_NOFOLLOW, unix.STATX_BTIME|unix.STATX_MTIME, &stat); err != nil {
+		id, saved, err := info(filepath.Join(directory, entry.Name()))
+		if err != nil {
 			return nil, err
 		}
-		saved := time.Unix(stat.Mtime.Sec, int64(stat.Mtime.Nsec))
-		if stat.Mask&unix.STATX_BTIME != 0 {
-			saved = time.Unix(stat.Btime.Sec, int64(stat.Btime.Nsec))
-		}
-		sessions = append(sessions, domain.FileRecoverySession{Number: number, SavedAt: saved.UTC()})
+		sessions = append(sessions, domain.FileRecoverySession{Number: number, ID: id, SavedAt: saved})
 	}
 	slices.SortFunc(sessions, func(a, b domain.FileRecoverySession) int { return a.Number - b.Number })
 	// The last change of every session, most recent sessions first, within
@@ -451,7 +499,9 @@ func recoveryTree(root string, paths []string) (recoveryItems, error) {
 			return recoveryItems{}, err
 		}
 		name := path.Base(chosen)
-		err = add(parent, name, chosen, uniqueName(name, used), 0)
+		var stat unix.Stat_t
+		dir := unix.Fstatat(int(parent.Fd()), name, &stat, unix.AT_SYMLINK_NOFOLLOW) == nil && stat.Mode&unix.S_IFMT == unix.S_IFDIR
+		err = add(parent, name, chosen, uniqueName(name, dir, used), 0)
 		parent.Close()
 		if missing(err) {
 			return recoveryItems{}, refuse(domain.FileRecoveryCodeNotFound, "“"+chosen+"” is not in the saved session.")
@@ -465,9 +515,13 @@ func recoveryTree(root string, paths []string) (recoveryItems, error) {
 	return recoveryItems{entries, modified, sources}, nil
 }
 
-// uniqueName gives a top-level name not used yet: "name (2).ext" and so on.
-func uniqueName(name string, used map[string]bool) string {
-	extension := path.Ext(name)
+// uniqueName gives a top-level name not used yet: "name (2).ext" for a
+// file and "name (2)" for a folder, as the desktop placement names them.
+func uniqueName(name string, dir bool, used map[string]bool) string {
+	extension := ""
+	if !dir {
+		extension = path.Ext(name)
+	}
 	if extension == name {
 		extension = ""
 	}
@@ -550,46 +604,92 @@ func recoverAsStudent(config Config, root string, paths []string) (*domain.FileR
 	child.Env = []string{"HOME=" + account.HomeDir, "LANG=C", "LC_ALL=C", "PATH=/var/empty"}
 	child.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid), Groups: []uint32{}}}
 	child.WaitDelay = 10 * time.Second
-	stdin, err := child.StdinPipe()
+	// The child runs as the student, who can stop it: every write to it
+	// must progress within recoverStallTimeout.
+	reader, writer, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
+	child.Stdin = reader
 	answer := &limitedBuffer{limit: domain.FileRecoveryMaxAnswerBytes}
 	child.Stdout = answer
 	child.Stderr = io.Discard
 	if err := child.Start(); err != nil {
+		reader.Close()
+		writer.Close()
 		return nil, err
 	}
-	streamErr := streamRecovery(stdin, root, items)
-	stdin.Close()
-	waitErr := child.Wait()
+	reader.Close()
+	streamErr := streamRecovery(stallWriter{writer}, root, items)
+	writer.Close()
 	if streamErr != nil {
-		var failure recoverFailure
-		if errors.As(streamErr, &failure) {
-			return nil, streamErr
-		}
+		_ = child.Process.Kill()
+	}
+	waitErr := child.Wait()
+	var failure recoverFailure
+	if errors.As(streamErr, &failure) {
+		return nil, streamErr
+	}
+	if streamErr != nil {
+		return nil, refuse(domain.FileRecoveryCodeFailed, "The copy stopped before every file reached the student's desktop; nothing was placed there. Try again.")
 	}
 	var reply domain.FileRecoveryHelperAnswer
 	if err := decodeStrict(answer.Bytes(), &reply); err != nil {
-		if streamErr != nil {
-			return nil, streamErr
-		}
 		if waitErr != nil {
-			return nil, fmt.Errorf("writing as the student failed: %w", waitErr)
+			return nil, refuse(domain.FileRecoveryCodeFailed, "Writing the files as the student failed; nothing may have been placed. Try again.")
 		}
 		return nil, errors.New("writing as the student gave no answer")
 	}
+	// The answer comes from a process the student controls: only a known
+	// code, a bounded plain sentence and a result that matches what was sent
+	// go back to the teacher.
 	if reply.Error != "" || reply.Restored == nil {
-		code := reply.Code
-		if code == "" {
-			code = domain.FileRecoveryCodeFailed
-		}
-		return nil, refuse(code, reply.Error)
+		return nil, refuse(domain.FileRecoveryCodeFailed, domain.SafeFileRecoveryText(reply.Error, 1024))
 	}
-	if streamErr != nil {
-		return nil, streamErr
+	if err := checkRestored(*reply.Restored, items); err != nil {
+		return nil, refuse(domain.FileRecoveryCodeFailed, "Writing the files as the student gave an answer that does not match the files sent.")
 	}
 	return reply.Restored, nil
+}
+
+// recoverStallTimeout ends a copy whose writing child takes nothing for
+// this long.
+var recoverStallTimeout = time.Minute
+
+// stallWriter fails a write that does not progress in time.
+type stallWriter struct{ file *os.File }
+
+func (w stallWriter) Write(data []byte) (int, error) {
+	if err := w.file.SetWriteDeadline(time.Now().Add(recoverStallTimeout)); err != nil {
+		return 0, err
+	}
+	return w.file.Write(data)
+}
+
+// checkRestored accepts the child's report only when it names a plain
+// folder in the home and as many placed items, files and bytes as were
+// sent.
+func checkRestored(restored domain.FileRecoveryRestored, items recoveryItems) error {
+	files, top := 0, 0
+	var size int64
+	for _, entry := range items.entries {
+		if !strings.Contains(entry.Path, "/") {
+			top++
+		}
+		if !entry.Dir {
+			files++
+			size += entry.Size
+		}
+	}
+	if restored.Folder == "" || domain.ValidFileRecoveryPath(restored.Folder) != nil || len(restored.Placed) != top || restored.Files != files || restored.Bytes != size {
+		return errors.New("unexpected report")
+	}
+	for _, name := range restored.Placed {
+		if name == "" || strings.Contains(name, "/") || domain.ValidFileRecoveryPath(name) != nil {
+			return errors.New("unexpected report")
+		}
+	}
+	return nil
 }
 
 // keepModificationTimes gives the written files and folders the

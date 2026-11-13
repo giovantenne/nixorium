@@ -83,5 +83,23 @@ func decodeFileRecoveryAnswer(data []byte) (domain.FileRecoveryHelperAnswer, err
 	if !errors.Is(decoder.Decode(new(any)), io.EOF) || answer.SchemaVersion != domain.FileRecoveryProtocolVersion {
 		return answer, errors.New("unexpected answer")
 	}
+	// Everything shown to the teacher stays plain text: file names are
+	// chosen by students.
+	answer.Error = domain.SafeFileRecoveryText(answer.Error, 1024)
+	if answer.Listing != nil {
+		entries := answer.Listing.Entries[:0]
+		for _, entry := range answer.Listing.Entries {
+			if entry.Name != "" && !strings.Contains(entry.Name, "/") && domain.ValidFileRecoveryPath(entry.Name) == nil {
+				entries = append(entries, entry)
+			}
+		}
+		answer.Listing.Entries = entries
+	}
+	if answer.Restored != nil {
+		answer.Restored.Folder = domain.SafeFileRecoveryText(answer.Restored.Folder, 4096)
+		for index, name := range answer.Restored.Placed {
+			answer.Restored.Placed[index] = domain.SafeFileRecoveryText(name, 255)
+		}
+	}
 	return answer, nil
 }

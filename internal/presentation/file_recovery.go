@@ -313,7 +313,11 @@ func (model dashboardModel) fileRecoveryView() string {
 	case recoveryStageSession:
 		lines = append(lines, tuiMuted("Saved sessions of "+m.computer+", the most recent first. \"Last change\" is when a visible file or folder last changed.", dark), "")
 		if len(m.sessions) == 0 {
-			lines = append(lines, "This computer has no saved session. The number of saved sessions is set in Change settings → Student snapshots.")
+			where := "Maintenance → Change settings → Student snapshots"
+			if model.actions.ClassroomMode {
+				where = "the administrator's settings"
+			}
+			lines = append(lines, "This computer has no saved session yet. A computer saves the previous session from its second startup on; how many it keeps is set in "+where+".")
 		}
 		start, end := listWindow(len(m.sessions), m.sessionCursor, visible)
 		for index := start; index < end; index++ {

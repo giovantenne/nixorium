@@ -27,7 +27,7 @@ func (source *recoverySource) FileRecovery(_ context.Context, _ domain.HostMeta,
 	saved := time.Date(2026, 11, 10, 8, 0, 0, 0, time.UTC)
 	switch request.Operation {
 	case domain.FileRecoveryHelperSessions:
-		return domain.FileRecoveryHelperAnswer{Sessions: []domain.FileRecoverySession{{Number: 1, SavedAt: saved}, {Number: 2, SavedAt: saved.Add(-time.Hour)}}}, nil
+		return domain.FileRecoveryHelperAnswer{Sessions: []domain.FileRecoverySession{{Number: 1, ID: "00000000-0000-0000-0000-000000000001", SavedAt: saved}, {Number: 2, ID: "00000000-0000-0000-0000-000000000002", SavedAt: saved.Add(-time.Hour)}}}, nil
 	case domain.FileRecoveryHelperList:
 		if request.Path == "Missing" {
 			return domain.FileRecoveryHelperAnswer{Error: "This folder is not in the saved session.", Code: domain.FileRecoveryCodeNotFound}, nil

@@ -38,6 +38,12 @@ func (source *fakeFileRecoverySource) FileRecovery(_ context.Context, host domai
 		}
 		return domain.FileRecoveryHelperAnswer{Listing: &domain.FileRecoveryListing{Session: request.Session, Path: request.Path, Entries: []domain.FileRecoveryEntry{{Name: "notes.txt", Size: 3}}}}, nil
 	case domain.FileRecoveryHelperRestore:
+		// Like the computer: the reviewed session must still have its number.
+		for _, session := range source.sessions {
+			if session.Number == request.Session && session.ID != request.SessionID {
+				return domain.FileRecoveryHelperAnswer{Error: "The computer restarted since the review and its saved sessions moved. Choose the session again.", Code: domain.FileRecoveryCodeMoved}, nil
+			}
+		}
 		return domain.FileRecoveryHelperAnswer{Restored: &domain.FileRecoveryRestored{Folder: "Desktop/Recovered files", Placed: request.Paths, Files: len(request.Paths), Bytes: 3}}, nil
 	}
 	return domain.FileRecoveryHelperAnswer{Error: "unknown"}, nil
@@ -48,7 +54,7 @@ func fileRecoveryLab() *fakeFileRecoverySource {
 	source.meta.Controller.Name = "pc99"
 	source.meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}, {Name: "pc02", IP: "10.0.0.2"}}
 	saved := time.Date(2026, 11, 10, 8, 12, 0, 0, time.UTC)
-	source.sessions = []domain.FileRecoverySession{{Number: 1, SavedAt: saved}, {Number: 2, SavedAt: saved.Add(-24 * time.Hour)}}
+	source.sessions = []domain.FileRecoverySession{{Number: 1, ID: "00000000-0000-0000-0000-000000000001", SavedAt: saved}, {Number: 2, ID: "00000000-0000-0000-0000-000000000002", SavedAt: saved.Add(-24 * time.Hour)}}
 	return source
 }
 
@@ -65,7 +71,7 @@ func TestFileRecoveryBrowseReviewAndApply(t *testing.T) {
 		t.Fatalf("listing = %+v, %v", listing, err)
 	}
 	plan := manager.Plan(ctx, "/srv/lab", "pc02", 2, []string{"Desktop/notes.txt"})
-	if plan.HasErrors() || plan.ReviewToken == "" || plan.Target.Name != "pc02" || !plan.SavedAt.Equal(source.sessions[1].SavedAt) {
+	if plan.HasErrors() || plan.ReviewToken == "" || plan.Target.Name != "pc02" || plan.SessionID != source.sessions[1].ID || !plan.SavedAt.Equal(source.sessions[1].SavedAt) {
 		t.Fatalf("plan = %+v", plan)
 	}
 	changed := plan
@@ -89,16 +95,14 @@ func TestFileRecoveryRefusesMovedSessionsAndBadChoices(t *testing.T) {
 	ctx := context.Background()
 	plan := manager.Plan(ctx, "/srv/lab", "pc01", 1, []string{"Desktop"})
 	// The computer restarted: the reviewed session is now number 2 and a
-	// new session 1 has another saving time.
-	source.sessions[0].SavedAt = source.sessions[0].SavedAt.Add(48 * time.Hour)
-	before := len(source.requests)
-	if report := manager.Apply(ctx, plan, plan.ReviewToken); report.State != "blocked" || !strings.Contains(report.Message, "restarted") {
+	// new session 1 has another identity.
+	source.sessions = []domain.FileRecoverySession{{Number: 1, ID: "00000000-0000-0000-0000-000000000003", SavedAt: source.sessions[0].SavedAt.Add(48 * time.Hour)}, {Number: 2, ID: source.sessions[0].ID, SavedAt: source.sessions[0].SavedAt}}
+	if report := manager.Apply(ctx, plan, plan.ReviewToken); !report.HasErrors() || report.Restored != nil || !strings.Contains(report.Message, "restarted") {
 		t.Fatalf("moved session = %+v", report)
 	}
-	for _, request := range source.requests[before:] {
-		if request.Operation == domain.FileRecoveryHelperRestore {
-			t.Fatal("restored after the sessions moved")
-		}
+	last := source.requests[len(source.requests)-1]
+	if last.Operation != domain.FileRecoveryHelperRestore || last.SessionID != "00000000-0000-0000-0000-000000000001" {
+		t.Fatalf("the restore did not carry the reviewed session: %+v", last)
 	}
 	for _, test := range []struct {
 		requested string
@@ -114,6 +118,8 @@ func TestFileRecoveryRefusesMovedSessionsAndBadChoices(t *testing.T) {
 		{"pc01", 1, nil},
 		{"pc01", 1, []string{"../etc"}},
 		{"pc01", 1, []string{"Desktop", "Desktop/a"}},
+		{"pc01", 1, []string{".ssh"}},
+		{"pc01", 1, []string{"Desktop/.hidden"}},
 	} {
 		if plan := manager.Plan(ctx, "/srv/lab", test.requested, test.session, test.paths); !plan.HasErrors() || plan.ReviewToken != "" {
 			t.Fatalf("%+v planned: %+v", test, plan)

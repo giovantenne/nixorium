@@ -803,7 +803,9 @@ that release's notes, so a release is not finished until the site follows it.
   (Computers → Recover student files) only reads published snapshots as root,
   never follows links, and writes into the student home only from its child
   running with the student's credentials; keep the review bound to the
-  session's time so a restart that moves the sessions is refused. The fixed root-only `nixorium-home-reset`
+  snapshot UUID (never the snapshot folder's times, which are the home's)
+  so a restart that moves the sessions is refused, and treat the child's
+  report as untrusted text. The fixed root-only `nixorium-home-reset`
   helper accepts no target arguments and reads only its store-backed system
   configuration. The isolated `modules/workspace-reset.nix` service retains
   the `home-reset` unit name, never restarts on switch, and gates both the

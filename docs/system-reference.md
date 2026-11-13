@@ -424,9 +424,15 @@ published snapshots, opening every name without following links; it streams
 the files to a copy of the helper running with the student's user and group,
 which writes them through a private staging folder in the home with modes
 0755/0644, so nothing the student controls can redirect the write. The
-review binds the computer, the session number, its time and the paths for
-ten minutes; applying asks the computer again and refuses when a restart
-moved the sessions since the review.
+review binds the computer, the session number, the session's snapshot
+identity (Btrfs UUID, read with its creation time from `btrfs subvolume
+show`; the snapshot folder itself keeps the home's times) and the paths for
+ten minutes; the computer checks the identity again when it copies and
+refuses when a restart moved the sessions since the review. The writing
+child's report is accepted only when it matches what was sent, and a child
+that takes nothing for a minute ends the copy; text that reaches the
+teacher's terminal is stripped of control characters. Hidden names are
+refused in requests too.
 
 Administrators and the teacher can also read and copy a file from the
 snapshot store (`snapshot-1` is the newest) in Files → Snapshots; writing it

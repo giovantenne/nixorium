@@ -336,8 +336,8 @@ student's own files are not changed,
 hidden files and links are left out, and at most 2000 items and 500 MB are
 copied at once. The copies disappear at the next restart like everything in
 the student account, so the student should save them where they keep their
-work. It works with or without the classroom view; update the computers
-before first use.
+work. A computer has saved sessions from its second startup on. It works
+with or without the classroom view; update the computers before first use.
 
 ## Collect files
 

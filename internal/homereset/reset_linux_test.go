@@ -457,10 +457,21 @@ func TestResetLifecycleVM(t *testing.T) {
 		if err := Reset(config); err != nil {
 			t.Fatal(err)
 		}
-		sessions, err := recoverySessions(publishedSnapshots)
-		if err != nil || len(sessions) == 0 || sessions[0].Number != 1 || sessions[0].SavedAt.IsZero() || time.Since(sessions[0].SavedAt) > time.Hour {
+		sessions, err := recoverySessions(publishedSnapshots, snapshotInfo(config))
+		if err != nil || len(sessions) < 2 || sessions[0].Number != 1 || time.Since(sessions[0].SavedAt) > time.Minute || sessions[0].SavedAt.Before(sessions[1].SavedAt) {
 			t.Fatal("unexpected saved sessions", sessions, err)
 		}
+		// Each session has its own identity and creation time, not those of
+		// the home it was taken from, and keeps its identity when a restart
+		// moves it to the next number.
+		ids := map[string]bool{}
+		for _, session := range sessions {
+			if ids[session.ID] {
+				t.Fatal("two sessions share an identity", sessions)
+			}
+			ids[session.ID] = true
+		}
+
 		root, err := sessionDirectory(publishedSnapshots, 1)
 		if err != nil {
 			t.Fatal(err)
@@ -531,6 +542,13 @@ func TestResetLifecycleVM(t *testing.T) {
 		}
 		if err := os.Remove(folder); err != nil {
 			t.Fatal(err)
+		}
+		if err := Reset(config); err != nil {
+			t.Fatal(err)
+		}
+		moved, err := recoverySessions(publishedSnapshots, snapshotInfo(config))
+		if err != nil || moved[1].ID != sessions[0].ID || moved[0].ID == sessions[0].ID || !moved[1].SavedAt.Equal(sessions[0].SavedAt) {
+			t.Fatal("a session did not keep its identity when it moved", sessions, moved, err)
 		}
 	})
 	t.Run("failed-recovery-blocks-retry", func(t *testing.T) {

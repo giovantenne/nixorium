@@ -41,9 +41,35 @@ func refusal(err error) string {
 	return ""
 }
 
+// fakeSnapshotInfo gives each snapshot folder a UUID made of its number.
+func fakeSnapshotInfo(name string) (string, time.Time, error) {
+	number, _ := snapshotNumber(filepath.Base(name))
+	return fmt.Sprintf("00000000-0000-0000-0000-%012d", number), time.Date(2026, 11, 10-number, 8, 0, 0, 0, time.UTC), nil
+}
+
+func TestParseSnapshotInfo(t *testing.T) {
+	output := `workspace/snapshot-1
+	Name: 			snapshot-1
+	UUID: 			3f1c2b7e-9d4a-4c1e-8f0a-2b6d5e7c9a10
+	Parent UUID: 		a1b2c3d4-e5f6-4711-8899-aabbccddeeff
+	Received UUID: 		-
+	Creation time: 		2026-11-10 08:12:31 +0100
+	Subvolume ID: 		263
+`
+	id, created, err := parseSnapshotInfo(output)
+	if err != nil || id != "3f1c2b7e-9d4a-4c1e-8f0a-2b6d5e7c9a10" || !created.Equal(time.Date(2026, 11, 10, 7, 12, 31, 0, time.UTC)) {
+		t.Fatalf("info = %q, %v, %v", id, created, err)
+	}
+	for _, broken := range []string{"UUID: -\nCreation time: 2026-11-10 08:12:31 +0100\n", "UUID: 3f1c2b7e-9d4a-4c1e-8f0a-2b6d5e7c9a10\nCreation time: -\n"} {
+		if _, _, err := parseSnapshotInfo(broken); err == nil {
+			t.Fatalf("accepted %q", broken)
+		}
+	}
+}
+
 func TestRecoverySessionsListsPublishedSnapshots(t *testing.T) {
 	directory := t.TempDir()
-	if sessions, err := recoverySessions(filepath.Join(directory, "missing")); err != nil || len(sessions) != 0 {
+	if sessions, err := recoverySessions(filepath.Join(directory, "missing"), fakeSnapshotInfo); err != nil || len(sessions) != 0 {
 		t.Fatalf("missing folder = %v, %v", sessions, err)
 	}
 	for _, name := range []string{"snapshot-3", "snapshot-1", "snapshot-10", "snapshot-01", "other"} {
@@ -54,7 +80,7 @@ func TestRecoverySessionsListsPublishedSnapshots(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(directory, "snapshot-2"), nil, 0o640); err != nil {
 		t.Fatal(err)
 	}
-	sessions, err := recoverySessions(directory)
+	sessions, err := recoverySessions(directory, fakeSnapshotInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,10 +311,53 @@ func TestLastChangeIgnoresHiddenNamesAndLinks(t *testing.T) {
 	}
 }
 
+func TestCheckRestoredMatchesWhatWasSent(t *testing.T) {
+	items := recoveryItems{entries: []classroomview.FileEntry{{Path: "notes.txt", Size: 5}, {Path: "Project", Dir: true}, {Path: "Project/main.c", Size: 9}}}
+	good := domain.FileRecoveryRestored{Folder: "Desktop/Recovered files", Placed: []string{"notes (2).txt", "Project"}, Files: 2, Bytes: 14}
+	if err := checkRestored(good, items); err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []func(*domain.FileRecoveryRestored){
+		func(r *domain.FileRecoveryRestored) { r.Folder = "Desktop/\x1b[2JRecovered" },
+		func(r *domain.FileRecoveryRestored) { r.Folder = "../etc" },
+		func(r *domain.FileRecoveryRestored) { r.Folder = "" },
+		func(r *domain.FileRecoveryRestored) { r.Placed = []string{"notes.txt"} },
+		func(r *domain.FileRecoveryRestored) { r.Placed = []string{"a/b", "Project"} },
+		func(r *domain.FileRecoveryRestored) { r.Placed = []string{"\u202enotes", "Project"} },
+		func(r *domain.FileRecoveryRestored) { r.Files = 3 },
+		func(r *domain.FileRecoveryRestored) { r.Bytes = 1 },
+	} {
+		bad := good
+		bad.Placed = append([]string(nil), good.Placed...)
+		change(&bad)
+		if err := checkRestored(bad, items); err == nil {
+			t.Fatalf("accepted %+v", bad)
+		}
+	}
+}
+
+func TestStalledChildEndsTheCopy(t *testing.T) {
+	old := recoverStallTimeout
+	recoverStallTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { recoverStallTimeout = old })
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	defer writer.Close()
+	started := time.Now()
+	// Nobody reads: the pipe fills and the write must give up.
+	_, err = stallWriter{writer}.Write(make([]byte, 4<<20))
+	if err == nil || time.Since(started) > 5*time.Second {
+		t.Fatalf("stalled write returned %v after %v", err, time.Since(started))
+	}
+}
+
 func TestUniqueName(t *testing.T) {
 	used := map[string]bool{}
-	got := []string{uniqueName("a.txt", used), uniqueName("a.txt", used), uniqueName("Folder", used), uniqueName("Folder", used), uniqueName(".bashrc", used), uniqueName(".bashrc", used)}
-	if strings.Join(got, ",") != "a.txt,a (2).txt,Folder,Folder (2),.bashrc,.bashrc (2)" {
+	got := []string{uniqueName("a.txt", false, used), uniqueName("a.txt", false, used), uniqueName("Folder", true, used), uniqueName("Folder", true, used), uniqueName("my.folder", true, used), uniqueName("my.folder", true, used)}
+	if strings.Join(got, ",") != "a.txt,a (2).txt,Folder,Folder (2),my.folder,my.folder (2)" {
 		t.Fatalf("names = %v", got)
 	}
 }
