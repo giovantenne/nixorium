@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.14.0] - 2026-11-13
+
+From 3.13.0 or 3.13.1, Update Nixorium, then Apply to controller and Update
+computers: each student computer needs the update before Recover student
+files can reach it. From 3.12.0 or older, first follow the notes of those
+releases.
+
 ### Added
 
 - **Student snapshots** in Maintenance → Change settings (`lab.studentSnapshots`
