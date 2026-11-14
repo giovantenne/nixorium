@@ -219,6 +219,6 @@ func (model dashboardModel) workspaceUpdateReviewView() string {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: safeWorkspaceText(model.message)})
 	}
 	return model.renderShell(tuiShell{path: []string{"Maintenance", model.updateTitle(), "Review"}, body: strings.Join(lines, "\n"),
-		fixedBody: "Enter saves the update and applies it to this controller.\nComputers are updated afterwards, from Computers → Update computers.", notices: notices,
+		fixedBody: "Apply update saves the update and applies it to this controller.\nComputers are updated afterwards, from Computers → Update computers.", notices: notices,
 		actions: []tuiAction{{key: "↑/↓", label: "Scroll"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
 }

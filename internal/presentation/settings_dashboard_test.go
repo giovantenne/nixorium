@@ -490,7 +490,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View().Content, "Enter restarts the software cache") {
+	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View().Content, "Restart the software cache?") {
 		t.Fatalf("restart review missing:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})

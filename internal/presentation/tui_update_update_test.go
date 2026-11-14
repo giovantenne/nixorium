@@ -100,7 +100,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release") || !strings.Contains(model.View().Content, "candidate controller built") || strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "Press Enter") || !strings.Contains(model.View().Content, "No push, PXE action") {
+	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release") || !strings.Contains(model.View().Content, "candidate controller built") || strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "Apply update") || !strings.Contains(model.View().Content, "No push, PXE action") {
 		t.Fatalf("update review missing: planned=%d\n%s", planned, model.View().Content)
 	}
 	updated, _ = model.Update(tea.WindowSizeMsg{Height: 40})

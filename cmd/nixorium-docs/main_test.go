@@ -19,7 +19,7 @@ func TestGalleryRenderingIsDeterministicAndSemantic(t *testing.T) {
 		"4 add · 0 already configured · 1 excluded",
 		"Opened from a saved software change",
 		"5 computers updated",
-		"Enter starts network installation mode",
+		"Start network installation?",
 		"in use: those sessions will be shut down",
 		"Logged in, not in use",
 		"Restricted teacher dashboard",

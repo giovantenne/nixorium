@@ -24,6 +24,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   Initial files, Diagnostics, Support report, Inventory, Background work) are
   gone, and so are key hints in the text that the footer already lists. Plain
   notes no longer carry the ○ of a waiting step.
+- Confirmation screens ask their question once: the Enter button names the
+  action, and sentences such as "Enter updates these computers." or "Press
+  Enter to shut down 2 computers." are gone. Save results start with what was
+  saved instead of the state in capitals, and drop sentences that repeated the
+  status rows. The Shut down and Restart review lists the computers without
+  the count table; an update result where every computer has the same outcome
+  gives the explanation once.
 
 ## [3.14.0] - 2026-11-13
 

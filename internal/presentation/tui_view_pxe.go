@@ -101,14 +101,15 @@ func (model dashboardModel) pxeView() string {
 			lines = append(lines, model.busyView())
 		}
 		lines = append(lines, model.operationProgressView(model.installation.pxeProgress, "Current progress")...)
-		notice := tuiNotice{kind: tuiStatusNeutral, title: "You can close Nixorium: the work continues and you can check it again later."}
+		// The footer's "Quit Nixorium; work continues" says that closing is safe.
+		notices := []tuiNotice{}
 		if model.installation.pxeProgress.State == "completed" {
-			notice = tuiNotice{kind: tuiStatusSuccess, title: "Client preparation completed", detail: "The client systems and network installation files are ready."}
+			notices = append(notices, tuiNotice{kind: tuiStatusSuccess, title: "Client preparation completed", detail: "The client systems and network installation files are ready."})
 		}
 		return model.renderShell(tuiShell{
 			path:          path,
 			body:          strings.Join(lines, "\n"),
-			notices:       []tuiNotice{notice},
+			notices:       notices,
 			actions:       model.pxeActions(),
 			activityShown: activity,
 		})
@@ -137,11 +138,10 @@ func (model dashboardModel) pxeView() string {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
 		return model.renderShell(tuiShell{
-			path:      path,
-			body:      body,
-			fixedBody: tuiSection("Enter starts network installation mode.", model.isDark),
-			notices:   notices,
-			actions:   model.pxeActions(),
+			path:    path,
+			body:    body,
+			notices: notices,
+			actions: model.pxeActions(),
 		})
 	}
 	if model.screen == dashboardPXELeaveReview {
@@ -189,7 +189,13 @@ func (model dashboardModel) computerInstallationSteps(labels []string) []string 
 		case index == model.installation.stage && model.screen == dashboardPXEStartReview:
 			lines = append(lines, tuiMuted("○ "+label+" · Awaiting confirmation", model.isDark))
 		case index == model.installation.stage:
-			lines = append(lines, tuiTitle(model.activityMarker()+" "+label, model.isDark))
+			// While the controller or client preparation runs, its own phase
+			// line below carries the spinner; one spinner per screen.
+			marker := model.activityMarker()
+			if model.installation.pxePreparing || model.controller.applying {
+				marker = "●"
+			}
+			lines = append(lines, marker+" "+tuiTitle(label, model.isDark))
 		default:
 			lines = append(lines, tuiMuted("○ "+label, model.isDark))
 		}
@@ -361,7 +367,7 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 	lines := []string{title, "  Phase: " + phaseLabels[operation.Phase]}
 	if !(model.progressDetails && operationDetailsAvailable(operation)) && !model.controller.details {
 		kind := tuiStatusNeutral
-		label := model.activityMarker() + " " + phaseLabels[operation.Phase]
+		label := phaseLabels[operation.Phase]
 		if operation.State == "completed" {
 			kind = tuiStatusSuccess
 			label = "Preparation completed"
@@ -374,7 +380,7 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 			label = phaseLabels[operation.Phase] + " failed"
 		}
 		if kind == tuiStatusNeutral {
-			lines = []string{tuiTitle(label, model.isDark)}
+			lines = []string{model.activityMarker() + " " + tuiTitle(label, model.isDark)}
 		} else {
 			lines = []string{tuiStatus(label, kind, model.isDark)}
 		}

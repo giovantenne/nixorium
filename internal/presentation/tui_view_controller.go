@@ -37,7 +37,7 @@ func (model dashboardModel) controllerView() string {
 		for _, line := range controllerChangeLines(plan) {
 			lines = append(lines, "  • "+line)
 		}
-		lines = append(lines, "", "Affects   "+plan.Controller+" (this controller only; client computers are not changed)", "", "Press Enter to build, activate, and verify this controller.")
+		lines = append(lines, "", "Affects   "+plan.Controller+" (this controller only; client computers are not changed)")
 		body := strings.Join(append(lines, details...), "\n")
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Services and networking may restart", detail: "This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot is not normally required."})
 		return model.renderShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Apply to controller"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})

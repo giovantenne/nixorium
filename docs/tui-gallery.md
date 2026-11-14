@@ -622,10 +622,10 @@ Packages     4 add · 0 already configured · 1 excluded
 Clients      5 included in the added packages
 
 ✓ Selected packages passed the configuration checks
-› + chromium · add for this controller and all clients, including future ones
-  + ghostty · add for this controller and all clients, including future ones
-  + nodejs · add for this controller and all clients, including future ones
-  + python3Packages.terminaltexteffects · add for this controller and all clients, including future ones
+› + chromium · add
+  + ghostty · add
+  + nodejs · add
+  + python3Packages.terminaltexteffects · add
 
 Now          Save and rebuild pc99 (this controller)
 Later        Review and update the affected client computers
@@ -678,8 +678,6 @@ pc03  10.42.0.13  Reachable at last check
 pc04  10.42.0.14  Reachable at last check
 pc05  10.42.0.15  Reachable at last check
 
-Enter updates these computers.
-
 ! Programs on the computers may restart during the update
   Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
 next one.
@@ -694,20 +692,12 @@ Nixorium  /  Computers  /  Update computers                                     
 
 ✓ 5 computers updated
 
+Each computer: Updated and checked: it is running the reviewed version.
 pc01 — Updated
-  Updated and checked: it is running the reviewed version.
-
 pc02 — Updated
-  Updated and checked: it is running the reviewed version.
-
 pc03 — Updated
-  Updated and checked: it is running the reviewed version.
-
 pc04 — Updated
-  Updated and checked: it is running the reviewed version.
-
 pc05 — Updated
-  Updated and checked: it is running the reviewed version.
 
 n New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
 ```
@@ -727,8 +717,6 @@ Reviewed revision  0123456789abcdef0123456789abcdef01234567
 Selected computers — latest availability check:
 pc01  10.42.0.11  Reachable at last check
 pc02  10.42.0.12  Not reached at last check
-
-Enter updates these computers.
 
 ! Programs on the computers may restart during the update
   Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
@@ -751,8 +739,6 @@ Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
 Selected computers — latest availability check:
 pc01  10.42.0.11  Reachable at last check
-
-Enter updates these computers.
 
 ! Programs on the computers may restart during the update
   Computers that did not answer are left unchanged. If an update is interrupted, recovery may be needed before the
@@ -813,8 +799,6 @@ Nixorium  /  Installation  /  Install computers                                 
 Start network installation?
 
 Affects  enp1s0 · controller network
-
-Enter starts network installation mode.
 
 ! The controller's laboratory address (10.42.0.99/24) is paused until network installation is finished
   Client computers on this network will be able to start the installer from the network, served by the controller
@@ -897,12 +881,7 @@ r Refresh status  ·  d Details  ·  Esc Detach  ·  F1 Help
 ```text
 Nixorium  /  Computers  /  Power controls                                                                     demo
 
-Shut down 2 eligible clients?
-
-Selected        3
-Eligible        2
-Controller      excluded
-Session safety  unknown states protected
+Shut down 2 computers?
 
 ! pc02 · In use · will shut down
 ✓ pc04 · Logged in, not in use · Ready
@@ -912,9 +891,7 @@ Session safety  unknown states protected
 Access and session state are checked again immediately before requests are sent.
 An accepted request does not prove that a computer is physically off.
 
-Press Enter to shut down 2 computers. 1 session in use will be interrupted.
-
-⏎ Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Send requests  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Restricted teacher dashboard
@@ -944,12 +921,7 @@ See, control and lock the students' screens, show yours, send your desktop
 ```text
 Nixorium  /  Computers  /  Power controls                                                                     demo
 
-Restart 1 eligible client?
-
-Selected        1
-Eligible        1
-Controller      excluded
-Session safety  unknown states protected
+Restart 1 computer?
 
 ✓ pc01 · Ready
 
@@ -957,9 +929,7 @@ Session safety  unknown states protected
 Access and session state are checked again immediately before requests are sent.
 An accepted request does not prove that the computer completed its restart.
 
-Press Enter to restart 1 computer.
-
-⏎ Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
+⏎ Enter Send requests  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Settings accounts menu
@@ -1107,9 +1077,6 @@ All initial files: 2 files, 2 folders, 8.1 KiB
   Documents/Lessons/
 Review lines 1–14 of 21
 
-Enter saves the files in the lab configuration. Computers change
-only when you update them.
-
 ↑/↓ Scroll  ·  ⏎ Enter Save  ·  Esc Cancel  ·  F1 Help
 ```
 
@@ -1134,9 +1101,6 @@ All initial files: 2 files, 2 folders, 8.1 KiB
   Documents/Lessons/run.sh · 96 B · executable
 Review lines 1–14 of 22
 
-Enter saves the files in the lab configuration. Computers change
-only when you update them.
-
 ↑/↓ Scroll  ·  ⏎ Enter Save  ·  Esc Cancel  ·  F1 Help
 ```
 
@@ -1157,9 +1121,8 @@ F1 Help
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-✓ SAVED
+✓ Initial-file manifest and reviewed copies saved and recorded locally.
 
-Initial-file manifest and reviewed copies saved and recorded locally.
 ✓ Configuration — Saved locally
 ! This controller — Needs applying
 ○ Client computers — Not updated here; unknown until checked
@@ -1175,9 +1138,8 @@ the computers, each one gets the new files at its next start.
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-! PARTIAL
+! Captured copies saved; the local Git record could not be confirmed. Inspect Git before applying systems.
 
-Captured copies saved; the local Git record could not be confirmed. Inspect Git before applying systems.
 ! Configuration — Save needs recovery
 ○ This controller — Unknown; not checked here
 ○ Client computers — Unknown until checked; none updated here
@@ -1224,11 +1186,9 @@ Destinations:
   controller (controller)
   pc01 (client)
   pc02 (client)
-Review lines 1–13 of 38
+Review lines 1–13 of 36
 
-Enter saves and records only the profile JSON; no system apply or reset.
-
-↑/↓ Scroll  ·  ⏎ Enter Save JSON  ·  Esc Cancel  ·  F1 Help
+↑/↓ Scroll  ·  ⏎ Enter Save  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Student workspace saved and recorded, not deployed
@@ -1236,14 +1196,12 @@ Enter saves and records only the profile JSON; no system apply or reset.
 ```text
 Nixorium  /  Settings  /  Student workspace                                                                   demo
 
-✓ SAVED
+✓ Profile saved and recorded locally. No computer or student home changed.
 
-Profile saved and recorded locally. No computer or student home changed.
 ✓ Configuration — Saved locally
 ! This controller — Needs applying
 ○ Client computers — Not updated here; unknown until checked
 
-Apply to this controller, then review the computers to update.
 Preferences take effect at the next computer start after system application.
 
 ⏎ Enter Apply to this controller  ·  Esc Settings  ·  F1 Help
@@ -1260,8 +1218,6 @@ What changes since the last verified activation:
   • Student preferences
 
 Affects   pc99 (this controller only; client computers are not changed)
-
-Press Enter to build, activate, and verify this controller.
 
 Technical details
 Revision  0123456789abcdef0123456789abcdef01234567
@@ -1286,7 +1242,7 @@ Applications whose version changes:
   Package nodejs: not selected -> 24.0
   Package vscode: 1.0 -> 2.0
 
-Enter saves the update and applies it to this controller.
+Apply update saves the update and applies it to this controller.
 Computers are updated afterwards, from Computers → Update computers.
 
 ↑/↓ Scroll  ·  F4 Details  ·  ⏎ Enter Apply update  ·  Esc Cancel  ·  F1 Help
@@ -1353,8 +1309,7 @@ Nixorium  /  Maintenance  /  Diagnostics  /  Support report                     
 
 A local report: minimized, not anonymous. No upload or remediation.
 
-✓ SAVED
-Saved the exact preview locally. Nothing was uploaded.
+✓ Saved the exact preview locally. Nothing was uploaded.
 Local file: "/demo/state/nixorium/support/support-0123456789abcdef.json"
 SHA-256: e83aa5986a7231de21c579859bdc0b5a0c3f8caa60a1370050f21840bd25a30f
 
@@ -1425,15 +1380,13 @@ Nixorium  /  Maintenance  /  Reset template                                     
 Reset deployment template
 Replace local customizations. Keep settings, keys and exact input pins.
 
-✓ SAVED
-Saved and committed locally. Apply systems and reboot separately; nothing pushed.
+✓ Saved and committed locally. Apply systems and reboot separately; nothing pushed.
 
 ✓ Configuration — Saved locally
 ! This controller — Needs applying
 ○ Client computers — Not updated here; unknown until checked
 
 Student-home changes take effect at the next computer start after system application.
-Applying the controller is optional here; no client deployment or reboot starts automatically.
 
 Backup: refs/nixorium/template-backups/demo
 Local commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb

@@ -146,7 +146,7 @@ func (model dashboardModel) gitUndoReviewWith(height int) string {
 	return model.renderShell(tuiShell{
 		path:      path,
 		body:      strings.Join(lines, "\n"),
-		fixedBody: tuiSection("Enter saves a new change that puts these files back.", model.isDark),
+		fixedBody: "Undo saves a new change that puts these files back.",
 		notices:   notices,
 		actions:   []tuiAction{{key: "↑/↓/Pg", label: "Scroll"}, {key: "Enter", label: "Undo"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
 	})

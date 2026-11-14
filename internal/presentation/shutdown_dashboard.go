@@ -261,9 +261,14 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 		shell.body = strings.Join(body, "\n")
 		shell.fixedBody = strings.Join(fixedBody, "\n")
 		if model.plan.State == "ready" {
-			shell.actions = []tuiAction{{key: "Enter", label: "Send requests"}, {key: "u", label: "Unknown sessions"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+			shell.actions = []tuiAction{{key: "Enter", label: "Send requests"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 		} else {
-			shell.actions = []tuiAction{{key: "u", label: "Unknown sessions"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
+			shell.actions = []tuiAction{{key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
+		}
+		// u changes how unknown session states are treated; offer it only
+		// when the review has one.
+		if shutdownHasUnknown(model.plan) {
+			shell.actions = append([]tuiAction{{key: "u", label: "Unknown sessions"}}, shell.actions...)
 		}
 	case dashboardShutdownResult:
 		shell.body = strings.Join(model.resultView(context), "\n")
@@ -345,13 +350,8 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 		verb = "Restart"
 		pastVerb = "restarted"
 	}
-	lines := []string{tuiSection(fmt.Sprintf("%s %s?", verb, countNoun(plan.Eligible, "eligible client")), context.dark), ""}
-	lines = append(lines, tuiFields(context.dark,
-		[2]string{"Selected", fmt.Sprint(len(plan.Targets))},
-		[2]string{"Eligible", fmt.Sprint(plan.Eligible)},
-		[2]string{"Controller", "excluded"},
-		[2]string{"Session safety", shutdownPolicyLabel(plan.Policy)},
-	)...)
+	// Each row says whether its request is sent; no table repeats the counts.
+	lines := []string{tuiSection(fmt.Sprintf("%s %s?", verb, countNoun(plan.Eligible, "computer")), context.dark)}
 	lines = append(lines, "")
 	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-ctaRows(context.height)-20))
 	for _, target := range plan.Targets[start:end] {
@@ -378,23 +378,17 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 		finalEvidence = "An accepted request does not prove that the computer completed its restart."
 	}
 	lines = append(lines, "", tuiStatus(warning, tuiStatusAttention, context.dark), "Access and session state are checked again immediately before requests are sent.", finalEvidence)
+	// The footer names u (Unknown sessions) and Enter; the text says only
+	// which way unknown sessions are treated.
 	if shutdownHasUnknown(plan) {
 		if plan.Policy == domain.ShutdownAcknowledgeUnknown {
-			lines = append(lines, "", tuiStatus("Unknown session risk acknowledged", tuiStatusAttention, context.dark), "Press u to protect unknown session states again.")
+			lines = append(lines, "", tuiStatus("Unknown session risk acknowledged", tuiStatusAttention, context.dark))
 		} else {
-			lines = append(lines, "", "Press u to explicitly acknowledge unknown session state and create a new plan.")
+			lines = append(lines, "", "Computers whose session state is unknown are protected: no request is sent to them.")
 		}
 	}
 	if plan.State == "ready" {
-		verb := "shut down"
-		if plan.Action == domain.ClientRestart {
-			verb = "restart"
-		}
-		prompt := fmt.Sprintf("Press Enter to %s %s.", verb, countNoun(plan.Eligible, "computer"))
-		if active := shutdownActiveCount(plan); active > 0 {
-			prompt += fmt.Sprintf(" %s in use will be interrupted.", countNoun(active, "session"))
-		}
-		return lines, []string{tuiSection(prompt, context.dark)}
+		return lines, nil
 	} else {
 		lines = append(lines, "", tuiStatus("No request can be sent from this plan", tuiStatusAttention, context.dark), plan.Message)
 	}

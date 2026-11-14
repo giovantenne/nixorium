@@ -281,10 +281,10 @@ func (model dashboardModel) templateResetView() string {
 		if m.result.State == "saved" {
 			kind = tuiStatusSuccess
 		}
-		lines = append(lines, tuiStatus(strings.ToUpper(m.result.State), kind, model.isDark), m.result.Message)
-		lines = append(lines, "")
+		lines = append(lines, saveResultHeadline(m.result.State, m.result.Message, kind, model.isDark), "")
 		lines = append(lines, saveStatusLines(m.result.State, m.result.RecoveryRequired, true, true, controllerVerifiedForSave(m.result.Revision, model.controller.result))...)
-		lines = append(lines, "", "Student-home changes take effect at the next computer start after system application.", "Applying the controller is optional here; no client deployment or reboot starts automatically.")
+		// The status rows say that nothing was applied or deployed.
+		lines = append(lines, "", "Student-home changes take effect at the next computer start after system application.")
 		if m.result.BackupRef != "" {
 			lines = append(lines, "", "Backup: "+m.result.BackupRef)
 		}

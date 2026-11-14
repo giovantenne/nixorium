@@ -133,7 +133,7 @@ func TestTemplateResetUIRendering(t *testing.T) {
 					default:
 						m.templateReset.stage = "result"
 						m.templateReset.result = domain.TemplateResetResult{State: state, BackupRef: "refs/nixorium/template-backups/20260929T120000.123456789Z-0123456789ab", Message: "No system was applied."}
-						want = append(want, strings.ToUpper(state), "Backup:")
+						want = append(want, "No system was applied.", "Backup:")
 					}
 					view := m.View().Content
 					if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {

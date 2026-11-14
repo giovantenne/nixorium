@@ -74,7 +74,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range installation.Frames {
 		installationText += frame.Text
 	}
-	for _, expected := range []string{"Controller address    " + demoServiceAddress, "Building system", "Activating system", "Verifying activation", "Controller operation completed", "Enter starts network installation mode", "Next: install computers", "Start UEFI network boot", "guided installer opens automatically"} {
+	for _, expected := range []string{"Controller address    " + demoServiceAddress, "Building system", "Activating system", "Verifying activation", "Controller operation completed", "Start network installation?", "Next: install computers", "Start UEFI network boot", "guided installer opens automatically"} {
 		if !strings.Contains(installationText, expected) {
 			t.Fatalf("installation demo omits %q", expected)
 		}
@@ -120,7 +120,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 			t.Fatalf("profile demo omits %q", expected)
 		}
 	}
-	for _, expected := range []string{"In use · will shut down", "in use will be interrupted", "pc02       accepted", "Accepted  2"} {
+	for _, expected := range []string{"In use · will shut down", "sessions will be shut down", "pc02       accepted", "Accepted  2"} {
 		if !strings.Contains(shutdownText, expected) {
 			t.Fatalf("shutdown demo omits %q", expected)
 		}
@@ -149,7 +149,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range classroom.Frames {
 		classroomText += frame.Text
 	}
-	for _, expected := range []string{"Classroom controls", "Computer inventory", "Power controls", "Internet access", "Action  Restart", "Press Enter to restart", "Restart requests accepted"} {
+	for _, expected := range []string{"Classroom controls", "Computer inventory", "Power controls", "Internet access", "Action  Restart", "Restart 1 computer?", "Restart requests accepted"} {
 		if !strings.Contains(classroomText, expected) {
 			t.Fatalf("classroom demo omits %q", expected)
 		}

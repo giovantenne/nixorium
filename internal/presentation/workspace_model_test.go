@@ -196,7 +196,7 @@ func TestWorkspaceSaveRequiresReviewAndNeverStartsOtherOperations(t *testing.T) 
 	m.actions.ApplyGitCommit = nil
 	m, cmd := workspaceKey(m, demoText("v"))
 	m = workspaceComplete(t, m, cmd)
-	if saves != 0 || !strings.Contains(m.View().Content, "Enter saves") {
+	if saves != 0 || !strings.Contains(m.View().Content, "Saving does not apply systems or reset a home.") {
 		t.Fatalf("the review does not say what Enter does:\n%s", m.View().Content)
 	}
 	m, _ = workspaceKey(m, demoCode(tea.KeyF1))
@@ -292,7 +292,7 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					case "review":
 						w.plan = demoWorkspacePlan()
 						w.stage = workspaceReview
-						want = append(want, "Enter saves and records only the profile JSON", "Save JSON", "no system apply or reset")
+						want = append(want, "Saving does not apply systems or reset a home.", "Save")
 					case "loading":
 						m.busy = "Loading workspace metadata"
 						m.beginRead(dashboardReadTimeout)
@@ -308,11 +308,11 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					case "saved":
 						w.stage = workspaceResult
 						w.result = domain.WorkspaceApplyReport{State: "saved", Message: "Only the declaration was saved."}
-						want = append(want, "SAVED", "Preferences take effect")
+						want = append(want, "Only the declaration was saved.", "Preferences take effect")
 					case "partial":
 						w.stage = workspaceResult
 						w.result = domain.WorkspaceApplyReport{State: "partial", RecoveryRequired: true, Message: "Replacement completed but durability is uncertain. Inspect the file before another change."}
-						want = append(want, "PARTIAL", "durability")
+						want = append(want, "Replacement completed", "durability")
 					}
 					view := m.View().Content
 					if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {

@@ -581,7 +581,7 @@ func phaseSteps(labels []string, current int, complete bool, marker string, dark
 		if complete || index < current {
 			lines = append(lines, tuiStatus(label, tuiStatusSuccess, dark))
 		} else if index == current {
-			lines = append(lines, tuiTitle(marker+" "+label, dark))
+			lines = append(lines, marker+" "+tuiTitle(label, dark))
 		} else {
 			lines = append(lines, tuiMuted("○ "+label, dark))
 		}
@@ -615,7 +615,6 @@ func (model dashboardModel) releaseReviewView() string {
 		lines = append(lines, fmt.Sprintf("Lines %d-%d of %d", start+1, end, len(patch)))
 	}
 	lines = append(lines, patch[start:end]...)
-	lines = append(lines, "", "Press Enter to save this validated update and activate the controller.")
 	notices := []tuiNotice{}
 	if model.updates.packageBase {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Builds passed; runtime and hardware remain unverified", detail: "Check the controller and a selected client before distributing to the fleet."})

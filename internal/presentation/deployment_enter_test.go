@@ -26,7 +26,7 @@ func TestUpdateComputersReviewIsConfirmedWithEnter(t *testing.T) {
 	model.deployment.plan = plan
 
 	view := demoANSI.ReplaceAllString(model.View().Content, "")
-	for _, want := range []string{"Update these computers?", "Builds   2 configurations for 2 computers", "Enter updates these computers.", "Enter", "Update computers", "Esc", "Selection"} {
+	for _, want := range []string{"Update these computers?", "Builds   2 configurations for 2 computers", "Enter", "Update computers", "Esc", "Selection"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("review lacks %q:\n%s", want, view)
 		}

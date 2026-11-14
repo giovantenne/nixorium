@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -64,7 +66,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 		t.Fatalf("planned = %q, screen = %d:\n%s", planned, model.screen, model.View().Content)
 	}
 
-	if view := model.View().Content; !strings.Contains(view, "Enter updates these computers.") || strings.Contains(view, "Type DEPLOY") || !strings.Contains(view, "Update computers") {
+	if view := model.View().Content; !strings.Contains(view, "Update these computers?") || strings.Contains(view, "Type DEPLOY") || !strings.Contains(view, "Update computers") {
 		t.Fatalf("the review does not say what Enter does:\n%s", view)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -130,7 +132,7 @@ func TestDeploymentProgressKeepsOnlyFiveAuthoredActivities(t *testing.T) {
 func TestDeploymentProgressDoesNotRegressAfterBuild(t *testing.T) {
 	model := dashboardModel{deployment: deploymentModel{progress: domain.DeploymentProgress{Phase: domain.DeploymentPhasePreflight}}}
 	view := strings.Join(model.deploymentProgressView(), "\n")
-	if !strings.Contains(view, "✓ Building configurations") || !strings.Contains(view, model.activityMarker()+" Revalidating reviewed configuration") {
+	if !strings.Contains(view, "✓ Building configurations") || !strings.Contains(ansi.Strip(view), ansi.Strip(model.activityMarker())+" Revalidating reviewed configuration") {
 		t.Fatalf("post-build revalidation regressed to an initial step:\n%s", view)
 	}
 }

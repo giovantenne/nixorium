@@ -123,7 +123,9 @@ func (model dashboardModel) homeFilesView() string {
 			start := min(m.scroll, max(0, len(wrapped)-capacity))
 			lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
 			lines = append(lines, fmt.Sprintf("Review lines %d–%d of %d", start+1, min(len(wrapped), start+capacity), len(wrapped)))
-			fixed = "Enter saves the files in the lab configuration. Computers change\nonly when you update them."
+			// The review text already says that saving changes only the
+			// configuration and when students get the files.
+			fixed = ""
 			label := "Save"
 			if m.plan.State == "unchanged" {
 				fixed = "Nothing changed."
@@ -138,7 +140,7 @@ func (model dashboardModel) homeFilesView() string {
 			if m.result.HasErrors() {
 				level = tuiStatusAttention
 			}
-			lines = append(lines, tuiStatus(strings.ToUpper(m.result.State), level, model.isDark), "", safeWorkspaceText(m.result.Message))
+			lines = append(lines, saveResultHeadline(m.result.State, safeWorkspaceText(m.result.Message), level, model.isDark), "")
 			lines = append(lines, saveStatusLines(m.result.State, m.result.RecoveryRequired, true, true, controllerVerifiedForSave(m.result.Revision, model.controller.result))...)
 			for _, issue := range m.result.Issues {
 				lines = append(lines, safeWorkspaceText(issue.Message))

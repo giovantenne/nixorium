@@ -164,7 +164,7 @@ func TestSupportUIRendering(t *testing.T) {
 						want = []string{"Support report", "Saving", "Help"}
 					case "saved", "partial":
 						m.support.result = domain.SupportExportResult{State: state, Path: "/home/admin/.local/state/nixorium/support/support-0123456789abcdef.json", Message: "Nothing was uploaded.", SHA256: strings.Repeat("a", 64)}
-						want = append(want, strings.ToUpper(state), "Diagnostics")
+						want = append(want, "Nothing was uploaded.", "Diagnostics")
 					}
 					view := m.View().Content
 					if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {

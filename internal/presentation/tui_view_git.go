@@ -169,7 +169,7 @@ func (model dashboardModel) gitCommitReviewView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	fixedBody := tuiSection("Enter saves these changes as one local commit.", model.isDark)
+	fixedBody := "Create commit saves these changes as one local commit."
 	if model.maintenance.gitDiscard {
 		fixedBody = tuiSection("Type "+model.maintenance.gitCommitPlan.Confirmation+" to continue:", model.isDark) + "\n> " + model.confirmation + "_"
 	}

@@ -17,7 +17,7 @@ func TestPowerReviewSeparatesSessionsInUseFromUnusedLogins(t *testing.T) {
 	m := shutdownModel{plan: plan}
 	lines, prompt := m.reviewView(shutdownViewContext{height: 40})
 	text := strings.Join(append(lines, prompt...), "\n")
-	for _, want := range []string{"pc01 · Logged in, not in use · Ready", "Nobody is using the selected computers now", "Press Enter to shut down"} {
+	for _, want := range []string{"pc01 · Logged in, not in use · Ready", "Nobody is using the selected computers now", "Shut down 2 computers?"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("unused review lacks %q:\n%s", want, text)
 		}
@@ -29,7 +29,7 @@ func TestPowerReviewSeparatesSessionsInUseFromUnusedLogins(t *testing.T) {
 	m.plan = plan
 	lines, prompt = m.reviewView(shutdownViewContext{height: 40})
 	text = strings.Join(append(lines, prompt...), "\n")
-	if !strings.Contains(text, "1 computer is in use") || !strings.Contains(text, "1 session in use will be interrupted") {
+	if !strings.Contains(text, "1 computer is in use") || !strings.Contains(text, "unsaved work may be lost") {
 		t.Fatalf("session in use not highlighted:\n%s", text)
 	}
 	var output bytes.Buffer

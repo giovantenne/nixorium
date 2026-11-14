@@ -46,11 +46,10 @@ func (model dashboardModel) servicesView() string {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
 		return model.renderShell(tuiShell{
-			path:      append(path, "Review"),
-			body:      body,
-			fixedBody: tuiSection("Enter restarts the software cache.", model.isDark),
-			notices:   notices,
-			actions:   []tuiAction{{key: "Enter", label: "Restart cache"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
+			path:    append(path, "Review"),
+			body:    body,
+			notices: notices,
+			actions: []tuiAction{{key: "Enter", label: "Restart cache"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
 		})
 	}
 	for _, service := range model.maintenance.services.Services {

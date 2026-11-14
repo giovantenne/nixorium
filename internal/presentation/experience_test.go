@@ -103,7 +103,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 					screen:       dashboardPXEStartReview,
 					installation: installationModel{startPlan: domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}},
 				},
-				expected: []string{"Enter starts network installation mode", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
+				expected: []string{"Start network installation?", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
 			},
 			{
 				name:     "recovery",
@@ -562,23 +562,23 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
 			}
 			if screen == dashboardDeployReview {
-				if !strings.Contains(view, "Enter updates these computers.") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Selection") {
+				if !strings.Contains(view, "Update computers") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Selection") {
 					t.Fatalf("deployment confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardShutdownReview {
-				if !strings.Contains(view, "Press Enter to") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+				if !strings.Contains(view, "Send requests") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("shutdown confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
-				if !strings.Contains(view, "Enter ") || !strings.Contains(view, "Cancel") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+				if !strings.Contains(demoANSI.ReplaceAllString(view, ""), "Enter ") || !strings.Contains(view, "Cancel") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("PXE confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardServicesRestartReview {
-				if !strings.Contains(view, "Enter restarts the software cache.") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+				if !strings.Contains(view, "Restart cache") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardControllerReview {
-				if !strings.Contains(view, "Press Enter") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") || strings.Contains(view, "REBUILD pc99") {
+				if !strings.Contains(view, "Apply to controller") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") || strings.Contains(view, "REBUILD pc99") {
 					t.Fatalf("controller review actions hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			}

@@ -159,7 +159,7 @@ func (model dashboardModel) activityStatus(actions []tuiAction) string {
 			status += " · Esc cancels"
 		}
 	case model.installation.pxePreparing:
-		// The screen's notice says the work continues after quitting.
+		// The footer's "Quit Nixorium; work continues" says it.
 	default:
 		status += " · Cannot be interrupted; wait for the result."
 	}

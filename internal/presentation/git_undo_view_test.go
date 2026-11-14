@@ -90,7 +90,7 @@ func TestDashboardUndoesTheLastSavedChangeAfterReviewAndEnter(t *testing.T) {
 		"modified      lab-software.json",
 		"added         modules/site.nix",
 		"What the undo changes:",
-		"Enter saves a new change that puts these files back.",
+		"Undo saves a new change that puts these files back.",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("the undo review lacks %q:\n%s", expected, view)
@@ -158,7 +158,7 @@ func TestUndoResultContinuesToTheOrdinaryControllerReview(t *testing.T) {
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if model.screen != dashboardControllerReview || !strings.Contains(view, "Apply the saved configuration to this controller?") || !strings.Contains(view, "Press Enter to build, activate, and verify this controller.") {
+	if model.screen != dashboardControllerReview || !strings.Contains(view, "Apply the saved configuration to this controller?") || !strings.Contains(view, "Apply to controller") {
 		t.Fatalf("the ordinary Apply to controller review did not open (screen %d):\n%s", model.screen, view)
 	}
 	if applied != 1 {
@@ -284,7 +284,7 @@ func TestDashboardUndoReviewFitsSmallTerminalsAndScrolls(t *testing.T) {
 		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 			t.Fatalf("the undo review does not fit %v (%dx%d):\n%s", size, lipgloss.Width(view), lipgloss.Height(view), view)
 		}
-		if !strings.Contains(view, "Enter saves a new change") || !strings.Contains(view, "Update computers so the clients use it too") && size[0] >= 120 {
+		if !strings.Contains(view, "Undo saves a new change") || !strings.Contains(view, "Update computers so the clients use it too") && size[0] >= 120 {
 			t.Fatalf("the confirmation or the next steps are hidden at %v:\n%s", size, view)
 		}
 		before := model.maintenance.gitScroll
@@ -302,7 +302,7 @@ func TestDashboardUndoReviewFitsSmallTerminalsAndScrolls(t *testing.T) {
 			model, _ = pressUndoKey(t, model, tea.KeyPressMsg{Code: tea.KeyUp})
 		}
 		start := model.View().Content
-		if !strings.Contains(start, "Last change: chore: update laboratory software") || !strings.Contains(start, "Update computers so the clients use it too") || !strings.Contains(start, "Enter saves a new change") {
+		if !strings.Contains(start, "Last change: chore: update laboratory software") || !strings.Contains(start, "Update computers so the clients use it too") || !strings.Contains(start, "Undo saves a new change") {
 			t.Fatalf("the review lost its header at %v:\n%s", size, start)
 		}
 		// The window opens on the summary of a short terminal, or on the

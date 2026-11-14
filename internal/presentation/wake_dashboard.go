@@ -124,7 +124,8 @@ func (model shutdownModel) wakeReviewView(context shutdownViewContext) ([]string
 	if plan.HasErrors() || send == 0 {
 		return append(lines, "", tuiStatus("No packet can be sent from this review", tuiStatusAttention, context.dark), plan.Message), nil
 	}
-	return lines, []string{tuiSection(fmt.Sprintf("Press Enter to send the packet to %s.", countNoun(send, "computer")), context.dark)}
+	// The title asks the question and the Enter button answers it.
+	return lines, nil
 }
 
 func wakeTargetStatus(target domain.WakeTarget, dark bool) string {

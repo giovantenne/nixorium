@@ -32,3 +32,20 @@ func TestUpdateProgressSaysOnceWhatRuns(t *testing.T) {
 		t.Errorf("update progress shows the spinner more than once:\n%s", view)
 	}
 }
+
+// Every recorded demo frame shows at most one spinner: the running step
+// carries it, and no separate spinner line repeats it.
+func TestDemoFramesShowAtMostOneSpinner(t *testing.T) {
+	bundle := RenderDemoBundle(strings.Repeat("a", 40), "2026-09-19")
+	for _, scenario := range bundle.Scenarios {
+		for index, frame := range scenario.Frames {
+			count := 0
+			for _, glyph := range tuiSpinnerFrames.Frames {
+				count += strings.Count(frame.Text, strings.TrimSpace(glyph))
+			}
+			if count > 1 {
+				t.Errorf("%s frame %d shows %d spinners:\n%s", scenario.ID, index, count, frame.Text)
+			}
+		}
+	}
+}

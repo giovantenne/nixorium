@@ -184,7 +184,7 @@ func TestDashboardPXEStartIsConfirmedWithEnter(t *testing.T) {
 		t.Fatalf("start review not shown:\n%s", model.View().Content)
 	}
 
-	if view := model.View().Content; !strings.Contains(view, "Enter starts network installation mode.") || strings.Contains(view, "Type START") || !strings.Contains(view, "Start PXE") {
+	if view := model.View().Content; !strings.Contains(view, "Start network installation?") || strings.Contains(view, "Type START") || !strings.Contains(view, "Start PXE") {
 		t.Fatalf("start review does not say what Enter does:\n%s", view)
 	}
 	// Esc cancels without touching the network.

@@ -8,6 +8,17 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// saveResultHeadline is the first line of a save result: the result message
+// with the status symbol, instead of the state word in capitals followed by a
+// message that says it again.
+func saveResultHeadline(state, message string, kind tuiStatusKind, dark bool) string {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		message = strings.ToUpper(state[:min(1, len(state))]) + state[min(1, len(state)):]
+	}
+	return tuiStatus(message, kind, dark)
+}
+
 // These rows describe this workflow's evidence, not live fleet state. In
 // particular, an unchanged declaration is not proof of system activation.
 func saveStatusLines(state string, recovery, controllerAffected, clientsAffected, verified bool) []string {

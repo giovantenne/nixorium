@@ -310,15 +310,18 @@ func (model dashboardModel) workspaceView() string {
 			var review bytes.Buffer
 			displayed := w.plan
 			if displayed.State == "ready" {
-				displayed.Message = "Save and record only workspace-profile.json locally. No system application, deployment or home reset is included."
+				// The review already says that saving applies no system and
+				// resets no home.
+				displayed.Message = ""
 			}
 			WorkspacePlanText(&review, displayed)
 			wrapped := strings.Split(lipgloss.NewStyle().Width(width).Render(strings.TrimSpace(review.String())), "\n")
 			start := min(w.scroll, max(0, len(wrapped)-capacity))
 			lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
 			lines = append(lines, fmt.Sprintf("Review lines %d–%d of %d", start+1, min(len(wrapped), start+capacity), len(wrapped)))
-			fixed = "Enter saves and records only the profile JSON; no system apply or reset."
-			label := "Save JSON"
+			// The review message already says what saving includes.
+			fixed = ""
+			label := "Save"
 			if w.plan.State == "unchanged" {
 				fixed = "Settings unchanged. Student home folders have not been checked."
 				label = "Back"
@@ -329,14 +332,15 @@ func (model dashboardModel) workspaceView() string {
 			if w.result.HasErrors() {
 				level = tuiStatusAttention
 			}
-			lines = append(lines, tuiStatus(strings.ToUpper(w.result.State), level, model.isDark), "", safeWorkspaceText(w.result.Message))
+			lines = append(lines, saveResultHeadline(w.result.State, safeWorkspaceText(w.result.Message), level, model.isDark), "")
 			lines = append(lines, saveStatusLines(w.result.State, w.result.RecoveryRequired, true, true, controllerVerifiedForSave(w.result.Revision, model.controller.result))...)
 			actions = model.saveFollowupActions("Settings")
 			for _, issue := range w.result.Issues {
 				lines = append(lines, safeWorkspaceText(issue.Message))
 			}
 			if w.result.State == "saved" {
-				lines = append(lines, "", "Apply to this controller, then review the computers to update.", workspaceApplicationText())
+				// The status rows say what to apply and update next.
+				lines = append(lines, "", workspaceApplicationText())
 			} else if !w.result.RecoveryRequired {
 				actions = append([]tuiAction{{key: "r", label: "Reload"}}, actions...)
 			}

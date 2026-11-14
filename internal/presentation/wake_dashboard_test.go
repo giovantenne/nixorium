@@ -63,7 +63,7 @@ func TestPowerControlsSwitchOnReviewsThenSendsPackets(t *testing.T) {
 	model, command := wakePress(model, tea.KeyPressMsg{Code: tea.KeyEnter})
 	model, _ = wakePress(model, command())
 	view = demoANSI.ReplaceAllString(model.View().Content, "")
-	for _, want := range []string{"Switch on 1 computer?", "pc01 · Off · receives the packet", "pc02 · Already on · skipped", "A packet is not proof that a computer starts", "Press Enter to send the packet to 1 computer."} {
+	for _, want := range []string{"Switch on 1 computer?", "pc01 · Off · receives the packet", "pc02 · Already on · skipped", "A packet is not proof that a computer starts"} {
 		if model.screen != dashboardShutdownReview || !strings.Contains(view, want) {
 			t.Fatalf("review lacks %q:\n%s", want, view)
 		}

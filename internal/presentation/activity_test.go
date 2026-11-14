@@ -142,7 +142,7 @@ func TestUnclassifiedMutationCannotQuitAndBackgroundPreparationCan(t *testing.T)
 	}
 	model := dashboardModel{screen: dashboardPXE, busy: "Preparing", installation: installationModel{pxePreparing: true}}
 	_, quit := model.Update(keyPress("q"))
-	if quit == nil || !strings.Contains(model.View().Content, "the work continues") {
+	if quit == nil || !strings.Contains(ansi.Strip(model.View().Content), "Quit Nixorium; work continues") {
 		t.Fatal("background work lost its existing safe quit")
 	}
 }

@@ -75,7 +75,6 @@ func (model dashboardModel) deployView() string {
 				tuiMuted("    The controller updates each of them as soon as it answers, and its user sees a notification.", model.isDark))
 		}
 		shell.body = strings.Join(lines, "\n")
-		shell.fixedBody = tuiSection("Enter updates these computers.", model.isDark)
 		shell.notices = append(shell.notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Programs on the computers may restart during the update",
@@ -103,9 +102,7 @@ func (model dashboardModel) deployView() string {
 		if line := deploymentResultCounts(summary); line != "" && !success {
 			lines = append(lines, "", line)
 		}
-		for _, computer := range summary.Computers {
-			lines = append(lines, "", computer.Name+" — "+computer.Outcome, "  "+computer.Guidance)
-		}
+		lines = append(lines, deploymentComputerLines(summary.Computers)...)
 		// A full success is already the green headline; the notice would
 		// only repeat it.
 		repeatsHeadline := success && len(model.deployment.result.Skipped) == 0
@@ -191,6 +188,28 @@ func deploymentResultCounts(summary domain.DeploymentResultSummary) string {
 
 // deploymentUnreachableNote says what happens to computers that did not
 // answer the quick check.
+// deploymentComputerLines lists the result per computer. When every computer
+// has the same outcome and guidance, the guidance is said once and the rows
+// list only names.
+func deploymentComputerLines(computers []domain.DeploymentComputerResult) []string {
+	same := len(computers) > 1
+	for _, computer := range computers {
+		same = same && computer.Outcome == computers[0].Outcome && computer.Guidance == computers[0].Guidance
+	}
+	lines := []string{}
+	if same {
+		lines = append(lines, "", "Each computer: "+computers[0].Guidance)
+		for _, computer := range computers {
+			lines = append(lines, computer.Name+" — "+computer.Outcome)
+		}
+		return lines
+	}
+	for _, computer := range computers {
+		lines = append(lines, "", computer.Name+" — "+computer.Outcome, "  "+computer.Guidance)
+	}
+	return lines
+}
+
 func deploymentUnreachableNote(queueable bool) string {
 	if queueable {
 		return "Computers that did not answer are left unchanged, or updated when switched on if you choose that (F3)."

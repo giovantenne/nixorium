@@ -302,7 +302,8 @@ func (model softwareModel) profileReviewRows() []string {
 		if scope, found := existing[item.ID]; found {
 			rows = append(rows, "= "+item.ID+" · already present; keep "+softwareScopeLabel(scope))
 		} else {
-			rows = append(rows, "+ "+item.ID+" · add for "+softwareScopeLabel(model.profilePlan.Request.Scope))
+			// The destination is shown once above the rows.
+			rows = append(rows, "+ "+item.ID+" · add")
 		}
 	}
 	return rows

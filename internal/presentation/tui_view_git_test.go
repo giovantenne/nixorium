@@ -102,7 +102,7 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardGitCommitReview || !strings.Contains(model.View().Content, "Enter saves these changes as one local commit.") || strings.Contains(model.View().Content, "Type COMMIT") || !strings.Contains(model.View().Content, "No hooks, signing actions, remote operations, or push") {
+	if model.screen != dashboardGitCommitReview || !strings.Contains(model.View().Content, "Create commit saves these changes as one local commit.") || strings.Contains(model.View().Content, "Type COMMIT") || !strings.Contains(model.View().Content, "No hooks, signing actions, remote operations, or push") {
 		t.Fatalf("commit review missing:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

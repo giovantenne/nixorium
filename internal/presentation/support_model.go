@@ -160,7 +160,7 @@ func (model dashboardModel) supportView() string {
 		if result.State == "saved" {
 			kind = tuiStatusSuccess
 		}
-		lines = append(lines, tuiStatus(strings.ToUpper(result.State), kind, model.isDark), result.Message)
+		lines = append(lines, saveResultHeadline(result.State, result.Message, kind, model.isDark))
 		if result.Path != "" {
 			lines = append(lines, fmt.Sprintf("Local file: %q", result.Path), "SHA-256: "+result.SHA256)
 		}

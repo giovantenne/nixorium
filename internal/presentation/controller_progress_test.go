@@ -258,7 +258,7 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardControllerReview || !strings.Contains(model.View().Content, revision) || strings.Contains(model.View().Content, "REBUILD pc99") || !strings.Contains(model.View().Content, "Press Enter") {
+	if model.screen != dashboardControllerReview || !strings.Contains(model.View().Content, revision) || strings.Contains(model.View().Content, "REBUILD pc99") || !strings.Contains(model.View().Content, "Apply to controller") {
 		t.Fatalf("controller review missing:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
