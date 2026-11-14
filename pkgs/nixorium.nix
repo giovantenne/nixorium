@@ -1,4 +1,8 @@
-{ buildGoModule, bubblewrap, callPackage, git, lib, makeWrapper, openssh, openssl, whois }:
+{ buildGoModule, bubblewrap, callPackage, git, lib, makeWrapper, openssh, openssl, whois
+# The TUI shows these beside the version. A laboratory that follows a moving
+# ref (master, a commit) passes its name as channel, so the build is not
+# mistaken for the release named in VERSION; empty means a release.
+, channel ? "", revision ? "", revisionDate ? "" }:
 
 let
   go = callPackage ./go.nix { };
@@ -56,7 +60,12 @@ in
       --suffix PATH : ${lib.makeBinPath [ git ]}
   '';
 
-  ldflags = [ "-s" "-w" "-X main.nixoriumVersion=${version}" "-X main.agentVersion=${version}" ];
+  ldflags = [ "-s" "-w" "-X main.nixoriumVersion=${version}" "-X main.agentVersion=${version}" ]
+    ++ lib.optionals (channel != "") [
+      "-X main.nixoriumChannel=${channel}"
+      "-X main.nixoriumRevision=${revision}"
+      "-X main.nixoriumRevisionDate=${revisionDate}"
+    ];
 
   passthru.go = go;
 

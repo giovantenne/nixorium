@@ -217,6 +217,10 @@ type tuiShell struct {
 	// without it that text is always shown, muted.
 	detailsKey bool
 	details    bool
+	// version is the running Nixorium, shown at the right of the header when
+	// it fits; versionMoving draws it as a warning (not a release).
+	version       string
+	versionMoving bool
 }
 
 type tuiShellRegions struct {
@@ -288,6 +292,15 @@ func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShe
 			}
 		}
 	}
+	if shell.version != "" {
+		label := tuiMuted(shell.version, darkBackground)
+		if shell.versionMoving {
+			label = lipgloss.NewStyle().Foreground(newTUITheme(darkBackground).attention).Render(shell.version)
+		}
+		if gap := tuiContentWidth(width) - lipgloss.Width(header) - lipgloss.Width(label); gap >= 3 {
+			header += strings.Repeat(" ", gap) + label
+		}
+	}
 	regions := tuiShellRegions{
 		header:    header,
 		body:      strings.TrimSpace(shell.body),
@@ -344,6 +357,15 @@ func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShe
 		regions.actions = tuiActionBar(width, darkBackground, actions...)
 	}
 	return regions
+}
+
+// tuiContentWidth is the width of the framed content of a terminal of the
+// given width (0 when unknown).
+func tuiContentWidth(terminal int) int {
+	if terminal == 0 {
+		return 100
+	}
+	return min(116, max(20, terminal-6))
 }
 
 func renderTUIShell(shell tuiShell, width int, darkBackground bool) string {

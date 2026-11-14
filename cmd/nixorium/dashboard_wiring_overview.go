@@ -35,6 +35,7 @@ func wireOverviewActions(actions *presentation.DashboardActions, deps dashboardD
 	}
 	actions.DismissUpdateNotification = func(notice domain.UpdateNotification) error { return updateNotifications.Dismiss(repository, notice) }
 	actions.RunningVersion = nixoriumVersion
+	actions.RunningBuild = presentation.RunningBuild{Channel: nixoriumChannel, Revision: nixoriumRevision, Date: nixoriumRevisionDate}
 	actions.LoadInitial = func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 		if setupMode {
 			return domain.StatusReport{}, setupManager.Status(ctx, repository), nil

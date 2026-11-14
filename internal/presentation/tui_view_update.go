@@ -81,7 +81,7 @@ func (model dashboardModel) updateView() string {
 			// master keeps its name; the revision says which one is saved.
 			target += " · " + shortRevision(plan.TargetRev)
 		}
-		running := displayRunningVersion(model.actions.RunningVersion)
+		running := model.runningVersionText()
 		if model.reload.offered() {
 			running += " (this window, opened before the update)"
 		}
@@ -144,7 +144,7 @@ func (model dashboardModel) updateView() string {
 	}
 
 	releases := model.availableUpdateReleases()
-	runningLine := "Running interface   " + displayRunningVersion(model.actions.RunningVersion)
+	runningLine := "Running interface   " + model.runningVersionText()
 	if floor := strings.TrimPrefix(model.updates.check.VersionFloor, "v"); floor != "" {
 		runningLine = "Running version     " + floor + " (older releases are hidden)"
 	}
@@ -271,11 +271,9 @@ func updatePlanPhaseIndex(phase domain.UpdatePlanPhase) int {
 	}
 }
 
-func displayRunningVersion(version string) string {
-	if version == "" {
-		return "unknown"
-	}
-	return version
+func (model dashboardModel) runningVersionText() string {
+	label, _ := model.runningVersionLabel()
+	return label
 }
 
 func updateCheckFailureSummary(report domain.UpdateCheckReport) (string, string) {

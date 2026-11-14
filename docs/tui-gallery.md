@@ -213,7 +213,7 @@ q Quit
 ## Overview
 
 ```text
-Nixorium  /  Overview
+Nixorium  /  Overview                                                                                         demo
 
 Laboratory overview
 Choose an area with the arrows or its letter.
@@ -232,7 +232,7 @@ Inventory, updating computers, Internet access and power
 ## Optional administrator Assistant
 
 ```text
-Nixorium  /  Overview
+Nixorium  /  Overview                                                                                         demo
 
 Laboratory overview
 Choose an area with the arrows or its letter.
@@ -412,7 +412,7 @@ Space switch saving · Enter continue · Esc back
 ## Optional conversation sharing
 
 ```text
-Nixorium  /  Assistant
+Nixorium  /  Assistant                                                                                        demo
 
 Assistant settings
 
@@ -427,7 +427,7 @@ conversations of this lab.
 ## Explicit answer report
 
 ```text
-Nixorium  /  Assistant
+Nixorium  /  Assistant                                                                                        demo
 
 Report this answer
 
@@ -481,7 +481,7 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ## Assistant proposal review
 
 ```text
-Nixorium  /  Assistant  /  Review the proposal
+Nixorium  /  Assistant  /  Review the proposal                                                                demo
 
 What changes
 • lab-software.json changed
@@ -502,7 +502,7 @@ choose the computers.
 ## Assistant evaluation failure
 
 ```text
-Nixorium  /  Assistant  /  Review the proposal
+Nixorium  /  Assistant  /  Review the proposal                                                                demo
 
 What changes
 • lab-software.json changed
@@ -589,7 +589,7 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ## Assistant saved configuration
 
 ```text
-Nixorium  /  Assistant  /  Review the proposal
+Nixorium  /  Assistant  /  Review the proposal                                                                demo
 
 Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. Computers were not updated.
 You can update them later from Computers → Update computers: try one computer first, check it, then update the
@@ -601,7 +601,7 @@ others.
 ## Pinned package search
 
 ```text
-Nixorium  /  Software
+Nixorium  /  Software                                                                                         demo
 
   [F2] Configured   ▸ [F3] Search     [F4] Suggested
 
@@ -621,7 +621,7 @@ Type Search  ·  ↑/↓ Results  ·  ⏎ Enter Choose computers  ·  Tab Change
 ## Additive software profile review
 
 ```text
-Nixorium  /  Software  /  Profile review
+Nixorium  /  Software  /  Profile review                                                                      demo
 
 Add Essential?
 Save adds missing packages and keeps existing choices.
@@ -645,7 +645,7 @@ Later        Review and update the affected client computers
 ## Contextual client deployment selection
 
 ```text
-Nixorium  /  Computers  /  Update computers
+Nixorium  /  Computers  /  Update computers                                                                   demo
 
 Update computers
 Select → Review → Deploy → Verify
@@ -672,7 +672,7 @@ F1 Help
 ## Update computers review
 
 ```text
-Nixorium  /  Computers  /  Update computers
+Nixorium  /  Computers  /  Update computers                                                                   demo
 
 Update these computers?
 
@@ -700,7 +700,7 @@ next one.
 ## Verified deployment result
 
 ```text
-Nixorium  /  Computers  /  Update computers
+Nixorium  /  Computers  /  Update computers                                                                   demo
 
 ✓ 5 computers updated
 
@@ -725,7 +725,7 @@ n New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
 ## Availability before client deployment
 
 ```text
-Nixorium  /  Computers  /  Update computers
+Nixorium  /  Computers  /  Update computers                                                                   demo
 
 Update these computers?
 
@@ -750,7 +750,7 @@ F2 Reachable only  ·  ⏎ Enter Update computers  ·  Esc Selection  ·  F1 Hel
 ## A new review for reachable computers only
 
 ```text
-Nixorium  /  Computers  /  Update computers
+Nixorium  /  Computers  /  Update computers                                                                   demo
 
 Update these computers?
 
@@ -774,7 +774,7 @@ next one.
 ## Per-computer deployment outcomes
 
 ```text
-Nixorium  /  Computers  /  Update computers
+Nixorium  /  Computers  /  Update computers                                                                   demo
 
 ! Some computers were not reached
 
@@ -793,7 +793,7 @@ n New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
 ## Unreachable computers do not waive recovery
 
 ```text
-Nixorium  /  Computers  /  Update computers
+Nixorium  /  Computers  /  Update computers                                                                   demo
 
 ! Deployment requires recovery — some computers were not reached
 
@@ -818,7 +818,7 @@ l Logs  ·  Enter Computers  ·  F1 Help
 ## PXE network-impact review
 
 ```text
-Nixorium  /  Installation  /  Install computers
+Nixorium  /  Installation  /  Install computers                                                               demo
 
 Start network installation?
 
@@ -837,7 +837,7 @@ laboratory address back. Remote connections to the controller may be interrupted
 ## Saved PXE settings
 
 ```text
-Nixorium  /  Installation  /  Network boot  /  Saved settings
+Nixorium  /  Installation  /  Network boot  /  Saved settings                                                 demo
 
 Use the saved installation settings?
 
@@ -858,7 +858,7 @@ This summary is not a readiness check. The installation still requires its own r
 ## USB SSH disk review
 
 ```text
-Nixorium  /  Installation  /  USB over SSH
+Nixorium  /  Installation  /  USB over SSH                                                                    demo
 
 Step 6 of 6  Check before erasing
 
@@ -889,7 +889,7 @@ Type exactly
 ## USB SSH verified result
 
 ```text
-Nixorium  /  Installation  /  USB over SSH
+Nixorium  /  Installation  /  USB over SSH                                                                    demo
 
 Install one computer from USB
 
@@ -905,7 +905,7 @@ r Refresh status  ·  d Details  ·  Esc Detach  ·  F1 Help
 ## Shutdown with active sessions
 
 ```text
-Nixorium  /  Computers  /  Power controls
+Nixorium  /  Computers  /  Power controls                                                                     demo
 
 Shut down 2 eligible clients?
 
@@ -930,7 +930,7 @@ Press Enter to shut down 2 computers. 1 session in use will be interrupted.
 ## Restricted teacher dashboard
 
 ```text
-Nixorium  /  Computers
+Nixorium  /  Computers                                                                                        demo
 
 Classroom controls
 Check computers, watch and lock students' screens, send files, control temporary Internet access, or switch
@@ -952,7 +952,7 @@ See, control and lock the students' screens, show yours, send your desktop
 ## Teacher restart review
 
 ```text
-Nixorium  /  Computers  /  Power controls
+Nixorium  /  Computers  /  Power controls                                                                     demo
 
 Restart 1 eligible client?
 
@@ -975,7 +975,7 @@ Press Enter to restart 1 computer.
 ## Settings accounts menu
 
 ```text
-Nixorium  /  Maintenance  /  Settings  /  Accounts
+Nixorium  /  Maintenance  /  Settings  /  Accounts                                                            demo
 
 Accounts
 Choose what to change for the laboratory accounts.
@@ -991,7 +991,7 @@ Teacher and student user names
 ## Change account names
 
 ```text
-Nixorium  /  Maintenance  /  Settings  /  Accounts  /  Names
+Nixorium  /  Maintenance  /  Settings  /  Accounts  /  Names                                                  demo
 
 Step 1 of 2  Accounts
 
@@ -1006,7 +1006,7 @@ Teacher account name, distinct from administrator and student.
 ## Change account passwords
 
 ```text
-Nixorium  /  Maintenance  /  Settings  /  Accounts  /  Passwords
+Nixorium  /  Maintenance  /  Settings  /  Accounts  /  Passwords                                              demo
 
 Change account passwords
 Choose the account whose password you want to change.
@@ -1027,7 +1027,7 @@ to this controller and then update the computers.
 ## Student workspace favorites
 
 ```text
-Nixorium  /  Settings  /  Student workspace
+Nixorium  /  Settings  /  Student workspace                                                                   demo
 
 Student workspace
 Favorite applications (ordered)
@@ -1045,7 +1045,7 @@ Space Toggle  ·  i Inherit  ·  c Clear  ·  ⏎ Enter Keep draft  ·  Esc Canc
 ## Initial files at 80x24
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files         demo
 
 Initial files
 Copied 2 files, 2 folders, 8.1 KiB
@@ -1067,7 +1067,7 @@ F1 Help
 ## Initial-file path completion
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
 Initial files
 Choose a file or a folder on this computer.
@@ -1083,7 +1083,7 @@ Tab Complete path  ·  ⏎ Enter Continue  ·  Esc Cancel  ·  F1 Help
 ## Initial-file copy and executable review
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
 Initial files
 Copied 2 files, 2 folders, 8.1 KiB
@@ -1104,7 +1104,7 @@ are not kept; links and special files are refused.
 ## Initial-file declaration review
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
 Initial files
 Initial files review: READY
@@ -1132,7 +1132,7 @@ only when you update them.
 ## Initial-file removal and mode-change review
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
 Initial files
 Initial files review: READY
@@ -1160,7 +1160,7 @@ only when you update them.
 ## Initial-file protected save
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
 Initial files
 
@@ -1174,7 +1174,7 @@ F1 Help
 ## Initial files saved without activation
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
 Initial files
 ✓ SAVED
@@ -1193,7 +1193,7 @@ the computers, each one gets the new files at its next start.
 ## Initial-file partial save
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
 Initial files
 ! PARTIAL
@@ -1213,7 +1213,7 @@ g Inspect Git state  ·  Esc Workspace  ·  F1 Help
 ## Initial-file source refusal
 
 ```text
-Nixorium  /  Settings  /  Student workspace  /  Initial files
+Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
 Initial files
 Choose a file or a folder on this computer.
@@ -1231,7 +1231,7 @@ Tab Complete path  ·  ⏎ Enter Continue  ·  Esc Cancel  ·  F1 Help
 ## Student workspace declaration review
 
 ```text
-Nixorium  /  Settings  /  Student workspace
+Nixorium  /  Settings  /  Student workspace                                                                   demo
 
 Student workspace
 Student workspace review: READY
@@ -1257,7 +1257,7 @@ Enter saves and records only the profile JSON; no system apply or reset.
 ## Student workspace saved and recorded, not deployed
 
 ```text
-Nixorium  /  Settings  /  Student workspace
+Nixorium  /  Settings  /  Student workspace                                                                   demo
 
 Student workspace
 ✓ SAVED
@@ -1276,7 +1276,7 @@ Preferences take effect at the next computer start after system application.
 ## Separate controller review after a workspace save
 
 ```text
-Nixorium  /  Maintenance  /  Controller  /  Review
+Nixorium  /  Maintenance  /  Controller  /  Review                                                            demo
 
 Apply the saved configuration to this controller?
 
@@ -1300,7 +1300,7 @@ is not normally required.
 ## Workspace versions in system update review
 
 ```text
-Nixorium  /  Maintenance  /  Update system and packages  /  Review
+Nixorium  /  Maintenance  /  Update system and packages  /  Review                                            demo
 
 Review update
 Builds passed; programs are checked when they run on a computer.
@@ -1320,7 +1320,7 @@ Computers are updated afterwards, from Computers → Update computers.
 ## Cancellable read with elapsed time
 
 ```text
-Nixorium  /  Maintenance  /  Diagnostics  /  Support report
+Nixorium  /  Maintenance  /  Diagnostics  /  Support report                                                   demo
 
 Local support report
 Minimized, not anonymous. No upload or remediation.
@@ -1335,7 +1335,7 @@ Esc Cancel read  ·  F1 Help
 ## Read cancelled without changes
 
 ```text
-Nixorium  /  Maintenance  /  Diagnostics
+Nixorium  /  Maintenance  /  Diagnostics                                                                      demo
 
 Diagnostics
 
@@ -1350,7 +1350,7 @@ e Support report  ·  ↑/↓ Select  ·  ⏎ Enter Evidence  ·  r Check again 
 ## Local support report preview
 
 ```text
-Nixorium  /  Maintenance  /  Diagnostics  /  Support report
+Nixorium  /  Maintenance  /  Diagnostics  /  Support report                                                   demo
 
 Local support report
 Minimized, not anonymous. No upload or remediation.
@@ -1378,7 +1378,7 @@ Lines 1–14 / 41 · Versions, revision, time and counts remain visible.
 ## Local support report saved without upload
 
 ```text
-Nixorium  /  Maintenance  /  Diagnostics  /  Support report
+Nixorium  /  Maintenance  /  Diagnostics  /  Support report                                                   demo
 
 Local support report
 Minimized, not anonymous. No upload or remediation.
@@ -1394,7 +1394,7 @@ SHA-256: e83aa5986a7231de21c579859bdc0b5a0c3f8caa60a1370050f21840bd25a30f
 ## Deployment template reset review
 
 ```text
-Nixorium  /  Maintenance  /  Reset template
+Nixorium  /  Maintenance  /  Reset template                                                                   demo
 
 Reset deployment template
 Replace local customizations. Keep settings, keys and exact input pins.
@@ -1422,7 +1422,7 @@ Type RESET DEPLOYMENT:
 ## Deployment template reset losses
 
 ```text
-Nixorium  /  Maintenance  /  Reset template
+Nixorium  /  Maintenance  /  Reset template                                                                   demo
 
 Reset deployment template
 Replace local customizations. Keep settings, keys and exact input pins.
@@ -1450,7 +1450,7 @@ Type RESET DEPLOYMENT:
 ## Deployment reset saved without activation
 
 ```text
-Nixorium  /  Maintenance  /  Reset template
+Nixorium  /  Maintenance  /  Reset template                                                                   demo
 
 Reset deployment template
 Replace local customizations. Keep settings, keys and exact input pins.
@@ -1474,7 +1474,7 @@ Local commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ## Changed client SSH key
 
 ```text
-Nixorium  /  Computers  /  Inventory
+Nixorium  /  Computers  /  Inventory                                                                          demo
 
 Computer inventory
 
@@ -1492,7 +1492,7 @@ h Review changed SSH key  ·  i Diagnostics  ·  t Technical  ·  Esc Back  ·  
 ## Cancellable SSH trust inspection
 
 ```text
-Nixorium  /  Computers  /  SSH trust
+Nixorium  /  Computers  /  SSH trust                                                                          demo
 
 Review this computer's changed SSH key
 ⣾  Reading the recorded and offered SSH fingerprints
@@ -1505,7 +1505,7 @@ Esc Cancel read  ·  F1 Help
 ## Single-client SSH trust review
 
 ```text
-Nixorium  /  Computers  /  SSH trust
+Nixorium  /  Computers  /  SSH trust                                                                          demo
 
 Review this computer's changed SSH key
 Computer: pc01 (10.42.0.11)
@@ -1523,7 +1523,7 @@ Type ROTATE HOST KEY: _
 ## SSH trust saved without deployment
 
 ```text
-Nixorium  /  Computers  /  Inventory
+Nixorium  /  Computers  /  Inventory                                                                          demo
 
 ⣾  Checking the configured computers
 
@@ -1537,7 +1537,7 @@ Esc Cancel read  ·  F1 Help
 ## Overview finds an existing managed job
 
 ```text
-Nixorium  /  Overview
+Nixorium  /  Overview                                                                                         demo
 
 Laboratory overview
 Items in yellow need your attention; press their number to open them.
@@ -1558,7 +1558,7 @@ v View progress  ·  ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  
 ## Read-only attachment to existing progress
 
 ```text
-Nixorium  /  Overview  /  Background work
+Nixorium  /  Overview  /  Background work                                                                     demo
 
 Managed background work
 Read-only attachment. Leaving this view does not stop the job.
@@ -1578,7 +1578,7 @@ Tab Other job  ·  Esc Overview  ·  q Quit  ·  F1 Help
 ## Interrupted managed job
 
 ```text
-Nixorium  /  Overview  /  Background work
+Nixorium  /  Overview  /  Background work                                                                     demo
 
 Managed background work
 Read-only attachment. Leaving this view does not stop the job.

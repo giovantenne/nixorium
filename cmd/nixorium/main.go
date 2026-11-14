@@ -20,6 +20,14 @@ import (
 
 var nixoriumVersion = "development"
 
+// Set at build time when the laboratory follows a moving ref (master, another
+// branch, a commit) instead of a release; empty for releases.
+var (
+	nixoriumChannel      string
+	nixoriumRevision     string
+	nixoriumRevisionDate string
+)
+
 type options struct {
 	internetAction       domain.InternetAction
 	lockAction           domain.LockAction

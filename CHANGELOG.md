@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- The TUI shows the running Nixorium at the right of the title line: the
+  version for a release, or the followed ref, commit and date (for example
+  `master · 06ae395 · 14 Nov 2026`) in the warning colour for a laboratory
+  that follows master, another branch or a pinned commit. Such a build is not
+  the release that VERSION names. The Update screen uses the same label.
+
 ## [3.14.0] - 2026-11-13
 
 From 3.13.0 or 3.13.1, Update Nixorium, then Apply to controller and Update

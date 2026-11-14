@@ -55,6 +55,7 @@ type DashboardActions struct {
 	PlanCleanup             func(context.Context, string) domain.CleanupPlanReport
 	ApplyCleanup            func(domain.CleanupPlanReport) domain.CleanupApplyReport
 	RunningVersion          string
+	RunningBuild            RunningBuild
 	LoadInventory           func(context.Context) (domain.StatusReport, error)
 	LoadInitial             func(context.Context) (domain.StatusReport, domain.SetupReport, error)
 	LoadDoctor              func(context.Context) (domain.DoctorReport, error)

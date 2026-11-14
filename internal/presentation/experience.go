@@ -440,9 +440,9 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 			}
 		}
 	}
-	width := min(116, max(20, model.width-6))
-	if model.width == 0 {
-		width = 100
+	width := tuiContentWidth(model.width)
+	if model.actions.RunningVersion != "" || model.actions.RunningBuild.Channel != "" {
+		shell.version, shell.versionMoving = model.runningVersionLabel()
 	}
 	shell.compactPrimary = compactTerminal(model.height)
 	regions := buildTUIShellRegions(shell, model.width, model.isDark)

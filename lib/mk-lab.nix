@@ -685,7 +685,28 @@ let
   # run in CI (tests/source-checks.nix builds the package with them); on a
   # busy controller they only add minutes, and a timing-sensitive test there
   # once failed an installation.
-  nixoriumPackage = (bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {}).overrideAttrs { doCheck = false; };
+  nixoriumPackage = (bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") nixoriumBuild).overrideAttrs { doCheck = false; };
+  # Which Nixorium the laboratory follows, read from its flake.lock: a tag
+  # equal to VERSION is a release and shows only the version; master, another
+  # branch or a pinned commit also shows the commit and its date in the TUI.
+  nixoriumBuild = let
+    lockFile = deploymentRoot + "/flake.lock";
+    lock = if builtins.pathExists lockFile then builtins.fromJSON (builtins.readFile lockFile) else {};
+    nodeName = lock.nodes.${lock.root or "root"}.inputs.nixorium or null;
+    original = if builtins.isString nodeName then lock.nodes.${nodeName}.original or {} else {};
+    release = "v" + lib.removeSuffix "\n" (builtins.readFile (upstreamRoot + "/VERSION"));
+    channel =
+      if original == {} then ""
+      else if original ? ref then (if original.ref == release then "" else original.ref)
+      else if original ? rev then "commit"
+      else if (original.type or "") == "github" then "master"
+      else "local";
+    revision = if builtins.isAttrs upstreamSelf then upstreamSelf.rev or upstreamSelf.dirtyRev or "" else "";
+    date = if builtins.isAttrs upstreamSelf then upstreamSelf.lastModifiedDate or "" else "";
+  in lib.optionalAttrs (channel != "") {
+    inherit channel revision;
+    revisionDate = builtins.substring 0 8 date;
+  };
   hostState = bootstrapPkgs.writeShellApplication {
     name = "nixorium-host-state";
     runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.gnused ];
