@@ -117,7 +117,7 @@ func TestCandidateControllerBuildExposesItsOwnDetails(t *testing.T) {
 				if command != nil || model.screen != dashboardUpdate || !model.updates.planning || model.controller.applying || model.updates.applying {
 					t.Fatal("toggling details changed the running operation")
 				}
-				for _, expected := range []string{model.updateTitle(), "Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "Elapsed:", "current deployment remains unchanged", "Progress details", "Help"} {
+				for _, expected := range []string{model.updateTitle(), "Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "Elapsed:", "Nothing changes until you confirm the review", "Progress details", "Help"} {
 					if !strings.Contains(view, expected) {
 						t.Fatalf("%v details=%t lost %q:\n%s", size, expanded, expected, view)
 					}
@@ -144,7 +144,7 @@ func TestGroupedUpdateBuildRetainsDetailsWithoutInventingCompletion(t *testing.T
 		model.beginRead(dashboardBuildTimeout)
 		t.Cleanup(model.read.cancel)
 		view := demoANSI.ReplaceAllString(model.View().Content, "")
-		for _, expected := range []string{"Target: master", "Required outputs: 5", "checking together", "Current check details", "Building all 5 required outputs together", "Elapsed:", "current deployment remains unchanged", "Help"} {
+		for _, expected := range []string{"Target: master", "Required outputs: 5", "checking together", "Current check details", "Building all 5 required outputs together", "Elapsed:", "Nothing changes until you confirm the review", "Help"} {
 			if !strings.Contains(view, expected) {
 				t.Fatalf("%v grouped build lost %q:\n%s", size, expected, view)
 			}

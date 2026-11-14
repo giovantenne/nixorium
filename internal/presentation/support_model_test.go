@@ -141,7 +141,7 @@ func TestSupportUIRendering(t *testing.T) {
 					m.screen = dashboardSupport
 					m.support.snapshot = demoSupportSnapshot()
 					m.width, m.height, m.isDark = size[0], size[1], dark
-					want := []string{"Local support report", "No upload", "F1", "Help", "Esc"}
+					want := []string{"Support report", "No upload", "F1", "Help", "Esc"}
 					switch state {
 					case "preview":
 						want = append(want, "Save locally", "schemaVersion")
@@ -161,7 +161,7 @@ func TestSupportUIRendering(t *testing.T) {
 					case "saving":
 						m.support.saving = true
 						m.busy = "Saving the reviewed report locally"
-						want = []string{"Local support report", "Saving", "Help"}
+						want = []string{"Support report", "Saving", "Help"}
 					case "saved", "partial":
 						m.support.result = domain.SupportExportResult{State: state, Path: "/home/admin/.local/state/nixorium/support/support-0123456789abcdef.json", Message: "Nothing was uploaded.", SHA256: strings.Repeat("a", 64)}
 						want = append(want, strings.ToUpper(state), "Diagnostics")

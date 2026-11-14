@@ -69,7 +69,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || !model.deployment.applying || !strings.Contains(model.View().Content, "Closing is disabled") {
+	if command == nil || !model.deployment.applying || !strings.Contains(model.View().Content, "Cannot be interrupted") {
 		t.Fatalf("confirmed deployment did not enter protected busy state:\n%s", model.View().Content)
 	}
 	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
@@ -130,7 +130,7 @@ func TestDeploymentProgressKeepsOnlyFiveAuthoredActivities(t *testing.T) {
 func TestDeploymentProgressDoesNotRegressAfterBuild(t *testing.T) {
 	model := dashboardModel{deployment: deploymentModel{progress: domain.DeploymentProgress{Phase: domain.DeploymentPhasePreflight}}}
 	view := strings.Join(model.deploymentProgressView(), "\n")
-	if !strings.Contains(view, "✓ Building configurations") || !strings.Contains(view, "● Revalidating reviewed configuration · Running") {
+	if !strings.Contains(view, "✓ Building configurations") || !strings.Contains(view, model.activityMarker()+" Revalidating reviewed configuration") {
 		t.Fatalf("post-build revalidation regressed to an initial step:\n%s", view)
 	}
 }

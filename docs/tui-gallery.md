@@ -193,9 +193,6 @@ n Configure clients  ·  ↑/↓ Select  ·  Enter Open  ·  Esc Overview  ·  F
 ```text
 Nixorium  /  Overview
 
-Laboratory overview
-Choose an area with the arrows or its letter.
-
 › [c] Computers
   [n] Installation
   [w] Software
@@ -203,8 +200,8 @@ Choose an area with the arrows or its letter.
 
 Inventory, updating computers, Internet access and power
 
-○ Nixorium update available: v3.1.0
-  Chosen channel: stable. u reviews updates; x dismisses this version.
+Nixorium update available: v3.1.0
+  Chosen channel: stable.
 
 u Review update  ·  x Dismiss update  ·  ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help
 q Quit
@@ -214,9 +211,6 @@ q Quit
 
 ```text
 Nixorium  /  Overview                                                                                         demo
-
-Laboratory overview
-Choose an area with the arrows or its letter.
 
 › [c] Computers
   [n] Installation
@@ -233,9 +227,6 @@ Inventory, updating computers, Internet access and power
 
 ```text
 Nixorium  /  Overview                                                                                         demo
-
-Laboratory overview
-Choose an area with the arrows or its letter.
 
 › [c] Computers
   [n] Installation
@@ -647,11 +638,10 @@ Later        Review and update the affected client computers
 ```text
 Nixorium  /  Computers  /  Update computers                                                                   demo
 
-Update computers
 Select → Review → Deploy → Verify
 
 Choose where to apply the saved configuration.
-Not checked in this session · r checks the computers now
+Not checked in this session
 
 5 of 5 computers selected
 
@@ -661,7 +651,7 @@ Not checked in this session · r checks the computers now
   [x] pc04       10.42.0.14 · Not checked
   [x] pc05       10.42.0.15 · Not checked
 
-○ Opened from a saved software change. Review deploys the complete current configuration.
+Opened from a saved software change. Review deploys the complete current configuration.
 
 ! Software selection saved locally.
 
@@ -977,7 +967,6 @@ Press Enter to restart 1 computer.
 ```text
 Nixorium  /  Maintenance  /  Settings  /  Accounts                                                            demo
 
-Accounts
 Choose what to change for the laboratory accounts.
 
 › [n] Change account names
@@ -1029,7 +1018,6 @@ to this controller and then update the computers.
 ```text
 Nixorium  /  Settings  /  Student workspace                                                                   demo
 
-Student workspace
 Favorite applications (ordered)
 
 Explicit selection
@@ -1047,7 +1035,6 @@ Space Toggle  ·  i Inherit  ·  c Clear  ·  ⏎ Enter Keep draft  ·  Esc Canc
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files         demo
 
-Initial files
 Copied 2 files, 2 folders, 8.1 KiB
 Check the list. Files start as not executable: press Space on programs.
 
@@ -1069,7 +1056,6 @@ F1 Help
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-Initial files
 Choose a file or a folder on this computer.
 Nixorium keeps a copy in the lab configuration and on every computer:
 add teaching materials only, never passwords or keys.
@@ -1085,7 +1071,6 @@ Tab Complete path  ·  ⏎ Enter Continue  ·  Esc Cancel  ·  F1 Help
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-Initial files
 Copied 2 files, 2 folders, 8.1 KiB
 Check the list. Files start as not executable: press Space on programs.
 
@@ -1106,7 +1091,6 @@ are not kept; links and special files are refused.
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-Initial files
 Initial files review: READY
 Student: student · the controller and 2 clients
 Changes:
@@ -1134,7 +1118,6 @@ only when you update them.
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-Initial files
 Initial files review: READY
 Student: student · the controller and 2 clients
 Changes:
@@ -1162,8 +1145,6 @@ only when you update them.
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-Initial files
-
 ⣾  Rechecking, saving and recording the reviewed initial files
 
 Elapsed: 0s · Cannot be interrupted; wait for the result.
@@ -1176,7 +1157,6 @@ F1 Help
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-Initial files
 ✓ SAVED
 
 Initial-file manifest and reviewed copies saved and recorded locally.
@@ -1195,7 +1175,6 @@ the computers, each one gets the new files at its next start.
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-Initial files
 ! PARTIAL
 
 Captured copies saved; the local Git record could not be confirmed. Inspect Git before applying systems.
@@ -1215,7 +1194,6 @@ g Inspect Git state  ·  Esc Workspace  ·  F1 Help
 ```text
 Nixorium  /  Settings  /  Student workspace  /  Initial files                                                 demo
 
-Initial files
 Choose a file or a folder on this computer.
 Nixorium keeps a copy in the lab configuration and on every computer:
 add teaching materials only, never passwords or keys.
@@ -1233,7 +1211,6 @@ Tab Complete path  ·  ⏎ Enter Continue  ·  Esc Cancel  ·  F1 Help
 ```text
 Nixorium  /  Settings  /  Student workspace                                                                   demo
 
-Student workspace
 Student workspace review: READY
 Preference changes:
   Desktop / Favorite applications (ordered): Inherit → code.desktop
@@ -1259,7 +1236,6 @@ Enter saves and records only the profile JSON; no system apply or reset.
 ```text
 Nixorium  /  Settings  /  Student workspace                                                                   demo
 
-Student workspace
 ✓ SAVED
 
 Profile saved and recorded locally. No computer or student home changed.
@@ -1309,7 +1285,6 @@ Applications whose version changes:
   Extension example.extension: 1.0 -> 2.0
   Package nodejs: not selected -> 24.0
   Package vscode: 1.0 -> 2.0
-F4 shows every version and the changes to the deployment files.
 
 Enter saves the update and applies it to this controller.
 Computers are updated afterwards, from Computers → Update computers.
@@ -1322,22 +1297,19 @@ Computers are updated afterwards, from Computers → Update computers.
 ```text
 Nixorium  /  Maintenance  /  Diagnostics  /  Support report                                                   demo
 
-Local support report
-Minimized, not anonymous. No upload or remediation.
+A local report: minimized, not anonymous. No upload or remediation.
 
 ⣾  Collecting local diagnostics; no build or upload
 
-Elapsed: 0s · Read-only; Esc cancels. Limit: 2m0s.
+Elapsed: 0s
 
-Esc Cancel read  ·  F1 Help
+Esc Cancel  ·  F1 Help
 ```
 
 ## Read cancelled without changes
 
 ```text
 Nixorium  /  Maintenance  /  Diagnostics                                                                      demo
-
-Diagnostics
 
 › ! Binary cache could not be reached
   Inspect the local cache service before retrying deployment.
@@ -1352,8 +1324,7 @@ e Support report  ·  ↑/↓ Select  ·  ⏎ Enter Evidence  ·  r Check again 
 ```text
 Nixorium  /  Maintenance  /  Diagnostics  /  Support report                                                   demo
 
-Local support report
-Minimized, not anonymous. No upload or remediation.
+A local report: minimized, not anonymous. No upload or remediation.
 
 {
   "schemaVersion": 1,
@@ -1380,8 +1351,7 @@ Lines 1–14 / 41 · Versions, revision, time and counts remain visible.
 ```text
 Nixorium  /  Maintenance  /  Diagnostics  /  Support report                                                   demo
 
-Local support report
-Minimized, not anonymous. No upload or remediation.
+A local report: minimized, not anonymous. No upload or remediation.
 
 ✓ SAVED
 Saved the exact preview locally. Nothing was uploaded.
@@ -1476,8 +1446,6 @@ Local commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ```text
 Nixorium  /  Computers  /  Inventory                                                                          demo
 
-Computer inventory
-
 pc01
 × SSH key changed
 
@@ -1497,9 +1465,9 @@ Nixorium  /  Computers  /  SSH trust                                            
 Review this computer's changed SSH key
 ⣾  Reading the recorded and offered SSH fingerprints
 
-Elapsed: 0s · Read-only; Esc cancels. Limit: 2m0s.
+Elapsed: 0s
 
-Esc Cancel read  ·  F1 Help
+Esc Cancel  ·  F1 Help
 ```
 
 ## Single-client SSH trust review
@@ -1527,11 +1495,11 @@ Nixorium  /  Computers  /  Inventory                                            
 
 ⣾  Checking the configured computers
 
-Elapsed: 0s · Read-only; Esc cancels. Limit: 2m0s.
+Elapsed: 0s
 
 ! The reviewed SSH key of pc01 is saved; checking the computers again.
 
-Esc Cancel read  ·  F1 Help
+Esc Cancel  ·  F1 Help
 ```
 
 ## Overview finds an existing managed job
@@ -1539,7 +1507,6 @@ Esc Cancel read  ·  F1 Help
 ```text
 Nixorium  /  Overview                                                                                         demo
 
-Laboratory overview
 Items in yellow need your attention; press their number to open them.
 
   [1] Controller configuration — running
@@ -1560,13 +1527,12 @@ v View progress  ·  ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  
 ```text
 Nixorium  /  Overview  /  Background work                                                                     demo
 
-Managed background work
-Read-only attachment. Leaving this view does not stop the job.
+View only. Leaving this view does not stop the job.
 
 Controller configuration — running
 Managed work is still running; viewing it does not start another operation.
 
-● Building system · Running
+⣾ Building system
 1/4 steps complete
 Building the reviewed controller system
 
@@ -1580,8 +1546,7 @@ Tab Other job  ·  Esc Overview  ·  q Quit  ·  F1 Help
 ```text
 Nixorium  /  Overview  /  Background work                                                                     demo
 
-Managed background work
-Read-only attachment. Leaving this view does not stop the job.
+View only. Leaving this view does not stop the job.
 
 Controller configuration — interrupted
 Progress was left running, but no managed unit is running. Inspect the journal before a fresh review.

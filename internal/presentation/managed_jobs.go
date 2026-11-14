@@ -81,7 +81,7 @@ func (model dashboardModel) managedJobNotices() []tuiNotice {
 // This view observes an independent job. It never sets applying/preparing flags,
 // synthesizes execution results or resumes a guided installation follow-up.
 func (model dashboardModel) managedJobsView() string {
-	lines := []string{tuiTitle("Managed background work", model.isDark), tuiMuted("Read-only attachment. Leaving this view does not stop the job.", model.isDark), ""}
+	lines := []string{tuiMuted("View only. Leaving this view does not stop the job.", model.isDark), ""}
 	if model.jobs.err != nil {
 		lines = append(lines, "Unit state could not be checked. The job may still be running.", "Checks retry automatically; do not start conflicting work.")
 	} else if len(model.jobs.items) == 0 {

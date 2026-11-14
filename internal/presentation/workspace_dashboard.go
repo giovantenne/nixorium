@@ -231,7 +231,7 @@ func (model dashboardModel) workspaceView() string {
 	if model.height == 0 {
 		capacity = 8
 	}
-	lines := []string{tuiTitle("Student workspace", model.isDark)}
+	lines := []string{}
 	actions := []tuiAction{{key: "Esc", label: "Settings"}, {key: "F1", label: "Help"}}
 	fixed := ""
 	if model.busy != "" {

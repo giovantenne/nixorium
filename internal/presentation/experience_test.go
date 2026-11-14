@@ -23,7 +23,7 @@ func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 			t.Fatal(err)
 		}
 		text := output.String()
-		if !strings.Contains(text, "Nixorium") || !strings.Contains(text, "Overview") || !strings.Contains(text, "Laboratory overview") || !strings.Contains(text, "Computers") || !strings.Contains(text, "Installation") || !strings.Contains(text, "Software") || !strings.Contains(text, "Maintenance") {
+		if !strings.Contains(text, "Nixorium") || !strings.Contains(text, "Overview") || !strings.Contains(text, "Computers") || !strings.Contains(text, "Installation") || !strings.Contains(text, "Software") || !strings.Contains(text, "Maintenance") {
 			t.Fatalf("meaning lost with %v", profile)
 		}
 		if strings.Contains(text, "38;2;") {
@@ -38,7 +38,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 		m.width = size[0]
 		m.height = size[1]
 		view := m.View().Content
-		for _, expected := range []string{"Nixorium", "Overview", "Laboratory overview", "Enter", "Open", "Help"} {
+		for _, expected := range []string{"Nixorium", "Overview", "Enter", "Open", "Help"} {
 			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("overview %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
@@ -287,7 +287,7 @@ func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 						progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "activate", Current: 2, Total: 4, Recent: []string{"Built the controller system", "Activating the controller system"}},
 					},
 				},
-				expected: []string{"Controller update is running", "Progress details", "Help"},
+				expected: []string{"The work continues on the controller", "Progress details", "Help"},
 			},
 			{
 				name: "controller result",
@@ -598,7 +598,7 @@ func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
 		model.updates.planStarted = time.Now().Add(-2 * time.Minute)
 		model.updates.planProgress = domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 2, Total: 5}
 		view := model.View().Content
-		for _, expected := range []string{"Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "Elapsed:", "current deployment remains unchanged", "Help"} {
+		for _, expected := range []string{"Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "Elapsed:", "Nothing changes until you confirm the review", "Help"} {
 			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("update progress %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
@@ -768,7 +768,7 @@ func TestEnterReviewsIgnoreTypedTextAndEscCancelsSafely(t *testing.T) {
 
 func TestExperienceStatesAndDisclosure(t *testing.T) {
 	m := experienceFixture(t, 24)
-	if !strings.Contains(m.View().Content, "Laboratory overview") || !strings.Contains(m.View().Content, "Computers") || strings.Contains(m.View().Content, "24 computers") {
+	if !strings.Contains(m.View().Content, "Overview") || !strings.Contains(m.View().Content, "Computers") || strings.Contains(m.View().Content, "24 computers") {
 		t.Fatal("entry is not intervention-oriented")
 	}
 	m.busy = "Checking laboratory and computers"

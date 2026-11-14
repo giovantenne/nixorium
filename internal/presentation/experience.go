@@ -72,7 +72,12 @@ func (model dashboardModel) computersView() string {
 		path = []string{"Software", "System status"}
 		back = "Software"
 	}
-	lines := []string{tuiTitle(title, model.isDark), ""}
+	// The breadcrumb names the inventory; the configuration view keeps its
+	// title, which says more than "System status".
+	lines := []string{}
+	if configurationView {
+		lines = append(lines, tuiTitle(title, model.isDark), "")
+	}
 	if model.busy != "" {
 		return model.renderShell(tuiShell{
 			path:    path,
@@ -329,7 +334,7 @@ func (model dashboardModel) diagnosticsView() string {
 	if model.diagnostics.back == dashboardHosts {
 		path = []string{"Computers", "Inventory", "Diagnostics"}
 	}
-	lines := []string{tuiTitle("Diagnostics", model.isDark), ""}
+	lines := []string{}
 	if model.busy != "" {
 		return model.renderShell(tuiShell{path: path, body: strings.Join(append(lines, model.busyView()), "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
@@ -395,7 +400,7 @@ func (model dashboardModel) frame(content string) string {
 func (model dashboardModel) renderShell(shell tuiShell) string {
 	shell = model.withResultSituation(shell)
 	if model.busy != "" && model.screen != dashboardDisclaimer {
-		if !strings.Contains(shell.body, model.busy) && !strings.Contains(shell.fixedBody, model.busy) {
+		if !shell.activityShown && !strings.Contains(shell.body, model.busy) && !strings.Contains(shell.fixedBody, model.busy) {
 			shell.fixedBody = strings.TrimSpace(model.busyView() + "\n" + shell.fixedBody)
 		}
 		if model.height > 0 && model.height < 28 {
@@ -410,7 +415,7 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 		if shell.fixedBody != "" {
 			shell.fixedBody += "\n"
 		}
-		shell.fixedBody += model.activityStatus()
+		shell.fixedBody += model.activityStatus(shell.actions)
 		if model.message != "" {
 			present := false
 			for _, notice := range shell.notices {
@@ -421,7 +426,7 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 			}
 		}
 		if model.read.cancel != nil {
-			shell.actions = []tuiAction{{key: "Esc", label: "Cancel read"}, {key: "F1", label: "Help"}}
+			shell.actions = []tuiAction{{key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 			if model.updates.planning && model.updatePlanDetailsAvailable() {
 				shell.actions = append([]tuiAction{{key: "l", label: "Progress details"}}, shell.actions...)
 			}
@@ -568,15 +573,17 @@ func (model dashboardModel) startDiagnostics() (tea.Model, tea.Cmd) {
 	})
 }
 
-func phaseSteps(labels []string, current int, complete bool, dark bool) []string {
+// phaseSteps lists the steps of an operation: ✓ done, the activity marker
+// (the spinner) on the current one, ○ waiting. The symbols carry the state.
+func phaseSteps(labels []string, current int, complete bool, marker string, dark bool) []string {
 	lines := []string{""}
 	for index, label := range labels {
 		if complete || index < current {
 			lines = append(lines, tuiStatus(label, tuiStatusSuccess, dark))
 		} else if index == current {
-			lines = append(lines, tuiTitle("● "+label+" · Running", dark))
+			lines = append(lines, tuiTitle(marker+" "+label, dark))
 		} else {
-			lines = append(lines, tuiMuted("○ "+label+" · Waiting", dark))
+			lines = append(lines, tuiMuted("○ "+label, dark))
 		}
 	}
 	return lines
@@ -586,7 +593,7 @@ func (model dashboardModel) releaseReviewView() string {
 	if model.updates.plan.Workspace != nil {
 		return model.workspaceUpdateReviewView()
 	}
-	lines := []string{tuiTitle("Review Nixorium update", model.isDark), "", tuiSection("Validated release", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updates.plan.CurrentRef, model.updates.plan.Target, model.updates.plan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updates.plan.Checks))}
+	lines := []string{tuiTitle("Review Nixorium update", model.isDark), "", tuiSection("Validated release", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updates.plan.CurrentRef, model.updates.plan.Target, model.updates.plan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed", len(model.updates.plan.Checks))}
 	if model.updates.packageBase {
 		lines[0] = tuiTitle("Review system and package update", model.isDark)
 		lines[2] = "Kernel, services and application versions may all change"

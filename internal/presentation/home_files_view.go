@@ -14,7 +14,7 @@ func (model dashboardModel) homeFilesView() string {
 	m := model.homeFiles
 	width := min(110, max(24, model.width-10))
 	capacity := max(2, model.height-ctaRows(model.height)-16)
-	lines := []string{tuiTitle("Initial files", model.isDark)}
+	lines := []string{}
 	actions := []tuiAction{{key: "Esc", label: "Workspace"}, {key: "F1", label: "Help"}}
 	fixed := ""
 	if model.busy != "" {

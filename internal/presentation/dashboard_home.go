@@ -190,11 +190,11 @@ func (model dashboardModel) homeView() string {
 	if model.navigation.menuRows == 0 {
 		return model.fitMenu(len(model.overviewTasks()), func(fitted dashboardModel) string { return fitted.homeView() })
 	}
-	subtitle := "Choose an area with the arrows or its letter."
+	// The breadcrumb names the screen and the footer the keys.
+	lines := []string{}
 	if len(model.pendingTasks()) > 0 {
-		subtitle = "Items in yellow need your attention; press their number to open them."
+		lines = append(lines, tuiMuted("Items in yellow need your attention; press their number to open them.", model.isDark), "")
 	}
-	lines := []string{tuiTitle("Laboratory overview", model.isDark), tuiMuted(subtitle, model.isDark), ""}
 	notices := []tuiNotice{}
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")
@@ -212,7 +212,7 @@ func (model dashboardModel) homeView() string {
 		if label == "master" {
 			label += " · " + shortRevision(model.updateNotification.Revision)
 		}
-		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "Nixorium update available: " + label, detail: "Chosen channel: " + string(model.updateNotification.Channel) + ". u reviews updates; x dismisses this version."})
+		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "Nixorium update available: " + label, detail: "Chosen channel: " + string(model.updateNotification.Channel) + "."})
 		actions = append([]tuiAction{{key: "u", label: "Review update"}, {key: "x", label: "Dismiss update"}}, actions...)
 	}
 	if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {

@@ -135,7 +135,7 @@ func (model dashboardModel) cancelActivity() dashboardModel {
 	return model
 }
 
-func (model dashboardModel) activityStatus() string {
+func (model dashboardModel) activityStatus(actions []tuiAction) string {
 	started := model.busyStarted
 	if model.read.cancel == nil {
 		switch {
@@ -153,17 +153,26 @@ func (model dashboardModel) activityStatus() string {
 	}
 	status := fmt.Sprintf("Elapsed: %s", elapsed)
 	switch {
-	case model.read.cancel != nil || model.inventory.cancel != nil || model.workspace.cancel != nil || model.support.cancel != nil || model.templateReset.cancel != nil || model.hostTrust.cancel != nil:
-		status += " · Read-only; Esc cancels."
-		if model.read.limit > 0 {
-			status += fmt.Sprintf(" Limit: %s.", model.read.limit)
+	case model.hasCancellableRead():
+		// A read changes nothing; the footer names Esc when it shows it.
+		if model.read.cancel == nil && !actionsHaveKey(actions, "Esc") {
+			status += " · Esc cancels"
 		}
 	case model.installation.pxePreparing:
-		status += " · Background work continues after quit."
+		// The screen's notice says the work continues after quitting.
 	default:
 		status += " · Cannot be interrupted; wait for the result."
 	}
 	return status
+}
+
+func actionsHaveKey(actions []tuiAction, key string) bool {
+	for _, action := range actions {
+		if action.key == key {
+			return true
+		}
+	}
+	return false
 }
 
 func (model dashboardModel) hasCancellableRead() bool {

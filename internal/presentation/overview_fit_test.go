@@ -21,7 +21,7 @@ func overviewFitFixture(t testing.TB, width, height int) dashboardModel {
 func TestOverviewShowsEveryAreaWhenItFits(t *testing.T) {
 	for _, size := range [][2]int{{90, 30}, {80, 24}} {
 		view := demoANSI.ReplaceAllString(overviewFitFixture(t, size[0], size[1]).View().Content, "")
-		for _, expected := range []string{"Laboratory overview", "Items in yellow need your attention", "[c] Computers", "[n] Installation", "[w] Software", "Maintenance", "Assistant"} {
+		for _, expected := range []string{"Items in yellow need your attention", "[c] Computers", "[n] Installation", "[w] Software", "Maintenance", "Assistant"} {
 			if !strings.Contains(view, expected) {
 				t.Fatalf("overview %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
@@ -33,8 +33,8 @@ func TestOverviewShowsEveryAreaWhenItFits(t *testing.T) {
 	m := overviewFitFixture(t, 90, 30)
 	m.recovery.report.Conditions = nil
 	view := demoANSI.ReplaceAllString(m.View().Content, "")
-	if !strings.Contains(view, "Choose an area with the arrows or its letter.") {
-		t.Fatalf("overview lacks the generic subtitle:\n%s", view)
+	if strings.Contains(view, "Choose an area") || strings.Contains(view, "Laboratory overview") {
+		t.Fatalf("overview repeats the breadcrumb or the footer keys:\n%s", view)
 	}
 }
 

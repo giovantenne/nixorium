@@ -169,7 +169,7 @@ func TestSuccessfulCommitShowsItsNoteAsInformation(t *testing.T) {
 		},
 	}
 	view := demoANSI.ReplaceAllString(model.View().Content, "")
-	if !strings.Contains(view, "○ reviewed paths committed locally") || strings.Contains(view, "! reviewed paths") {
+	if !strings.Contains(view, "reviewed paths committed locally") || strings.Contains(view, "! reviewed paths") {
 		t.Fatalf("success note shown as a warning:\n%s", view)
 	}
 }

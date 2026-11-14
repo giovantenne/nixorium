@@ -32,7 +32,11 @@ func (model *dashboardModel) trackControllerApply(operation tea.Cmd) tea.Cmd {
 }
 
 func (model dashboardModel) controllerProgressView(path []string) string {
-	lines := []string{tuiTitle("Controller configuration", model.isDark), "", model.busyView()}
+	lines := []string{tuiTitle("Controller configuration", model.isDark), ""}
+	activity := model.operationShowsActivity(model.controller.progress)
+	if !activity {
+		lines = append(lines, model.busyView())
+	}
 	lines = append(lines, model.operationProgressView(model.controller.progress, "Current progress")...)
 	if model.controller.progressUnavailable {
 		// Without readable progress the journal is the only view of the job:
@@ -50,8 +54,9 @@ func (model dashboardModel) controllerProgressView(path []string) string {
 	}
 	return model.renderShell(tuiShell{
 		path: path, body: strings.Join(lines, "\n"),
-		notices: []tuiNotice{{kind: tuiStatusAttention, title: "Controller update is running", detail: "Wait for verification. The managed job survives a lost terminal."}},
-		actions: actions,
+		notices:       []tuiNotice{{kind: tuiStatusNeutral, title: "The work continues on the controller even if this window closes."}},
+		actions:       actions,
+		activityShown: activity,
 	})
 }
 

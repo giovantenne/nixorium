@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -256,7 +258,7 @@ func TestUpdatePlanningShowsRealCandidatePhasesAndBuildCount(t *testing.T) {
 	if command == nil || !model.updates.planning || !strings.Contains(model.View().Content, "Target: "+target) {
 		t.Fatalf("update planning did not start with visible context:\n%s", model.View().Content)
 	}
-	foundBuild := false
+	foundBuild, lastBuildView := false, ""
 	for command != nil && model.screen != dashboardUpdateReview {
 		message := command()
 		updated, command = model.Update(message)
@@ -266,9 +268,13 @@ func TestUpdatePlanningShowsRealCandidatePhasesAndBuildCount(t *testing.T) {
 			payload = wrapped.message
 		}
 		if progress, ok := payload.(dashboardUpdatePlanProgressMsg); ok && progress.progress.Phase == domain.UpdatePlanPhaseBuild {
-			view := model.View().Content
-			foundBuild = strings.Contains(view, "Test systems before saving") && strings.Contains(view, "Testing the controller system") && strings.Contains(view, "Safety check 2/5") && strings.Contains(view, "Elapsed:") && strings.Contains(view, "current deployment remains unchanged")
+			view := ansi.Strip(model.View().Content)
+			lastBuildView = view
+			foundBuild = strings.Contains(view, "Test systems before saving") && strings.Contains(view, "Testing the controller system") && strings.Contains(view, "Safety check 2/5") && strings.Contains(view, "Elapsed:") && strings.Contains(view, "Nothing changes until you confirm the review")
 		}
+	}
+	if !foundBuild {
+		t.Logf("last build view:\n%s", lastBuildView)
 	}
 	if !foundBuild || model.updates.planning || model.screen != dashboardUpdateReview {
 		t.Fatalf("update progress did not reach a visible representative build: found=%t planning=%t screen=%d\n%s", foundBuild, model.updates.planning, model.screen, model.View().Content)

@@ -454,7 +454,6 @@ func (model dashboardModel) settingsView() string {
 // account passwords are separate forms with their own review.
 func (model dashboardModel) settingsAccountsView() string {
 	lines := []string{
-		tuiTitle("Accounts", model.isDark),
 		"Choose what to change for the laboratory accounts.",
 		"",
 		trimBlankLines(model.settings.accountsMenu.list.View()),

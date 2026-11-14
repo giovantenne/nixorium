@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -465,6 +466,13 @@ func (model *dashboardModel) ensureActivitySpinner() {
 	if len(model.activitySpinner.Spinner.Frames) == 0 {
 		model.activitySpinner = newTUISpinner(model.isDark)
 	}
+}
+
+// activityMarker is the spinner frame that marks the step in progress.
+func (model dashboardModel) activityMarker() string {
+	model.ensureActivitySpinner()
+	// Dot frames end with a space; the step label adds its own.
+	return strings.Replace(model.activitySpinner.View(), " ", "", 1)
 }
 
 func (model dashboardModel) busyView() string {

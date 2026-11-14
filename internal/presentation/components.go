@@ -221,6 +221,9 @@ type tuiShell struct {
 	// it fits; versionMoving draws it as a warning (not a release).
 	version       string
 	versionMoving bool
+	// activityShown: the body already marks the running step with the
+	// spinner, so the shell adds no separate spinner line.
+	activityShown bool
 }
 
 type tuiShellRegions struct {
@@ -531,7 +534,8 @@ func tuiNoticeTitle(title string, kind tuiStatusKind, dark bool) string {
 	if kind != tuiStatusNeutral {
 		return tuiStatus(title, kind, dark)
 	}
-	return tuiNoticeText("○ "+title, kind, dark)
+	// ○ marks a waiting step; a neutral notice is plain muted text.
+	return tuiMuted(title, dark)
 }
 
 // compactTerminal reports a terminal too short for the bordered next-step

@@ -18,20 +18,20 @@ func (model dashboardModel) deployView() string {
 		if model.deployment.stopReview {
 			return model.deploymentStopView()
 		}
-		lines := []string{
-			tuiTitle("Distributing the prepared system", model.isDark),
-			"",
-			model.busyView(),
+		progress := model.deploymentProgressView()
+		lines := []string{tuiTitle("Distributing the prepared system", model.isDark)}
+		if model.deploymentStepsShown() {
+			shell.activityShown = true
+		} else {
+			lines = append(lines, "", model.busyView())
 		}
-		lines = append(lines, model.deploymentProgressView()...)
+		lines = append(lines, progress...)
 		shell.body = strings.Join(lines, "\n")
-		shell.notices = []tuiNotice{{
-			kind:   tuiStatusAttention,
-			title:  "Deployment is running",
-			detail: "Detailed output is saved in the private log. Closing is disabled until this foreground operation returns.",
-		}}
+		// The status line says it cannot be interrupted; the notice adds only
+		// where the details go.
+		shell.notices = []tuiNotice{{kind: tuiStatusNeutral, title: "Detailed output is saved in the private log."}}
 		if model.deployment.stopRequested {
-			shell.notices[0].detail = "Stopping local supervision and checking client state. Remote activation may continue; do not start another deployment."
+			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: "Stopping local supervision", detail: "Checking client state. Remote activation may continue; do not start another deployment."}}
 		}
 		shell.actions = nil
 		if model.deploymentDetailsAvailable() {
@@ -122,7 +122,6 @@ func (model dashboardModel) deployView() string {
 	}
 
 	lines := []string{
-		tuiTitle("Update computers", model.isDark),
 		tuiMuted("Select → Review → Deploy → Verify", model.isDark),
 		"",
 	}
@@ -199,6 +198,14 @@ func deploymentUnreachableNote(queueable bool) string {
 	return "Computers that did not answer are left unchanged."
 }
 
+// deploymentStepsShown reports that deploymentProgressView shows the step
+// list, whose current step carries the spinner.
+func (model dashboardModel) deploymentStepsShown() bool {
+	progressState := model.deployment.progress
+	expanded := model.progressDetails && model.deploymentDetailsAvailable()
+	return progressState.Phase != "" && !(expanded && len(progressState.Output) > 0)
+}
+
 func (model dashboardModel) deploymentProgressView() []string {
 	progressState := model.deployment.progress
 	if progressState.Phase == "" {
@@ -224,7 +231,7 @@ func (model dashboardModel) deploymentProgressView() []string {
 	case domain.DeploymentPhaseComplete:
 		index = 4
 	}
-	lines := phaseSteps([]string{"Building configurations", "Revalidating reviewed configuration", "Updating computers", "Verifying computers"}, index, progressState.Phase == domain.DeploymentPhaseComplete, model.isDark)
+	lines := phaseSteps([]string{"Building configurations", "Revalidating reviewed configuration", "Updating computers", "Verifying computers"}, index, progressState.Phase == domain.DeploymentPhaseComplete, model.activityMarker(), model.isDark)
 	expanded := model.progressDetails && model.deploymentDetailsAvailable()
 	if expanded && len(progressState.Output) > 0 {
 		// Show actual activity above the fold in an 80x24 terminal instead of

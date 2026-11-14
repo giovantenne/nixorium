@@ -14,6 +14,17 @@ The project follows [Semantic Versioning](https://semver.org/).
   that follows master, another branch or a pinned commit. Such a build is not
   the release that VERSION names. The Update screen uses the same label.
 
+### Changed
+
+- Simpler TUI screens. While work runs, the spinner marks the current step
+  and the step list no longer adds "Running" and "Waiting"; one line gives the
+  elapsed time, without the read time limit or a second mention of Esc, which
+  the footer already shows. Titles that repeated the path at the top
+  (Overview, Update Nixorium, Update computers, Accounts, Student workspace,
+  Initial files, Diagnostics, Support report, Inventory, Background work) are
+  gone, and so are key hints in the text that the footer already lists. Plain
+  notes no longer carry the ○ of a waiting step.
+
 ## [3.14.0] - 2026-11-13
 
 From 3.13.0 or 3.13.1, Update Nixorium, then Apply to controller and Update

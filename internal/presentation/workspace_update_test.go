@@ -73,7 +73,7 @@ func TestUpdateReviewShowsOnlyChangesUntilDetails(t *testing.T) {
 	plan.Workspace.Current.Packages = append(plan.Workspace.Current.Packages, domain.WorkspacePackage{Package: "gcc", Version: "15.2.0"})
 	plan.Workspace.Proposed.Packages = append(plan.Workspace.Proposed.Packages, domain.WorkspacePackage{Package: "gcc", Version: "15.2.0"})
 	summary := strings.Join(updateReviewLines(plan, false), "\n")
-	for _, want := range []string{"NixOS base: nixos-26.05 (unchanged)", "Applications whose version changes:", "Package vscode: 1.0 -> 2.0", "Package nodejs: not selected -> 24.0", "F4 shows every version and the changes to the deployment files."} {
+	for _, want := range []string{"NixOS base: nixos-26.05 (unchanged)", "Applications whose version changes:", "Package vscode: 1.0 -> 2.0", "Package nodejs: not selected -> 24.0"} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary misses %q:\n%s", want, summary)
 		}

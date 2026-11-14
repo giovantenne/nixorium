@@ -107,7 +107,7 @@ func TestPXEFailedObservationCannotActOnPreviousReadiness(t *testing.T) {
 func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	view := model.View().Content
-	if !strings.Contains(view, "Installation") || !strings.Contains(view, "Laboratory overview") {
+	if !strings.Contains(view, "Installation") || !strings.Contains(view, "Overview") {
 		t.Fatalf("dashboard omits PXE workflow:\n%s", view)
 	}
 

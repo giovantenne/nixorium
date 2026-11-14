@@ -76,44 +76,41 @@ func (model dashboardModel) pxeView() string {
 	if model.controller.applying {
 		// Keep live progress ahead of static installation steps. At 80x24 the
 		// safety footer must not push the actual running phase off screen.
-		lines = []string{tuiTitle(title, model.isDark)}
-		if model.controller.progress.State != "completed" {
-			lines = append(lines, "", model.busyView())
-		} else {
-			lines = append(lines, "")
+		lines = []string{tuiTitle(title, model.isDark), ""}
+		activity := model.operationShowsActivity(model.controller.progress)
+		if !activity && model.controller.progress.State != "completed" {
+			lines = append(lines, model.busyView())
 		}
 		lines = append(lines, model.operationProgressView(model.controller.progress, "Controller progress")...)
-		notice := tuiNotice{kind: tuiStatusAttention, title: "Controller activation is running", detail: "The managed job survives a lost terminal; services and networking may restart."}
+		notice := tuiNotice{kind: tuiStatusNeutral, title: "Services and networking may restart. The work continues if this window closes."}
 		if model.controller.progress.State == "completed" {
 			notice = tuiNotice{kind: tuiStatusSuccess, title: "Controller activation and verification completed", detail: "Continuing with client-system preparation."}
 		}
 		return model.renderShell(tuiShell{
-			path:    path,
-			body:    strings.Join(lines, "\n"),
-			notices: []tuiNotice{notice},
-			actions: model.pxeActions(),
+			path:          path,
+			body:          strings.Join(lines, "\n"),
+			notices:       []tuiNotice{notice},
+			actions:       model.pxeActions(),
+			activityShown: activity,
 		})
 	}
 	if model.installation.pxePreparing {
-		if model.installation.pxeProgress.State != "completed" {
-			lines = append(lines, "", model.busyView())
-		} else {
-			lines = append(lines, "")
+		lines = append(lines, "")
+		activity := model.operationShowsActivity(model.installation.pxeProgress)
+		if !activity && model.installation.pxeProgress.State != "completed" {
+			lines = append(lines, model.busyView())
 		}
 		lines = append(lines, model.operationProgressView(model.installation.pxeProgress, "Current progress")...)
-		notice := tuiNotice{
-			kind:   tuiStatusAttention,
-			title:  "Preparation continues if this view closes",
-			detail: "You can close Nixorium: the work continues and you can check it again later.",
-		}
+		notice := tuiNotice{kind: tuiStatusNeutral, title: "You can close Nixorium: the work continues and you can check it again later."}
 		if model.installation.pxeProgress.State == "completed" {
 			notice = tuiNotice{kind: tuiStatusSuccess, title: "Client preparation completed", detail: "The client systems and network installation files are ready."}
 		}
 		return model.renderShell(tuiShell{
-			path:    path,
-			body:    strings.Join(lines, "\n"),
-			notices: []tuiNotice{notice},
-			actions: model.pxeActions(),
+			path:          path,
+			body:          strings.Join(lines, "\n"),
+			notices:       []tuiNotice{notice},
+			actions:       model.pxeActions(),
+			activityShown: activity,
 		})
 	}
 	if model.busy != "" {
@@ -192,9 +189,9 @@ func (model dashboardModel) computerInstallationSteps(labels []string) []string 
 		case index == model.installation.stage && model.screen == dashboardPXEStartReview:
 			lines = append(lines, tuiMuted("○ "+label+" · Awaiting confirmation", model.isDark))
 		case index == model.installation.stage:
-			lines = append(lines, tuiTitle("● "+label+" · Running", model.isDark))
+			lines = append(lines, tuiTitle(model.activityMarker()+" "+label, model.isDark))
 		default:
-			lines = append(lines, tuiMuted("○ "+label+" · Waiting", model.isDark))
+			lines = append(lines, tuiMuted("○ "+label, model.isDark))
 		}
 	}
 	return lines
@@ -338,6 +335,13 @@ func pxeStatusKind(mode string) tuiStatusKind {
 	}
 }
 
+// operationShowsActivity reports that operationProgressView marks the running
+// phase with the spinner, so no separate spinner line is needed.
+func (model dashboardModel) operationShowsActivity(operation domain.OperationProgress) bool {
+	return operation.Operation != "" && operation.State != "completed" && operation.State != "failed" &&
+		!(model.progressDetails && operationDetailsAvailable(operation)) && !model.controller.details
+}
+
 func (model dashboardModel) operationProgressView(operation domain.OperationProgress, title string) []string {
 	if operation.Operation == "" {
 		return []string{"  Waiting for managed progress…"}
@@ -357,7 +361,7 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 	lines := []string{title, "  Phase: " + phaseLabels[operation.Phase]}
 	if !(model.progressDetails && operationDetailsAvailable(operation)) && !model.controller.details {
 		kind := tuiStatusNeutral
-		label := "● " + phaseLabels[operation.Phase] + " · Running"
+		label := model.activityMarker() + " " + phaseLabels[operation.Phase]
 		if operation.State == "completed" {
 			kind = tuiStatusSuccess
 			label = "Preparation completed"

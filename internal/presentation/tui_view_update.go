@@ -14,22 +14,28 @@ func (model dashboardModel) updateView() string {
 	if model.controller.applying {
 		return model.controllerProgressView(path)
 	}
-	lines := []string{tuiTitle(model.updateTitle(), model.isDark), ""}
+	// The breadcrumb names the screen; no title repeats it.
+	lines := []string{}
 	if model.busy != "" {
+		activityShown := false
 		if model.updates.planning {
+			activityShown = true
 			lines = append(lines, "Target: "+model.updates.target)
 			phaseLabels := updatePlanPhaseLabels()
 			phaseIndex := updatePlanPhaseIndex(model.updates.planProgress.Phase)
 			if model.height > 0 && model.height < 28 {
-				lines = append(lines, "", fmt.Sprintf("Phase %d/%d · %s", phaseIndex+1, len(phaseLabels), phaseLabels[phaseIndex]))
+				lines = append(lines, "", fmt.Sprintf("%s Phase %d/%d · %s", model.activityMarker(), phaseIndex+1, len(phaseLabels), phaseLabels[phaseIndex]))
 			} else {
-				lines = append(lines, phaseSteps(phaseLabels, phaseIndex, false, model.isDark)...)
+				lines = append(lines, phaseSteps(phaseLabels, phaseIndex, false, model.activityMarker(), model.isDark)...)
 			}
-			model.busy = updatePlanProgressDescription(model.updates.planProgress)
-			if model.updates.packageBase && model.updates.planProgress.Phase == domain.UpdatePlanPhaseLock {
-				model.busy = "Preparing the selected system and package base"
+			// The step list says what runs; only the test step and the package
+			// base add which system is being prepared or tested.
+			switch {
+			case model.updates.packageBase && model.updates.planProgress.Phase == domain.UpdatePlanPhaseLock:
+				lines = append(lines, "", tuiMuted("Preparing the selected system and package base", model.isDark))
+			case model.updates.planProgress.Phase == domain.UpdatePlanPhaseBuild:
+				lines = append(lines, "", tuiMuted(updatePlanProgressDescription(model.updates.planProgress), model.isDark))
 			}
-			lines = append(lines, "", model.busyView())
 			if model.updates.planProgress.Total > 0 {
 				if model.updates.planProgress.Current == 0 {
 					lines = append(lines, groupedBuildLine(model.updates.planProgress))
@@ -47,13 +53,13 @@ func (model dashboardModel) updateView() string {
 		if model.updates.applying {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Update save is running", detail: "Wait for the atomic two-file result before closing Nixorium."})
 		} else {
-			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The current deployment remains unchanged", detail: "Downloads and local builds can take several minutes."})
+			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "Nothing changes until you confirm the review.", detail: "Downloads and builds can take several minutes."})
 		}
 		actions := []tuiAction{{key: "F1", label: "Help"}}
 		if model.updates.planning && model.updatePlanDetailsAvailable() {
 			actions = append([]tuiAction{{key: "l", label: "Progress details"}}, actions...)
 		}
-		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions, activityShown: activityShown})
 	}
 	if model.updates.result.Operation != "" {
 		success := !model.updates.result.HasErrors() && model.updates.result.Updated && !model.updates.result.RecoveryRequired && controllerVerifiedForSave(model.updates.result.Revision, model.controller.result)

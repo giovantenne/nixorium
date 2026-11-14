@@ -148,7 +148,7 @@ func (model dashboardModel) supportLines() []string {
 }
 
 func (model dashboardModel) supportView() string {
-	lines := []string{tuiTitle("Local support report", model.isDark), "Minimized, not anonymous. No upload or remediation.", ""}
+	lines := []string{"A local report: minimized, not anonymous. No upload or remediation.", ""}
 	actions := []tuiAction{{key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())

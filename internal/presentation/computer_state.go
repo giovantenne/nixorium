@@ -23,9 +23,10 @@ func (model dashboardModel) observedHost(name string) (domain.HostStatus, bool) 
 
 func observationHeading(at time.Time) string {
 	if at.IsZero() {
-		return "Not checked in this session · r checks the computers now"
+		return "Not checked in this session"
 	}
-	return "Last checked " + at.Local().Format("15:04:05") + " · r checks again"
+	// The footer names the key that checks again.
+	return "Last checked " + at.Local().Format("15:04:05")
 }
 
 // deploymentStateLabel states whether a computer needs the saved configuration.

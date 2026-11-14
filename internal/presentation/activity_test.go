@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -75,8 +76,8 @@ func TestReadActivityReturnsToOriginAndShowsUnavailableKeys(t *testing.T) {
 	}
 	updated, next := model.Update(keyPress("x"))
 	model = updated.(dashboardModel)
-	view := model.View().Content
-	for _, want := range []string{"Elapsed:", "Read-only", "Esc", "Loading information"} {
+	view := ansi.Strip(model.View().Content)
+	for _, want := range []string{"Elapsed:", "Esc Cancel", "Loading information"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("missing %q: %s", want, view)
 		}
@@ -99,9 +100,10 @@ func TestAllBusyScreensExplainElapsedTimeAndSafety(t *testing.T) {
 			safety := "Cannot be interrupted"
 			if reading {
 				model.beginRead(dashboardReadTimeout)
-				safety = "Esc cancels"
+				// A read changes nothing; the footer offers Esc.
+				safety = "Esc Cancel"
 			}
-			view := model.View().Content
+			view := ansi.Strip(model.View().Content)
 			model.read.cancelRead()
 			if !strings.Contains(view, "Working") || !strings.Contains(view, "Elapsed:") || !strings.Contains(view, safety) {
 				t.Errorf("screen %d (read %t) omits activity safety: %s", screen, reading, view)
@@ -140,7 +142,7 @@ func TestUnclassifiedMutationCannotQuitAndBackgroundPreparationCan(t *testing.T)
 	}
 	model := dashboardModel{screen: dashboardPXE, busy: "Preparing", installation: installationModel{pxePreparing: true}}
 	_, quit := model.Update(keyPress("q"))
-	if quit == nil || !strings.Contains(model.View().Content, "continues after quit") {
+	if quit == nil || !strings.Contains(model.View().Content, "the work continues") {
 		t.Fatal("background work lost its existing safe quit")
 	}
 }

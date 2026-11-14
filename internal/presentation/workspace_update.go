@@ -125,11 +125,7 @@ func updateReviewLines(report domain.UpdatePlanReport, full bool) []string {
 		fmt.Fprintln(&content, strings.Join(migrations, "\n"))
 	}
 	if !full {
-		if report.Workspace != nil {
-			fmt.Fprintln(&content, "F4 shows every version and the changes to the deployment files.")
-		} else {
-			fmt.Fprintln(&content, "F4 shows the changes to the deployment files.")
-		}
+		// The footer's F4 Details shows every version and the file changes.
 		return strings.Split(strings.TrimSuffix(content.String(), "\n"), "\n")
 	}
 	if len(migrations) > 0 {
