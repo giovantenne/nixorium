@@ -19,7 +19,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   on first use and shows it on the Back up lab and Restore lab screens, with
   the steps to add it to the repository with write access (GitHub, GitLab or
   another service); `nixorium backup key` prints it. Keys already set up for
-  the administrator keep working.
+  the administrator keep working, including a key and known-hosts file set
+  for the server in `~/.ssh/config`.
 - GitHub's and GitLab.com's published SSH host keys are built in. For another
   Git server, the first connection shows its fingerprint to compare with the
   one the service publishes; once confirmed (Nixorium checks it again), the

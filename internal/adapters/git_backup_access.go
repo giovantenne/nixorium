@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -121,27 +122,83 @@ func BackupAccessKey() (string, error) {
 	return line, nil
 }
 
-// backupSSHCommand is the ssh command Git uses for backup transport. Host keys
-// stay strictly checked: the administrator's known_hosts, the servers trusted
-// through TrustGitHost and the pinned keys in hosts. The backup key comes first, then the
-// default keys ssh would otherwise try, so a backup configured earlier with the
-// administrator's own key keeps working.
-func backupSSHCommand(hosts string) string {
+// backupSSHCommand is the ssh command Git uses to reach remote. Host keys stay
+// strictly checked. The servers trusted through TrustGitHost and the pinned
+// keys in hosts are added as global known-hosts files, so the administrator's
+// own known_hosts, including one set for that server in ~/.ssh/config, still
+// counts. The backup key comes first. The default keys ssh would otherwise try
+// follow it only when ~/.ssh/config names no key for that server: an explicit
+// -i replaces ssh's default list, so a backup configured earlier with the
+// administrator's own key keeps working, while a key configured for the
+// server is offered as configured.
+func backupSSHCommand(hosts, remote string) string {
 	parts := []string{"ssh", "-oBatchMode=yes", "-oStrictHostKeyChecking=yes", "-oConnectTimeout=15"}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return strings.Join(parts, " ")
 	}
-	parts = append(parts, shellQuote("-oUserKnownHostsFile="+filepath.Join(home, ".ssh", "known_hosts")+" "+filepath.Join(home, ".ssh", gitHostsFileName)+" "+hosts))
-	// An explicit -i replaces ssh's default key list, so the defaults that
-	// exist are named again after the backup key.
-	for _, name := range []string{backupAccessKeyName, "id_ed25519", "id_ecdsa", "id_rsa"} {
+	parts = append(parts, shellQuote("-oGlobalKnownHostsFile=/etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts2 "+filepath.Join(home, ".ssh", gitHostsFileName)+" "+hosts))
+	names := []string{backupAccessKeyName}
+	if !sshConfigNamesKey(home, remote) {
+		names = append(names, "id_ed25519", "id_ecdsa", "id_rsa")
+	}
+	for _, name := range names {
 		path := filepath.Join(home, ".ssh", name)
 		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
 			parts = append(parts, "-i", shellQuote(path))
 		}
 	}
 	return strings.Join(parts, " ")
+}
+
+// sshConfigNamesKey reports whether the administrator's ~/.ssh/config names
+// an IdentityFile for the server of remote: `ssh -G` (which makes no
+// connection) resolves different key files with that file than without any
+// configuration. Any doubt answers false, which keeps the default keys.
+func sshConfigNamesKey(home, remote string) bool {
+	config := filepath.Join(home, ".ssh", "config")
+	if info, err := os.Stat(config); err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	host, port, err := gitRemoteHost(remote)
+	if err != nil {
+		return false
+	}
+	target := host
+	if u, parseErr := url.Parse(remote); parseErr == nil && u.Scheme == "ssh" {
+		if u.User != nil && u.User.Username() != "" {
+			target = u.User.Username() + "@" + host
+		}
+	} else if at := strings.Index(remote, "@"); at > 0 {
+		target = remote[:at] + "@" + host
+	}
+	if strings.HasPrefix(target, "-") {
+		return false
+	}
+	configured, err := sshIdentityFiles(config, port, target)
+	if err != nil {
+		return false
+	}
+	defaults, err := sshIdentityFiles(os.DevNull, port, target)
+	return err == nil && configured != defaults
+}
+
+// sshIdentityFiles lists the key files ssh would offer to target with the
+// given configuration file.
+func sshIdentityFiles(config, port, target string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "ssh", "-G", "-F", config, "-p", port, "--", target).Output()
+	if err != nil {
+		return "", err
+	}
+	var files []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if file, found := strings.CutPrefix(line, "identityfile "); found {
+			files = append(files, strings.TrimSpace(file))
+		}
+	}
+	return strings.Join(files, "\n"), nil
 }
 
 // writePinnedGitHosts writes the pinned host keys to a private temporary file

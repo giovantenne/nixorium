@@ -55,8 +55,8 @@ func TestBackupSSHCommandChecksHostsAndOffersTheBackupKeyFirst(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, ".ssh", "id_ed25519"), []byte("key"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	command := backupSSHCommand("/tmp/pinned")
-	for _, want := range []string{"-oBatchMode=yes", "-oStrictHostKeyChecking=yes", "'-oUserKnownHostsFile=" + home + "/.ssh/known_hosts " + home + "/.ssh/nixorium-git-hosts /tmp/pinned'"} {
+	command := backupSSHCommand("/tmp/pinned", "git@github.com:school/lab.git")
+	for _, want := range []string{"-oBatchMode=yes", "-oStrictHostKeyChecking=yes", "'-oGlobalKnownHostsFile=/etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts2 " + home + "/.ssh/nixorium-git-hosts /tmp/pinned'"} {
 		if !strings.Contains(command, want) {
 			t.Fatalf("command lacks %q: %s", want, command)
 		}
@@ -172,7 +172,7 @@ func TestUnknownGitHostIsTrustedOnlyWithTheComparedFingerprint(t *testing.T) {
 	if err := TrustGitHost(t.Context(), "ssh://git@*.example/lab.git", unknown.Fingerprint); err == nil {
 		t.Fatal("a host pattern was accepted")
 	}
-	if command := backupSSHCommand("/tmp/pinned"); !strings.Contains(command, filepath.Join(home, ".ssh", gitHostsFileName)) {
+	if command := backupSSHCommand("/tmp/pinned", remote); !strings.Contains(command, filepath.Join(home, ".ssh", gitHostsFileName)) {
 		t.Fatalf("trusted hosts not consulted: %s", command)
 	}
 }
@@ -217,5 +217,33 @@ func TestChangedGitHostKeyNamesTheFileToFix(t *testing.T) {
 	got := explainBackupGitError(message).Error()
 	if !strings.Contains(got, "ssh-keygen -R <server> -f /home/admin/.ssh/nixorium-git-hosts") || errors.Is(explainBackupGitError(message), errUnknownGitHost) {
 		t.Fatalf("changed key message = %q", got)
+	}
+}
+
+func TestAKeyConfiguredForTheServerReplacesTheDefaultKeys(t *testing.T) {
+	if _, err := exec.LookPath("ssh"); err != nil {
+		t.Skip("ssh is not installed")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if _, err := BackupAccessKey(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".ssh", "id_ed25519"), []byte("key"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	config := "Host lab-backup\n  HostName 127.0.0.1\n  IdentityFile " + home + "/.ssh/backup-key\n  UserKnownHostsFile " + home + "/.ssh/backup-known-hosts\n"
+	if err := os.WriteFile(filepath.Join(home, ".ssh", "config"), []byte(config), 0600); err != nil {
+		t.Fatal(err)
+	}
+	configured := backupSSHCommand("/tmp/pinned", "root@lab-backup:/srv/lab.git")
+	if strings.Contains(configured, "id_ed25519") || !strings.Contains(configured, "nixorium-backup'") || strings.Contains(configured, "UserKnownHostsFile") {
+		t.Fatalf("configured server: %s", configured)
+	}
+	if other := backupSSHCommand("/tmp/pinned", "git@github.com:school/lab.git"); !strings.Contains(other, "id_ed25519'") {
+		t.Fatalf("server without a configured key: %s", other)
+	}
+	if over := backupSSHCommand("/tmp/pinned", "ssh://root@lab-backup:2222/srv/lab.git"); strings.Contains(over, "id_ed25519") {
+		t.Fatalf("ssh:// address of a configured server: %s", over)
 	}
 }

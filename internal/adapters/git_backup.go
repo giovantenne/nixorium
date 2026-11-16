@@ -89,7 +89,15 @@ func backupGit(ctx context.Context, repository string, args ...string) (string, 
 			return "", err
 		}
 		defer cleanup()
-		environment = append(environment, "GIT_SSH_COMMAND="+backupSSHCommand(hosts))
+		// Every network call names the remote right after "--".
+		remote := ""
+		for index, arg := range args {
+			if arg == "--" && index+1 < len(args) {
+				remote = args[index+1]
+				break
+			}
+		}
+		environment = append(environment, "GIT_SSH_COMMAND="+backupSSHCommand(hosts, remote))
 	}
 	arguments := []string{"-c", "core.hooksPath=/dev/null", "-c", "protocol.ext.allow=never", "-c", "protocol.file.allow=always", "-c", "push.followTags=false", "-c", "commit.gpgSign=false"}
 	arguments = append(arguments, args...)
