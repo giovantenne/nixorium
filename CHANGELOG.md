@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.15.0] - 2026-11-16
+
 ### Added
 
 - The TUI shows the running Nixorium at the right of the title line: the
@@ -54,6 +56,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   status rows. The Shut down and Restart review lists the computers without
   the count table; an update result where every computer has the same outcome
   gives the explanation once.
+
 ### Fixed
 
 - Student computers no longer show "This computer was updated" while the
@@ -71,6 +74,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   review reaches the repository before asking for the passphrase and names the
   problem: an unknown server, a key that is missing or read-only, a wrong
   address or branch, an unreachable server, or a branch with other history.
+- The explorable menus on the website reach every entry of a long menu;
+  Maintenance stopped at Controller services.
 
 ## [3.14.0] - 2026-11-13
 
@@ -3195,7 +3200,12 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.11.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.15.0...HEAD
+[3.15.0]: https://github.com/giovantenne/nixorium/compare/v3.14.0...v3.15.0
+[3.14.0]: https://github.com/giovantenne/nixorium/compare/v3.13.1...v3.14.0
+[3.13.1]: https://github.com/giovantenne/nixorium/compare/v3.13.0...v3.13.1
+[3.13.0]: https://github.com/giovantenne/nixorium/compare/v3.12.0...v3.13.0
+[3.12.0]: https://github.com/giovantenne/nixorium/compare/v3.11.0...v3.12.0
 [3.11.0]: https://github.com/giovantenne/nixorium/compare/v3.10.0...v3.11.0
 [3.10.0]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.4...v3.10.0
 [3.10.0-beta.4]: https://github.com/giovantenne/nixorium/compare/v3.10.0-beta.3...v3.10.0-beta.4
