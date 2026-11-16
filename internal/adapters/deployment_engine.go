@@ -236,7 +236,7 @@ func applyClientSystems(ctx context.Context, plan domain.DeploymentPlanReport, o
 		go func() {
 			defer group.Done()
 			activation := record.activation(target.Name)
-			outcomes[index] = applyClientSystem(ctx, target, deploymentAddress(plan, target), systems[target.Name], activation.ActivationID, log, record, copySlots, activationSlots)
+			outcomes[index] = applyClientSystem(ctx, target, deploymentAddress(plan, target), systems[target.Name], activation.ActivationID, plan.Revision, log, record, copySlots, activationSlots)
 		}()
 	}
 	group.Wait()
@@ -313,7 +313,7 @@ func deploymentAddress(plan domain.DeploymentPlanReport, target domain.Deploymen
 	return target.IP
 }
 
-func applyClientSystem(ctx context.Context, target domain.DeploymentTarget, address, system, activationID string, log io.Writer, record *pendingRecord, copySlots, activationSlots chan struct{}) clientActivation {
+func applyClientSystem(ctx context.Context, target domain.DeploymentTarget, address, system, activationID, revision string, log io.Writer, record *pendingRecord, copySlots, activationSlots chan struct{}) clientActivation {
 	outcome := clientActivation{name: target.Name}
 	say := func(format string, arguments ...any) {
 		fmt.Fprintf(log, "[%s] "+format+"\n", append([]any{target.Name}, arguments...)...)
@@ -427,7 +427,41 @@ func applyClientSystem(ctx context.Context, target domain.DeploymentTarget, addr
 	_ = record.update(target.Name, func(activation *domain.PendingActivation) {
 		activation.State, activation.Result, activation.ExitCode = domain.ActivationFinished, result.result, result.exitCode
 	})
+	if domain.ActivationSwitched(result.result) {
+		announceVerifiedClient(ctx, target, address, revision, say)
+	}
 	return outcome
+}
+
+// clientNoticeCheckTimeout bounds the check of one computer right after its
+// activation; a computer still restarting its network is checked again by
+// the final verification.
+const clientNoticeCheckTimeout = 5 * time.Second
+
+// announceVerifiedClient checks one computer right after its activation with
+// the same authenticated host-state probe as the final verification, and
+// shows its update notice only when it runs the reviewed revision (and, for a
+// shared system, carries its own identity). The person at that computer then
+// learns about the update when it is in place, not when the slowest computer
+// finishes. The final verification still decides the outcome and records it;
+// it shows the notice on computers this check could not confirm.
+func announceVerifiedClient(ctx context.Context, target domain.DeploymentTarget, address, revision string, say func(string, ...any)) {
+	probe := probeCurrentSystem(ctx, domain.HostMeta{Name: target.Name, IP: address}, clientNoticeCheckTimeout)
+	if probe.Revision == "" || probe.SystemPath == "" || probe.Revision != revision {
+		say("not confirmed at the reviewed revision yet; the update notice waits for the final verification")
+		return
+	}
+	if target.SharedSystem() {
+		if number, _ := domain.ClientNumber(target.Name); probe.Number != number {
+			say("its identity does not match yet; the update notice waits for the final verification")
+			return
+		}
+	}
+	noticeContext, cancel := context.WithTimeout(ctx, clientNoticeCheckTimeout)
+	defer cancel()
+	if status, err := runClientCommand(noticeContext, address, clientUpdateAnnounceCommand); err == nil && status == 0 {
+		say("verified at the reviewed revision; update notice shown")
+	}
 }
 
 // clientSSHOptions are those of the existing management access: keys only,
@@ -531,6 +565,31 @@ func clientActivationStartCommand(system, activationID string) string {
 		`--setenv=PATH=/run/current-system/sw/bin:/run/wrappers/bin ` +
 		`--setenv=NIXORIUM_ACTIVATION=` + activationID + ` '--setenv=NIXORIUM_SYSTEM=` + strings.ReplaceAll(system, `'`, `'\''`) + `' ` +
 		`/bin/sh -c '` + clientActivationScript + `' && echo ` + clientActivationStarted + ` || exit ` + fmt.Sprint(clientActivationStartFailedStatus)
+}
+
+// clientUpdateAnnounceCommand shows the update notice that activation
+// prepared: the classroom extension watches update-notice.json. It runs only
+// after the controller verified the computer at the reviewed revision, and
+// does nothing when no notice waits (the system did not change).
+const clientUpdateAnnounceCommand = `if [ -f /run/nixorium/update-pending.json ]; then mv -f /run/nixorium/update-pending.json /run/nixorium/update-notice.json; fi`
+
+// AnnounceUpdates tells the person at each verified computer that the update
+// is in place. It is best effort: a computer that does not answer keeps its
+// notice waiting, and the update result does not depend on it.
+func (Local) AnnounceUpdates(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) int {
+	results := probeHosts(ctx, hosts, timeout, func(ctx context.Context, host domain.HostMeta, timeout time.Duration) bool {
+		commandContext, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		status, err := runClientCommand(commandContext, sshAddress(host, timeout), clientUpdateAnnounceCommand)
+		return err == nil && status == 0
+	})
+	announced := 0
+	for _, done := range results {
+		if done {
+			announced++
+		}
+	}
+	return announced
 }
 
 // clientActivationStarted is printed once systemd-run accepted the unit.

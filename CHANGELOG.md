@@ -45,6 +45,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   gives the explanation once.
 ### Fixed
 
+- Student computers no longer show "This computer was updated" while the
+  update is still running. The notice was written at the start of the
+  switch, before services restarted and before the controller verified the
+  computer, and also appeared when the activation then failed. Activation now
+  only prepares it; the controller shows it on each computer as soon as it
+  has verified that computer at the reviewed revision, right after its own
+  activation, without waiting for the other computers.
 - The Git repository address, paths and passphrases can be pasted on the Back
   up lab and Restore lab screens; the paste was ignored, so the address had
   to be typed.

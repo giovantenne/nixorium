@@ -77,6 +77,11 @@ case "$remote" in
     esac
     ;;
   *journalctl*) echo "activation output" ;;
+  *update-pending*) printf '%s\n' "$host" >> "$state/announced" ;;
+  nixorium-host-state)
+    [ -n "$NIXORIUM_TEST_HOST_REVISION" ] || exit 255
+    printf '/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-nixos-system-pc01-test\n%s\n' "$NIXORIUM_TEST_HOST_REVISION"
+    ;;
 esac
 `
 
@@ -424,5 +429,40 @@ func TestDeploymentPendingGateRefusesMalformedSpecialAndSymlinkEvidence(t *testi
 				t.Fatal("unsafe evidence bypassed gate")
 			}
 		})
+	}
+}
+
+func TestDeploymentEngineShowsTheNoticeOnceAComputerIsVerified(t *testing.T) {
+	for _, scenario := range []struct {
+		name, revision, log string
+		announced           bool
+	}{
+		{"reviewed revision", strings.Repeat("a", 40), "update notice shown", true},
+		{"other revision", strings.Repeat("b", 40), "waits for the final verification", false},
+		{"no answer", "", "waits for the final verification", false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			plan, directory, state := deploymentProcessFixture(t, "0")
+			t.Setenv("NIXORIUM_TEST_HOST_REVISION", scenario.revision)
+			var output bytes.Buffer
+			if err := buildAndApply(t, plan, directory, &output); err != nil {
+				t.Fatalf("apply: %v\n%s", err, output.String())
+			}
+			announced, _ := os.ReadFile(filepath.Join(state, "announced"))
+			if (strings.TrimSpace(string(announced)) == "192.0.2.1") != scenario.announced || !strings.Contains(output.String(), scenario.log) {
+				t.Fatalf("announced = %q\n%s", announced, output.String())
+			}
+		})
+	}
+}
+
+func TestDeploymentEngineShowsNoNoticeAfterAFailedActivation(t *testing.T) {
+	plan, directory, state := deploymentProcessFixture(t, "1")
+	t.Setenv("NIXORIUM_TEST_HOST_REVISION", strings.Repeat("a", 40))
+	if err := buildAndApply(t, plan, directory, io.Discard); err == nil {
+		t.Fatal("failed activation reported as success")
+	}
+	if announced, _ := os.ReadFile(filepath.Join(state, "announced")); len(announced) != 0 {
+		t.Fatalf("notice shown after a failed activation: %q", announced)
 	}
 }

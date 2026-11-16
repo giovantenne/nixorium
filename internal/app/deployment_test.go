@@ -495,3 +495,39 @@ func TestDeploymentLeavesOutComputersThatStopAnsweringAfterTheBuild(t *testing.T
 		t.Fatalf("phases %v, report %+v", source.runPhases, report)
 	}
 }
+
+// announcingSource records the computers told that their update is in place.
+type announcingSource struct {
+	*fakeDeploymentSource
+	announced []string
+}
+
+func (s *announcingSource) AnnounceUpdates(_ context.Context, hosts []domain.HostMeta, _ time.Duration) int {
+	for _, host := range hosts {
+		s.announced = append(s.announced, host.Name)
+	}
+	return len(hosts)
+}
+
+func TestUpdateNoticeIsShownOnlyOnVerifiedComputers(t *testing.T) {
+	base := readyDeploymentSource()
+	base.runErrors = map[domain.DeploymentPhase]error{domain.DeploymentPhaseApply: errors.New("partial fixture failure")}
+	base.current["pc02"] = domain.HostSystemProbe{SystemPath: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-pc02-system", Revision: "fedcba9876543210"}
+	delete(base.current, "pc03")
+	source := &announcingSource{fakeDeploymentSource: base}
+	output := &bytes.Buffer{}
+	newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "@lab", base.revision, "", output)
+	if strings.Join(source.announced, ",") != "pc01" || !strings.Contains(output.String(), "Update notice in place on 1/1 verified computer(s)") {
+		t.Fatalf("announced = %v, output = %q", source.announced, output.String())
+	}
+}
+
+func TestUpdateNoticeWaitsWhenActivationIsUnconfirmed(t *testing.T) {
+	base := readyDeploymentSource()
+	base.runErrors = map[domain.DeploymentPhase]error{domain.DeploymentPhaseApply: &domain.DeploymentUnconfirmedError{Err: errors.New("disconnected")}}
+	source := &announcingSource{fakeDeploymentSource: base}
+	newTestDeploymentManager(source).Execute(context.Background(), "/deployment", "@lab", base.revision, "", io.Discard)
+	if len(source.announced) != 0 {
+		t.Fatalf("unconfirmed activation announced to %v", source.announced)
+	}
+}

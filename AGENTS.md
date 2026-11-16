@@ -467,9 +467,14 @@ that release's notes, so a release is not finished until the site follows it.
   the queue entries of the computers it updated. Queueing is a visible review
   choice, never implicit; Update computers preselects computers whose queued
   update became stale, and the administrator can change that selection.
-- Every client update that replaces the running system writes
-  `/run/nixorium/update-notice.json` during activation; the classroom extension
-  notifies the user and offers GNOME's restart dialog when kernel, initrd,
+- Every client update that replaces the running system prepares
+  `/run/nixorium/update-pending.json` during activation; only after the
+  controller verified that computer at the reviewed revision (with the
+  host-state probe right after its own activation, else at the final
+  verification) does it rename the file to `update-notice.json` (the fixed
+  `clientUpdateAnnounceCommand`, best effort, never for an unconfirmed
+  activation). The classroom extension
+  then notifies the user and offers GNOME's restart dialog when kernel, initrd,
   modules or systemd changed. Never restart automatically.
   Per-computer outcomes must retain uncertainty and recovery requirements;
   never infer individual activation success from an aggregate batch result.

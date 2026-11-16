@@ -27,6 +27,14 @@ type DeploymentSource interface {
 
 const deploymentVerificationTimeout = 3 * time.Second
 
+// updateAnnouncer is implemented by a source that can show the update notice
+// on computers once they are verified.
+type updateAnnouncer interface {
+	AnnounceUpdates(context.Context, []domain.HostMeta, time.Duration) int
+}
+
+const updateAnnounceTimeout = 10 * time.Second
+
 // A computer that has just activated its system may need a few seconds before
 // it answers the host-state check, so a missing answer is asked for again.
 const (
@@ -297,6 +305,18 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 	if err := m.source.RecordSuccessfulDeployments(report.Repository, updates); err != nil {
 		report.Verification.Detail = "verified target state could not be recorded"
 		return err
+	}
+	// Only now, with each computer verified at the reviewed revision, does
+	// the person at it see that it was updated.
+	if announcer, ok := m.source.(updateAnnouncer); ok {
+		verified := make([]domain.HostMeta, 0, len(updates))
+		for _, host := range hosts {
+			if _, found := updates[host.Name]; found {
+				verified = append(verified, host)
+			}
+		}
+		announced := announcer.AnnounceUpdates(ctx, verified, updateAnnounceTimeout)
+		fmt.Fprintf(output, "  Update notice in place on %d/%d verified computer(s)\n", announced, len(verified))
 	}
 	report.Verification.Recorded = len(updates)
 	report.Verification.Detail = fmt.Sprintf("recorded %d authenticated target(s)", len(updates))

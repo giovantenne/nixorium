@@ -235,7 +235,11 @@ func collect(ctx context.Context, config Config, area string, execute runner) Re
 		}
 	}
 	if area == "updates" {
-		data, err := readFixed("/run/nixorium/update-notice.json", 1024)
+		// A notice still waiting for the controller is the newer one.
+		data, err := readFixed("/run/nixorium/update-pending.json", 1024)
+		if errors.Is(err, unix.ENOENT) {
+			data, err = readFixed("/run/nixorium/update-notice.json", 1024)
+		}
 		if restart, at, valid := parseRestartNotice(data, time.Now()); err == nil && valid {
 			r.RestartRequired = &restart
 			r.RestartNoticeAt = at

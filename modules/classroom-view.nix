@@ -62,10 +62,13 @@ in
       };
     };
 
-    # After an update replaces the running system (never at boot), record it
-    # for the classroom extension, which tells the person at the computer.
-    # A restart is needed when the kernel, initrd, modules or systemd change,
-    # as NixOS itself checks. /run is emptied by the restart.
+    # After an update replaces the running system (never at boot), prepare the
+    # notice for the classroom extension, which tells the person at the
+    # computer. Activation scripts run at the start of the switch, so the
+    # notice waits in update-pending.json: the controller renames it to
+    # update-notice.json only after it verified this computer at the new
+    # revision. A restart is needed when the kernel, initrd, modules or
+    # systemd change, as NixOS itself checks. /run is emptied by the restart.
     systemd.tmpfiles.rules = [ "d /run/nixorium 0755 root root -" ];
     system.activationScripts.nixoriumUpdateNotice = {
       deps = [ "specialfs" ];
@@ -79,9 +82,9 @@ in
           done
           ${pkgs.coreutils}/bin/install -d -m 0755 /run/nixorium
           printf '{"updatedAt":%s,"restart":%s}\n' "$(${pkgs.coreutils}/bin/date +%s)" "$restart" \
-            > /run/nixorium/update-notice.json.new
-          ${pkgs.coreutils}/bin/chmod 0644 /run/nixorium/update-notice.json.new
-          ${pkgs.coreutils}/bin/mv -f /run/nixorium/update-notice.json.new /run/nixorium/update-notice.json
+            > /run/nixorium/update-pending.json.new
+          ${pkgs.coreutils}/bin/chmod 0644 /run/nixorium/update-pending.json.new
+          ${pkgs.coreutils}/bin/mv -f /run/nixorium/update-pending.json.new /run/nixorium/update-pending.json
         fi
       '';
     };

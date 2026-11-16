@@ -55,6 +55,16 @@ Nixorium builds and applies client systems itself:
   computer finished, or never started, it is removed and the update reports
   the computers that were not updated. Only a computer whose result is
   unknown keeps the record and the operation unconfirmed.
+- **Update notice (amended 2026-11-16).** Activation only prepares the notice
+  for the person at the computer (`/run/nixorium/update-pending.json`). Right
+  after a computer's activation succeeds, the engine checks it with the
+  host-state probe of the verification; when it runs the reviewed revision,
+  one more fixed SSH command renames the file to `update-notice.json`, which
+  the classroom extension shows. The final verification does the same for
+  the computers this check could not confirm, and still alone decides and
+  records the outcome. It is best effort and never sent after an unconfirmed
+  activation, so the notice no longer appears while the switch is still
+  running or before the controller verified the computer.
 - Copies run four at a time, activations ten at a time.
 - **Self-closing records (owner decision D7).** When the engine returns with
   unknown results it marks the record `applyReturned`: the recorder process no

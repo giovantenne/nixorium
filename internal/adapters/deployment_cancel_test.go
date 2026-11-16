@@ -61,7 +61,7 @@ func TestAStoppedUpdateStartsNoFurtherActivation(t *testing.T) {
 	done := make(chan clientActivation)
 	var log bytes.Buffer
 	go func() {
-		done <- applyClientSystem(ctx, target, target.IP, "/nix/store/"+strings.Repeat("a", 32)+"-system", strings.Repeat("c", 32), &lockedWriter{writer: &log}, record, make(chan struct{}, 1), slots)
+		done <- applyClientSystem(ctx, target, target.IP, "/nix/store/"+strings.Repeat("a", 32)+"-system", strings.Repeat("c", 32), "", &lockedWriter{writer: &log}, record, make(chan struct{}, 1), slots)
 	}()
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		if _, err := os.Stat(copied); err == nil {
