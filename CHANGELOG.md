@@ -28,6 +28,17 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The administrator guide in a new laboratory is a short index (what the
+  repository holds, how to open Nixorium, a table from task to menu and
+  guide) with four guides beside it: `CLASSROOM.md`, `INSTALLATION.md`,
+  `SOFTWARE.md` and `MAINTENANCE.md`. Each section starts from the menu path
+  and keeps its commands in a short block. Details only maintainers need were
+  removed. The commands they show are checked against the real argument
+  parser. Existing laboratories receive the guides with the update, through
+  the deployment migration `2026-11-administrator-guides`: it replaces
+  `README.md` when it is any committed form of the template guide and creates
+  the four guides; an edited `README.md` or an own file with one of those names
+  makes it a "Manual change" and nothing is touched.
 - Simpler TUI screens. While work runs, the spinner marks the current step
   and the step list no longer adds "Running" and "Waiting"; one line gives the
   elapsed time, without the read time limit or a second mention of Esc, which

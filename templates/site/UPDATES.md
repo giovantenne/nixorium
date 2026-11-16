@@ -187,7 +187,7 @@ computer's identity record (`/var/lib/nixorium/identity.json`, only its number)
 over SSH and checks the number again afterwards. A record that names another
 computer is never overwritten: that computer stays unchanged and the result says
 "identity record names another computer" (see
-[Troubleshooting](troubleshooting.md#the-update-says-identity-record-names-another-computer)).
+[Troubleshooting](https://github.com/giovantenne/nixorium/blob/master/docs/troubleshooting.md#the-update-says-identity-record-names-another-computer)).
 To go back, choose the previous generation in the computer's boot menu.
 In laboratory mode the plan also evaluates the netboot, PXE firmware and
 installer outputs without building them: they are built when network
@@ -244,7 +244,7 @@ file.
 If the new release's program fails, changes something it did not declare, or
 needs a newer way of migrating than your release knows, the update is refused
 and the current release stays; see
-[the update is refused](troubleshooting.md#the-update-is-refused-because-of-the-new-releases-changes-to-your-files)
+[the update is refused](https://github.com/giovantenne/nixorium/blob/master/docs/troubleshooting.md#the-update-is-refused-because-of-the-new-releases-changes-to-your-files)
 in the troubleshooting guide.
 
 **Updating from a release without this feature** (3.9.0 or older). Such a

@@ -96,7 +96,9 @@ Generated docs (`docs/tui-gallery.md`, `docs/menu-map.md`): after any TUI menu c
 `scripts/generate-docs.sh --write`; it also refreshes `docs/menu-map.md`.
 
 Lab operation commands belong in the
-[administrator guide](templates/site/README.md) and the
+[administrator guides](templates/site/README.md) (the README is a short index;
+`CLASSROOM.md`, `INSTALLATION.md`, `SOFTWARE.md` and `MAINTENANCE.md` hold the
+procedures, one topic each) and the
 [maintainer skill](skills/nixorium-maintainer/SKILL.md), not in the upstream
 development workflow. Do not run a deployment merely to validate upstream code.
 
@@ -170,7 +172,9 @@ migration in the same change:
   `internal/deploymigrate/files/<migration id>/` and list the SHA-256 of every
   released form it replaces (from `git show <tag>:templates/site/<file>`). The
   files are replaced together or, when one was edited or a write fails (the
-  files already written are restored), not at all (manual).
+  files already written are restored), not at all (manual). Mark a file that
+  released templates did not have with `Created: true`: when it is missing it
+  is created (mode 0644), and removed again if a later write fails.
 - To give existing laboratories a package the template now declares for
   every computer, use `AddSharedPackage`: it adds the package to
   `lab-software.json` for the controller and all clients, and leaves it

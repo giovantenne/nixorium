@@ -76,8 +76,8 @@ since the previous tag.
 
 ## Keep distribution coherent
 
-Public API changes must update the template, both READMEs, `AGENTS.md`, and
-`CHANGELOG.md` together. The template copy of `nixorium-maintainer` must be
+Public API changes must update the template, both READMEs (and the topic
+guides beside the template README), `AGENTS.md`, and `CHANGELOG.md` together. The template copy of `nixorium-maintainer` must be
 identical to the upstream copy. The upstream-only `nixorium-developer` skill
 must not be copied into private deployments.
 

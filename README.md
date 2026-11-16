@@ -148,7 +148,7 @@ to run ProxyDHCP beside the existing DHCP server; USB over SSH works without
 it. The USB live system may reach the controller over Wi-Fi during the
 installation, but an installed computer uses its wired card: connect the cable
 before it restarts. The
-[administrator guide](templates/site/README.md#requirements-for-installing-clients)
+[administrator guide](templates/site/INSTALLATION.md#requirements)
 lists the network, storage and console requirements in full.
 
 ## Quick start
@@ -200,8 +200,8 @@ trial on virtual machines, follow the
    the client from the official NixOS ISO (Minimal or Graphical; Minimal is
    better on a computer with 4 GB of RAM or less) and follow the controller, which checks the
    client's fingerprint before using any password. Both procedures are in the
-   administrator guide: [network boot](templates/site/README.md#install-computers-with-pxe)
-   and [USB over SSH](templates/site/README.md#install-one-computer-from-usb-over-ssh).
+   administrator guide: [network boot](templates/site/INSTALLATION.md#network-boot-pxe)
+   and [USB over SSH](templates/site/INSTALLATION.md#usb-over-ssh).
 
 4. **Check it, then expand.** Start the client from its disk, try the student
    session, a reboot and an update from **Computers → Update computers**. Make
@@ -221,7 +221,7 @@ and the [security policy](SECURITY.md).
 
 **Run a lab**
 
-- [Administrator guide](templates/site/README.md): setup, daily operation and customization
+- [Administrator guide](templates/site/README.md): setup, daily operation and customization, with separate guides for the [classroom](templates/site/CLASSROOM.md), [installation](templates/site/INSTALLATION.md), [software](templates/site/SOFTWARE.md) and [maintenance](templates/site/MAINTENANCE.md)
 - [Assistant](docs/assistant.md): describe a lab customization and review the proposal before saving
 - [Troubleshooting](docs/troubleshooting.md): failures, recovery and [backups](docs/troubleshooting.md#backups-and-restoration)
 - [Optional adoption statistics](docs/telemetry.md): preview, consent and privacy

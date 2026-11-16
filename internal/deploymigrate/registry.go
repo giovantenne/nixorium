@@ -139,6 +139,10 @@ var Registry = []Migration{
 				}},
 			})
 		},
+	}, {
+		ID:          "2026-11-administrator-guides",
+		Description: "The administrator guide (README.md) becomes a short index, with separate guides for the classroom, installation, software and maintenance beside it.",
+		Apply:       administratorGuides,
 	},
 }
 

@@ -26,7 +26,9 @@ func guidanceRoot(t *testing.T) string {
 
 func guidanceFiles(t *testing.T, root string) []string {
 	t.Helper()
-	files := []string{"AGENTS.md", "CONTRIBUTING.md", "templates/site/AGENTS.md", "docs/agent-guidance.md", "docs/support-report.md"}
+	files := []string{"AGENTS.md", "CONTRIBUTING.md", "templates/site/AGENTS.md", "docs/agent-guidance.md", "docs/support-report.md",
+		// The administrator guides: their commands are checked like the agents'.
+		"templates/site/README.md", "templates/site/CLASSROOM.md", "templates/site/INSTALLATION.md", "templates/site/SOFTWARE.md", "templates/site/MAINTENANCE.md"}
 	err := filepath.WalkDir(filepath.Join(root, "skills"), func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -107,6 +109,10 @@ func guidanceCommands(body string) ([][]string, error) {
 			args = strings.TrimPrefix(line, "nix run .#nixorium -- ")
 		default:
 			continue
+		}
+		// A trailing "  # note" explains the command and is not an argument.
+		if index := strings.Index(args, " #"); index >= 0 {
+			args = args[:index]
 		}
 		fields := strings.Fields(args)
 		for i, field := range fields {

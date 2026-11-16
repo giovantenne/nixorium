@@ -64,7 +64,7 @@ The operator performs changes through native reviews. Software/input-update
 TUI flows may also commit and activate the controller; workspace saves offer
 separate activation. Proposed, saved, built and active are distinct states.
 
-Use [administrator instructions](README.md), [troubleshooting](TROUBLESHOOTING.md),
+Use [administrator instructions](README.md) and the guides it lists, [troubleshooting](TROUBLESHOOTING.md),
 [updates](UPDATES.md) and [template reset](DEPLOYMENT-RESET.md) to explain human
 procedures, not authorize agent execution. Unsupported customization is a
 separate development task. Updating inputs does not automatically refresh copied

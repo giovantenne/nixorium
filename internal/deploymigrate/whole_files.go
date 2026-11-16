@@ -27,13 +27,16 @@ type WholeFile struct {
 	// laboratory created after the later change would read as changed by
 	// hand at every update.
 	Later []string
+	// Created marks a file that released templates did not have: a missing
+	// file is created (mode 0644) instead of counting as changed by hand.
+	Created bool
 }
 
 // ReplaceWholeFiles replaces template files the administrator never changed,
 // all together or not at all: applied when each file is a released form or
-// already the new one (or a later form), done when all are already new or
-// later, manual (nothing touched) when any file was changed by hand or is
-// missing.
+// already the new one (or a later form), or is a missing Created file; done
+// when all are already new or later; manual (nothing touched) when any file
+// was changed by hand or is missing.
 func ReplaceWholeFiles(tree Tree, replacements []WholeFile) Outcome {
 	// What is found is kept: a failed write restores it, and each file keeps
 	// the mode it had.
@@ -41,11 +44,16 @@ func ReplaceWholeFiles(tree Tree, replacements []WholeFile) Outcome {
 		file    WholeFile
 		content []byte
 		mode    fs.FileMode
+		created bool
 	}
 	var edited []string
 	var pending []original
 	for _, file := range replacements {
 		content, mode, found, err := tree.Read(file.Path)
+		if err == nil && !found && file.Created {
+			pending = append(pending, original{file: file, mode: 0o644, created: true})
+			continue
+		}
 		if err != nil || !found {
 			edited = append(edited, file.Path)
 			continue
@@ -77,7 +85,11 @@ func ReplaceWholeFiles(tree Tree, replacements []WholeFile) Outcome {
 			// The failed file may be half written: restore it too.
 			var stuck []string
 			for _, written := range pending[:index+1] {
-				if tree.Write(written.file.Path, written.content, written.mode) != nil {
+				restore := func() error { return tree.Write(written.file.Path, written.content, written.mode) }
+				if written.created {
+					restore = func() error { return tree.Remove(written.file.Path) }
+				}
+				if restore() != nil {
 					stuck = append(stuck, written.file.Path)
 				}
 			}
