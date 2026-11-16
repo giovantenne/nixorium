@@ -31,6 +31,9 @@ func wireBackupActions(actions *presentation.DashboardActions, deps dashboardDep
 	actions.RestoreLab = func(remote, branch, target string, passphrase []byte) domain.BackupReport {
 		return (adapters.GitBackup{}).Restore(ctx, remote, branch, target, passphrase)
 	}
+	actions.GitBackupKey = adapters.BackupAccessKey
+	actions.CheckGitBackupAccess = (adapters.GitBackup{}).CheckAccess
+	actions.TrustGitHost = adapters.TrustGitHost
 	actions.GitBackupDestination = func() (string, string) { return (adapters.GitBackup{}).Destination(repository) }
 	actions.BackupFileFolder = func() string {
 		// A connected USB drive keeps the backup away from this controller.

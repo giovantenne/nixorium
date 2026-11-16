@@ -66,13 +66,15 @@ type options struct {
 	acknowledgeUnreachable bool
 	queueUnreachable       bool
 	// network is the new laboratory network of network migrate plan/start.
-	network        string
-	backupTarget   string
-	backupRemote   string
-	backupBranch   string
-	backupFile     string
-	passphraseFile string
-	remove         bool
+	network      string
+	backupTarget string
+	// backupFingerprint is the Git server fingerprint backup trust-host checks.
+	backupFingerprint string
+	backupRemote      string
+	backupBranch      string
+	backupFile        string
+	passphraseFile    string
+	remove            bool
 	// collectInto is the folder collect plan/apply saves desktops into
 	// instead of ~/Nixorium/Collected.
 	collectInto string
@@ -230,7 +232,7 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 	case "template-reset":
 		return runTemplateResetRecoveryCommand(ctx, repository, options, stdout, stderr)
 	case "backup":
-		if options.subcommand == "plan" || options.subcommand == "publish" || options.subcommand == "clone" {
+		if options.subcommand == "plan" || options.subcommand == "publish" || options.subcommand == "clone" || options.subcommand == "key" || options.subcommand == "trust-host" {
 			return runGitBackupCommand(ctx, repository, options, stdout, stderr)
 		}
 		return runBackupCommand(ctx, repository, options, stdout, stderr)
@@ -491,6 +493,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       schedule set [--on <HH:MM>] [--off <HH:MM>] [--days <mon-fri|all|mon,wed,fri>] [--json] sets it, replacing the old one; --days is mon-fri when left out")
 	fmt.Fprintln(writer, "       schedule run [--repo <deployment>] [--json] does what is due this minute (started by nixorium-classroom-schedule.timer)")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
+	fmt.Fprintln(writer, "       backup key")
+	fmt.Fprintln(writer, "       backup trust-host --remote <ssh-url> --fingerprint <SHA256:…>")
 	fmt.Fprintln(writer, "       backup plan --remote <ssh-url> [--branch <branch>] [--repo <deployment>]")
 	fmt.Fprintln(writer, "       backup publish --remote <ssh-url> [--branch <branch>] --expect <token> --yes [--passphrase-file <file>]")
 	fmt.Fprintln(writer, "       backup clone [--remote <ssh-url> [--branch <branch>] --to <new-directory> --yes] [--passphrase-file <file>]")

@@ -21,13 +21,40 @@ func (model dashboardModel) handleBackupMessage(message tea.Msg) (tea.Model, tea
 	case gitBackupPlanMsg:
 		model.busy = ""
 		if message.err != nil {
-			model.message = message.err.Error()
+			model.gitAccessError(message.err)
 			return model, nil
 		}
 		model.backup.plan = message.plan
 		model.backup.reviewed = true
 		model.backup.field = 0
 		return model, nil
+	case gitAccessMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.gitAccessError(message.err)
+			return model, nil
+		}
+		model.backup.reviewed = true
+		return model, nil
+	case gitHostTrustedMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.message = message.err.Error()
+			return model, nil
+		}
+		model.backup.trusted = model.backup.unknownHost.Fingerprint
+		model.backup.unknownHost = nil
+		// Reach the repository again, now that its server is trusted.
+		if model.backup.restore {
+			if model.actions.CheckGitBackupAccess == nil {
+				return model, nil
+			}
+			return model.checkRestoreAccess()
+		}
+		if model.actions.PlanGitBackup == nil {
+			return model, nil
+		}
+		return model.planGitBackup()
 	case backupResultMsg:
 		model.busy = ""
 		model.backup.result, model.backup.done = message.report, true

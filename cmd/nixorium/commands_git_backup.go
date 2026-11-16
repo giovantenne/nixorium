@@ -22,7 +22,7 @@ func parseGitBackupArguments(args []string) (options, error) {
 			o.json = true
 		case "--help", "-h":
 			o.help = true
-		case "--remote", "--branch", "--repo", "--to", "--expect", "--passphrase-file":
+		case "--remote", "--branch", "--repo", "--to", "--expect", "--passphrase-file", "--fingerprint":
 			flag := args[i]
 			i++
 			if i >= len(args) || args[i] == "" {
@@ -41,6 +41,8 @@ func parseGitBackupArguments(args []string) (options, error) {
 				o.expect = args[i]
 			case "--passphrase-file":
 				o.passphraseFile = args[i]
+			case "--fingerprint":
+				o.backupFingerprint = args[i]
 			}
 		default:
 			return o, fmt.Errorf("unknown backup option %q", args[i])
@@ -52,8 +54,20 @@ func parseGitBackupArguments(args []string) (options, error) {
 	if o.subcommand == "clone" && len(args) == 1 {
 		return o, nil
 	}
+	if o.subcommand == "key" {
+		if len(args) != 1 {
+			return o, errors.New("backup key accepts no options")
+		}
+		return o, nil
+	}
 	if o.backupRemote == "" {
 		return o, errors.New("backup requires --remote <private-repository-ssh-url>")
+	}
+	if (o.subcommand == "trust-host") != (o.backupFingerprint != "") {
+		return o, errors.New("--fingerprint belongs to backup trust-host, which also requires it")
+	}
+	if o.subcommand == "trust-host" && (o.yes || o.expect != "" || o.backupTarget != "" || o.passphraseFile != "" || o.backupBranch != "" || o.repository != "") {
+		return o, errors.New("backup trust-host accepts only --remote and --fingerprint")
 	}
 	switch o.subcommand {
 	case "plan":
@@ -74,8 +88,25 @@ func parseGitBackupArguments(args []string) (options, error) {
 
 func runGitBackupCommand(ctx context.Context, repository string, o options, stdout, stderr io.Writer) int {
 	g := adapters.GitBackup{}
+	if o.subcommand == "key" {
+		key, err := adapters.BackupAccessKey()
+		if err != nil {
+			fmt.Fprintln(stderr, "Error:", err)
+			return 1
+		}
+		fmt.Fprintln(stdout, key)
+		return 0
+	}
+	if o.subcommand == "trust-host" {
+		if err := adapters.TrustGitHost(ctx, o.backupRemote, o.backupFingerprint); err != nil {
+			fmt.Fprintln(stderr, "Error:", err)
+			return 1
+		}
+		fmt.Fprintln(stdout, "The Git server is trusted for backups on this controller.")
+		return 0
+	}
 	if o.subcommand == "clone" && o.backupRemote == "" {
-		err := presentation.RunRestoreLab(presentation.DashboardActions{RestoreLab: func(remote, branch, target string, passphrase []byte) domain.BackupReport {
+		err := presentation.RunRestoreLab(presentation.DashboardActions{GitBackupKey: adapters.BackupAccessKey, CheckGitBackupAccess: g.CheckAccess, TrustGitHost: adapters.TrustGitHost, RestoreLab: func(remote, branch, target string, passphrase []byte) domain.BackupReport {
 			return g.Restore(ctx, remote, branch, target, passphrase)
 		}, RestoreLabArchive: func(source, target string, passphrase []byte) domain.BackupReport {
 			return adapters.Local{}.RestoreLab(ctx, source, passphrase, target)
@@ -102,7 +133,7 @@ func runGitBackupCommand(ctx context.Context, repository string, o options, stdo
 				_ = presentation.JSON(stdout, plan)
 			} else {
 				fmt.Fprintf(stdout, "Private repository: %s\nBranch: %s\nSaved revision: %s\nTracked files: %d (ignored files excluded)\nRecovery: encrypted private keys, account hashes and trusted computer keys\nReview token: %s\n", plan.Remote, plan.Branch, plan.Revision, plan.Files, plan.ReviewToken)
-				fmt.Fprintln(stdout, "Confirm the repository is PRIVATE in GitHub/GitLab before publishing. Configuration and Git history stay readable; private keys and account password hashes are encrypted. Git credentials and the passphrase must be kept separately.")
+				fmt.Fprintln(stdout, "Confirm the repository is PRIVATE on your Git service before publishing. Configuration and Git history stay readable; private keys and account password hashes are encrypted. Git credentials and the passphrase must be kept separately.")
 			}
 			return 0
 		}

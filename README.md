@@ -190,7 +190,7 @@ trial on virtual machines, follow the
    Change settings → Accounts → Change account passwords**.
 
    Optionally use **Maintenance → Back up lab** and choose an **encrypted file**
-   (for example on a USB drive), or a **private GitHub/GitLab repository** that
+   (for example on a USB drive), or a **private Git repository** (GitHub, GitLab or another SSH Git service) that
    then stays up to date automatically. Keep the passphrase separately. Backup is
    recommended but never blocks installation or updates.
 

@@ -59,7 +59,8 @@ var screenHelp = map[dashboardScreen]helpText{
 	dashboardBackup: helpText{head: []string{
 		"Backup is optional and never blocks installation or updates. Choose an encrypted file or a private Git repository.",
 		"An encrypted file contains the entire deployment and Git history. Mount the USB first, choose an existing folder outside the deployment, and enter a passphrase of at least 12 characters. Review, then Enter creates the archive.",
-		"For Git, use the SSH URL of a PRIVATE GitHub/GitLab repository. Configure an independent SSH key/agent and verify the host fingerprint outside Nixorium first.",
+		"Git backups use a PRIVATE repository on any Git service reachable over SSH (git@… or ssh://…). Nixorium creates a backup key for this controller (~/.ssh/nixorium-backup) and shows it: add it to the repository with write access. nixorium backup key prints it too.",
+		"GitHub and GitLab.com are recognised automatically. At the first connection to another Git server, Nixorium shows its fingerprint: trust it only if it is identical to the one the service publishes. On a school server, its administrator reads it with ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub.",
 		"The first Git backup reviews committed files, encrypts recovery keys, then pushes when you press Enter after confirming the repository is private. The remote branch is verified after sending; rejected or uncertain pushes are not backups.",
 		"Afterwards saved changes are pushed automatically while Nixorium is open, without the passphrase. Back up now pushes immediately. When keys, account passwords or trusted computers change, the passphrase is asked again.",
 		"For Git backups, configuration and Git history remain readable; private keys and managed account password hashes are encrypted. Other ignored files are excluded. Review custom files for credentials before committing.",

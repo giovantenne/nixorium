@@ -12,7 +12,7 @@ func parseArguments(arguments []string) (options, error) {
 	if len(arguments) >= 2 && arguments[0] == "config" && arguments[1] == "source" {
 		return parseEvaluationSourceArguments(arguments[2:])
 	}
-	if len(arguments) >= 2 && arguments[0] == "backup" && (arguments[1] == "plan" || arguments[1] == "publish" || arguments[1] == "clone") {
+	if len(arguments) >= 2 && arguments[0] == "backup" && (arguments[1] == "plan" || arguments[1] == "publish" || arguments[1] == "clone" || arguments[1] == "key" || arguments[1] == "trust-host") {
 		return parseGitBackupArguments(arguments[1:])
 	}
 	if len(arguments) > 0 && arguments[0] == "telemetry" {

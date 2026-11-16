@@ -1205,8 +1205,8 @@ Backup is optional and never blocks client installation or updates. Open
   enter its folder instead. Enter and repeat a passphrase, review, then create the archive.
   The entire deployment, Git history, private keys and account hashes are encrypted.
 - **Private Git repository**: save local edits first, choose your school's **private**
-  GitHub/GitLab repository and branch, then enter a passphrase and press Enter once you have confirmed it is private.
-  Configure independent SSH access and verify the Git server's fingerprint first.
+  Git repository (GitHub, GitLab or another SSH Git service) and branch, then enter a passphrase and press Enter once you have confirmed it is private.
+  First add the backup key shown on the screen to the repository with write access; for a server other than GitHub or GitLab.com, compare and trust its fingerprint when asked.
   Private keys and account hashes are encrypted; configuration and history remain
   readable. A Git backup is complete only after the remote revision is verified.
   Afterwards every saved change is pushed automatically while Nixorium is open;

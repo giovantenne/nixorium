@@ -163,9 +163,18 @@ type DashboardActions struct {
 	PublishGitBackup        func(domain.GitBackupPlan, []byte) domain.BackupReport
 	RestoreLab              func(string, string, string, []byte) domain.BackupReport
 	GitBackupDestination    func() (string, string)
-	SyncGitBackup           func(context.Context, string) domain.BackupReport
-	BackupFileFolder        func() string
-	RestoreLabArchive       func(string, string, []byte) domain.BackupReport
+	// GitBackupKey returns the public key the Git backup uses, creating it
+	// on first use; the administrator adds it to the repository.
+	GitBackupKey func() (string, error)
+	// CheckGitBackupAccess reaches the repository of a restore before
+	// anything is fetched; an unknown server is a domain.UnknownGitHostError.
+	CheckGitBackupAccess func(ctx context.Context, remote, branch string) error
+	// TrustGitHost records the server of remote once the administrator has
+	// compared its fingerprint; it refuses a server that now shows another.
+	TrustGitHost      func(ctx context.Context, remote, fingerprint string) error
+	SyncGitBackup     func(context.Context, string) domain.BackupReport
+	BackupFileFolder  func() string
+	RestoreLabArchive func(string, string, []byte) domain.BackupReport
 	// RestoreFolder proposes where Restore lab puts the restored lab;
 	// FindBackupFiles lists backup files on connected drives, newest first.
 	RestoreFolder   func() string

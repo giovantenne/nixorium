@@ -1072,12 +1072,38 @@ private remote repository that then stays up to date automatically. An absent
 or stale backup produces an advisory Overview reminder only.
 
 For a **Private Git repository**, push the saved deployment and its encrypted recovery keys
-to a **private** GitHub or GitLab repository (including self-hosted GitLab). Create the private repository on your provider first, and configure
-independent SSH access on the controller. Verify the Git server's host fingerprint
-through a trusted channel before using Nixorium; SSH host verification is never
-disabled. This workflow currently accepts SSH URLs, not HTTPS or tokens in URLs.
-Keep Git access separate from the lab's SSH key so a replacement controller can
-fetch the backup without first needing the keys inside it.
+to a **private** repository on any Git service reachable over SSH (GitHub, GitLab,
+Gitea, a school server). Create an empty private repository first, without a README.
+The backup screen shows this controller's **backup key**, which Nixorium creates in
+`~/.ssh/nixorium-backup` on first use (`nixorium backup key` prints it as well). Add it
+to the repository with write access: on GitHub, **Settings → Deploy keys → Add deploy
+key → Allow write access**; on GitLab, **Settings → Repository → Deploy keys → Grant
+write permissions**; elsewhere, as a deploy key with write access. GitLab protects the
+default branch once the first backup creates it: if a later automatic backup is
+refused, allow the key under **Settings → Repository → Protected branches → Allowed
+to push**. Then paste the repository's SSH address (`git@…` or `ssh://…`). The key has no passphrase, so the
+automatic backup can use it, and it is separate from the lab's SSH key, so a
+replacement controller can fetch the backup with its own backup key before it has
+the keys inside it. Keys already set up for this user keep working.
+
+SSH host verification is never disabled. GitHub's and GitLab.com's published host
+keys are built in. At the first connection to another server, the screen shows its
+fingerprint: compare it with the one the service publishes (or ask its administrator)
+and trust it only if they are identical. Nixorium checks the fingerprint again when
+you confirm and records the server in `~/.ssh/nixorium-git-hosts`; your own
+`~/.ssh/known_hosts` is read but never changed. On a school server, its administrator
+reads the fingerprint with `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`. From the
+command line, `nixorium backup trust-host --remote <address> --fingerprint <SHA256:…>`
+does the same. A server whose key later changes is refused and nothing is sent; only
+if the Git service confirms that the server was reinstalled, remove the old key with
+`ssh-keygen -R <server> -f <file>` (the message names the file) and back up again to
+compare the new fingerprint. An address that goes through your own SSH settings
+(`~/.ssh/config`) cannot be verified by Nixorium itself: add that server's key to
+`~/.ssh/known_hosts`. This workflow accepts SSH addresses, not HTTPS or tokens
+in URLs. The review reaches the repository before asking for the passphrase, and names
+the problem when it cannot: a server that cannot be reached, a key that is missing or
+read-only, a wrong address or branch, a protected branch, or a branch that already
+holds other history.
 
 Save configuration edits through **Maintenance → Review Git changes** first.
 Back up lab reviews the destination, branch and saved revision, then asks for a
@@ -1141,8 +1167,10 @@ nixorium backup clone
 Choose **Backup file** or **Private Git repository**. For a file, Nixorium
 looks for `nixorium-backup-*.age` files on connected drives and proposes the
 newest; enter its passphrase. **Restore into** proposes a new folder next to
-the deployment (`nixorium-restored`); change it only if needed. For Git, enter
-the SSH repository URL, branch and the passphrase. Review and confirm. Both restore the deployment
+the deployment (`nixorium-restored`); change it only if needed. For Git, first add
+the backup key shown on the screen to the repository as a deploy key with write
+access (a new controller has its own key), then paste the SSH address and enter the
+branch and the passphrase. Review and confirm. Both restore the deployment
 with its private keys and account passwords into the new directory and fill the
 controller's trusted computer keys in the same way. The equivalent
 noninteractive Git command is:

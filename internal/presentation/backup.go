@@ -2,10 +2,12 @@ package presentation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -27,6 +29,15 @@ type backupModel struct {
 	// adopted holds the result of using the restored lab on this controller.
 	adopted     bool
 	adoptResult domain.BackupReport
+	// accessKey is the public key to add to the Git repository; accessErr
+	// says why it could not be read or created.
+	accessKey, accessErr string
+	// unknownHost is a Git server never verified on this controller, shown
+	// with its fingerprint until the administrator trusts it or goes back.
+	// trusted is the fingerprint just trusted: the same server unknown again
+	// means ssh reaches it another way (~/.ssh/config).
+	unknownHost *domain.UnknownGitHostError
+	trusted     string
 }
 type backupResultMsg struct{ report domain.BackupReport }
 type backupAdoptMsg struct{ report domain.BackupReport }
@@ -35,6 +46,12 @@ type gitBackupPlanMsg struct {
 	plan domain.GitBackupPlan
 	err  error
 }
+
+// gitAccessMsg is the result of reaching the repository of a restore.
+type gitAccessMsg struct{ err error }
+
+// gitHostTrustedMsg is the result of trusting a Git server.
+type gitHostTrustedMsg struct{ err error }
 
 // backupSyncState tracks the background push of saved changes to a configured
 // Git backup. failed holds a revision whose push already failed, so a refresh
@@ -196,6 +213,24 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 		model.screen = dashboardHome
 		return model.refreshOverview()
 	}
+	if b.unknownHost != nil {
+		switch key.String() {
+		case "esc":
+			b.unknownHost = nil
+			model.message = ""
+		case "enter":
+			if model.actions.TrustGitHost == nil {
+				return model, nil
+			}
+			trust, remote, fingerprint := model.actions.TrustGitHost, strings.TrimSpace(b.remote), b.unknownHost.Fingerprint
+			model.busy = "Checking the Git server's fingerprint again and trusting it"
+			model.message = ""
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return gitHostTrustedMsg{trust(ctx, remote, fingerprint)}
+			})
+		}
+		return model, nil
+	}
 	if key.String() == "esc" || (b.done && key.String() == "enter") {
 		done := b.done
 		b.clearSecrets()
@@ -259,6 +294,9 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			if choice == 1 && b.gitConfigured() && model.actions.SyncGitBackup != nil {
 				return model.syncBackupNow()
 			}
+			if !b.archive {
+				b.loadAccessKey(model.actions.GitBackupKey)
+			}
 		}
 		return model, nil
 	}
@@ -292,12 +330,7 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 				model.message = "Backup is unavailable in this session."
 				return model, nil
 			}
-			remote, branch, action := strings.TrimSpace(b.remote), strings.TrimSpace(b.branch), model.actions.PlanGitBackup
-			model.busy = "Checking saved configuration and recovery keys"
-			return model.startRead(func(ctx context.Context) tea.Msg {
-				plan, err := action(ctx, remote, branch)
-				return gitBackupPlanMsg{plan, err}
-			})
+			return model.planGitBackup()
 		}
 		if b.restore && !b.reviewed {
 			if b.archive && (strings.TrimSpace(b.source) == "" || strings.TrimSpace(b.destination) == "" || len(b.passphrase) == 0) {
@@ -307,6 +340,9 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			if !b.archive && (b.remote == "" || b.branch == "" || b.destination == "" || len(b.passphrase) == 0) {
 				model.message = "Enter the SSH repository URL, branch, the folder to restore into and the passphrase."
 				return model, nil
+			}
+			if !b.archive && model.actions.CheckGitBackupAccess != nil {
+				return model.checkRestoreAccess()
 			}
 			b.reviewed = true
 			model.message = ""
@@ -368,50 +404,7 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 		if (b.restore || b.archive) && b.reviewed {
 			return model, nil
 		}
-		var plain *string
-		var secret *[]rune
-		switch {
-		case b.restore && b.archive:
-			switch b.field {
-			case 0:
-				plain = &b.source
-			case 1:
-				secret = &b.passphrase
-			case 2:
-				plain = &b.destination
-			}
-		case b.restore:
-			switch b.field {
-			case 0:
-				plain = &b.remote
-			case 1:
-				plain = &b.branch
-			case 2:
-				plain = &b.destination
-			case 3:
-				secret = &b.passphrase
-			}
-		case b.archive:
-			switch b.field {
-			case 0:
-				plain = &b.destination
-			case 1:
-				secret = &b.passphrase
-			case 2:
-				secret = &b.repeat
-			}
-		case b.reviewed:
-			switch b.field {
-			case 0:
-				secret = &b.passphrase
-			case 1:
-				secret = &b.repeat
-			}
-		case b.field == 0:
-			plain = &b.remote
-		default:
-			plain = &b.branch
-		}
+		plain, secret := b.activeField()
 		if key.String() == "backspace" {
 			if plain != nil {
 				r := []rune(*plain)
@@ -433,6 +426,153 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 		}
 	}
 	return model, nil
+}
+
+// activeField returns the field that takes typing: plain text or a secret.
+// Both are nil while nothing can be typed.
+func (b *backupModel) activeField() (plain *string, secret *[]rune) {
+	if b.choosing || b.done || b.unknownHost != nil || ((b.restore || b.archive) && b.reviewed) {
+		return nil, nil
+	}
+	switch {
+	case b.restore && b.archive:
+		switch b.field {
+		case 0:
+			plain = &b.source
+		case 1:
+			secret = &b.passphrase
+		case 2:
+			plain = &b.destination
+		}
+	case b.restore:
+		switch b.field {
+		case 0:
+			plain = &b.remote
+		case 1:
+			plain = &b.branch
+		case 2:
+			plain = &b.destination
+		case 3:
+			secret = &b.passphrase
+		}
+	case b.archive:
+		switch b.field {
+		case 0:
+			plain = &b.destination
+		case 1:
+			secret = &b.passphrase
+		case 2:
+			secret = &b.repeat
+		}
+	case b.reviewed:
+		switch b.field {
+		case 0:
+			secret = &b.passphrase
+		case 1:
+			secret = &b.repeat
+		}
+	case b.field == 0:
+		plain = &b.remote
+	default:
+		plain = &b.branch
+	}
+	return plain, secret
+}
+
+// pasteText inserts pasted text into the active field: the repository
+// address copied from GitHub, a path or a passphrase from a password manager.
+func (b *backupModel) pasteText(text string) bool {
+	plain, secret := b.activeField()
+	switch {
+	case plain != nil:
+		*plain = appendInputText(*plain, strings.TrimSpace(text), 4096)
+	case secret != nil:
+		// Spaces may belong to a passphrase; only the line break a copy
+		// often adds is dropped.
+		for _, character := range strings.TrimRight(text, "\r\n") {
+			if len(*secret) >= 1024 {
+				break
+			}
+			if unicode.IsPrint(character) && !unicode.In(character, unicode.Cf) {
+				*secret = append(*secret, character)
+			}
+		}
+	default:
+		return false
+	}
+	return true
+}
+
+// checkRestoreAccess reaches the restore repository before the review.
+func (model dashboardModel) checkRestoreAccess() (tea.Model, tea.Cmd) {
+	check, remote, branch := model.actions.CheckGitBackupAccess, strings.TrimSpace(model.backup.remote), strings.TrimSpace(model.backup.branch)
+	model.busy = "Reaching the repository"
+	model.message = ""
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return gitAccessMsg{check(ctx, remote, branch)}
+	})
+}
+
+// planGitBackup reviews the backup destination, reaching the repository.
+func (model dashboardModel) planGitBackup() (tea.Model, tea.Cmd) {
+	remote, branch, action := strings.TrimSpace(model.backup.remote), strings.TrimSpace(model.backup.branch), model.actions.PlanGitBackup
+	model.busy = "Checking saved configuration and reaching the repository"
+	model.message = ""
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		plan, err := action(ctx, remote, branch)
+		return gitBackupPlanMsg{plan, err}
+	})
+}
+
+// gitAccessError shows an unknown server for confirmation and any other
+// access problem as a message.
+func (model *dashboardModel) gitAccessError(err error) {
+	var unknown domain.UnknownGitHostError
+	if errors.As(err, &unknown) && unknown.Fingerprint == model.backup.trusted {
+		model.message = "The server was trusted, but the connection still does not recognise it: the address probably uses your own SSH settings (~/.ssh/config). Add the server's key to ~/.ssh/known_hosts instead."
+		return
+	}
+	if errors.As(err, &unknown) {
+		model.backup.unknownHost = &unknown
+		model.message = ""
+		return
+	}
+	model.message = err.Error()
+}
+
+func (b *backupModel) loadAccessKey(load func() (string, error)) {
+	if load == nil || b.accessKey != "" {
+		return
+	}
+	key, err := load()
+	if err != nil {
+		b.accessErr = "The backup key could not be prepared: " + err.Error()
+		return
+	}
+	b.accessKey, b.accessErr = key, ""
+}
+
+// accessSteps explain, before the address is asked, how this controller
+// gets access to the repository.
+func (b backupModel) accessSteps(width int, dark bool) []string {
+	first := "1. Create an empty PRIVATE repository on your Git service (without a README)."
+	if b.restore {
+		first = "1. Open the private repository that holds the backup."
+	}
+	lines := []string{first,
+		"2. Add this controller's backup key to the repository, with write access:",
+		"   GitHub: Settings → Deploy keys → Add deploy key → Allow write access.",
+		"   GitLab: Settings → Repository → Deploy keys → Grant write permissions.",
+		"   Other services: add it as a deploy key with write access.",
+		""}
+	if b.accessKey != "" {
+		lines = append(lines, tuiFieldValue(b.accessKey, dark))
+		if len(b.accessKey) > tuiContentWidth(width) {
+			lines = append(lines, tuiMuted("The window is too narrow for the key on one line: widen it, or copy it from nixorium backup key in a wider terminal.", dark))
+		}
+		lines = append(lines, "")
+	}
+	return append(lines, "3. Copy the repository's SSH address (git@… or ssh://…) and paste it below.", "")
 }
 
 func (model dashboardModel) backupView() string {
@@ -471,6 +611,14 @@ func (model dashboardModel) backupView() string {
 				actions = []tuiAction{{key: "Enter", label: "Review controller"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
 			}
 		}
+	} else if b.unknownHost != nil {
+		host := b.unknownHost
+		lines = append(lines, "First connection to the Git server "+host.Host+".",
+			"Compare its fingerprint with the one your Git service publishes (in its",
+			"documentation, or ask its administrator):", "",
+			"  "+tuiFieldValue(host.Algorithm+"  "+host.Fingerprint, model.isDark), "",
+			"Trust it only if the two are identical. Nothing has been sent to it.")
+		actions = []tuiAction{{key: "Enter", label: "Trust this server"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	} else if b.done {
 		lines = append(lines, "", tuiResult(b.result.Message, !b.result.HasErrors(), model.isDark))
 		if b.result.Path != "" && !b.restore {
@@ -548,7 +696,8 @@ func (model dashboardModel) backupView() string {
 			lines = append(lines, "", "Repository: "+b.remote, "Branch: "+b.branch, "Restore into: "+b.destination, "", "Restore original keys and trusted computers. Existing folders are never replaced.", "No system will be activated.")
 			actions = []tuiAction{{key: "Enter", label: "Restore lab"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		case b.restore:
-			lines = append(lines, "Restore into a new folder using independent SSH access.", "No password or Git token belongs in the repository URL.", "")
+			lines = append(lines, b.accessSteps(model.width, model.isDark)...)
+			lines = append(lines, "The lab is restored into a new folder; nothing is replaced.", "")
 			fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}, {"Restore into", b.destination}, {"Passphrase", dots(b.passphrase)}}
 		case b.archive && b.reviewed:
 			lines = append(lines, "", "Destination folder: "+b.destination,
@@ -565,11 +714,11 @@ func (model dashboardModel) backupView() string {
 				"Use a passphrase of at least 12 characters. The whole archive is encrypted.", "")
 			fields = []field{{"Folder", b.destination}, {"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}}
 		case b.reviewed:
-			lines = append(lines, "Repository: "+b.plan.Remote, "Branch: "+b.plan.Branch+" · revision "+shortRevision(b.plan.Revision), fmt.Sprintf("%d tracked files and Git history; ignored files excluded.", b.plan.Files), "Configuration stays readable; password hashes and private keys are encrypted.", "Later saved changes are pushed automatically. The passphrase is needed again only", "when keys, account passwords or trusted computers change.", "Confirm the repository is PRIVATE on GitHub/GitLab, then press Enter to encrypt and push.", "")
+			lines = append(lines, "Repository: "+b.plan.Remote, "Branch: "+b.plan.Branch+" · revision "+shortRevision(b.plan.Revision), fmt.Sprintf("%d tracked files and Git history; ignored files excluded.", b.plan.Files), "Configuration stays readable; password hashes and private keys are encrypted.", "Later saved changes are pushed automatically. The passphrase is needed again only", "when keys, account passwords or trusted computers change.", "Confirm the repository is PRIVATE on your Git service, then press Enter to encrypt and push.", "")
 			fields = []field{{"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}}
 			actions[1].label = "Encrypt and push"
 		default:
-			lines = append(lines, "Save changes through Review Git changes first.", "Use a PRIVATE repository and independent SSH access; F1 explains setup.", "")
+			lines = append(lines, b.accessSteps(model.width, model.isDark)...)
 			fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}}
 		}
 		for i, f := range fields {
@@ -582,6 +731,9 @@ func (model dashboardModel) backupView() string {
 	}
 	shell.body = strings.Join(lines, "\n")
 	shell.actions = actions
+	if b.accessErr != "" && !b.archive && !b.choosing && !b.done {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: b.accessErr})
+	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}

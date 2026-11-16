@@ -162,15 +162,36 @@ func TestGitBackupRefusesStaleDirtyAndLeakedHistory(t *testing.T) {
 	}
 }
 
-func TestGitBackupRemoteFailureDoesNotRecordSuccess(t *testing.T) {
+func TestGitBackupUnreachableRemoteStopsBeforeThePassphrase(t *testing.T) {
 	g, repo, _ := gitBackupFixture(t)
 	remote := filepath.Join(t.TempDir(), "missing.git")
+	if _, err := g.Plan(t.Context(), repo, remote, "main"); err == nil || !strings.Contains(err.Error(), "repository was not found") {
+		t.Fatalf("unreachable remote reviewed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, gitRecoveryFile)); !os.IsNotExist(err) {
+		t.Fatal("recovery file written before the remote was reached")
+	}
+}
+
+func TestGitBackupRemoteFailureDoesNotRecordSuccess(t *testing.T) {
+	g, repo, remote := gitBackupFixture(t)
+	// The remote branch holds other history: the review reaches it, the push
+	// is refused and never forced.
+	other := t.TempDir()
+	workspaceTestGit(t, other, "init", "-q", "--initial-branch=main")
+	workspaceTestGit(t, other, "config", "user.name", "Test")
+	workspaceTestGit(t, other, "config", "user.email", "test@example.invalid")
+	writeGitReviewFile(t, other, "README", "other lab\n")
+	workspaceTestGit(t, other, "add", ".")
+	workspaceTestGit(t, other, "commit", "-m", "other")
+	workspaceTestGit(t, other, "push", remote, "main")
 	p, err := g.Plan(t.Context(), repo, remote, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result := g.Publish(t.Context(), p, []byte("correct horse battery")); !result.HasErrors() {
-		t.Fatal("missing remote accepted")
+	result := g.Publish(t.Context(), p, []byte("correct horse battery"))
+	if !result.HasErrors() || !strings.Contains(result.Message, "different history") {
+		t.Fatalf("diverged remote accepted or unexplained: %+v", result)
 	}
 	if _, due := (Local{}).BackupDue(repo); !due {
 		t.Fatal("failed push recorded")

@@ -47,11 +47,14 @@ type gitBackupRecord struct {
 var backupPasswordHash = regexp.MustCompile(`\$6\$(?:rounds=[0-9]+\$)?[A-Za-z0-9./]{1,64}\$[A-Za-z0-9./]{3,}`)
 
 var backupSSHURL = regexp.MustCompile(`^[a-zA-Z0-9_.-]+@[a-zA-Z0-9.-]+:[a-zA-Z0-9_./-]+$`)
+
+// backupHostName keeps known_hosts pattern characters out of a server name.
+var backupHostName = regexp.MustCompile(`^(?:[a-zA-Z0-9.-]+|[0-9a-fA-F:]+)$`)
 var backupBranch = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._/-]*$`)
 
 func (g GitBackup) validateDestination(remote, branch string) error {
 	valid := backupSSHURL.MatchString(remote)
-	if u, err := url.Parse(remote); err == nil && u.Scheme == "ssh" && u.Hostname() != "" && u.Path != "" && u.RawQuery == "" && u.Fragment == "" {
+	if u, err := url.Parse(remote); err == nil && u.Scheme == "ssh" && backupHostName.MatchString(u.Hostname()) && u.Path != "" && u.RawQuery == "" && u.Fragment == "" {
 		_, password := u.User.Password()
 		valid = !password && !strings.ContainsAny(remote, "\r\n\t ")
 	}
@@ -59,7 +62,7 @@ func (g GitBackup) validateDestination(remote, branch string) error {
 		valid = true
 	}
 	if !valid {
-		return errors.New("use the private repository's SSH URL (git@github.com:owner/repository.git or ssh://git@host/path); configure SSH access separately")
+		return errors.New("use the SSH address of a private repository, for example git@github.com:school/lab.git or ssh://git@git.school.example/lab.git")
 	}
 	if !backupBranch.MatchString(branch) || strings.Contains(branch, "..") || strings.Contains(branch, "//") || strings.HasSuffix(branch, "/") || strings.HasSuffix(branch, ".") || strings.Contains(branch, ".lock") {
 		return errors.New("choose a valid Git branch, for example main")
@@ -78,11 +81,24 @@ func backupGit(ctx context.Context, repository string, args ...string) (string, 
 			environment = append(environment, v)
 		}
 	}
-	environment = append(environment, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0", "GIT_SSH_COMMAND=ssh -oBatchMode=yes -oStrictHostKeyChecking=yes -oConnectTimeout=15")
+	environment = append(environment, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0")
+	network := len(args) > 0 && (args[0] == "push" || args[0] == "fetch" || args[0] == "ls-remote")
+	if network {
+		hosts, cleanup, err := writePinnedGitHosts()
+		if err != nil {
+			return "", err
+		}
+		defer cleanup()
+		environment = append(environment, "GIT_SSH_COMMAND="+backupSSHCommand(hosts))
+	}
 	arguments := []string{"-c", "core.hooksPath=/dev/null", "-c", "protocol.ext.allow=never", "-c", "protocol.file.allow=always", "-c", "push.followTags=false", "-c", "commit.gpgSign=false"}
 	arguments = append(arguments, args...)
 	out, truncated, err := runBoundedGitWithEnvironment(ctx, repository, environment, 16*1024*1024, arguments...)
 	if err != nil {
+		if network {
+			// push --porcelain reports a rejected ref on standard output.
+			return "", explainBackupGitError(err.Error() + "\n" + out)
+		}
 		return "", errors.New("Git operation failed; check SSH access, the repository URL and branch, then retry (no force push is performed)")
 	}
 	if truncated {
@@ -224,8 +240,45 @@ func (g GitBackup) Plan(ctx context.Context, repository, remote, branch string) 
 	if err := g.checkHistory(ctx, repository, p.Revision, material); err != nil {
 		return p, err
 	}
+	// Reach the repository now, so an access problem shows before the
+	// passphrase is asked and before anything is committed.
+	if err := checkBackupAccess(ctx, p.Remote, p.Branch); err != nil {
+		return p, err
+	}
 	p.ReviewToken = p.Token()
 	return p, nil
+}
+
+// CheckAccess reaches the repository of a restore before anything is
+// fetched, so an unknown server or a missing key shows on the form.
+func (g GitBackup) CheckAccess(ctx context.Context, remote, branch string) error {
+	if err := g.validateDestination(remote, branch); err != nil {
+		return err
+	}
+	return checkBackupAccess(ctx, remote, branch)
+}
+
+// checkBackupAccess lists the destination branch from an empty directory, so
+// no deployment configuration can redirect the address. A server never
+// verified on this controller comes back as domain.UnknownGitHostError with
+// its fingerprint.
+func checkBackupAccess(ctx context.Context, remote, branch string) error {
+	empty, err := os.MkdirTemp("", "nixorium-backup-check-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(empty)
+	if _, err := backupGit(ctx, empty, "init", "--quiet"); err != nil {
+		return err
+	}
+	_, err = backupGit(ctx, empty, "ls-remote", "--heads", "--", remote, "refs/heads/"+branch)
+	if errors.Is(err, errUnknownGitHost) {
+		if unknown, scanErr := scanGitHost(ctx, remote); scanErr == nil {
+			return unknown
+		}
+		return errOwnSSHSettings
+	}
+	return err
 }
 
 func (g GitBackup) checkHistory(ctx context.Context, repository, revision string, material gitRecovery) error {
@@ -493,7 +546,7 @@ func (g GitBackup) Sync(ctx context.Context, repository, skip string) domain.Bac
 	defer root.Close()
 	plan, err := g.Plan(ctx, repository, record.Plan.Remote, record.Plan.Branch)
 	if err != nil {
-		return stop("blocked", err.Error())
+		return stop("blocked", "Automatic Git backup failed: "+err.Error())
 	}
 	if plan.Revision != head {
 		return stop("blocked", "The configuration changed while preparing the backup; it will be pushed next time.")

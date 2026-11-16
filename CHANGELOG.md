@@ -13,6 +13,18 @@ The project follows [Semantic Versioning](https://semver.org/).
   `master · 06ae395 · 14 Nov 2026`) in the warning colour for a laboratory
   that follows master, another branch or a pinned commit. Such a build is not
   the release that VERSION names. The Update screen uses the same label.
+- The Git backup has its own SSH key. Nixorium creates `~/.ssh/nixorium-backup`
+  on first use and shows it on the Back up lab and Restore lab screens, with
+  the steps to add it to the repository with write access (GitHub, GitLab or
+  another service); `nixorium backup key` prints it. Keys already set up for
+  the administrator keep working.
+- GitHub's and GitLab.com's published SSH host keys are built in. For another
+  Git server, the first connection shows its fingerprint to compare with the
+  one the service publishes; once confirmed (Nixorium checks it again), the
+  server is recorded in `~/.ssh/nixorium-git-hosts` and `~/.ssh/known_hosts` is
+  left unchanged. `nixorium backup trust-host --remote … --fingerprint …` does
+  the same from the command line. Restore lab reaches the repository the same
+  way before its review.
 
 ### Changed
 
@@ -31,6 +43,16 @@ The project follows [Semantic Versioning](https://semver.org/).
   status rows. The Shut down and Restart review lists the computers without
   the count table; an update result where every computer has the same outcome
   gives the explanation once.
+### Fixed
+
+- The Git repository address, paths and passphrases can be pasted on the Back
+  up lab and Restore lab screens; the paste was ignored, so the address had
+  to be typed.
+- A Git backup no longer fails with only "Git operation failed" when the
+  controller has a new SSH key or has never connected to the Git server. The
+  review reaches the repository before asking for the passphrase and names the
+  problem: an unknown server, a key that is missing or read-only, a wrong
+  address or branch, an unreachable server, or a branch with other history.
 
 ## [3.14.0] - 2026-11-13
 
@@ -71,7 +93,6 @@ From 3.13.0, Update Nixorium, then Apply to controller. A controller blocked
 by an interrupted client update can do both; then review the interrupted
 update again and confirm it. From 3.12.0 or older, first follow the notes of
 those releases.
-
 ### Fixed
 
 - Confirming the review of an interrupted client update no longer refuses
@@ -118,7 +139,6 @@ older, first follow the notes of those releases.
   `scripts/configure-software-profile.sh`; one you edited stays.
 - The classroom view has its own dock icon, a smaller Nixorium mark with
   four green screens, so it is no longer mistaken for Nixorium's.
-
 ### Fixed
 
 - **Review the interrupted update** can be confirmed again when a student
@@ -149,7 +169,6 @@ older, first follow the notes of those releases.
   makes the lab screensaver respect it, and any application that asks GNOME
   to keep the screen on (if you edited `scripts/screensaver-monitor.sh`, the
   review shows a manual change).
-
 ### Fixed
 
 - Remote control in the classroom view types characters that need AltGr and
@@ -376,7 +395,6 @@ to controller and Update computers as usual.
   outside the target folder.
 - The system path that starts an update on a student computer must be a
   well-formed Nix store path and is quoted in the command.
-
 ### Fixed
 
 - Update computers works without Internet on the controller when the change needs nothing new from the Internet. Before, the build stopped at "Could not resolve host: cache.nixos.org", even for a system the controller could build by itself. The controller now builds such systems locally (Nix `fallback`). A change that adds software the controller does not have still needs Internet. The fix reaches the controller with Apply to controller.
@@ -487,7 +505,6 @@ controller runs:
   Before, that phase printed nothing for several minutes after the last
   "packages downloaded" line. Each build now uses every processor; builds
   still run one at a time, which keeps the USB system's memory bounded.
-
 ### Fixed
 
 - Showing the teacher's screen no longer fills a student computer's memory.
@@ -622,7 +639,6 @@ below, with `v3.10.0-beta.3` in both places.
   a controller? Restore its lab** on the Overview, Restore lab proposes the
   newest backup file found on a connected drive and a folder to restore into,
   and the restored backup counts as the lab's last backup.
-
 ### Fixed
 
 - Esc on the computer selection opened after a saved change returns to the
@@ -782,7 +798,6 @@ below, with `v3.10.0-beta.3` in both places.
 - The readiness check of the laboratory configuration, which takes about 20
   seconds, is done once per saved configuration and then reused: updating
   computers no longer repeats it when it reviews and again after the build.
-
 ### Fixed
 
 - The check after an update now tries up to three times, a few seconds apart,
@@ -860,7 +875,6 @@ below, with `v3.10.0-beta.3` in both places.
   date, so the new review includes them; the selection can still be changed.
 - Modules of a deployment can test the computer's role with the `isController`
   and `nixoriumRole` arguments instead of comparing host names.
-
 ### Fixed
 
 - Reviewing an interrupted update of the student computers no longer waits
@@ -915,7 +929,6 @@ below, with `v3.10.0-beta.3` in both places.
   only the disk chosen for installation must hold at least 8 GiB.
 
 ## [3.8.2] - 2026-10-16
-
 ### Fixed
 
 - 3.8.1 was tagged but never published: its release checks found an
@@ -940,7 +953,6 @@ below, with `v3.10.0-beta.3` in both places.
 
 - **Exam mode** is removed from the classroom view. Use **Internet → Block
   Internet**, **Lock** and **Message** one by one.
-
 ### Fixed
 
 - **Update computers** no longer fails after **Update Nixorium**. Until 3.8.0,
@@ -1159,7 +1171,6 @@ below, with `v3.10.0-beta.3` in both places.
   Assistant now adds "This request was not counted." to the notice, and the
   request is not taken from the requests you have left. A request you stop
   yourself is still counted.
-
 ### Fixed
 
 - The classroom view no longer waits forever on a slow or stuck student
@@ -1256,7 +1267,6 @@ below, with `v3.10.0-beta.3` in both places.
   recover` and `pxe stop` start with the same sentence.
 - On the result of a USB installation refused because of an interrupted
   network installation, Enter opens the network recovery.
-
 ### Fixed
 
 - In a resumed Assistant chat that is read-only, the arrow keys now scroll the
@@ -1297,7 +1307,6 @@ below, with `v3.10.0-beta.3` in both places.
   and save; a new password still takes effect only after you apply the
   configuration to the controller and update the computers. The first-setup
   password step is unchanged.
-
 ### Fixed
 
 - The lab screensaver service no longer depends on the executable bit of its
@@ -1353,7 +1362,6 @@ below, with `v3.10.0-beta.3` in both places.
 - The classroom view has a **Refresh** button that asks for every computer
   at once and draws the cards again. When the controller does not answer,
   the summary says **Reconnecting…** and the page keeps asking.
-
 ### Fixed
 
 - "Shutting down…" and "Restarting…" no longer stay on classroom view cards
@@ -1425,7 +1433,6 @@ below, with `v3.10.0-beta.3` in both places.
 
 - Removed the unused `nixorium bootstrap configure` command; `install.sh` has
   its own bootstrap prompts and never called it.
-
 ### Fixed
 
 - Local `systemctl` calls pass `--no-ask-password` and the command resets a
@@ -1467,7 +1474,6 @@ below, with `v3.10.0-beta.3` in both places.
   then asks for the code, when sending the first request.
 - The administrator Overview focuses on its menu and shows all entries when
   the terminal has room.
-
 ### Fixed
 
 - Assistant subscription progress appears once per chat; inactive annual
@@ -1517,7 +1523,6 @@ service at `assistant.nixorium.org`.
   process, within the overall time limit.
 
 ## [3.2.3] - 2026-10-12
-
 ### Fixed
 
 - Client computers now configure DHCP and their static lab address on the wired
@@ -1794,7 +1799,6 @@ the changes below.
   SSH from the controller. Deployments must drop `publicKeys.veyon`,
   `keys/veyon-public-key.pem` and any `veyonNativeHosts` setting, which are
   now rejected. GNOME's remote desktop server stays disabled.
-
 ### Fixed
 
 - USB/SSH installation now returns a durable reboot acknowledgement before the
@@ -2254,7 +2258,6 @@ the changes below.
   `restart plan` / `restart apply` CLI. It reuses inventory/session rechecks,
   expiring review tokens, the fleet operation lock and fixed SSH dispatch, and
   never treats temporary network loss as proof of a completed reboot.
-
 ### Fixed
 
 - Adding software, saving settings and other reviewed changes no longer need
@@ -2410,7 +2413,6 @@ the changes below.
   activated, before account details and passwords. Its initial software-profile
   step installs the complete selected profile without exposing package IDs or
   asking for technical exclusions.
-
 ### Fixed
 
 - PXE preparation and operation guards can lock an existing legacy deployment
@@ -3052,7 +3054,6 @@ the changes below.
 - Configuration-schema tests, targeted GitHub evaluation of one client and
   other representative outputs plus a fresh template, and a separate local
   matrix for builds, netboot, and offline installer equivalence.
-
 ### Fixed
 
 - Serialized template-owned catalog, client-group, and home-reset policy as

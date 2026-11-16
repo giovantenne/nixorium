@@ -485,3 +485,112 @@ func TestPartialAdoptRetriesTheKeysAndEscOpensTheOverview(t *testing.T) {
 		t.Fatalf("Esc after using the restored lab went to %d", m.screen)
 	}
 }
+
+func TestGitBackupShowsTheAccessKeyAndAcceptsAPastedAddress(t *testing.T) {
+	const key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyForTheBackupScreenOnly nixorium-backup"
+	m := newTestModel(t, withActions(DashboardActions{GitBackupKey: func() (string, error) { return key, nil }}))
+	next, _ := m.openBackup()
+	m = next.(dashboardModel)
+	m.backup.remote = ""
+	next, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = next.(dashboardModel)
+	view := demoANSI.ReplaceAllString(m.View().Content, "")
+	for _, want := range []string{key, "Deploy keys", "Allow write access", "paste it below"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("Git backup form lacks %q:\n%s", want, view)
+		}
+	}
+	next, _ = m.Update(tea.PasteMsg{Content: "  git@github.com:school/lab.git\n"})
+	m = next.(dashboardModel)
+	if m.backup.remote != "git@github.com:school/lab.git" {
+		t.Fatalf("pasted address = %q", m.backup.remote)
+	}
+	// A passphrase from a password manager can be pasted as well.
+	m.backup.reviewed, m.backup.field = true, 0
+	next, _ = m.Update(tea.PasteMsg{Content: " long pasted passphrase\n"})
+	m = next.(dashboardModel)
+	if string(m.backup.passphrase) != " long pasted passphrase" || strings.Contains(m.View().Content, "long pasted passphrase") {
+		t.Fatal("pasted passphrase not taken or shown")
+	}
+}
+
+func TestGitRestoreExplainsAccessWhenTheKeyCannotBePrepared(t *testing.T) {
+	m := newTestModel(t, withActions(DashboardActions{GitBackupKey: func() (string, error) { return "", os.ErrPermission }}))
+	next, _ := m.openRestoreLab()
+	m = next.(dashboardModel)
+	next, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = next.(dashboardModel)
+	view := demoANSI.ReplaceAllString(m.View().Content, "")
+	if !strings.Contains(view, "backup key could not be prepared") || !strings.Contains(view, "holds the backup") {
+		t.Fatalf("restore form:\n%s", view)
+	}
+}
+
+func TestGitRestoreTrustsAnUnknownServerAfterConfirmation(t *testing.T) {
+	unknown := domain.UnknownGitHostError{Host: "git.school.example", Algorithm: "ED25519", Fingerprint: "SHA256:abcdef"}
+	checks, trusted := 0, ""
+	m := newTestModel(t, withActions(DashboardActions{
+		CheckGitBackupAccess: func(_ context.Context, remote, branch string) error {
+			checks++
+			if trusted == "" {
+				return unknown
+			}
+			return nil
+		},
+		TrustGitHost: func(_ context.Context, remote, fingerprint string) error {
+			trusted = fingerprint
+			return nil
+		},
+	}))
+	m.screen = dashboardBackup
+	m.backup = backupModel{restore: true, field: 3, remote: "git@git.school.example:lab.git", branch: "main", destination: "/new/lab", passphrase: []rune("restore password")}
+	run := func(cmd tea.Cmd) {
+		t.Helper()
+		for cmd != nil {
+			next, follow := m.Update(cmd())
+			m = next.(dashboardModel)
+			cmd = follow
+		}
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	run(cmd)
+	view := demoANSI.ReplaceAllString(m.View().Content, "")
+	if m.backup.unknownHost == nil || !strings.Contains(view, "SHA256:abcdef") || !strings.Contains(view, "Trust this server") || m.backup.reviewed {
+		t.Fatalf("unknown server not shown for comparison:\n%s", view)
+	}
+	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	run(cmd)
+	if trusted != "SHA256:abcdef" || checks != 2 || m.backup.unknownHost != nil || !m.backup.reviewed {
+		t.Fatalf("trust flow: trusted=%q checks=%d reviewed=%v message=%q", trusted, checks, m.backup.reviewed, m.message)
+	}
+}
+
+func TestGitBackupUnknownServerCanBeLeftWithEsc(t *testing.T) {
+	m := newTestModel(t)
+	m.screen = dashboardBackup
+	m.backup = backupModel{remote: "git@git.school.example:lab.git", branch: "main", unknownHost: &domain.UnknownGitHostError{Host: "git.school.example", Algorithm: "ED25519", Fingerprint: "SHA256:abcdef"}}
+	next, _ := m.Update(tea.PasteMsg{Content: "extra"})
+	m = next.(dashboardModel)
+	if m.backup.remote != "git@git.school.example:lab.git" || m.backup.branch != "main" {
+		t.Fatal("a paste changed a field hidden behind the trust screen")
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = next.(dashboardModel)
+	if m.backup.unknownHost != nil || m.screen != dashboardBackup || m.backup.remote == "" {
+		t.Fatal("Esc did not return to the form")
+	}
+}
+
+func TestGitBackupStopsAskingWhenATrustedServerStaysUnknown(t *testing.T) {
+	unknown := domain.UnknownGitHostError{Host: "lab-alias", Algorithm: "ED25519", Fingerprint: "SHA256:abcdef"}
+	m := newTestModel(t)
+	m.screen = dashboardBackup
+	m.backup = backupModel{remote: "git@lab-alias:lab.git", branch: "main", trusted: "SHA256:abcdef"}
+	next, _ := m.Update(gitBackupPlanMsg{err: unknown})
+	m = next.(dashboardModel)
+	if m.backup.unknownHost != nil || !strings.Contains(m.message, "~/.ssh/config") {
+		t.Fatalf("trust loop: unknown=%v message=%q", m.backup.unknownHost, m.message)
+	}
+}

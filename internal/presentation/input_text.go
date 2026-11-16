@@ -68,6 +68,12 @@ func (model dashboardModel) pasteIntoInput(paste tea.PasteMsg) (dashboardModel, 
 	case model.screen == dashboardSetupKeys && model.keys.importing:
 		model.keys.path = appendInputText(model.keys.path, text, setupKeyPathMax)
 		return model, nil, true
+	case model.screen == dashboardBackup:
+		if !model.backup.pasteText(paste.Content) {
+			return model, nil, false
+		}
+		model.message = ""
+		return model, nil, true
 	case model.screen == dashboardNetworkChange && model.networkChangeEditing():
 		var digits strings.Builder
 		for _, character := range text {

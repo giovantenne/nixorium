@@ -98,7 +98,10 @@ Never claim success because evidence is unavailable.
 The human administrator can use Maintenance → Back up lab and choose an encrypted
 file (folder or USB drive) for a fully encrypted deployment archive, or a private
 Git repository to review and push the saved deployment plus encrypted original
-recovery keys over SSH. The administrator TUI then pushes later saved revisions
+recovery keys over SSH. Access uses the controller's dedicated backup key
+(`nixorium backup key`), added to the repository with write access; a Git server
+other than GitHub or GitLab.com is trusted only after the administrator compares
+its fingerprint. The administrator TUI then pushes later saved revisions
 to that repository automatically while recovery material is unchanged. Private keys and `lab-credentials.json` remain ignored locally and
 are encrypted in the recovery file. Configuration and Git history remain readable
 to repository members; the passphrase is never stored. Backup is optional; a missing or stale backup
