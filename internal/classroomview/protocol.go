@@ -249,6 +249,12 @@ type Session interface {
 // ErrUnreachable means the client did not answer over SSH.
 var ErrUnreachable = errors.New("the computer did not answer")
 
+// ErrNoConnection is the ErrUnreachable of a client that SSH itself could not
+// reach: switched off, off the network or refusing the controller. Every
+// action over SSH fails the same way then, unlike an agent that does not
+// answer on a computer that is on.
+var ErrNoConnection = fmt.Errorf("%w: no SSH connection", ErrUnreachable)
+
 // AgentError carries an agent or relay error code.
 type AgentError struct{ Code string }
 

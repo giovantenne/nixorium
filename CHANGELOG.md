@@ -6,6 +6,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Classroom actions no longer wait for computers that are switched off while
+  the classroom view page is open. A computer the page found off in the last
+  few seconds is listed as off in the review at once, for locking, Internet,
+  messages, screen sharing, sending and collecting files, restart and shut
+  down, from the page or from the menu; before, each review waited for its
+  connection timeout. Switch on still checks every computer.
+
 ## [3.15.0] - 2026-11-16
 
 ### Added

@@ -90,6 +90,10 @@ type ClassroomViewHub struct {
 	frameWait time.Duration
 	newFrame  chan struct{}
 	now       func() time.Time
+	// offAt holds, for the computers the last attempt found with no SSH
+	// connection, when that attempt began and the addresses it tried
+	// (KnownOff).
+	offAt map[string]classroomOffAttempt
 	// Answered, when set, hears of every computer that answered over the
 	// lab network, whether or not someone is signed in; Switch on learns
 	// its hardware address then.
@@ -102,6 +106,49 @@ func NewClassroomViewHub(hosts func(ctx context.Context) ([]domain.HostMeta, err
 		interval: 1500 * time.Millisecond, idle: 15 * time.Second, frameWait: classroomFrameWait, newFrame: make(chan struct{}),
 		computers: map[string]*ClassroomComputer{}, running: map[string]bool{},
 		sessions: map[string]classroomview.Session{}, focus: map[string]time.Time{}, controlled: map[string]bool{}, now: time.Now,
+		offAt: map[string]classroomOffAttempt{},
+	}
+}
+
+// classroomKnownOffAge bounds how old a failed attempt may be for KnownOff to
+// count. The overview tries a computer that is off again after five intervals
+// (7.5 s) plus the attempt itself: the 5 s SSH connection timeout, and up to
+// 2 s for each address sshAddress probes during a network transition. From
+// the start of one attempt to the end of the next that is at most about 26 s,
+// so a failure this recent means the computer is still off; once the
+// overview closes, the failures age out. Raising those timeouts or the pause
+// needs a longer age, or KnownOff turns false between attempts (the actions
+// then only wait as they did before).
+const classroomKnownOffAge = 30 * time.Second
+
+// classroomOffAttempt is an attempt that found no SSH connection.
+type classroomOffAttempt struct {
+	started      time.Time
+	ip, previous string
+}
+
+// KnownOff tells whether the overview's last attempt to reach the computer,
+// begun less than classroomKnownOffAge ago at the addresses host has now,
+// found no SSH connection. The classroom actions skip such a computer at once
+// instead of waiting for its SSH timeout. A computer switched on moments ago
+// counts as off until the next attempt reaches it; one whose address changed
+// since that attempt does not count.
+func (hub *ClassroomViewHub) KnownOff(host domain.HostMeta) bool {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	attempt, found := hub.offAt[host.Name]
+	return found && attempt.ip == host.IP && attempt.previous == host.PreviousIP && hub.now().Sub(attempt.started) < classroomKnownOffAge
+}
+
+// noteAttempt records the outcome of an attempt to reach host, begun at
+// started, for KnownOff.
+func (hub *ClassroomViewHub) noteAttempt(host domain.HostMeta, started time.Time, err error) {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	if errors.Is(err, classroomview.ErrNoConnection) {
+		hub.offAt[host.Name] = classroomOffAttempt{started: started, ip: host.IP, previous: host.PreviousIP}
+	} else {
+		delete(hub.offAt, host.Name)
 	}
 }
 
@@ -332,7 +379,9 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 		if session == nil {
 			// The channel lives as long as the overview is watched; each
 			// exchange has its own timeout in the connector.
+			started := hub.now()
 			opened, err := hub.connector.Connect(context.Background(), host)
+			hub.noteAttempt(host, started, err)
 			if hub.Answered != nil && (err == nil || errors.As(err, new(classroomview.AgentError))) {
 				hub.Answered(host)
 			}

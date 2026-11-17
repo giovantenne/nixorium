@@ -48,17 +48,20 @@ func run() error {
 	// A computer that answers the classroom view teaches the controller its
 	// hardware address for Switch on.
 	hub.Answered = func(host domain.HostMeta) { local.LearnWakeAddresses([]domain.HostMeta{host}) }
+	// The page's actions skip the computers the overview found switched off.
+	agents := lockSource{local, adapters.ClassroomAgentConnector{}, hub.KnownOff}
+	controllerAccess := skipKnownOff{local, hub.KnownOff}
 	worker := classroomWorker{
 		repository: repository,
 		plans:      newPlanStore(),
 		view:       newViewServer(hub),
 		viewOn:     adapters.ClassroomViewApplied,
 		inspector:  app.NewInspector(local),
-		power:      app.NewShutdownManager(local),
-		internet:   app.NewInternetManager(local),
-		lock:       app.NewLockManager(lockSource{local, adapters.ClassroomAgentConnector{}}),
+		power:      app.NewShutdownManager(controllerAccess),
+		internet:   app.NewInternetManager(controllerAccess),
+		lock:       app.NewLockManager(agents),
 		shares:     shares,
-		share:      app.NewShareManager(lockSource{local, adapters.ClassroomAgentConnector{}}, shares),
+		share:      app.NewShareManager(agents, shares),
 		records:    local,
 		wake:       app.NewWakeManager(local),
 		schedule:   app.NewScheduleManager(local),
@@ -67,9 +70,9 @@ func run() error {
 	// Files collected from students' desktops wait in the private
 	// temporary folder too, until the user who asked saves them.
 	worker.collected = newCollectStore(os.TempDir())
-	worker.collect = app.NewCollectManager(lockSource{local, adapters.ClassroomAgentConnector{}}, worker.collected)
+	worker.collect = app.NewCollectManager(agents, worker.collected)
 	go worker.collected.expire(ctx, time.Minute)
-	worker.message = app.NewMessageManager(lockSource{local, adapters.ClassroomAgentConnector{}})
+	worker.message = app.NewMessageManager(agents)
 	// The page's actions go through the same handling as the dashboard.
 	worker.view.actions = worker.handle
 	worker.view.desktops = newDesktopBroker()
@@ -86,7 +89,7 @@ func run() error {
 	}
 	// Showing the teacher's screen starts only from the page.
 	worker.view.enabled = worker.viewOn
-	worker.view.broadcasts = &broadcaster{manager: app.NewBroadcastManager(lockSource{local, adapters.ClassroomAgentConnector{}}), repository: repository, viewOn: worker.viewOn}
+	worker.view.broadcasts = &broadcaster{manager: app.NewBroadcastManager(agents), repository: repository, viewOn: worker.viewOn}
 	return adapters.NewClassroomIPCServer(adapters.ClassroomSocketPath, worker.handle).Serve(ctx)
 }
 
@@ -114,6 +117,7 @@ type classroomWorker struct {
 type lockSource struct {
 	cachedLocal
 	adapters.ClassroomAgentConnector
+	off knownOff
 }
 
 func (worker classroomWorker) handle(ctx context.Context, request domain.ClassroomRequest) domain.ClassroomResponse {

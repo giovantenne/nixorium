@@ -340,3 +340,69 @@ func TestClassroomFrameWaitsForTheNextPicture(t *testing.T) {
 		t.Fatalf("an unchanged frame was sent: %q %d", image, frame)
 	}
 }
+
+func TestClassroomViewHubKnowsWhichComputersAreOff(t *testing.T) {
+	connector := &fakeAgentConnector{
+		errors: map[string]error{
+			"pc02": classroomview.ErrNoConnection,
+			"pc03": classroomview.ErrUnreachable,
+			"pc04": classroomview.AgentError{Code: classroomview.CodeNoSession},
+		},
+	}
+	hosts := []domain.HostMeta{{Name: "pc01"}, {Name: "pc02"}, {Name: "pc03"}, {Name: "pc04"}}
+	hub := NewClassroomViewHub(func(context.Context) ([]domain.HostMeta, error) { return hosts, nil }, connector)
+	hub.interval, hub.idle = 10*time.Millisecond, 100*time.Millisecond
+	if _, err := hub.Computers(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// Wait until every computer was tried once.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		computers, err := hub.Computers(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tried := true
+		for _, computer := range computers {
+			tried = tried && computer.State != ClassroomConnecting
+		}
+		if tried || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// Only a computer SSH could not reach is off: one whose agent does not
+	// answer or where nobody is signed in answers over SSH.
+	for name, off := range map[string]bool{"pc01": false, "pc02": true, "pc03": false, "pc04": false, "pc05": false} {
+		if hub.KnownOff(domain.HostMeta{Name: name}) != off {
+			t.Errorf("KnownOff(%s) = %v", name, !off)
+		}
+	}
+}
+
+func TestClassroomKnownOffAgesOutAndClearsWhenTheComputerAnswers(t *testing.T) {
+	hub := NewClassroomViewHub(nil, &fakeAgentConnector{})
+	now := time.Date(2026, 11, 17, 9, 0, 0, 0, time.UTC)
+	hub.now = func() time.Time { return now }
+	pc01 := domain.HostMeta{Name: "pc01", IP: "10.0.0.1"}
+	hub.noteAttempt(pc01, now, classroomview.ErrNoConnection)
+	now = now.Add(classroomKnownOffAge - time.Second)
+	if !hub.KnownOff(pc01) {
+		t.Fatal("a recent failure is not off")
+	}
+	// The administrator changed the address while the overview kept trying
+	// the old one: the computer is not known to be off at the new one.
+	if hub.KnownOff(domain.HostMeta{Name: "pc01", IP: "10.0.0.11"}) || hub.KnownOff(domain.HostMeta{Name: "pc01", IP: "10.0.0.1", PreviousIP: "10.1.0.1"}) {
+		t.Fatal("a failure at another address counts")
+	}
+	// The overview closed and stopped trying: the failure is too old.
+	now = now.Add(2 * time.Second)
+	if hub.KnownOff(pc01) {
+		t.Fatal("an old failure still counts")
+	}
+	hub.noteAttempt(pc01, now, classroomview.ErrNoConnection)
+	hub.noteAttempt(pc01, now, nil)
+	if hub.KnownOff(pc01) {
+		t.Fatal("a computer that answered is still off")
+	}
+}

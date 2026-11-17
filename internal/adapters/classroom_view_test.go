@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -129,5 +130,46 @@ func TestClassroomAgentConnectorLocksAndSendsFiles(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("a short file was sent")
+	}
+}
+
+// failingSSH puts an ssh on PATH that exits at once with status.
+func failingSSH(t *testing.T, status int) {
+	t.Helper()
+	directory := t.TempDir()
+	script := fmt.Sprintf("#!/bin/sh\nexit %d\n", status)
+	if err := os.WriteFile(filepath.Join(directory, "ssh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestClassroomAgentConnectorTellsANoSSHConnectionApart(t *testing.T) {
+	host := domain.HostMeta{Name: "pc01", IP: "192.0.2.1"}
+	// ssh exits with 255 when it cannot connect: the computer is off for
+	// every action over SSH.
+	failingSSH(t, 255)
+	_, err := ClassroomAgentConnector{}.Connect(context.Background(), host)
+	if !errors.Is(err, classroomview.ErrNoConnection) || !errors.Is(err, classroomview.ErrUnreachable) {
+		t.Fatalf("ssh 255: err = %v", err)
+	}
+	// Connected, but the relay ended without answering: unreachable for the
+	// classroom view only.
+	failingSSH(t, 1)
+	_, err = ClassroomAgentConnector{}.Connect(context.Background(), host)
+	if !errors.Is(err, classroomview.ErrUnreachable) || errors.Is(err, classroomview.ErrNoConnection) {
+		t.Fatalf("ssh 1: err = %v", err)
+	}
+	// A relay that closes its output and lingers is stopped after a second
+	// and is not off either.
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "ssh"), []byte("#!/bin/sh\nexec >&-\nsleep 30\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+	started := time.Now()
+	_, err = ClassroomAgentConnector{}.Connect(context.Background(), host)
+	if !errors.Is(err, classroomview.ErrUnreachable) || errors.Is(err, classroomview.ErrNoConnection) || time.Since(started) > 5*time.Second {
+		t.Fatalf("lingering relay: err = %v after %v", err, time.Since(started))
 	}
 }

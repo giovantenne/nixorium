@@ -37,6 +37,9 @@ func (ClassroomAgentConnector) Connect(ctx context.Context, host domain.HostMeta
 	session := &sshAgentSession{command: command, input: stdin, output: stdout}
 	reply, err := session.exchange(classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}, 10*time.Second)
 	if err != nil {
+		if session.connectionFailed() {
+			return nil, classroomview.ErrNoConnection
+		}
 		session.Close()
 		return nil, classroomview.ErrUnreachable
 	}
@@ -221,6 +224,36 @@ func (session *sshAgentSession) exchange(request classroomview.Message, timeout 
 	case <-time.After(timeout):
 		session.closeLocked()
 		return classroomview.Message{}, errors.New("the classroom agent did not answer in time")
+	}
+}
+
+// sshConnectionFailed is the exit status of ssh when it could not connect.
+const sshConnectionFailed = 255
+
+// connectionFailed ends a session whose first exchange failed and tells
+// whether ssh itself could not connect. Its standard output has closed, so
+// ssh is exiting; one that does not exit within a second is stopped and
+// counts as connected.
+func (session *sshAgentSession) connectionFailed() bool {
+	session.mutex.Lock()
+	defer session.mutex.Unlock()
+	if session.closed {
+		// The exchange timed out and stopped ssh already.
+		return false
+	}
+	session.closed = true
+	_ = session.input.Close()
+	exited := make(chan struct{})
+	go func() {
+		_ = session.command.Wait()
+		close(exited)
+	}()
+	select {
+	case <-exited:
+		return session.command.ProcessState.ExitCode() == sshConnectionFailed
+	case <-time.After(time.Second):
+		_ = session.command.Process.Kill()
+		return false
 	}
 }
 
