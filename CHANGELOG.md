@@ -6,6 +6,23 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.16.0] - 2026-11-18
+
+### Added
+
+- Recovery can stop the automatic update of queued computers: select it and
+  press `s`, then Enter. Computers it had already started finish on their
+  own and the interrupted update is then reviewed as usual. Automatic updates
+  stay paused, also after a restart of the controller, until Computers →
+  Queued updates → `p` resumes them; the Overview shows `UPDATES-PAUSED`.
+- The review of an interrupted update has a last resort, `x` **Close without
+  checking**, confirmed by typing `CLOSE`, for when the review cannot finish:
+  a computer stays "still updating", the record cannot be read, or the review
+  keeps refusing. It archives the record as it is and notes in the history
+  that nobody checked the computers; it refuses while the update is still
+  running. The computers keep whatever system they reached: update them again
+  from Update computers.
+
 ### Changed
 
 - Classroom actions no longer wait for computers that are switched off while
@@ -27,21 +44,6 @@ The project follows [Semantic Versioning](https://semver.org/).
   and the update ends, instead of keeping every other operation waiting for
   up to 20 minutes. As before, the interrupted update closes itself when the
   computer answers again and its result can be read; otherwise review it.
-
-### Added
-
-- Recovery can stop the automatic update of queued computers: select it and
-  press `s`, then Enter. Computers it had already started finish on their
-  own and the interrupted update is then reviewed as usual. Automatic updates
-  stay paused, also after a restart of the controller, until Computers →
-  Queued updates → `p` resumes them; the Overview shows `UPDATES-PAUSED`.
-- The review of an interrupted update has a last resort, `x` **Close without
-  checking**, confirmed by typing `CLOSE`, for when the review cannot finish:
-  a computer stays "still updating", the record cannot be read, or the review
-  keeps refusing. It archives the record as it is and notes in the history
-  that nobody checked the computers; it refuses while the update is still
-  running. The computers keep whatever system they reached: update them again
-  from Update computers.
 
 ### Fixed
 
