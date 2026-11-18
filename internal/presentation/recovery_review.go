@@ -22,6 +22,8 @@ type recoveryReview struct {
 	resetResult  domain.TemplateResetRecoveryResult
 	confirmation string
 	done         bool
+	// closing asks for CLOSE before closing the update without checking.
+	closing bool
 	// failure is the technical text of the apply that left the record when
 	// the review opened at the point of failure; d shows it.
 	failure        string
@@ -206,8 +208,16 @@ func (model dashboardModel) updateResetRecoveryReview(key tea.KeyPressMsg) (tea.
 // update as reviewed when every computer was checked, Esc goes back.
 func (model dashboardModel) updateDeploymentRecoveryReview(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	review := &model.recovery.review
+	if review.closing {
+		return model.updateUncheckedClose(key)
+	}
 	ready, _ := review.ready()
 	switch key.String() {
+	case "x":
+		if model.uncheckedCloseAvailable() {
+			review.closing, review.confirmation = true, ""
+			model.message = ""
+		}
 	case "esc", "left":
 		return model.leaveRecoveryReview()
 	case "r":
@@ -228,6 +238,45 @@ func (model dashboardModel) updateDeploymentRecoveryReview(key tea.KeyPressMsg) 
 		plan, action := review.deployPlan, model.actions.ApplyDeploymentRecovery
 		model.busy = "Archiving the reviewed record"
 		return model, func() tea.Msg { return recoveryResultMsg{deploy: action(plan)} }
+	}
+	return model, nil
+}
+
+// uncheckedCloseWord confirms closing an interrupted update without checking.
+const uncheckedCloseWord = "CLOSE"
+
+// uncheckedCloseAvailable: a record exists and this session can close it.
+func (model dashboardModel) uncheckedCloseAvailable() bool {
+	return model.actions.CloseDeploymentRecoveryUnchecked != nil && model.recovery.review.deployPlan.State != "unchanged"
+}
+
+// updateUncheckedClose reads CLOSE; Enter closes, Esc goes back to the review.
+func (model dashboardModel) updateUncheckedClose(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	review := &model.recovery.review
+	switch key.String() {
+	case "esc":
+		review.closing, review.confirmation = false, ""
+		model.message = "Nothing was changed."
+	case "backspace":
+		value := []rune(review.confirmation)
+		if len(value) > 0 {
+			review.confirmation = string(value[:len(value)-1])
+		}
+	case "enter":
+		if review.confirmation != uncheckedCloseWord {
+			review.confirmation = ""
+			model.message = "Confirmation did not match; nothing was changed."
+			return model, nil
+		}
+		review.closing, review.confirmation = false, ""
+		model.message = ""
+		model.busy = "Closing the interrupted update without checking"
+		action := model.actions.CloseDeploymentRecoveryUnchecked
+		return model, func() tea.Msg { return recoveryResultMsg{deploy: action()} }
+	default:
+		if key.Text != "" && key.Text != " " && len(review.confirmation) < 64 {
+			review.confirmation += key.Text
+		}
 	}
 	return model, nil
 }
@@ -291,6 +340,22 @@ func (model dashboardModel) deploymentRecoveryReviewView(shell tuiShell, title s
 		shell.actions = []tuiAction{{key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
+	if review.closing {
+		shell.path = append(shell.path, "Close without checking")
+		lines = append(lines,
+			"Use this only when the review cannot finish: a computer stays \"still applying\", or the review keeps refusing.",
+			"Nixorium will not check the computers of this update. They keep whatever system they reached, old or new,",
+			"and other operations are unblocked. Update them again from Computers → Update computers.",
+			"The record is kept in the recovered folder and the history notes that nobody checked them.",
+		)
+		shell.body = strings.Join(lines, "\n")
+		shell.fixedBody = tuiSection("Type "+uncheckedCloseWord+" to continue:", model.isDark) + "\n> " + review.confirmation + "_"
+		shell.actions = []tuiAction{{key: "Enter", label: "Confirm"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+		if model.message != "" {
+			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: model.message}}
+		}
+		return model.renderShell(shell)
+	}
 	lines = append(lines, deploymentRecoveryLines(review.deployPlan, review.usbHost, model.isDark)...)
 	ready, _ := review.ready()
 	shell.actions = []tuiAction{{key: "r", label: "Check again"}}
@@ -310,6 +375,9 @@ func (model dashboardModel) deploymentRecoveryReviewView(shell tuiShell, title s
 			label = "Hide details"
 		}
 		shell.actions = append(shell.actions, tuiAction{key: "d", label: label})
+	}
+	if model.uncheckedCloseAvailable() {
+		shell.actions = append(shell.actions, tuiAction{key: "x", label: "Close without checking"})
 	}
 	shell.actions = append(shell.actions, tuiAction{key: "Esc", label: "Back"}, tuiAction{key: "F1", label: "Help"})
 	shell.body = strings.Join(lines, "\n")

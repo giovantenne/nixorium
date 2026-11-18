@@ -127,6 +127,13 @@ var nextSteps = map[string]NextStep{
 		Action: "Nothing to do",
 		TUI:    "Computers → Queued updates", Command: "nixorium deploy queue status", Screen: RecoveryDeferredUpdates,
 	},
+	"UPDATES-PAUSED": {
+		Code:   "UPDATES-PAUSED",
+		Title:  "Automatic updates of queued computers are paused",
+		Why:    "An automatic update was stopped from Recovery; queued computers are not updated until you resume.",
+		Action: "Resume them when the laboratory is free",
+		TUI:    "Computers → Queued updates", Command: "nixorium deploy queue status", Screen: RecoveryDeferredUpdates,
+	},
 	"UPDATES-NEED-REVIEW": {
 		Code:   "UPDATES-NEED-REVIEW",
 		Title:  "A queued update needs a new review",

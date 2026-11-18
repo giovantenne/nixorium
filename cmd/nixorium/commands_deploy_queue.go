@@ -21,7 +21,7 @@ func newDeferredUpdateManager() *app.DeferredUpdateManager {
 	local := adapters.Local{}
 	deployments := app.NewDeploymentManager(local)
 	return app.NewDeferredUpdateManager(adapters.ManagedDeferredUpdates(), local, func(ctx context.Context, repository string, hosts []string, revision string) (domain.DeploymentExecutionReport, bool) {
-		return executeDeploymentOperationGated(ctx, deployments, repository, strings.Join(hosts, ","), revision, io.Discard, nil)
+		return executeDeploymentOperationGated(ctx, adapters.OpenQueuedDeploymentOperation, deployments, repository, strings.Join(hosts, ","), revision, io.Discard, nil)
 	})
 }
 

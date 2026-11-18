@@ -52,6 +52,18 @@ func (model dashboardModel) updateDeferredUpdates(key tea.KeyPressMsg) (tea.Mode
 		model.deferred.cursor = min(max(0, len(entries)-1), model.deferred.cursor+1)
 	case "r":
 		return model.loadDeferredUpdates()
+	case "p":
+		if !model.deferred.status.Paused || model.actions.ResumeAutomaticUpdates == nil {
+			return model, nil
+		}
+		if err := model.actions.ResumeAutomaticUpdates(); err != nil {
+			model.message = "Automatic updates are still paused: " + err.Error()
+			return model, nil
+		}
+		next, command := model.loadDeferredUpdates()
+		updated := next.(dashboardModel)
+		updated.message = "Automatic updates resumed; the controller updates queued computers again as they answer."
+		return updated, command
 	case "x", "X":
 		if len(entries) == 0 || model.actions.CancelDeferredUpdates == nil {
 			return model, nil
@@ -89,6 +101,9 @@ func (model dashboardModel) deferredUpdatesView() string {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusFailure, title: issue.Message})
 		}
 	}
+	if status.Paused {
+		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: "Automatic updates are paused", detail: "An automatic update was stopped from Recovery. Queued computers are not updated until you resume; press p when the laboratory is free."})
+	}
 	if len(status.Updates) == 0 {
 		lines = append(lines, "No computer is waiting for an update.", "", tuiMuted("In Computers → Update computers, computers that are off can be queued with F3.", model.isDark))
 	}
@@ -109,6 +124,9 @@ func (model dashboardModel) deferredUpdatesView() string {
 	shell.actions = []tuiAction{{key: "r", label: "Refresh"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
 	if len(status.Updates) > 0 {
 		shell.actions = append([]tuiAction{{key: "↑/↓", label: "Select"}, {key: "x", label: "Remove"}, {key: "X", label: "Remove all"}}, shell.actions...)
+	}
+	if status.Paused && model.actions.ResumeAutomaticUpdates != nil {
+		shell.actions = append([]tuiAction{{key: "p", label: "Resume automatic updates"}}, shell.actions...)
 	}
 	return model.renderShell(shell)
 }

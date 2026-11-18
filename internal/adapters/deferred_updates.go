@@ -11,6 +11,8 @@ import (
 	"os"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -147,3 +149,48 @@ func writeDeferredUpdatesAt(directory *os.File, queue domain.DeferredUpdateQueue
 	}
 	return directory.Sync()
 }
+
+// deferredUpdatesPausedName marks the queue as paused: an automatic update
+// was stopped, and queued computers wait until the administrator resumes.
+const deferredUpdatesPausedName = "deferred-updates-paused"
+
+// Paused reports the pause marker. A marker that exists but cannot be
+// inspected counts as present: nothing starts by itself on doubt. Without
+// the coordination directory there is no queue to pause.
+func (store DeferredUpdates) Paused() bool {
+	directory, err := openCoordinationDirectory(store.directory, store.managed)
+	if err != nil {
+		return false
+	}
+	defer directory.Close()
+	var stat unix.Stat_t
+	err = unix.Fstatat(int(directory.Fd()), deferredUpdatesPausedName, &stat, unix.AT_SYMLINK_NOFOLLOW)
+	return !errors.Is(err, unix.ENOENT)
+}
+
+// SetPaused creates or removes the pause marker.
+func (store DeferredUpdates) SetPaused(paused bool) error {
+	directory, err := openCoordinationDirectory(store.directory, store.managed)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	if !paused {
+		if err := unix.Unlinkat(int(directory.Fd()), deferredUpdatesPausedName, 0); err != nil && !errors.Is(err, unix.ENOENT) {
+			return fmt.Errorf("resume queued updates: %w", err)
+		}
+		return directory.Sync()
+	}
+	descriptor, err := unix.Openat(int(directory.Fd()), deferredUpdatesPausedName, unix.O_WRONLY|unix.O_CREAT|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0o600)
+	if err != nil {
+		return fmt.Errorf("pause queued updates: %w", err)
+	}
+	if err := unix.Close(descriptor); err != nil {
+		return err
+	}
+	return directory.Sync()
+}
+
+// DeferredUpdatesPaused tells the Overview whether automatic updates of the
+// controller's queue are paused.
+func (Local) DeferredUpdatesPaused() bool { return ManagedDeferredUpdates().Paused() }

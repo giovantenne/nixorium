@@ -157,12 +157,19 @@ type DashboardActions struct {
 	// Reviewed recoveries of interrupted operations.
 	PlanDeploymentRecovery  func(context.Context, bool) domain.DeploymentRecoveryPlan
 	ApplyDeploymentRecovery func(domain.DeploymentRecoveryPlan) domain.DeploymentRecoveryResult
-	PlanResetRecovery       func(context.Context) domain.TemplateResetRecoveryPlan
-	CreateBackup            func(string, []byte) domain.BackupReport
-	PlanGitBackup           func(context.Context, string, string) (domain.GitBackupPlan, error)
-	PublishGitBackup        func(domain.GitBackupPlan, []byte) domain.BackupReport
-	RestoreLab              func(string, string, string, []byte) domain.BackupReport
-	GitBackupDestination    func() (string, string)
+	// CloseDeploymentRecoveryUnchecked archives the record of an interrupted
+	// update without checking its computers: the last resort of the review.
+	CloseDeploymentRecoveryUnchecked func() domain.DeploymentRecoveryResult
+	// StopAutomaticUpdate stops the running automatic update of queued
+	// computers and pauses the queue; ResumeAutomaticUpdates lifts the pause.
+	StopAutomaticUpdate    func(context.Context) error
+	ResumeAutomaticUpdates func() error
+	PlanResetRecovery      func(context.Context) domain.TemplateResetRecoveryPlan
+	CreateBackup           func(string, []byte) domain.BackupReport
+	PlanGitBackup          func(context.Context, string, string) (domain.GitBackupPlan, error)
+	PublishGitBackup       func(domain.GitBackupPlan, []byte) domain.BackupReport
+	RestoreLab             func(string, string, string, []byte) domain.BackupReport
+	GitBackupDestination   func() (string, string)
 	// GitBackupKey returns the public key the Git backup uses, creating it
 	// on first use; the administrator adds it to the repository.
 	GitBackupKey func() (string, error)

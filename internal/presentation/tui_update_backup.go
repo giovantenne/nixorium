@@ -79,6 +79,8 @@ func (model dashboardModel) handleBackupMessage(message tea.Msg) (tea.Model, tea
 		return model, nil
 	case backupSyncMsg:
 		return model.finishBackupSync(message)
+	case automaticUpdateStoppedMsg:
+		return model.finishAutomaticUpdateStop(message)
 	case recoveryResultMsg:
 		model.busy = ""
 		model.recovery.review.done = true

@@ -44,6 +44,29 @@ func TestBusyGateNamesItsHolder(t *testing.T) {
 	}
 }
 
+// The queue runner runs as the administrator, but nobody started its update:
+// the refusal names the automatic update without an account.
+func TestBusyGateNamesAutomaticUpdateWithoutAccount(t *testing.T) {
+	directory, err := ensureTestCoordinationDirectory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := acquireOperationGateAt(directory, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	first.describeAutomatic(domain.QueuedUpdateOperation)
+	_, err = acquireOperationGateAt(directory, false)
+	var busy *OperationBusyError
+	if !errors.As(err, &busy) || !busy.Known || busy.User != "" {
+		t.Fatalf("busy error = %#v", err)
+	}
+	if !strings.HasPrefix(err.Error(), OperationBusyMessage+": "+domain.QueuedUpdateOperation+", started at ") {
+		t.Fatalf("message = %q", err.Error())
+	}
+}
+
 func TestBusyGateIgnoresUnconfirmedOwners(t *testing.T) {
 	lockPath := filepath.Join(t.TempDir(), "lock")
 	for _, content := range []string{

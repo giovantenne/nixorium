@@ -171,7 +171,11 @@ func (model dashboardModel) logDetailView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Esc", label: "History"}, {key: "F1", label: "Help"}}})
+		back := "History"
+		if model.maintenance.logFromRecovery {
+			back = "Recovery"
+		}
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Esc", label: back}, {key: "F1", label: "Help"}}})
 	}
 	entry := model.maintenance.logDetail.Log
 	contentLines := operationLogContentLines(model.maintenance.logDetail.Content)
@@ -186,6 +190,9 @@ func (model dashboardModel) logDetailView() string {
 		"",
 	)
 	lines = append(lines, contentLines[model.maintenance.logScroll:end]...)
+	if model.maintenance.logFromRecovery {
+		return model.renderShell(tuiShell{path: []string{"Recovery", "Log of the running update"}, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "↑/↓/Pg/Home/End", label: "Scroll"}, {key: "r", label: "Read again"}, {key: "Esc", label: "Recovery"}, {key: "F1", label: "Help"}}})
+	}
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "↑/↓/Pg/Home/End", label: "Scroll"}, {key: "Esc", label: "History"}, {key: "F1", label: "Help"}}})
 }
 

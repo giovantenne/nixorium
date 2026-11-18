@@ -40,7 +40,17 @@ type BlockingCondition struct {
 	Blocks  string     `json:"blocks,omitempty"`
 	Affects []string   `json:"affects,omitempty"`
 	Next    NextStep   `json:"next"`
+	// Log is the private operation log the running operation is writing
+	// (nixorium logs show), when it is an update of computers.
+	Log string `json:"log,omitempty"`
+	// Stoppable: the running operation is the automatic update of queued
+	// computers, which the administrator may stop from Recovery.
+	Stoppable bool `json:"stoppable,omitempty"`
 }
+
+// QueuedUpdateOperation names the update of queued computers that the
+// controller starts by itself when they answer again.
+const QueuedUpdateOperation = "Automatic update of computers switched back on"
 
 type RecoveryReport struct {
 	SchemaVersion int                 `json:"schemaVersion"`

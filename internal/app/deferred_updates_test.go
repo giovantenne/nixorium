@@ -11,8 +11,15 @@ import (
 )
 
 type memoryDeferredStore struct {
-	queue domain.DeferredUpdateQueue
-	busy  bool
+	queue  domain.DeferredUpdateQueue
+	busy   bool
+	paused bool
+}
+
+func (s *memoryDeferredStore) Paused() bool { return s.paused }
+func (s *memoryDeferredStore) SetPaused(paused bool) error {
+	s.paused = paused
+	return nil
 }
 
 func (s *memoryDeferredStore) Read() (domain.DeferredUpdateQueue, error) {
@@ -229,4 +236,91 @@ func TestDeferredUpdatesRunStopsWhenTheControllerIsBusy(t *testing.T) {
 			}
 		})
 	}
+}
+
+// While paused, a pass updates nothing and says why; Status reports it.
+func TestDeferredUpdatesPausedRunUpdatesNothing(t *testing.T) {
+	manager, store, source, deployed := deferredManagerFixture(t)
+	store.queue.Put(domain.DeferredUpdate{Host: "pc03", IP: "10.0.0.3", Revision: source.revision, QueuedAt: time.Unix(1_799_999_000, 0).UTC()})
+	source.ssh = map[string]domain.SSHProbe{"pc03": {Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable}}
+	if err := manager.Pause(); err != nil {
+		t.Fatal(err)
+	}
+	report := manager.Run(context.Background(), "/deployment")
+	if len(*deployed) != 0 || len(report.Results) != 1 || report.Results[0].State != "paused" || !strings.Contains(report.Message, "paused") {
+		t.Fatalf("deployed %v, report %+v", *deployed, report)
+	}
+	if status := manager.Status(context.Background(), "/deployment"); !status.Paused || !strings.Contains(status.Message, "paused") {
+		t.Fatalf("status = %+v", status)
+	}
+	if err := manager.Resume(); err != nil {
+		t.Fatal(err)
+	}
+	manager.Run(context.Background(), "/deployment")
+	if strings.Join(*deployed, ",") != "pc03@aaaa" {
+		t.Fatalf("after resume deployed %v", *deployed)
+	}
+}
+
+type fakeAutomaticControl struct {
+	holders []domain.OperationHolder // successive observations; empty: free
+	stopErr error
+	stops   int
+}
+
+func (c *fakeAutomaticControl) OperationLockHolder() (domain.OperationHolder, bool) {
+	if len(c.holders) == 0 {
+		return domain.OperationHolder{}, false
+	}
+	holder := c.holders[0]
+	if len(c.holders) > 1 {
+		c.holders = c.holders[1:]
+	}
+	return holder, true
+}
+
+func (c *fakeAutomaticControl) StopDeferredUpdates(context.Context) error {
+	c.stops++
+	if c.stopErr == nil {
+		c.holders = nil
+	}
+	return c.stopErr
+}
+
+// Stopping pauses the queue only when the automatic update really stopped;
+// otherwise it says why and leaves an earlier pause as it was.
+func TestDeferredUpdatesStopRunningChecksThatItStopped(t *testing.T) {
+	automatic := domain.OperationHolder{Operation: domain.QueuedUpdateOperation, Known: true, PID: 7}
+	manager, store, _, _ := deferredManagerFixture(t)
+
+	ended := &fakeAutomaticControl{}
+	if err := manager.StopRunning(context.Background(), ended); err == nil || ended.stops != 0 || store.paused {
+		t.Fatalf("ended: err %v stops %d paused %v", err, ended.stops, store.paused)
+	}
+	person := &fakeAutomaticControl{holders: []domain.OperationHolder{{Operation: "Update computers", Known: true, PID: 8}}}
+	if err := manager.StopRunning(context.Background(), person); err == nil || person.stops != 0 || store.paused {
+		t.Fatalf("person: err %v stops %d paused %v", err, person.stops, store.paused)
+	}
+	failing := &fakeAutomaticControl{holders: []domain.OperationHolder{automatic}, stopErr: errors.New("access denied")}
+	if err := manager.StopRunning(context.Background(), failing); err == nil || store.paused {
+		t.Fatalf("failed stop left the queue paused: %v", err)
+	}
+	terminalStop := &stubbornControl{fakeAutomaticControl: &fakeAutomaticControl{holders: []domain.OperationHolder{automatic}}}
+	store.paused = true
+	if err := manager.StopRunning(context.Background(), terminalStop); err == nil || !strings.Contains(err.Error(), "still running") || !store.paused {
+		t.Fatalf("terminal run: err %v paused %v", err, store.paused)
+	}
+	store.paused = false
+	stopped := &fakeAutomaticControl{holders: []domain.OperationHolder{automatic}}
+	if err := manager.StopRunning(context.Background(), stopped); err != nil || stopped.stops != 1 || !store.paused {
+		t.Fatalf("stop: err %v stops %d paused %v", err, stopped.stops, store.paused)
+	}
+}
+
+// stubbornControl's stop succeeds but the holder stays: a run from a terminal.
+type stubbornControl struct{ *fakeAutomaticControl }
+
+func (c *stubbornControl) StopDeferredUpdates(context.Context) error {
+	c.stops++
+	return nil
 }

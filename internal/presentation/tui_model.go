@@ -185,12 +185,15 @@ type updateModel struct {
 // maintenanceModel owns the read-only service/log/repository views and the
 // optional reviewed local commit state.
 type maintenanceModel struct {
-	services        domain.ServicesReport
-	serviceResult   domain.ServiceActionReport
-	logs            domain.OperationLogsReport
-	logDetail       domain.OperationLogReport
-	logCursor       int
-	logScroll       int
+	services      domain.ServicesReport
+	serviceResult domain.ServiceActionReport
+	logs          domain.OperationLogsReport
+	logDetail     domain.OperationLogReport
+	logCursor     int
+	logScroll     int
+	// logFromRecovery: the log detail shows the running update opened from
+	// Recovery; Esc returns there and r reads the log again.
+	logFromRecovery bool
 	gitReview       domain.GitReviewReport
 	gitScroll       int
 	gitCommitCursor int
@@ -316,6 +319,8 @@ type recoveryModel struct {
 	report domain.RecoveryReport
 	cursor int
 	review recoveryReview
+	// stopping asks to confirm stopping the automatic update.
+	stopping bool
 }
 
 // navigationModel holds cursors, scrolling and paging shared by screens.

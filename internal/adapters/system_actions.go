@@ -55,6 +55,16 @@ func unitFailureCause(journal string) string {
 	return ""
 }
 
+// DeferredUpdatesUnit runs the automatic update of queued computers.
+const DeferredUpdatesUnit = "nixorium-deferred-updates.service"
+
+// StopDeferredUpdates stops the automatic update of queued computers that is
+// running. The computers it already started finish on their own; the record
+// of the update then asks for a review.
+func (local Local) StopDeferredUpdates(ctx context.Context) error {
+	return local.ControlSystemUnit(ctx, "stop", DeferredUpdatesUnit)
+}
+
 func (Local) ControlSystemUnit(ctx context.Context, verb, unit string) error {
 	return controlSystemUnit(ctx, managedCoordinationDirectory, checkManagedJobConflict, func(ctx context.Context, arguments ...string) error {
 		_, err := run(ctx, "systemctl", arguments...)
@@ -75,6 +85,7 @@ func controlSystemUnit(ctx context.Context, coordination string, jobConflict fun
 		"nixorium-pxe.service":              {"start": true, "stop": true, "reset-failed": true},
 		"nixorium-pxe-network.service":      {"stop": true, "reset-failed": true},
 		"nixorium-pxe-recover.service":      {"start": true},
+		DeferredUpdatesUnit:                 {"stop": true},
 	}
 	if !allowed[unit][verb] && !(verb == "start" && (controllerApplyUnitPattern.MatchString(unit) || cleanupUnitPattern.MatchString(unit))) {
 		return fmt.Errorf("system unit action %q %q is not an allowed Nixorium action", verb, unit)

@@ -157,6 +157,7 @@ func (model dashboardModel) updateLogsKey(key tea.KeyPressMsg) (tea.Model, tea.C
 			return model, nil
 		}
 		id := model.maintenance.logs.Logs[model.maintenance.logCursor].ID
+		model.maintenance.logFromRecovery = false
 		model.busy = "Reading the bounded operation log tail"
 		model.message = ""
 		return model.startRead(func(ctx context.Context) tea.Msg {
@@ -170,8 +171,16 @@ func (model dashboardModel) updateLogDetailKey(key tea.KeyPressMsg) (tea.Model, 
 	maximum := maximumLogScroll(model.maintenance.logDetail, model.logDetailHeight())
 	switch key.String() {
 	case "esc", "left":
-		model.screen = dashboardLogs
 		model.message = ""
+		if model.maintenance.logFromRecovery {
+			model.maintenance.logFromRecovery = false
+			return model.openRecovery()
+		}
+		model.screen = dashboardLogs
+	case "r":
+		if model.maintenance.logFromRecovery && model.maintenance.logDetail.Log != nil {
+			return model.openRunningLog(model.maintenance.logDetail.Log.ID)
+		}
 	case "up", "k":
 		if model.maintenance.logScroll > 0 {
 			model.maintenance.logScroll--

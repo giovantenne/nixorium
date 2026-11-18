@@ -30,6 +30,8 @@ func TestControlSystemUnitRejectsUnknownVerbUnitPairs(t *testing.T) {
 		{verb: "start", unit: "nixorium-harmonia.service"},
 		{verb: "restart", unit: "harmonia.service"},
 		{verb: "restart", unit: "nixorium-restart-cache.service"},
+		{verb: "start", unit: DeferredUpdatesUnit},
+		{verb: "stop", unit: "nixorium-deferred-updates.timer"},
 	} {
 		if err := local.ControlSystemUnit(context.Background(), test.verb, test.unit); err == nil {
 			t.Fatalf("accepted %s %s", test.verb, test.unit)
@@ -155,5 +157,28 @@ func TestUnitFailureCauseNamesWhatTheAdministratorCanFix(t *testing.T) {
 	}
 	if got := unitFailureCause("all good\nstopped\n"); got != "" {
 		t.Fatalf("unknown cause = %q", got)
+	}
+}
+
+// Stopping the automatic update reaches systemd even with a pending record:
+// it never starts anything.
+func TestControlSystemUnitStopsTheAutomaticUpdate(t *testing.T) {
+	directory, err := ensureTestCoordinationDirectory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, deploymentPendingName), []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var calls [][]string
+	runner := func(_ context.Context, arguments ...string) error {
+		calls = append(calls, arguments)
+		return nil
+	}
+	if err := controlSystemUnit(context.Background(), directory, func(context.Context) error { return errors.New("no job check expected") }, runner, "stop", DeferredUpdatesUnit); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 1 || !strings.Contains(strings.Join(calls[0], " "), "stop "+DeferredUpdatesUnit) {
+		t.Fatalf("calls = %v", calls)
 	}
 }

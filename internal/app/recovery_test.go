@@ -147,6 +147,43 @@ func TestRecoveryShowsARunningUpdateAsBusyNotInterrupted(t *testing.T) {
 	}
 }
 
+// fakeLogRecoverySource also names the log of the running update.
+type fakeLogRecoverySource struct {
+	fakeRecoverySource
+	log string
+}
+
+func (s fakeLogRecoverySource) RunningDeploymentLog(holder domain.OperationHolder) string {
+	if holder.PID != 4242 {
+		return ""
+	}
+	return s.log
+}
+
+// The busy condition names the log the running update writes, so the
+// administrator can follow it; any other operation names none.
+func TestRecoveryNamesTheLogOfTheRunningUpdate(t *testing.T) {
+	holder := domain.OperationHolder{Operation: "Automatic update of computers switched back on", Known: true, PID: 4242, StartedAt: time.Now()}
+	for _, test := range []struct {
+		name   string
+		holder domain.OperationHolder
+		want   string
+	}{
+		{"running update", holder, "deploy-20261118T125119.118559664Z-4242.log"},
+		{"another operation", domain.OperationHolder{Operation: "Apply to controller", Known: true, PID: 5151, StartedAt: time.Now()}, ""},
+		{"unknown holder", domain.OperationHolder{PID: 4242}, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := fakeLogRecoverySource{fakeRecoverySource{holder: test.holder, busy: true}, "deploy-20261118T125119.118559664Z-4242.log"}
+			report := NewRecoveryInspector(source).Observe(context.Background(), "/srv/lab")
+			busy, found := report.Condition(domain.RecoveryOperationBusy)
+			if !found || busy.Log != test.want {
+				t.Fatalf("busy = %+v, found %v; want log %q", busy, found, test.want)
+			}
+		})
+	}
+}
+
 type fakeQueuedRecoverySource struct {
 	fakeRecoverySource
 	waiting, attention int
@@ -190,5 +227,35 @@ func TestRecoveryDoesNotCallAQueuedUpdateThatNeedsReviewNothingToDo(t *testing.T
 	}
 	if report := NewRecoveryInspector(fakeQueuedRecoverySource{}).Observe(context.Background(), "/srv/lab"); len(report.Conditions) != 0 {
 		t.Fatalf("an empty queue is not a condition: %+v", report.Conditions)
+	}
+}
+
+type fakePausedRecoverySource struct {
+	fakeQueuedRecoverySource
+	paused bool
+}
+
+func (s fakePausedRecoverySource) DeferredUpdatesPaused() bool { return s.paused }
+
+// The automatic update can be stopped from Recovery; Update computers
+// started by a person cannot. A paused queue is not "nothing to do".
+func TestRecoveryOffersToStopOnlyTheAutomaticUpdateAndShowsThePause(t *testing.T) {
+	for _, test := range []struct {
+		operation string
+		stoppable bool
+	}{{domain.QueuedUpdateOperation, true}, {"Update computers", false}} {
+		source := fakeRecoverySource{holder: domain.OperationHolder{Operation: test.operation, Known: true, PID: 7, StartedAt: time.Now()}, busy: true}
+		busy, _ := NewRecoveryInspector(source).Observe(context.Background(), "/srv/lab").Condition(domain.RecoveryOperationBusy)
+		if busy.Stoppable != test.stoppable {
+			t.Fatalf("%s: stoppable = %v", test.operation, busy.Stoppable)
+		}
+	}
+	for _, paused := range []bool{false, true} {
+		source := fakePausedRecoverySource{fakeQueuedRecoverySource{waiting: 2}, paused}
+		queued, found := NewRecoveryInspector(source).Observe(context.Background(), "/srv/lab").Condition(domain.RecoveryDeferredUpdates)
+		want := map[bool]string{false: "UPDATES-QUEUED", true: "UPDATES-PAUSED"}[paused]
+		if !found || queued.Next.Code != want {
+			t.Fatalf("paused %v: %+v", paused, queued)
+		}
 	}
 }

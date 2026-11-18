@@ -68,3 +68,21 @@ unsafe record); the refusal names the next step.
 shut down, restart and the schedule run beside maintenance: they refuse only
 the computers named in an unfinished client update, through a per-operation
 lease on `classroom.lock`, instead of the shared operation gate.
+
+## Amendment (2026-11-18)
+
+Owner decision after a laboratory stayed blocked by a running automatic
+update: the administrator must always have a way out from the TUI.
+
+- Recovery offers **Stop the automatic update** for the update of queued
+  computers (`nixorium deploy queue run`, run by
+  `nixorium-deferred-updates.service`). It pauses the queue with a marker in
+  the coordination directory, then stops the unit; computers already started
+  finish on their own and their record is reviewed as usual. Queued updates
+  resume only when the administrator says so.
+- The review of an interrupted client update offers **Close without
+  checking**, confirmed by typing `CLOSE`. It archives the record as it is,
+  even unreadable, under `recovered/` with an `-unchecked` name, holding the
+  operation lock, and records the outcome as unchecked in the history. It
+  refuses while the process that started the update runs. The update is not
+  declared successful; its computers are updated again by a new review.

@@ -37,6 +37,7 @@ func (model dashboardModel) observeRecovery(ctx context.Context) domain.Recovery
 func (model dashboardModel) openRecovery() (tea.Model, tea.Cmd) {
 	model.screen = dashboardRecovery
 	model.recovery.cursor = 0
+	model.recovery.stopping = false
 	model.message = ""
 	if model.actions.LoadRecovery == nil {
 		return model, nil
@@ -70,6 +71,11 @@ func (model dashboardModel) recoveryFlow(condition domain.BlockingCondition) (te
 			next, command := model.openControllerReview()
 			return next, command, true
 		}
+	case domain.RecoveryOperationBusy:
+		if condition.Log != "" && model.actions.LoadLog != nil {
+			next, command := model.openRunningLog(condition.Log)
+			return next, command, true
+		}
 	case domain.RecoveryDeploymentPending:
 		if model.actions.PlanDeploymentRecovery != nil {
 			next, command := model.openDeploymentRecovery()
@@ -84,9 +90,78 @@ func (model dashboardModel) recoveryFlow(condition domain.BlockingCondition) (te
 	return model, nil, false
 }
 
+// automaticUpdateStoppedMsg ends a request to stop the automatic update.
+type automaticUpdateStoppedMsg struct{ err error }
+
+// stoppableCondition is the selected condition when it is the automatic
+// update of queued computers and this session can stop it.
+func (model dashboardModel) stoppableCondition() bool {
+	conditions := model.recovery.report.Conditions
+	if len(conditions) == 0 || model.actions.StopAutomaticUpdate == nil {
+		return false
+	}
+	selected := conditions[min(model.recovery.cursor, len(conditions)-1)]
+	return selected.Kind == domain.RecoveryOperationBusy && selected.Stoppable
+}
+
+func (model dashboardModel) stopAutomaticUpdate() (tea.Model, tea.Cmd) {
+	model.recovery.stopping = false
+	model.busy = "Stopping the automatic update"
+	model.message = ""
+	stop := model.actions.StopAutomaticUpdate
+	return model, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		return automaticUpdateStoppedMsg{err: stop(ctx)}
+	}
+}
+
+func (model dashboardModel) finishAutomaticUpdateStop(message automaticUpdateStoppedMsg) (tea.Model, tea.Cmd) {
+	model.busy = ""
+	next, command := model.openRecovery()
+	updated := next.(dashboardModel)
+	if message.err != nil {
+		updated.message = "The automatic update was not stopped: " + message.err.Error()
+	} else {
+		updated.message = "The automatic update was stopped and automatic updates are paused; resume them in Computers → Queued updates. If it had started updating computers, review the interrupted update."
+	}
+	return updated, command
+}
+
+// openRunningLog shows the tail of the log the running update is writing.
+func (model dashboardModel) openRunningLog(id string) (tea.Model, tea.Cmd) {
+	model.maintenance.logFromRecovery = true
+	model.busy = "Reading the log of the running update"
+	model.message = ""
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return dashboardLogMsg{report: model.actions.LoadLog(ctx, id)}
+	})
+}
+
 func (model dashboardModel) updateRecovery(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	conditions := model.recovery.report.Conditions
+	if model.recovery.stopping {
+		switch key.String() {
+		case "enter":
+			if !model.stoppableCondition() {
+				// A refresh found that the automatic update had ended.
+				model.recovery.stopping = false
+				model.message = "The automatic update has already ended; nothing was stopped."
+				return model, nil
+			}
+			return model.stopAutomaticUpdate()
+		case "esc", "left":
+			model.recovery.stopping = false
+			model.message = "The automatic update goes on; nothing was changed."
+		}
+		return model, nil
+	}
 	switch key.String() {
+	case "s":
+		if model.stoppableCondition() {
+			model.recovery.stopping = true
+			model.message = ""
+		}
 	case "esc", "left":
 		model.screen = dashboardHome
 		model.message = ""
@@ -116,6 +191,17 @@ func (model dashboardModel) recoveryView() string {
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
+	if model.recovery.stopping {
+		shell.path = []string{"Recovery", "Stop the automatic update"}
+		shell.body = strings.Join([]string{
+			tuiTitle("Stop the automatic update?", model.isDark), "",
+			"The controller stops updating the queued computers that answered again.",
+			"Computers it already started finish on their own; Nixorium then asks you to review the interrupted update.",
+			"Automatic updates stay paused until you resume them in Computers → Queued updates.",
+		}, "\n")
+		shell.actions = []tuiAction{{key: "Enter", label: "Stop it"}, {key: "Esc", label: "Keep it running"}, {key: "F1", label: "Help"}}
+		return model.renderShell(shell)
+	}
 	lines := []string{tuiTitle("What blocks operations", model.isDark), tuiMuted("Read from local state only; nothing is changed by this screen.", model.isDark), ""}
 	conditions := model.recovery.report.Conditions
 	if len(conditions) == 0 {
@@ -139,7 +225,17 @@ func (model dashboardModel) recoveryView() string {
 		lines = append(lines, next, "")
 	}
 	shell.body = strings.TrimSpace(strings.Join(lines, "\n"))
-	shell.actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "r", label: "Refresh"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+	open := "Open"
+	if len(conditions) > 0 {
+		if selected := conditions[min(model.recovery.cursor, len(conditions)-1)]; selected.Kind == domain.RecoveryOperationBusy && selected.Log != "" && model.actions.LoadLog != nil {
+			open = "View its log"
+		}
+	}
+	shell.actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: open}}
+	if model.stoppableCondition() {
+		shell.actions = append(shell.actions, tuiAction{key: "s", label: "Stop the automatic update"})
+	}
+	shell.actions = append(shell.actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: "Overview"}, tuiAction{key: "F1", label: "Help"})
 	if model.message != "" {
 		shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: model.message}}
 	}

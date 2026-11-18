@@ -10,6 +10,7 @@ var shutdownHelp = helpText{head: []string{
 
 var logsHelp = helpText{head: []string{
 	"Enter open log   r refresh list   ↑/↓/pg scroll detail",
+	"The log of a running update, opened from Recovery: r reads it again, Esc returns to Recovery.",
 }}
 
 var gitReviewHelp = helpText{head: []string{
@@ -84,7 +85,7 @@ var screenHelp = map[dashboardScreen]helpText{
 		"After finishing, prepare network installation again before installing a computer by PXE.",
 	}},
 	dashboardDeferredUpdates: helpText{head: []string{
-		"These computers were off when an update was reviewed. Every minute the controller updates those that answer, together, with the same build, check and record as Update computers.", "A computer marked as changed is not updated: the configuration moved on after queueing. Review the update again.", "x removes the selected computer, X removes all; they keep their current system. r refreshes.",
+		"These computers were off when an update was reviewed. Every minute the controller updates those that answer, together, with the same build, check and record as Update computers.", "A computer marked as changed is not updated: the configuration moved on after queueing. Review the update again.", "x removes the selected computer, X removes all; they keep their current system. r refreshes.", "After an automatic update was stopped from Recovery, automatic updates are paused: p resumes them.",
 	}},
 	dashboardLock: helpText{head: []string{
 		"Space select clients; a select all; Tab choose lock or unlock; Enter review, then Enter applies.", "A locked screen shows \"Eyes on the teacher\" and ignores keyboard and mouse; logging out or restarting unlocks it.", "Computers that are off or have nobody signed in are listed and skipped.",
@@ -163,6 +164,9 @@ var screenHelp = map[dashboardScreen]helpText{
 		"n new review   d result details   l logs / progress detail", "q closes the view; systemd-owned work continues",
 	}},
 	dashboardRecoveryReview: helpText{},
+	dashboardRecovery: helpText{head: []string{
+		"Enter opens the way out of the selected condition; on an update of computers that is running, it shows the end of its log.", "s on the automatic update of queued computers stops it after a confirmation and pauses automatic updates until you resume them in Computers → Queued updates.",
+	}},
 	dashboardServices: helpText{head: []string{
 		"c review cache restart   r refresh   l logs after result",
 	}},

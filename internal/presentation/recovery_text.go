@@ -113,6 +113,19 @@ func deploymentRecoveryLines(plan domain.DeploymentRecoveryPlan, usbHost string,
 }
 
 func deploymentRecoveryResultLines(result domain.DeploymentRecoveryResult, dark bool) []string {
+	if result.Unchecked {
+		if result.State != "completed" {
+			return []string{tuiResult("The interrupted update was not closed", false, dark), "", result.Message, "", "Nothing was changed. Press Enter, then open the review again."}
+		}
+		lines := []string{tuiResult("The interrupted update is closed without checking.", true, dark), "Other operations are unblocked. Its computers may have the old or the new system: update them again from Computers → Update computers."}
+		if result.Archive != "" {
+			lines = append(lines, "", tuiMuted("The record is kept in "+result.Archive, dark))
+		}
+		if _, warning, found := strings.Cut(result.Message, "operation outcome was not recorded: "); found {
+			lines = append(lines, tuiMuted("The operation history was not updated: "+warning, dark))
+		}
+		return lines
+	}
 	if result.State != "completed" {
 		lines := []string{tuiResult("The interrupted update was not marked as reviewed", false, dark), "", result.Message, "", "Nothing was changed. Press Enter, then open the review again."}
 		return lines

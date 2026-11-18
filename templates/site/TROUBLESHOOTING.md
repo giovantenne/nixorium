@@ -83,6 +83,7 @@ and JSON issues carry a `next` object with the same code and texts; the JSON
 | `DISK-LOW` | The controller is low on disk space | Free disk space (Maintenance → Free disk space) |
 | `CONTROLLER-NOT-APPLIED` | The controller is not running its saved configuration | Apply the saved configuration to the controller ([Controller apply failed](#controller-apply-failed)) |
 | `UPDATES-QUEUED` | Some computers will update when they are switched on | Nothing to do (Computers → Queued updates shows them; review again those marked as changed) |
+| `UPDATES-PAUSED` | Automatic updates of queued computers are paused | Resume them when the laboratory is free (Computers → Queued updates, `p`); see [Another operation is already running](#another-operation-is-already-running) |
 | `UPDATES-NEED-REVIEW` | A queued update needs a new review | Review the queued updates (Computers → Queued updates; `nixorium deploy queue status`): the configuration changed after queueing, or the update kept failing |
 | `BACKUP-DUE` | A backup of this laboratory is due | Back up the lab ([Backups and restoration](#backups-and-restoration)) |
 | `BACKUP-NONE` | This laboratory has no backup yet | Back up the lab when its setup is done ([Backups and restoration](#backups-and-restoration)) |
@@ -423,11 +424,24 @@ known-hosts backup; retain those files for investigation.
 
 A refused operation names the running one when it can be confirmed, for
 example `another Nixorium controller or client operation is already running:
-Update computers, started by admin at 10:02`. Wait for it, or open its
-progress from the Overview. The description is read from the lock file and
-checked against the live process; it is never a reason to remove the lock.
-Without a confirmed holder the message says so; do not delete
-`/var/lib/nixorium/coordination/operation.lock`.
+Update computers, started by admin at 10:02`. The update the controller
+starts by itself for queued computers that answer again is named
+`Automatic update of computers switched back on`. Wait for it, or open its
+progress from the Overview. For an update of computers, open the item in
+the Overview and press Enter in Recovery: it shows the end of the log the
+update is writing, and `r` reads it again. While an update runs, Nixorium
+names it instead of reporting its record as an interrupted update (the login
+message only says that an update is running or was interrupted).
+
+The automatic update can be stopped: in Recovery, select it and press `s`,
+then Enter. The computers it had already started finish on their own, and
+Nixorium then asks to review the interrupted update. Automatic updates stay
+paused, also after a restart of the controller, until **Computers → Queued
+updates** → `p` resumes them; meanwhile the Overview shows
+`UPDATES-PAUSED`. An interrupted update still closes itself while paused. The description is read
+from the lock file and checked against the live process; it is never a
+reason to remove the lock. Without a confirmed holder the message says so;
+do not delete `/var/lib/nixorium/coordination/operation.lock`.
 
 Classroom controls (Internet access, shut down, restart and the schedule) do
 not wait for a running operation: they leave alone only the computers being
@@ -687,8 +701,9 @@ computers were not touched: review the interrupted update before updating
 them." Another running operation, an interrupted template reset, a failed
 evaluation and an open network installation still stop the activation.
 
-Recovery is reviewed, never automatic: there is no automatic retry or
-force-unlock (ADR 0023; confirmation as in ADR 0026). When an update started
+Recovery is reviewed: there is no automatic retry (ADR 0023; confirmation as
+in ADR 0026). The only unlock without a check is the typed last resort
+described below. When an update started
 from **Computers → Update computers** stops this way, Nixorium opens the review
 at once. Otherwise open it from the Overview row **A previous update of the
 student computers was interrupted**, or press Enter on a failure notice that
@@ -711,7 +726,8 @@ still starting up, do not count):
 
 The review also refuses while another Nixorium window or terminal that started
 the update is still open; the window that just ran the update is accepted once
-its apply has returned. Press Enter to mark the update as reviewed. Nothing
+its apply has returned. For the automatic update of queued computers, stop it
+from Recovery (see [Another operation is already running](#another-operation-is-already-running)). Press Enter to mark the update as reviewed. Nothing
 changes on the computers: the exact reviewed record is archived under
 `/var/lib/nixorium/coordination/recovered/` (holding the operation lock, never
 overwriting an earlier archive) and other operations are unblocked. The old
@@ -728,11 +744,22 @@ nixorium deploy recover apply --expect REVIEW_TOKEN
 
 Add `--acknowledge-unreachable` to both to continue without the computers that
 do not answer.
+
+When the review cannot finish (a computer stays *still updating*, the record
+cannot be read, or the review keeps refusing), press `x` **Close without
+checking** in the review and type `CLOSE`. Nixorium archives the record as it
+is under `recovered/` with an `-unchecked` name, holding the operation lock,
+and notes in the history that nobody checked the computers; other operations
+are unblocked. It refuses while the update is still running. The computers
+keep whatever system they reached, old or new: update them again from
+**Computers → Update computers**. This is the last resort in the TUI; prefer
+the review whenever it can finish.
 `apply` asks `Mark this update as reviewed? [y/N]`; `--yes` skips the question
 for scripts. The token binds the reviewed observations; a changed computer or
 record requires a fresh plan.
 
-Only when the guided review cannot run, recover by hand:
+Only when neither the review nor **Close without checking** can run, recover
+by hand:
 
 1. Keep the private operation log and the pending record; do not delete or
    overwrite them, and review them before sharing.

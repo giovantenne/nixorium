@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -15,6 +16,10 @@ import (
 type DeferredUpdateStore interface {
 	Read() (domain.DeferredUpdateQueue, error)
 	Mutate(func(*domain.DeferredUpdateQueue) error) error
+	// Paused tells whether an automatic update was stopped and the queue
+	// waits for the administrator; SetPaused sets or clears it.
+	Paused() bool
+	SetPaused(bool) error
 }
 
 // DeferredDeploy applies a reviewed revision to the named computers exactly
@@ -69,6 +74,7 @@ func (m *DeferredUpdateManager) Queue(plan domain.DeploymentPlanReport, hosts []
 // Status reads the queue and marks entries whose configuration changed.
 func (m *DeferredUpdateManager) Status(ctx context.Context, repository string) domain.DeferredUpdateStatus {
 	status := domain.DeferredUpdateStatus{SchemaVersion: domain.SchemaVersion, Operation: "deploy-queue-status", State: "ready", Updates: []domain.DeferredUpdateEntry{}, Issues: []domain.ValidationIssue{}}
+	status.Paused = m.store.Paused()
 	queue, err := m.store.Read()
 	if err != nil {
 		status.State = "failed"
@@ -91,7 +97,56 @@ func (m *DeferredUpdateManager) Status(ctx context.Context, repository string) d
 	default:
 		status.Message = fmt.Sprintf("%s will update when switched on; %d changed configuration since and need a new review.", countLabel(status.Waiting(), "computer"), len(status.Updates)-status.Waiting())
 	}
+	if status.Paused && len(status.Updates) > 0 {
+		status.Message = "Automatic updates are paused: " + countLabel(len(status.Updates), "computer") + " wait until you resume them."
+	}
 	return status
+}
+
+// Pause stops new automatic updates until Resume; an update that is running
+// is stopped separately.
+func (m *DeferredUpdateManager) Pause() error { return m.store.SetPaused(true) }
+
+// Resume lets the controller update queued computers again on its next pass.
+func (m *DeferredUpdateManager) Resume() error { return m.store.SetPaused(false) }
+
+// Paused tells whether automatic updates wait for Resume.
+func (m *DeferredUpdateManager) Paused() bool { return m.store.Paused() }
+
+// AutomaticUpdateControl observes the operation lock and stops the unit that
+// runs the automatic update.
+type AutomaticUpdateControl interface {
+	OperationLockHolder() (domain.OperationHolder, bool)
+	StopDeferredUpdates(context.Context) error
+}
+
+// StopRunning stops the automatic update that holds the operation lock and
+// pauses the queue. It changes nothing when that update has already ended,
+// and it says so, undoing its own pause, when the update goes on (a run
+// started from a terminal is not the unit's).
+func (m *DeferredUpdateManager) StopRunning(ctx context.Context, control AutomaticUpdateControl) error {
+	holder, busy := control.OperationLockHolder()
+	if !busy || !holder.Known || holder.Operation != domain.QueuedUpdateOperation {
+		return errors.New("the automatic update has already ended; nothing was stopped")
+	}
+	wasPaused := m.store.Paused()
+	if err := m.store.SetPaused(true); err != nil {
+		return err
+	}
+	undo := func() {
+		if !wasPaused {
+			_ = m.store.SetPaused(false)
+		}
+	}
+	if err := control.StopDeferredUpdates(ctx); err != nil {
+		undo()
+		return err
+	}
+	if after, still := control.OperationLockHolder(); still && after.Known && after.PID == holder.PID {
+		undo()
+		return errors.New("it is still running: it was not started by the controller's timer, for example from a terminal; wait for it to finish")
+	}
+	return nil
 }
 
 // Cancel removes the named computers, or every computer for "@all".
@@ -127,6 +182,13 @@ func (m *DeferredUpdateManager) Run(ctx context.Context, repository string) doma
 	}
 	if len(queue.Updates) == 0 {
 		report.Message = "No computer is waiting for an update."
+		return report
+	}
+	if m.store.Paused() {
+		for _, update := range queue.Updates {
+			report.Results = append(report.Results, domain.DeferredUpdateOutcome{Host: update.Host, State: "paused", Detail: "automatic updates are paused; resume them in Computers → Queued updates"})
+		}
+		report.Message = "Automatic updates are paused; resume them in Computers → Queued updates."
 		return report
 	}
 	if observer, ok := m.source.(operationObserver); ok {

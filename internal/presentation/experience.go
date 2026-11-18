@@ -309,7 +309,8 @@ func (model dashboardModel) dynamicHelp() []string {
 		if model.recovery.review.kind == "deploy" {
 			lines = append(lines, "r check every computer again   c continue without the computers that do not answer (c again includes them)",
 				"Enter marks the update as reviewed once every computer was checked   d technical details of the failure   Esc back",
-				"Marking it as reviewed changes nothing on the computers: it archives the record and unblocks other operations. Then update the computers again.")
+				"Marking it as reviewed changes nothing on the computers: it archives the record and unblocks other operations. Then update the computers again.",
+				"x close without checking, after typing CLOSE: the last resort when the review cannot finish. Nobody checks the computers; update them again afterwards.")
 		} else {
 			lines = append(lines, "r check the repository again   Enter confirm   Esc back without changing anything",
 				"When the reset had finished, only the branch move is missing, or nothing was replaced, Enter confirms: no file changes and the marker is archived.",
@@ -528,6 +529,9 @@ func (model dashboardModel) textEntry() bool {
 		return true
 	}
 	if model.screen == dashboardSetupKeys && model.keys.importing {
+		return true
+	}
+	if model.screen == dashboardRecoveryReview && model.recovery.review.kind == "deploy" && model.recovery.review.closing && !model.recovery.review.done {
 		return true
 	}
 	if model.screen == dashboardRecoveryReview && model.recovery.review.kind == "reset" && !model.recovery.review.done {

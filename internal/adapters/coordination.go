@@ -44,6 +44,14 @@ func (gate *operationGate) describe(label string) {
 	}
 }
 
+// describeAutomatic names an operation the controller started by itself,
+// without the account it runs as.
+func (gate *operationGate) describeAutomatic(label string) {
+	if gate != nil {
+		writeOperationOwner(gate.file, label, "")
+	}
+}
+
 func acquireManagedOperationGate() (*operationGate, error) {
 	return acquireOperationGateAt(managedCoordinationDirectory, true)
 }
@@ -58,7 +66,7 @@ func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate,
 		return nil, err
 	}
 	defer directory.Close()
-	if err := checkDeploymentPendingAt(directory); err != nil {
+	if err := checkDeploymentPendingUnlessBusyAt(directory, managed); err != nil {
 		return nil, err
 	}
 	if present, markerErr := inspectReservationAt(directory); present {
@@ -97,13 +105,46 @@ func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate,
 	return &operationGate{file: lock}, nil
 }
 
+// checkDeploymentPendingUnlessBusyAt refuses for a pending client update
+// record, except while an operation holds the lock: that operation is then
+// reported. The record is most often the one of the update still running,
+// which is not interrupted; if it was left by an earlier update, it is
+// reported once the running operation ends. Called before taking the lock:
+// a process holding it would find itself busy.
+func checkDeploymentPendingUnlessBusyAt(directory *os.File, managed bool) error {
+	pending := checkDeploymentPendingAt(directory)
+	if pending == nil {
+		return nil
+	}
+	descriptor, err := syscall.Openat(int(directory.Fd()), coordinationLockName, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return pending
+	}
+	lock := os.NewFile(uintptr(descriptor), filepath.Join(directory.Name(), coordinationLockName))
+	defer lock.Close()
+	if validateCoordinationLock(lock, managed) != nil {
+		return pending
+	}
+	// A shared probe: two observers do not collide with each other.
+	if err := syscall.Flock(descriptor, syscall.LOCK_SH|syscall.LOCK_NB); err != nil {
+		if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
+			return operationBusy(lock)
+		}
+		return pending
+	}
+	defer func() { _ = syscall.Flock(descriptor, syscall.LOCK_UN) }()
+	// The update may have finished, clearing its record, between the first
+	// look and the probe: look again while nobody can write it.
+	return checkDeploymentPendingAt(directory)
+}
+
 func operationActiveAt(directoryPath string, managed bool) (bool, error) {
 	directory, err := openCoordinationDirectory(directoryPath, managed)
 	if err != nil {
 		return false, err
 	}
 	defer directory.Close()
-	if err := checkDeploymentPendingAt(directory); err != nil {
+	if err := checkDeploymentPendingUnlessBusyAt(directory, managed); err != nil {
 		return true, err
 	}
 	if present, markerErr := inspectReservationAt(directory); present {
@@ -295,7 +336,7 @@ func acquireRecoveryGateAt(directoryPath string, managed bool) (*operationGate, 
 		return nil, err
 	}
 	defer directory.Close()
-	if err := checkDeploymentPendingAt(directory); err != nil {
+	if err := checkDeploymentPendingUnlessBusyAt(directory, managed); err != nil {
 		return nil, err
 	}
 	descriptor, err := syscall.Openat(int(directory.Fd()), coordinationLockName, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)

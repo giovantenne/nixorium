@@ -247,6 +247,49 @@ func (m *DeploymentRecoveryManager) Apply(ctx context.Context, plan domain.Deplo
 	return result
 }
 
+// uncheckedArchiveSource archives the record without comparing it with a
+// review, even when it cannot be read.
+type uncheckedArchiveSource interface {
+	ArchivePendingDeploymentUnchecked() (string, error)
+}
+
+// CloseUnchecked is the last resort when the review cannot finish: it
+// archives the record without checking the computers. It refuses while the
+// update is still running; stop it first. The computers keep whatever system
+// they reached and are updated again by a new review.
+func (m *DeploymentRecoveryManager) CloseUnchecked() domain.DeploymentRecoveryResult {
+	result := domain.DeploymentRecoveryResult{SchemaVersion: domain.SchemaVersion, Operation: "deploy-recover", State: "blocked", Unchecked: true, Issues: []domain.ValidationIssue{}}
+	refuse := func(field, code, message string) domain.DeploymentRecoveryResult {
+		result.Issues = append(result.Issues, domain.BlockedIssue(field, code, message))
+		result.Message = message
+		return result
+	}
+	pending, present, err := m.source.PendingDeployment()
+	if !present {
+		result.State, result.Message = "unchanged", "No interrupted client update is recorded."
+		return result
+	}
+	if err == nil && !pending.ApplyReturned && m.recorderRunning(pending.ControllerPID, pending.ControllerPIDStart, pending.StartedAt) {
+		return refuse("process", "OP-BUSY", "the update is still running; stop it from Recovery or wait for it to finish, then close it")
+	}
+	archiver, ok := m.source.(uncheckedArchiveSource)
+	if !ok {
+		return refuse("archive", "DEPLOY-PENDING", "closing without checking is not available here")
+	}
+	archive, archiveErr := archiver.ArchivePendingDeploymentUnchecked()
+	if archiveErr != nil {
+		return refuse("archive", "DEPLOY-PENDING", "the record could not be archived: "+archiveErr.Error())
+	}
+	result.State, result.Archive = "completed", archive
+	if err == nil {
+		for _, target := range pending.Targets {
+			result.Targets = append(result.Targets, target.Name)
+		}
+	}
+	result.Message = "The interrupted update is closed without checking its computers, and operations are unblocked. Its computers may have the old or the new system: update them again from Update computers."
+	return result
+}
+
 func recoveryTarget(host domain.HostMeta, activity domain.DeploymentActivity, reviewed string) domain.DeploymentRecoveryTarget {
 	target := domain.DeploymentRecoveryTarget{Name: host.Name, IP: host.IP, Revision: activity.Revision, Detail: activity.Detail}
 	switch {

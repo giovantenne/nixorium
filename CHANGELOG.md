@@ -14,6 +14,45 @@ The project follows [Semantic Versioning](https://semver.org/).
   messages, screen sharing, sending and collecting files, restart and shut
   down, from the page or from the menu; before, each review waited for its
   connection timeout. Switch on still checks every computer.
+- The update the controller starts by itself for queued computers that answer
+  again is named `Automatic update of computers switched back on` wherever a
+  running operation is shown, instead of `Update computers, started by admin`.
+- While an update of computers runs, Recovery opens the end of the log it is
+  writing with Enter, and `r` reads it again. Before, its progress could be
+  followed only from a terminal.
+
+- An update of computers no longer waits for a computer that stops answering
+  altogether once its activation has started, for example because it was
+  switched off: after 2 minutes without any answer its result is left unknown
+  and the update ends, instead of keeping every other operation waiting for
+  up to 20 minutes. As before, the interrupted update closes itself when the
+  computer answers again and its result can be read; otherwise review it.
+
+### Added
+
+- Recovery can stop the automatic update of queued computers: select it and
+  press `s`, then Enter. Computers it had already started finish on their
+  own and the interrupted update is then reviewed as usual. Automatic updates
+  stay paused, also after a restart of the controller, until Computers →
+  Queued updates → `p` resumes them; the Overview shows `UPDATES-PAUSED`.
+- The review of an interrupted update has a last resort, `x` **Close without
+  checking**, confirmed by typing `CLOSE`, for when the review cannot finish:
+  a computer stays "still updating", the record cannot be read, or the review
+  keeps refusing. It archives the record as it is and notes in the history
+  that nobody checked the computers; it refuses while the update is still
+  running. The computers keep whatever system they reached: update them again
+  from Update computers.
+
+### Fixed
+
+- While an update of computers was running, another operation, such as
+  removing a computer from Queued updates, was refused as if a previous
+  update had been interrupted. It now names the running update; the login
+  message of the administrator says that an update is running or was
+  interrupted.
+- The Nixorium icon of the taskbar no longer stops with `id: cannot find name
+  for group ID` after a program that had its own group, such as VirtualBox,
+  is removed while the session is open.
 
 ## [3.15.0] - 2026-11-16
 

@@ -18,7 +18,8 @@ import (
 // Fake commands of the deployment engine. The fake ssh plays the computer:
 // NIXORIUM_TEST_ACTIVATION sets how the activation ends (an exit status,
 // "vanish" for a unit that stops without a result, "busy" for another
-// activation running, "hang" for one that never ends).
+// activation running, "hang" for one that never ends, "gone" for a computer
+// switched off once its activation started).
 const fakeEngineNix = `#!/bin/sh
 printf '['
 first=1
@@ -68,6 +69,8 @@ case "$remote" in
     exit 0
     ;;
   *'--- unit'*)
+    [ "$NIXORIUM_TEST_ACTIVATION" = gone ] && { echo "ssh: connect to host $host port 22: No route to host" >&2; exit 255; }
+    [ "$NIXORIUM_TEST_ACTIVATION" = failing ] && { echo "observe failed" >&2; exit 1; }
     id=$(cat "$state/id-$host" 2>/dev/null)
     case "$NIXORIUM_TEST_ACTIVATION" in
       hang) printf '\n--- unit\nrunning\n' ;;
@@ -102,11 +105,11 @@ func deploymentProcessFixture(t *testing.T, activation string) (domain.Deploymen
 	t.Setenv("NIXORIUM_TEST_PENDING", filepath.Join(directory, deploymentPendingName))
 	previous := clientBuildSource
 	clientBuildSource = func(context.Context, string, string) (string, error) { return "path:/nix/store/source", nil }
-	pollInterval, grace, timeout := clientActivationPoll, clientActivationStartGrace, clientActivationTimeout
-	clientActivationPoll, clientActivationStartGrace, clientActivationTimeout = 10*time.Millisecond, 100*time.Millisecond, 2*time.Second
+	pollInterval, grace, timeout, silence := clientActivationPoll, clientActivationStartGrace, clientActivationTimeout, clientActivationSilence
+	clientActivationPoll, clientActivationStartGrace, clientActivationTimeout, clientActivationSilence = 10*time.Millisecond, 100*time.Millisecond, 2*time.Second, 2*time.Second
 	t.Cleanup(func() {
 		clientBuildSource = previous
-		clientActivationPoll, clientActivationStartGrace, clientActivationTimeout = pollInterval, grace, timeout
+		clientActivationPoll, clientActivationStartGrace, clientActivationTimeout, clientActivationSilence = pollInterval, grace, timeout, silence
 	})
 	plan := domain.DeploymentPlanReport{Repository: t.TempDir(), Revision: strings.Repeat("a", 40), ColmenaSelector: "pc01", Targets: []domain.DeploymentTarget{{Name: "pc01", IP: "192.0.2.1"}}}
 	return plan, directory, state
@@ -296,6 +299,48 @@ func TestDeploymentEngineReportsAFinishedFailureWithoutRecovery(t *testing.T) {
 	}
 	if err := checkDeploymentPendingPath(directory); err != nil {
 		t.Fatalf("a known failure kept the laboratory blocked: %v", err)
+	}
+}
+
+// A computer that stops answering once its activation started (switched off)
+// is waited for only clientActivationSilence, not the whole activation
+// timeout; its result stays unknown and the record is kept.
+func TestDeploymentEngineStopsWaitingForASilentComputer(t *testing.T) {
+	plan, directory, _ := deploymentProcessFixture(t, "gone")
+	clientActivationTimeout, clientActivationSilence = time.Minute, 200*time.Millisecond
+	var output bytes.Buffer
+	started := time.Now()
+	err := buildAndApply(t, plan, directory, &output)
+	if elapsed := time.Since(started); elapsed > 20*time.Second {
+		t.Fatalf("waited %s for a silent computer", elapsed)
+	}
+	var uncertain *domain.DeploymentUnconfirmedError
+	if !errors.As(err, &uncertain) {
+		t.Fatalf("silent computer not reported as unconfirmed: %v\n%s", err, output.String())
+	}
+	if !strings.Contains(output.String(), "no answer from the computer since") || !strings.Contains(output.String(), "No route to host") {
+		t.Fatalf("log:\n%s", output.String())
+	}
+	activation := readTestPending(t, directory).ActivationOf("pc01")
+	if activation.State != domain.ActivationStarted || activation.Result != domain.ActivationUnknown {
+		t.Fatalf("activation = %+v", activation)
+	}
+}
+
+// A computer that answers, even with a failing command, is not silent: it is
+// waited for until the activation timeout.
+func TestDeploymentEngineWaitsForAComputerThatAnswers(t *testing.T) {
+	plan, directory, _ := deploymentProcessFixture(t, "failing")
+	clientActivationTimeout, clientActivationSilence = time.Second, 100*time.Millisecond
+	var output bytes.Buffer
+	started := time.Now()
+	err := buildAndApply(t, plan, directory, &output)
+	var uncertain *domain.DeploymentUnconfirmedError
+	if !errors.As(err, &uncertain) || time.Since(started) < time.Second {
+		t.Fatalf("after %s: %v\n%s", time.Since(started), err, output.String())
+	}
+	if strings.Contains(output.String(), "no answer from the computer since") {
+		t.Fatalf("an answering computer was treated as silent:\n%s", output.String())
 	}
 }
 

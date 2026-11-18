@@ -180,3 +180,50 @@ func ensureTestCoordinationDirectory(stateRoot string) (string, error) {
 	}
 	return directory, classroom.Close()
 }
+
+// While an update holds the lock, its own pending record is not reported as
+// an interrupted update: the refusal names the running operation. Once it
+// has ended, a record left behind blocks as an interrupted update.
+func TestCoordinationReportsRunningUpdateBeforeItsPendingRecord(t *testing.T) {
+	directory, err := ensureTestCoordinationDirectory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	running, err := acquireOperationGateAt(directory, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	running.describe("Update computers")
+	if err := os.WriteFile(filepath.Join(directory, deploymentPendingName), []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := acquireOperationGateAt(directory, false); err == nil || !strings.Contains(err.Error(), "Update computers") {
+		t.Fatalf("gate during the update: %v", err)
+	} else if code, _ := domain.BlockedCodeOf(err); code != "OP-BUSY" {
+		t.Fatalf("gate during the update reported %q: %v", code, err)
+	}
+	if active, err := operationActiveAt(directory, false); !active {
+		t.Fatalf("observation during the update: active=%t error=%v", active, err)
+	} else if code, _ := domain.BlockedCodeOf(err); code != "OP-BUSY" {
+		t.Fatalf("observation during the update reported %q: %v", code, err)
+	}
+	if _, err := acquireRecoveryGateAt(directory, false); err == nil {
+		t.Fatal("recovery gate taken during the update")
+	} else if code, _ := domain.BlockedCodeOf(err); code != "OP-BUSY" {
+		t.Fatalf("recovery gate during the update reported %q: %v", code, err)
+	}
+
+	if err := running.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := acquireOperationGateAt(directory, false); err == nil {
+		t.Fatal("gate taken over a pending record")
+	} else if code, _ := domain.BlockedCodeOf(err); code != "DEPLOY-PENDING" {
+		t.Fatalf("gate after the update reported %q: %v", code, err)
+	}
+	if active, err := operationActiveAt(directory, false); !active {
+		t.Fatalf("observation after the update: active=%t error=%v", active, err)
+	} else if code, _ := domain.BlockedCodeOf(err); code != "DEPLOY-PENDING" {
+		t.Fatalf("observation after the update reported %q: %v", code, err)
+	}
+}

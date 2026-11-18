@@ -62,6 +62,19 @@ func wireDeploymentActions(actions *presentation.DashboardActions, deps dashboar
 		_, err := newDeferredUpdateManager().Cancel(hosts)
 		return err
 	}
+	actions.StopAutomaticUpdate = func(ctx context.Context) error {
+		return newDeferredUpdateManager().StopRunning(ctx, local)
+	}
+	actions.ResumeAutomaticUpdates = func() error {
+		return newDeferredUpdateManager().Resume()
+	}
+	actions.CloseDeploymentRecoveryUnchecked = func() domain.DeploymentRecoveryResult {
+		result := app.NewDeploymentRecoveryManager(local).ForProcess(os.Getpid()).CloseUnchecked()
+		if result.State == "completed" {
+			result.Message = operationRecordMessage(result.Message, result)
+		}
+		return result
+	}
 	actions.PlanDeploymentRecovery = func(ctx context.Context, acknowledge bool) domain.DeploymentRecoveryPlan {
 		return app.NewDeploymentRecoveryManager(local).ForProcess(os.Getpid()).Plan(ctx, repository, acknowledge)
 	}

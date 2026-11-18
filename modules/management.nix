@@ -173,7 +173,10 @@ let
     name = "nixorium-session";
     runtimeInputs = [ pkgs.coreutils nixoriumPackage ];
     text = ''
-      GROUPS_OF_USER=" $(id -nG) "
+      # A group removed while the session was open (VirtualBox's, for one)
+      # has no name any more: id prints its number and exits with an error,
+      # which must not stop the launcher.
+      GROUPS_OF_USER=" $(id -nG 2>/dev/null || true) "
       if [[ "$GROUPS_OF_USER" != *" nixorium-operations "* && "$GROUPS_OF_USER" != *" nixorium-classroom "* ]]; then
         echo "Nixorium is for the laboratory administrator and the teacher."
         read -r -p "Press Enter to close. " _ || true
@@ -352,7 +355,7 @@ in
       if [[ $- == *i* && "''${USER:-}" == admin && -t 1 ]]; then
         echo "Nixorium: manage the laboratory with 'nixorium' (or the Nixorium icon)."
         [[ -e /var/lib/nixorium/coordination/deployment-pending.json ]] \
-          && echo "  Attention: a previous update of the student computers was interrupted. Open nixorium to review it."
+          && echo "  Attention: an update of the student computers is running or was interrupted. Open nixorium to follow or review it."
         [[ -e /var/lib/nixorium/coordination/usb-reservation.json ]] \
           && echo "  Attention: a USB installation was not finished. Open nixorium → Installation."
         [[ -e ${lib.escapeShellArg cfg.deploymentPath}/.git/nixorium-template-reset.json ]] \
@@ -379,7 +382,8 @@ in
              (unit == "nixorium-pxe.service" &&
               (verb == "start" || verb == "stop" || verb == "reset-failed")) ||
              (unit == "nixorium-pxe-network.service" &&
-              (verb == "stop" || verb == "reset-failed"))) &&
+              (verb == "stop" || verb == "reset-failed")) ||
+             (unit == "nixorium-deferred-updates.service" && verb == "stop")) &&
             subject.isInGroup("wheel")) {
           return polkit.Result.YES;
         }

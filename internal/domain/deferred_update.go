@@ -130,8 +130,11 @@ type DeferredUpdateStatus struct {
 	State         string                `json:"state"`
 	Revision      string                `json:"revision,omitempty"`
 	Updates       []DeferredUpdateEntry `json:"updates"`
-	Message       string                `json:"message,omitempty"`
-	Issues        []ValidationIssue     `json:"issues"`
+	// Paused: an automatic update was stopped; queued computers are not
+	// updated until the administrator resumes.
+	Paused  bool              `json:"paused,omitempty"`
+	Message string            `json:"message,omitempty"`
+	Issues  []ValidationIssue `json:"issues"`
 }
 
 type DeferredUpdateEntry struct {

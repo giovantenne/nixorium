@@ -149,6 +149,13 @@ func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 		record.State = report.State
 		record.Subject = fmt.Sprintf("%d recorded computer(s)", len(report.Targets))
 		record.Summary = "interrupted client update reviewed and its record archived"
+		if report.Unchecked {
+			// Listed with its summary: nobody checked the computers.
+			if report.State == "completed" {
+				record.State = "unchecked"
+			}
+			record.Summary = "interrupted client update closed without checking its computers; its record archived"
+		}
 	case domain.TemplateResetRecoveryResult:
 		record.Operation = report.Operation
 		record.State = report.State

@@ -53,6 +53,12 @@ var (
 	clientActivationTimeout    = 20 * time.Minute
 	clientActivationPoll       = 5 * time.Second
 	clientActivationStartGrace = 30 * time.Second
+	// clientActivationSilence ends the wait for a computer that stops
+	// answering at all after its activation started: the network restart of
+	// an activation lasts seconds, a computer switched off never answers
+	// (owner decision 2026-11-18). Its result stays unknown, as after the
+	// timeout, and the update closes itself once the computer answers again.
+	clientActivationSilence = 2 * time.Minute
 )
 
 // clientBuildSource prepares the reviewed source of a build; tests replace it.
@@ -670,8 +676,12 @@ func waitForClientActivation(ctx context.Context, address, activationID string) 
 	started := time.Now()
 	deadline := started.Add(clientActivationTimeout)
 	lastDetail := "no answer from the computer"
+	lastAnswer := started
 	for {
-		output, err := runClientOutput(ctx, address, clientActivationObserveCommand)
+		output, status, err := runClientSSH(ctx, address, clientActivationObserveCommand)
+		if err == nil || (status != sshConnectionFailed && status != -1) {
+			lastAnswer = time.Now()
+		}
 		if err == nil {
 			observation := parseClientActivation(output, activationID)
 			if observation.result != "" {
@@ -684,6 +694,9 @@ func waitForClientActivation(ctx context.Context, address, activationID string) 
 			}
 		} else {
 			lastDetail = "no answer from the computer: " + err.Error()
+			if time.Since(lastAnswer) >= clientActivationSilence {
+				return clientActivationObservation{result: domain.ActivationUnknown, detail: "no answer from the computer since " + lastAnswer.Local().Format("15:04:05") + ": " + err.Error()}
+			}
 		}
 		if !time.Now().Before(deadline) || ctx.Err() != nil {
 			return clientActivationObservation{result: domain.ActivationUnknown, detail: lastDetail}

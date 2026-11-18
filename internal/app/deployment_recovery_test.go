@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -244,5 +245,52 @@ func TestOlderRecordsAreNeverClosedAutomatically(t *testing.T) {
 	}
 	if _, closed := manager.AutoClose(context.Background(), "/srv/lab"); closed {
 		t.Fatal("a record without the engine's states was closed without review")
+	}
+}
+
+type uncheckedRecovery struct {
+	*fakeDeploymentRecovery
+	readErr  error
+	archived string
+}
+
+func (f *uncheckedRecovery) PendingDeployment() (domain.PendingDeployment, bool, error) {
+	return f.pending, f.present, f.readErr
+}
+
+func (f *uncheckedRecovery) ArchivePendingDeploymentUnchecked() (string, error) {
+	f.archived = "/var/lib/nixorium/coordination/recovered/deployment-x-unchecked.json"
+	f.present = false
+	return f.archived, nil
+}
+
+// Closing without checking refuses while the update runs, archives any
+// record otherwise, even unreadable, and is recorded as unchecked.
+func TestDeploymentRecoveryClosesWithoutCheckingAsALastResort(t *testing.T) {
+	pending := domain.PendingDeployment{SchemaVersion: 1, Repository: "/srv/lab", Revision: strings.Repeat("a", 40), Targets: []domain.DeploymentTarget{{Name: "pc25"}}, StartedAt: time.Now(), ControllerPID: 4242, ControllerPIDStart: "9"}
+
+	running := &uncheckedRecovery{fakeDeploymentRecovery: &fakeDeploymentRecovery{pending: pending, present: true, running: true}}
+	if result := NewDeploymentRecoveryManager(running).CloseUnchecked(); result.State != "blocked" || running.archived != "" {
+		t.Fatalf("closed a running update: %+v", result)
+	}
+
+	stuck := &uncheckedRecovery{fakeDeploymentRecovery: &fakeDeploymentRecovery{pending: pending, present: true}}
+	result := NewDeploymentRecoveryManager(stuck).CloseUnchecked()
+	if result.State != "completed" || !result.Unchecked || result.Archive != stuck.archived || strings.Join(result.Targets, ",") != "pc25" {
+		t.Fatalf("result = %+v", result)
+	}
+	record, ok := operationRecordFor(result)
+	if !ok || record.State != "unchecked" || !strings.Contains(record.Summary, "without checking") {
+		t.Fatalf("record = %+v", record)
+	}
+
+	unreadable := &uncheckedRecovery{fakeDeploymentRecovery: &fakeDeploymentRecovery{present: true}, readErr: errors.New("the pending deployment record is not valid JSON")}
+	if result := NewDeploymentRecoveryManager(unreadable).CloseUnchecked(); result.State != "completed" || unreadable.archived == "" {
+		t.Fatalf("unreadable record not closed: %+v", result)
+	}
+
+	absent := &uncheckedRecovery{fakeDeploymentRecovery: &fakeDeploymentRecovery{}}
+	if result := NewDeploymentRecoveryManager(absent).CloseUnchecked(); result.State != "unchanged" {
+		t.Fatalf("absent record: %+v", result)
 	}
 }

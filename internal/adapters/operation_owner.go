@@ -77,13 +77,6 @@ func defaultOperationLabel() string {
 // recordOperationOwner replaces the lock content with this process. It is
 // called only while holding the lock; failures leave an unknown owner.
 func recordOperationOwner(lock *os.File, label string) {
-	if lock == nil {
-		return
-	}
-	start, err := processStartTime(os.Getpid())
-	if err != nil {
-		return
-	}
 	name := ""
 	if current, lookupErr := user.Current(); lookupErr == nil {
 		name = current.Username
@@ -91,6 +84,19 @@ func recordOperationOwner(lock *os.File, label string) {
 	// The classroom worker runs as the administrator on behalf of the teacher.
 	if filepath.Base(os.Args[0]) == "nixorium-classroom-worker" && label != operationOwnerLabels["nixorium-classroom-worker"] {
 		label, name = label+" from classroom controls", ""
+	}
+	writeOperationOwner(lock, label, name)
+}
+
+// writeOperationOwner records this process as the lock holder; name is the
+// account that started it, empty when no person did.
+func writeOperationOwner(lock *os.File, label, name string) {
+	if lock == nil {
+		return
+	}
+	start, err := processStartTime(os.Getpid())
+	if err != nil {
+		return
 	}
 	content, err := json.Marshal(operationOwner{Operation: label, User: name, PID: os.Getpid(), PIDStart: start, StartedAt: time.Now().UTC()})
 	if err != nil {

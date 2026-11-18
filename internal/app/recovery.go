@@ -22,6 +22,18 @@ type RecoverySource interface {
 	ServiceState(context.Context, string) domain.ServiceState
 }
 
+// runningLogSource names the log an update of computers holding the
+// operation lock is writing ("" for any other operation).
+type runningLogSource interface {
+	RunningDeploymentLog(domain.OperationHolder) string
+}
+
+// deferredPausedSource tells whether automatic updates of queued computers
+// are paused.
+type deferredPausedSource interface {
+	DeferredUpdatesPaused() bool
+}
+
 // recorderSource tells whether the process that wrote the pending record is
 // still alive (the same PID and start time).
 type recorderSource interface {
@@ -113,6 +125,11 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 			detail = upperFirst(holder.Description()) + ". " + detail
 		}
 		add(domain.RecoveryOperationBusy, "OP-BUSY", detail, "Controller and client operations.", nil, nil)
+		busyCondition := &report.Conditions[len(report.Conditions)-1]
+		if logs, ok := inspector.source.(runningLogSource); ok && holder.Known {
+			busyCondition.Log = logs.RunningDeploymentLog(holder)
+		}
+		busyCondition.Stoppable = holder.Known && holder.Operation == domain.QueuedUpdateOperation
 	}
 	if issues := inspector.source.LabSettingsIssues(root); len(issues) > 0 {
 		detail := issues[0].Field + ": " + issues[0].Message
@@ -145,6 +162,10 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 					detail += fmt.Sprintf(", %s will update when switched on", countLabel(waiting, "computer"))
 				}
 				detail += ". Open the queue to review: a configuration changed after queueing, or an update kept failing."
+			}
+			if paused, ok := inspector.source.(deferredPausedSource); ok && paused.DeferredUpdatesPaused() {
+				code = "UPDATES-PAUSED"
+				detail = fmt.Sprintf("%s wait until you resume automatic updates.", countLabel(waiting+attention, "computer"))
 			}
 			add(domain.RecoveryDeferredUpdates, code, detail, "", nil, nil)
 		}

@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -90,6 +91,51 @@ func (Local) OperationLogs(limit int) ([]domain.OperationLogEntry, error) {
 		candidates[index].State = operationResultState(content)
 	}
 	return candidates, nil
+}
+
+// RunningDeploymentLog names the client update log the holder of the
+// operation lock is writing: the newest deployment log of its process,
+// started after it took the lock. Another operation writes none: "".
+func (Local) RunningDeploymentLog(holder domain.OperationHolder) string {
+	if !holder.Known || holder.PID <= 0 {
+		return ""
+	}
+	stateRoot, err := userStateRoot()
+	if err != nil {
+		return ""
+	}
+	directory, err := openOperationLogDirectory(stateRoot)
+	if err != nil {
+		return ""
+	}
+	defer directory.Close()
+	names, err := directory.Readdirnames(maximumOperationLogScan)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return ""
+	}
+	return runningDeploymentLog(names, holder)
+}
+
+func runningDeploymentLog(names []string, holder domain.OperationHolder) string {
+	pid := strconv.Itoa(holder.PID)
+	// The lock records its start just before the log is created; a log of
+	// an earlier process with the same number is older.
+	earliest := holder.StartedAt.Add(-time.Second)
+	newest, newestAt := "", time.Time{}
+	for _, name := range names {
+		match := deploymentLogName.FindStringSubmatch(name)
+		if match == nil || match[2] != pid {
+			continue
+		}
+		started, err := time.Parse(operationLogTimestampLayout, match[1])
+		if err != nil || started.Before(earliest) {
+			continue
+		}
+		if newest == "" || started.After(newestAt) {
+			newest, newestAt = name, started
+		}
+	}
+	return newest
 }
 
 func (Local) OperationLog(id string, maximumBytes int64) (domain.OperationLogReport, error) {

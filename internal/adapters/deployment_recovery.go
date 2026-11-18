@@ -119,7 +119,45 @@ func (Local) ArchivePendingDeployment(expected domain.PendingDeployment) (string
 	return archivePendingDeploymentAt(managedCoordinationDirectory, true, expected)
 }
 
+// ArchivePendingDeploymentUnchecked archives the record whatever it holds,
+// even unreadable, without comparing it with a review: the last resort when
+// the review cannot finish. It still waits for nobody to hold the operation
+// lock, so a running update is never cut off.
+func (Local) ArchivePendingDeploymentUnchecked() (string, error) {
+	return archivePendingDeploymentUncheckedAt(managedCoordinationDirectory, true)
+}
+
+func archivePendingDeploymentUncheckedAt(directoryPath string, managed bool) (string, error) {
+	return archivePendingRecordAt(directoryPath, managed, "-unchecked", func() error {
+		if _, err := os.Lstat(filepath.Join(directoryPath, deploymentPendingName)); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return errors.New("the interrupted update record is gone")
+			}
+			return err
+		}
+		return nil
+	})
+}
+
 func archivePendingDeploymentAt(directoryPath string, managed bool, expected domain.PendingDeployment) (string, error) {
+	return archivePendingRecordAt(directoryPath, managed, "", func() error {
+		current, present, err := pendingDeploymentAt(directoryPath)
+		if !present {
+			return errors.New("the interrupted update record is gone")
+		}
+		if err != nil {
+			return err
+		}
+		if !current.SameRecord(expected) {
+			return errors.New("the interrupted update record changed after review")
+		}
+		return nil
+	})
+}
+
+// archivePendingRecordAt moves the record into recovered/ under the operation
+// lock, after check accepts it; suffix marks how it was closed.
+func archivePendingRecordAt(directoryPath string, managed bool, suffix string, check func() error) (string, error) {
 	directory, err := openCoordinationDirectory(directoryPath, managed)
 	if err != nil {
 		return "", err
@@ -139,15 +177,8 @@ func archivePendingDeploymentAt(directoryPath string, managed bool, expected dom
 		clearOperationOwner(lock)
 		_ = syscall.Flock(descriptor, syscall.LOCK_UN)
 	}()
-	current, present, err := pendingDeploymentAt(directoryPath)
-	if !present {
-		return "", errors.New("the interrupted update record is gone")
-	}
-	if err != nil {
+	if err := check(); err != nil {
 		return "", err
-	}
-	if !current.SameRecord(expected) {
-		return "", errors.New("the interrupted update record changed after review")
 	}
 	if err := unix.Mkdirat(int(directory.Fd()), "recovered", 0o770); err != nil && !errors.Is(err, unix.EEXIST) {
 		return "", fmt.Errorf("create the recovered records directory: %w", err)
@@ -158,7 +189,7 @@ func archivePendingDeploymentAt(directoryPath string, managed bool, expected dom
 	}
 	recovered := os.NewFile(uintptr(recoveredFD), filepath.Join(directoryPath, "recovered"))
 	defer recovered.Close()
-	name := "deployment-" + time.Now().UTC().Format("20060102T150405.000000000Z") + ".json"
+	name := "deployment-" + time.Now().UTC().Format("20060102T150405.000000000Z") + suffix + ".json"
 	if err := unix.Renameat2(int(directory.Fd()), deploymentPendingName, recoveredFD, name, unix.RENAME_NOREPLACE); err != nil {
 		return "", fmt.Errorf("archive the interrupted update record: %w", err)
 	}

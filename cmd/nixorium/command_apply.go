@@ -155,14 +155,14 @@ func executeDeploymentOperation(ctx context.Context, manager *app.DeploymentMana
 }
 
 func executeDeploymentOperationWithProgress(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
-	report, _ := executeDeploymentOperationGated(ctx, manager, repository, requested, expectedRevision, stream, observe)
+	report, _ := executeDeploymentOperationGated(ctx, adapters.OpenDeploymentOperation, manager, repository, requested, expectedRevision, stream, observe)
 	return report
 }
 
 // executeDeploymentOperationGated also reports a busy operation gate, in
-// which case nothing was attempted.
-func executeDeploymentOperationGated(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer, observe func(domain.DeploymentProgress)) (domain.DeploymentExecutionReport, bool) {
-	operation, err := adapters.OpenDeploymentOperation()
+// which case nothing was attempted. open takes the gate and starts the log.
+func executeDeploymentOperationGated(ctx context.Context, open func() (*adapters.DeploymentOperation, error), manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer, observe func(domain.DeploymentProgress)) (domain.DeploymentExecutionReport, bool) {
+	operation, err := open()
 	if err != nil {
 		// Nothing was attempted: report from the inputs, without evaluating
 		// or probing the laboratory again (the queue runner asks every minute).

@@ -66,13 +66,16 @@ func (p DeploymentRecoveryPlan) HasErrors() bool {
 }
 
 type DeploymentRecoveryResult struct {
-	SchemaVersion int               `json:"schemaVersion"`
-	Operation     string            `json:"operation"`
-	State         string            `json:"state"`
-	Archive       string            `json:"archive,omitempty"`
-	Targets       []string          `json:"targets,omitempty"`
-	Message       string            `json:"message,omitempty"`
-	Issues        []ValidationIssue `json:"issues"`
+	SchemaVersion int    `json:"schemaVersion"`
+	Operation     string `json:"operation"`
+	State         string `json:"state"`
+	Archive       string `json:"archive,omitempty"`
+	// Unchecked: closed without checking its computers (the last resort
+	// when the review cannot finish).
+	Unchecked bool              `json:"unchecked,omitempty"`
+	Targets   []string          `json:"targets,omitempty"`
+	Message   string            `json:"message,omitempty"`
+	Issues    []ValidationIssue `json:"issues"`
 }
 
 func (r DeploymentRecoveryResult) HasErrors() bool {

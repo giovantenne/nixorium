@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func PublishRemoteOperationLog(operationID string, content []byte, result string) (string, error) {
@@ -83,6 +85,17 @@ type DeploymentOperation struct {
 }
 
 func OpenDeploymentOperation() (*DeploymentOperation, error) {
+	return openGatedDeploymentOperation(func(gate *operationGate) { gate.describe("Update computers") })
+}
+
+// OpenQueuedDeploymentOperation is OpenDeploymentOperation for the queue
+// runner: the lock names the automatic update, not the account it runs as,
+// which did not start it.
+func OpenQueuedDeploymentOperation() (*DeploymentOperation, error) {
+	return openGatedDeploymentOperation(func(gate *operationGate) { gate.describeAutomatic(domain.QueuedUpdateOperation) })
+}
+
+func openGatedDeploymentOperation(describe func(*operationGate)) (*DeploymentOperation, error) {
 	stateRoot, err := userStateRoot()
 	if err != nil {
 		return nil, err
@@ -91,7 +104,7 @@ func OpenDeploymentOperation() (*DeploymentOperation, error) {
 	if err != nil {
 		return nil, err
 	}
-	gate.describe("Update computers")
+	describe(gate)
 	return openDeploymentOperationWithGate(stateRoot, time.Now(), gate)
 }
 
